@@ -1,0 +1,56 @@
+[project]
+name = "ai-agent-lib-core"
+version = "0.1.0"
+description = "Core contracts, configuration, container and local adapters for the Enterprise Agentic Platform."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "aiosqlite>=0.20",
+    "httpx>=0.27",
+    "jsonschema>=4.21",
+    "langchain-core>=1.0",
+    "langgraph>=1.2",
+    "langgraph-checkpoint-sqlite>=3.0",
+    "opentelemetry-api>=1.25",
+    "pydantic>=2.7",
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+    "sqlglot>=25.0",
+]
+
+[project.optional-dependencies]
+# The DuckDB data source, for CSV files in local development.
+duckdb = [
+    "duckdb>=1.1",
+]
+# The jwt identity provider: OAuth 2.0 access tokens, for example from Microsoft Entra ID.
+jwt = [
+    "pyjwt[crypto]>=2.10.1",
+]
+# The MCP bindings.
+mcp = [
+    "httpx2>=2.0",
+    "mcp>=2.3",
+]
+# The HTTP entry point, health routes and server loop in ai_agent_lib_core.integrations.http.
+serve = [
+    "starlette>=0.45",
+    "uvicorn>=0.32",
+]
+# The anthropic model provider.
+anthropic = [
+    "langchain-anthropic>=1.0",
+]
+# Needed to use the contract test suites in ai_agent_lib_core.testing.contracts.
+testing = [
+    "pytest>=8.2",
+    "pytest-asyncio>=1.4",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ai_agent_lib_core"]

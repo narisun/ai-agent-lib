@@ -218,3 +218,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ai-agent-lib local development state (audit log, SQLite stores)
+.agentlib/
+
+# OPA bundle manifests are source files, not the PyInstaller output ignored above
+!policies/bundle/.manifest
+!**/policies/.manifest

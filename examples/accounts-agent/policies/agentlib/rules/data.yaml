@@ -1,0 +1,26 @@
+# What this service allows. The first rule that matches a request allows it;
+# a request that no rule matches is denied.
+#
+# One document, two engines. In local development the in-process `rules`
+# provider reads this file. A deployed service asks OPA, which loads this
+# folder as a bundle (the file becomes `data.agentlib.rules`) next to the
+# platform's Rego bundle.
+schema: agentlib.rules/v1
+rules:
+  - id: agent-uses-its-models
+    actions: [model.route]
+    applications: [accounts-agent]
+    resources: [default]
+
+  - id: agent-calls-its-own-tools
+    actions: [tool.call]
+    applications: [accounts-agent]
+    resources: [lookup_balance]
+
+  # Tools of the accounts MCP server, named <server>/<tool>. The server decides
+  # for itself what the caller may see.
+  - id: agent-calls-the-accounts-server
+    actions: [tool.call]
+    applications: [accounts-agent]
+    resources: ["accounts/*"]
+    max_classification: restricted

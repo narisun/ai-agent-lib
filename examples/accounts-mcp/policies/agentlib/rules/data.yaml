@@ -1,0 +1,37 @@
+# What this server allows. The first rule that matches a request allows it;
+# a request that no rule matches is denied.
+#
+# One document, two engines. In local development the in-process `rules`
+# provider reads this file. A deployed server asks OPA, which loads this
+# folder as a bundle (the file becomes `data.agentlib.rules`) next to the
+# platform's Rego bundle in policies/bundle.
+schema: agentlib.rules/v1
+rules:
+  # Who may call the tools at all: staff, and only through the accounts agent.
+  # The agent is the application the caller's token was issued to.
+  - id: staff-call-account-tools
+    actions: [tool.call]
+    applications: [accounts-mcp]
+    roles: [analyst, manager]
+    agents: [accounts-agent]
+    resources: ["accounts/*"]
+    max_classification: restricted
+
+  # Managers see everything a query returns.
+  - id: managers-query-accounts
+    actions: [data.query]
+    applications: [accounts-mcp]
+    roles: [manager]
+    resources: ["ledger.*"]
+    max_classification: restricted
+
+  # Analysts see balances, but not who holds the account.
+  - id: analysts-query-accounts
+    actions: [data.query]
+    applications: [accounts-mcp]
+    roles: [analyst]
+    resources: ["ledger.*"]
+    max_classification: restricted
+    obligations:
+      mask_columns: [holder]
+      max_rows: 50

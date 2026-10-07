@@ -1,0 +1,25 @@
+# The MCP tool registry: which servers and tools exist. An agent can only use
+# a tool that is listed here, and only if the tool's live input schema still
+# matches its pin.
+#
+# To print the pins of the server as it is now:
+#   uv run python -m accounts_mcp.pins
+schema: agentlib.registry/v1
+servers:
+  - id: accounts
+    owner: treasury-data
+    url: http://127.0.0.1:8001/mcp
+    audience: accounts-mcp
+    tools:
+      - name: accounts.by_region
+        version: 1.0.0
+        schema_sha256: e4d89340aa686df30713711cf3ac0671ac5131d74e82f45e7bb2017d32647fa2
+        classification: restricted
+        read_only: true
+        description: Accounts in one region, with holder and balance.
+      - name: accounts.balance
+        version: 1.0.0
+        schema_sha256: 5dd5b9dee77226bf5aa967e9575e75401bc4504e251e5a6238ed56a16caf1eaf
+        classification: restricted
+        read_only: true
+        description: The holder and balance of one account.

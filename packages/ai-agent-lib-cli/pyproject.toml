@@ -1,0 +1,20 @@
+[project]
+name = "ai-agent-lib-cli"
+version = "0.1.0"
+description = "Developer tooling and project templates for the Enterprise Agentic Platform library."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "ai-agent-lib-core",
+]
+
+[tool.uv.sources]
+ai-agent-lib-core = { workspace = true }
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ai_agent_lib_cli"]

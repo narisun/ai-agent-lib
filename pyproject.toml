@@ -1,0 +1,276 @@
+# Workspace root for the ai-agent-lib repository.
+# The root is not a distribution: it only wires the three packages together
+# and holds the shared tool configuration.
+
+[tool.uv.workspace]
+members = ["packages/*", "examples/*"]
+
+[dependency-groups]
+dev = [
+    "duckdb>=1.1",
+    "hypothesis>=6.100",
+    "boto3>=1.35",
+    "import-linter>=2.0",
+    "langchain-anthropic>=1.0",
+    "mcp>=2.3",
+    "mypy>=1.11",
+    "opentelemetry-sdk>=1.25",
+    # A real PostgreSQL for the checkpoint store's integration tests. No wheel for Linux on ARM.
+    "pgserver>=0.1.4; sys_platform != 'linux' or platform_machine == 'x86_64'",
+    "pytest>=8.2",
+    "pytest-asyncio>=1.4",
+    "pytest-cov>=5.0",
+    "pytest-socket>=0.7",
+    "respx>=0.21",
+    "ruff>=0.6",
+    "types-jsonschema>=4.21",
+    "types-pyyaml>=6.0",
+]
+
+# --------------------------------------------------------------------------- ruff
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["packages/*/src", "examples/*/src"]
+
+[tool.ruff.lint]
+select = [
+    "A",    # builtin shadowing
+    "ARG",  # unused arguments
+    "B",    # bugbear
+    "BLE",  # no blind except
+    "C4",   # comprehensions
+    "C90",  # complexity
+    "D",    # docstrings
+    "DTZ",  # timezone-aware datetimes
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # import order
+    "N",    # naming
+    "PT",   # pytest style
+    "PTH",  # pathlib over os.path
+    "RUF",  # ruff-specific
+    "S",    # security
+    "SIM",  # simplifications
+    "T20",  # no print statements
+    "UP",   # modern syntax
+    "W",    # pycodestyle warnings
+]
+ignore = [
+    "D105", # magic methods need no docstring
+    "D107", # __init__ is documented on the class
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.mccabe]
+# A function with more branches than this is split before it merges.
+max-complexity = 12
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["D", "S101", "S105", "S106", "S608", "ARG"]
+"tests/**" = ["D", "S101", "S105", "S106", "S608", "ARG"]
+# The specification fixes these exception names, so the Error-suffix rule is off here.
+"**/contracts/errors.py" = ["N818"]
+# Method signatures here are fixed by the framework base class.
+"**/adapters/model_fake.py" = ["ARG002"]
+"**/integrations/langgraph/model.py" = ["ARG002"]
+# Contract suites are tests shipped inside the package: asserts are the point.
+"**/testing/contracts.py" = ["D102", "S101"]
+"**/testing/langgraph_contracts.py" = ["D102", "S101"]
+
+# --------------------------------------------------------------------------- mypy
+[[tool.mypy.overrides]]
+# The AWS SDK ships no type information. Adapters take a client typed by a small protocol.
+module = ["boto3.*", "botocore.*"]
+ignore_missing_imports = true
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unreachable = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+namespace_packages = true
+plugins = ["pydantic.mypy"]
+explicit_package_bases = true
+mypy_path = [
+    "$MYPY_CONFIG_FILE_DIR/packages/ai-agent-lib-core/src",
+    "$MYPY_CONFIG_FILE_DIR/packages/ai-agent-lib-aws/src",
+    "$MYPY_CONFIG_FILE_DIR/packages/ai-agent-lib-cli/src",
+    "$MYPY_CONFIG_FILE_DIR/packages/ai-agent-lib-core/tests",
+    "$MYPY_CONFIG_FILE_DIR/packages/ai-agent-lib-aws/tests",
+    "$MYPY_CONFIG_FILE_DIR/examples/accounts-agent/src",
+    "$MYPY_CONFIG_FILE_DIR/examples/accounts-agent/tests",
+    "$MYPY_CONFIG_FILE_DIR/examples/accounts-mcp/src",
+    "$MYPY_CONFIG_FILE_DIR/examples/accounts-mcp/tests",
+    "$MYPY_CONFIG_FILE_DIR/tests",
+]
+files = [
+    "packages/ai-agent-lib-core/src",
+    "packages/ai-agent-lib-aws/src",
+    "packages/ai-agent-lib-cli/src",
+    "packages/ai-agent-lib-core/tests",
+    "packages/ai-agent-lib-aws/tests",
+    "examples/accounts-agent/src",
+    "examples/accounts-agent/tests",
+    "examples/accounts-mcp/src",
+    "examples/accounts-mcp/tests",
+    "tests",
+]
+
+# ------------------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["packages", "examples", "tests"]
+# Lets the repository-level tests import their shared helpers.
+pythonpath = ["tests", "examples/accounts-mcp/tests"]
+addopts = [
+    "--import-mode=importlib",
+    "--strict-markers",
+    "--strict-config",
+    "-ra",
+    "--disable-socket",
+    "--allow-unix-socket",
+    # Tests that need something outside the process are opt-in: -m integration
+    "-m", "not integration and not container",
+]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+xfail_strict = true
+filterwarnings = [
+    "error",
+    # pytest-socket warns as it raises; the SocketBlockedError is what matters.
+    "ignore:A test tried to use socket.socket.:UserWarning",
+]
+markers = [
+    "container: needs a container runtime",
+    "integration: needs something outside the process, such as an opa binary or an AWS account",
+]
+
+# ------------------------------------------------------------------ import-linter
+[tool.importlinter]
+root_packages = ["ai_agent_lib_core", "ai_agent_lib_aws", "ai_agent_lib_cli"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "contracts imports nothing else from the library"
+type = "forbidden"
+source_modules = ["ai_agent_lib_core.contracts"]
+forbidden_modules = [
+    "ai_agent_lib_core.adapters",
+    "ai_agent_lib_core.config",
+    "ai_agent_lib_core.di",
+    "ai_agent_lib_core.integrations",
+    "ai_agent_lib_core.kit",
+    "ai_agent_lib_core.pipeline",
+    "ai_agent_lib_core.testing",
+]
+
+[[tool.importlinter.contracts]]
+name = "config, pipeline and adapters import contracts only"
+type = "independence"
+modules = [
+    "ai_agent_lib_core.adapters",
+    "ai_agent_lib_core.config",
+    "ai_agent_lib_core.pipeline",
+]
+
+[[tool.importlinter.contracts]]
+name = "config, pipeline and adapters stay below di and integrations"
+type = "forbidden"
+source_modules = [
+    "ai_agent_lib_core.adapters",
+    "ai_agent_lib_core.config",
+    "ai_agent_lib_core.pipeline",
+]
+forbidden_modules = [
+    "ai_agent_lib_core.di",
+    "ai_agent_lib_core.integrations",
+    "ai_agent_lib_core.kit",
+    "ai_agent_lib_core.testing",
+]
+
+[[tool.importlinter.contracts]]
+name = "only integrations.langgraph imports langgraph"
+type = "forbidden"
+source_modules = [
+    "ai_agent_lib_core.adapters",
+    "ai_agent_lib_core.config",
+    "ai_agent_lib_core.contracts",
+    "ai_agent_lib_core.di",
+    "ai_agent_lib_core.integrations.http",
+    "ai_agent_lib_core.integrations.mcp",
+    "ai_agent_lib_core.pipeline",
+]
+forbidden_modules = ["langgraph"]
+# di reaches LangGraph only through integrations.langgraph, which is the point.
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "only integrations.http imports the HTTP server framework"
+type = "forbidden"
+source_modules = [
+    "ai_agent_lib_core.adapters",
+    "ai_agent_lib_core.config",
+    "ai_agent_lib_core.contracts",
+    "ai_agent_lib_core.di",
+    "ai_agent_lib_core.integrations.langgraph",
+    "ai_agent_lib_core.integrations.mcp",
+    "ai_agent_lib_core.pipeline",
+    "ai_agent_lib_aws",
+]
+forbidden_modules = ["starlette", "uvicorn"]
+# The MCP SDK serves with the same framework; core reaches it only through integrations.http.
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "only integrations.mcp imports the MCP SDK"
+type = "forbidden"
+source_modules = [
+    "ai_agent_lib_core.adapters",
+    "ai_agent_lib_core.config",
+    "ai_agent_lib_core.contracts",
+    "ai_agent_lib_core.di",
+    "ai_agent_lib_core.integrations.http",
+    "ai_agent_lib_core.integrations.langgraph",
+    "ai_agent_lib_core.pipeline",
+]
+forbidden_modules = ["mcp", "mcp_types"]
+# di and the LangGraph bindings reach the SDK only through integrations.mcp.
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "core never imports the AWS SDK, the AWS package or the CLI"
+type = "forbidden"
+source_modules = ["ai_agent_lib_core"]
+forbidden_modules = ["boto3", "botocore", "ai_agent_lib_aws", "ai_agent_lib_cli"]
+
+[[tool.importlinter.contracts]]
+name = "a provider pack builds on contracts and the kit only"
+type = "forbidden"
+source_modules = ["ai_agent_lib_aws"]
+forbidden_modules = [
+    "ai_agent_lib_core.adapters",
+    "ai_agent_lib_core.config",
+    "ai_agent_lib_core.di",
+    "ai_agent_lib_core.integrations",
+    "ai_agent_lib_core.pipeline",
+    "ai_agent_lib_core.testing",
+]
+# The kit itself is built from core's adapters and registry; a pack reaches them only through it.
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "in the AWS package only the checkpoint store imports langgraph"
+type = "forbidden"
+source_modules = ["ai_agent_lib_aws"]
+forbidden_modules = ["langgraph"]
+ignore_imports = ["ai_agent_lib_aws.checkpoint_postgres -> langgraph"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "no runtime package imports the CLI"
+type = "forbidden"
+source_modules = ["ai_agent_lib_aws"]
+forbidden_modules = ["ai_agent_lib_cli"]

@@ -1,0 +1,51 @@
+"""Command-line entry point: serve the MCP server over Streamable HTTP."""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import sys
+from collections.abc import Sequence
+
+from accounts_mcp.server import SERVER_ID, build_server
+from ai_agent_lib_core import AgentLibError, ServiceContainer
+from ai_agent_lib_core.contracts import DeploymentEnv
+from ai_agent_lib_core.integrations.http import ServiceLifecycle, add_health_routes, serve
+from ai_agent_lib_core.integrations.mcp import verify_registration
+
+__all__ = ["main"]
+
+
+async def _serve(host: str, port: int) -> None:
+    async with ServiceContainer.from_env() as services:
+        server = build_server(services)
+        # Health and readiness answer without a token; a load balancer has none.
+        lifecycle = ServiceLifecycle(services.validate)
+        add_health_routes(server, lifecycle)
+        entry = services.registry.tools.get(SERVER_ID)
+        if entry is not None:
+            # Fail at startup, not on the first call, if the tools and the registry disagree.
+            local = services.config.deployment_env is DeploymentEnv.LOCAL
+            await verify_registration(server, entry, require_pins=not local)
+        app = server.streamable_http_app(stateless_http=True, json_response=True, host=host)
+        # serve() runs services.validate() once it is listening, and on SIGTERM
+        # lets the calls in flight finish before it returns.
+        await serve(app, lifecycle, host=host, port=port)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Serve until stopped. SIGTERM lets calls in flight finish first."""
+    parser = argparse.ArgumentParser(prog="accounts-mcp", description=__doc__)
+    parser.add_argument("--host", default="127.0.0.1", help="address to listen on")
+    parser.add_argument("--port", type=int, default=8001, help="port to listen on")
+    arguments = parser.parse_args(argv)
+    try:
+        asyncio.run(_serve(arguments.host, arguments.port))
+    except AgentLibError as error:
+        sys.stderr.write(f"accounts-mcp: {type(error).__name__}: {error}\n")
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
