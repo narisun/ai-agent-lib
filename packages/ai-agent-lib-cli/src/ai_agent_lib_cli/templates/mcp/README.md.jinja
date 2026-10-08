@@ -1,0 +1,62 @@
+# {{ name }}
+
+{{ description }}
+
+An ordinary MCP server. The library governs every tool call (identity, the
+tool registry, policy, guardrails and audit) and every query the tools make.
+
+| Tool | What it does |
+| --- | --- |
+| `{{ server_id }}.greet` | A plain tool: returns a greeting |
+| `{{ server_id }}.people_by_team` | Runs the named query `people_by_team` over `data/people.csv` |
+
+## Test it
+
+```bash
+uv run pytest mcp-servers/{{ name }}
+```
+
+The tests need no account and no network. They run the real rules file, so
+they show what each role is allowed to see:
+
+| Role | Tool call | Data |
+| --- | --- | --- |
+| `manager` | allowed | every column |
+| `analyst` | allowed | `email` is masked, at most 50 rows |
+| anything else | denied | none |
+
+Start a change with a test in `tests/test_{{ package }}.py`: pick the caller's
+roles, call the tool, and say what that caller should be shown.
+
+## Run it
+
+```bash
+uv run {{ name }}        # serves http://127.0.0.1:{{ port }}/mcp, with /healthz and /readyz
+```
+
+On this machine a caller without a token is the development identity in
+`{{ var.identity_options }}`. Local state is written under `.agentlib/`.
+
+## What to read
+
+| File | Shows |
+| --- | --- |
+| `src/{{ package }}/server.py` | The tools, and the two places the library appears |
+| `queries/people_by_team.sql` | A named query: SQL with a declared interface |
+| `data/people.csv` | The sample data. Each CSV file is a table |
+| `.env.example` | How the service is configured locally |
+
+## Adding a tool over your own data
+
+1. Put a CSV file in `data/` and a query in `queries/`. The query's header
+   declares its parameters, its row limit and its classification.
+2. Write a failing test that calls the new tool as a role and says what that
+   role should see.
+3. Add the tool in `server.py` and list it under `{{ server_id }}` in
+   `registry/mcp-tools.yaml`.
+4. Run `uv run agentlib registry pin {{ server_id }}` to pin its arguments.
+5. If a new role or a new column to mask is involved, add or change a rule in
+   `policies/agentlib/rules/data.yaml`.
+
+The queries are written in the dialect of the production database and run
+unchanged over CSV files locally.

@@ -1,0 +1,116 @@
+"""The server with its own configuration, called in process with no network.
+
+Everything is real except the transport: the CSV data source, the rules file,
+the registry and the audit log. A test picks the caller's roles, calls a tool
+the way an agent does, and checks what that caller was shown.
+"""
+
+from __future__ import annotations
+
+import json
+from collections.abc import AsyncIterator
+from pathlib import Path
+from typing import Any
+
+import pytest
+from ai_agent_lib_core import ServiceContainer
+from ai_agent_lib_core.contracts import MASK
+from ai_agent_lib_core.integrations.mcp import mcp_result_text, verify_registration
+from ai_agent_lib_core.testing import TEST_AGENT, audit_records, load_test_config
+from ai_agent_lib_core.testing.mcp import call_tool_as
+from mcp.server.mcpserver import MCPServer
+
+from {{ package }} import APPLICATION, SERVER_ID, build_server
+
+SERVICE = Path(__file__).resolve().parents[1]
+Running = tuple[ServiceContainer, MCPServer[Any]]
+
+
+@pytest.fixture
+async def running(tmp_path: Path) -> AsyncIterator[Running]:
+    """The server, started the way its command line starts it.
+
+    A server only answers an agent the registry lists for it. `test_agent`
+    adds one for the test, so these tests do not depend on which agents exist.
+    """
+    config = load_test_config(
+        SERVICE / ".env.example", state_dir=tmp_path, test_agent=TEST_AGENT
+    )
+    async with ServiceContainer(config) as services:
+        await services.validate()
+        yield services, build_server(services)
+
+
+async def test_the_tools_are_the_ones_the_registry_lists(running: Running) -> None:
+    services, server = running
+    entry = services.registry.tools.get(SERVER_ID)
+    assert entry is not None
+    # A tool that is offered but not registered, or the other way round, fails
+    # here. So does a tool whose arguments changed since it was pinned: run
+    # 'agentlib registry pin {{ server_id }}' after changing a tool on purpose.
+    await verify_registration(server, entry, require_pins=False)
+    assert entry.audience == APPLICATION
+
+
+async def test_greet_says_hello(running: Running) -> None:
+    services, server = running
+    result = await call_tool_as(
+        services, server, "{{ server_id }}.greet", {"name": "Ada"}, roles=["{{ role }}"]
+    )
+    assert not result.is_error
+    assert mcp_result_text(result) == "Hello, Ada! This is {{ name }}."
+
+
+async def test_a_manager_sees_every_column(running: Running) -> None:
+    services, server = running
+    result = await call_tool_as(
+        services, server, "{{ server_id }}.people_by_team", {"team": "payments"}, roles=["manager"]
+    )
+    table = result.structured_content
+    assert table["columns"] == ["person_id", "name", "team", "email"]
+    assert table["rows"] == [
+        [103, "Cleo Carr", "payments", "cleo.carr@example.test"],
+        [104, "Dev Dalal", "payments", "dev.dalal@example.test"],
+    ]
+    assert table["masked_columns"] == []
+
+
+async def test_an_analyst_sees_people_but_not_their_email(
+    running: Running, tmp_path: Path
+) -> None:
+    services, server = running
+    result = await call_tool_as(
+        services, server, "{{ server_id }}.people_by_team", {"team": "risk"}, roles=["analyst"]
+    )
+    table = result.structured_content
+    assert table["rows"] == [[105, "Eli Ember", "risk", MASK]]
+    assert table["masked_columns"] == ["email"]
+
+    # Both decisions are on the audit log, and the masked value is not.
+    query, tool = audit_records(tmp_path)
+    assert (query["event"], tool["event"]) == ("data.query", "tool.call")
+    assert query["attributes"]["policy_reason_code"] == "{{ server_id }}-analysts-see-no-email"
+    assert tool["attributes"]["policy_reason_code"] == "{{ server_id }}-staff-call-the-tools"
+    assert "eli.ember" not in json.dumps([query, tool])
+
+
+async def test_any_other_role_is_denied_before_the_tool_runs(
+    running: Running, tmp_path: Path
+) -> None:
+    services, server = running
+    result = await call_tool_as(
+        services, server, "{{ server_id }}.people_by_team", {"team": "risk"}, roles=["intern"]
+    )
+    assert result.is_error
+    assert mcp_result_text(result) == "The call was denied (reason: no_matching_rule)."
+    (record,) = audit_records(tmp_path)
+    assert (record["event"], record["outcome"]) == ("tool.call", "denied")
+
+
+async def test_a_team_nobody_is_in_is_an_empty_table_not_an_error(running: Running) -> None:
+    services, server = running
+    result = await call_tool_as(
+        services, server, "{{ server_id }}.people_by_team", {"team": "nobody"}, roles=["manager"]
+    )
+    assert not result.is_error
+    assert result.structured_content["rows"] == []

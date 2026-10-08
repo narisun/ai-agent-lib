@@ -1,0 +1,74 @@
+# {{ name }}
+
+{{ description }}
+
+An ordinary LangGraph tool-calling agent: one model node, one tool node and
+the standard routing between them. The library supplies the governed model,
+the governed tools, the scoped checkpointer and the per-request run arguments.
+
+## Test it
+
+```bash
+uv run pytest agents/{{ name }}
+```
+
+The tests need no account and no network. Start a change with a test:
+
+| To change | Start in |
+| --- | --- |
+| What a tool does | `tests/test_{{ package }}.py`, the tool tests at the top |
+| How the agent behaves | `tests/test_{{ package }}.py`, with a scripted model |
+| What the rules allow | `tests/test_{{ package }}_as_configured.py`, which runs the real rules file |
+| The HTTP entry point | `tests/test_{{ package }}_service.py` |
+
+## Run it
+
+```bash
+uv run {{ name }} "Say hello to Ada."
+uv run {{ name }}-serve --port {{ port }}
+curl -s localhost:{{ port }}/invoke -H 'content-type: application/json' \
+  -d '{"input": {"question": "Say hello to Ada."}, "thread_id": "demo"}'
+```
+
+{% if model_provider == "fake" %}
+`.env` selects the `fake` model, which needs no account and echoes the
+question. To use a real model, set `{{ var.model_provider }}` and
+`{{ var.model_id }}` in `.env`.
+{% else %}
+`.env` selects the `{{ model_provider }}` model provider. Set
+`{{ var.model_id }}` there before the first run.
+{% endif %}
+
+{% if servers %}
+This agent calls the tools of {{ servers | join(" and ") }}. Start
+{{ "them" if servers | length > 1 else "it" }} first, each in its own terminal,
+or the agent stops with "could not be reached":
+
+```bash
+{% for server in servers %}
+uv run {{ server }}
+{% endfor %}
+```
+
+{% endif %}
+On this machine a caller without a token is the development identity in
+`{{ var.identity_options }}`. Local state is written under `.agentlib/`: the
+audit log as JSON lines and the conversation checkpoints in SQLite.
+
+## What to read
+
+| File | Shows |
+| --- | --- |
+| `src/{{ package }}/tools.py` | The agent's own tools: plain functions |
+| `src/{{ package }}/graph.py` | The graph, and the five places the library appears in it |
+| `src/{{ package }}/__main__.py` | One question from the command line |
+| `src/{{ package }}/service.py` | Serving the agent over HTTP |
+| `.env.example` | How the service is configured locally |
+
+## Adding a tool
+
+1. Write a failing test for the function in `tests/test_{{ package }}.py`.
+2. Write the function in `tools.py` and add it to the list in `graph.py`.
+3. Name it in the rule `{{ name }}-calls-its-own-tools` in
+   `policies/agentlib/rules/data.yaml`. Until then every call to it is denied,
+   and `tests/test_{{ package }}_as_configured.py` is where you see that.

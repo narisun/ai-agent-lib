@@ -74,6 +74,9 @@ class ConfigResolver:
         source: Where raw values come from.
         bindings: The variable table. Defaults to the library's own table.
         profile_defaults: The adapters each profile selects by default.
+        base_dir: The folder a relative path in a value is relative to,
+            normally the folder of the ``.env`` file. Without it a relative
+            path is relative to the working directory.
     """
 
     def __init__(
@@ -82,9 +85,11 @@ class ConfigResolver:
         *,
         bindings: Sequence[Binding] = DEFAULT_BINDINGS,
         profile_defaults: Mapping[Profile, ProfileDefaults] = PROFILE_DEFAULTS,
+        base_dir: Path | None = None,
     ) -> None:
         validate_bindings(bindings)
         self._source = source
+        self._base_dir = base_dir
         self._bindings = tuple(bindings)
         self._by_key = {binding.key: binding for binding in self._bindings}
         self._profile_defaults = profile_defaults
@@ -123,6 +128,7 @@ class ConfigResolver:
             sections[section] = ProviderSelection(
                 provider=values.get(selector, defaults.sections[section]),
                 options=self._json_object(values, options_key(section)),
+                base_dir=self._base_dir,
             )
 
         config = ServiceConfig(
@@ -261,7 +267,12 @@ class ConfigResolver:
 
     def _path(self, values: Mapping[str, str], key: str) -> Path | None:
         raw = values.get(key)
-        return Path(raw).expanduser() if raw is not None else None
+        if raw is None:
+            return None
+        path = Path(raw).expanduser()
+        if self._base_dir is not None and not path.is_absolute():
+            return self._base_dir / path
+        return path
 
     def _json(self, values: Mapping[str, str], key: str) -> Any:
         binding = self._by_key[key]
@@ -324,7 +335,7 @@ class ConfigResolver:
             options = {key: value for key, value in spec.items() if key != _DATA_SOURCE_KIND}
             try:
                 sources[source] = ProviderSelection(
-                    provider=spec[_DATA_SOURCE_KIND], options=options
+                    provider=spec[_DATA_SOURCE_KIND], options=options, base_dir=self._base_dir
                 )
             except (TypeError, ValueError) as exc:
                 raise ConfigurationError(f"{name}: data source {source!r}: {exc}") from None

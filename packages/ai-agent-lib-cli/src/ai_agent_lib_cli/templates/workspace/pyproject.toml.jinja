@@ -1,0 +1,56 @@
+# The {{ name }} workspace. Every agent and MCP server in it is one member.
+# The root is not a package: it only holds what the members share.
+
+[project]
+name = "{{ name }}"
+version = "0.1.0"
+description = "Agents and MCP servers of {{ owner }}, built on ai-agent-lib."
+requires-python = ">=3.11"
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["agents/*", "mcp-servers/*"]
+{% if library.kind == "path" %}
+
+# The library comes from a local checkout. Once it is on your package index,
+# delete this table and give a version in each member's dependencies.
+[tool.uv.sources]
+ai-agent-lib-core = { path = "{{ library.path }}/packages/ai-agent-lib-core", editable = true }
+ai-agent-lib-aws = { path = "{{ library.path }}/packages/ai-agent-lib-aws", editable = true }
+ai-agent-lib-cli = { path = "{{ library.path }}/packages/ai-agent-lib-cli", editable = true }
+{% endif %}
+
+[dependency-groups]
+dev = [
+    # The agentlib command, to add agents and MCP servers to this workspace.
+    "ai-agent-lib-cli{{ library.version or "" }}",
+    "mypy>=1.11",
+    "pytest>=8.2",
+    "pytest-asyncio>=1.4",
+    "ruff>=0.6",
+]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["agents", "mcp-servers", "tests"]
+addopts = ["--import-mode=importlib", "--strict-markers", "-ra"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["agents/*/src", "mcp-servers/*/src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+# The formatter keeps lines short where it can; a long string is not an error.
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["."]
+exclude = ['^\.venv/']

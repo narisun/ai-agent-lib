@@ -1,0 +1,8 @@
+-- description: The people in one team.
+-- param team: string
+-- max_rows: 50
+-- classification: confidential
+SELECT person_id, name, team, email
+FROM people
+WHERE team = :team
+ORDER BY person_id

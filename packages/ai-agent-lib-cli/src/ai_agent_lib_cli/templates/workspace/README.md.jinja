@@ -1,0 +1,51 @@
+# {{ name }}
+
+A local development workspace for agents and MCP servers built on
+`ai-agent-lib`. Owner: {{ owner }}.
+
+## Start
+
+```bash
+uv sync --all-packages     # one environment for every service in the workspace
+uv run pytest              # every test, with no network and no accounts
+```
+
+## Add services
+
+```bash
+uv run agentlib new mcp hello-mcp        # an MCP server with a sample data source
+uv run agentlib new agent hello-agent    # a LangGraph agent
+uv run agentlib link hello-agent hello   # let the agent call the server's tools
+uv sync --all-packages                   # install what was added
+uv run pytest
+```
+
+Each command writes working code with its tests, registers the service and
+adds the rules it needs. From there the code is yours: change a test first,
+watch it fail, then change the code.
+
+## What is here
+
+| Path | What it is |
+| --- | --- |
+| `agents/` | One folder per agent |
+| `mcp-servers/` | One folder per MCP server |
+| `registry/agents.yaml` | Which agents exist and which MCP servers each may call |
+| `registry/mcp-tools.yaml` | Which MCP servers and tools exist, with a pin of each tool's input schema |
+| `policies/agentlib/rules/data.yaml` | What every service allows. A request no rule matches is denied |
+| `tests/` | Tests of the workspace as a whole, and of agents together with servers |
+| `agentlib.toml` | The answers this workspace was generated from |
+
+Every service reads the same registry and rules files, so an agent and the
+servers it calls agree on who may do what.
+
+## How a service is configured
+
+Each service has a `.env.example`, which is committed and which its tests
+read, and a `.env`, which is yours and is not committed. A path in either is
+relative to the file, so a service finds its files whatever folder it is
+started from. Local state (the audit log, conversation checkpoints) is written
+to `.agentlib/` in the service's folder.
+
+Nothing here needs an account or a network connection until you select a real
+model.

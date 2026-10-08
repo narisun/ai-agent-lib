@@ -97,6 +97,18 @@ def _freeze(value: object) -> object:
     raise TypeError(f"options must be JSON-like values, not {type(value).__name__}")
 
 
+def _rebased(options: OptionsT, base_dir: Path) -> OptionsT:
+    """Return ``options`` with every relative path made relative to ``base_dir``."""
+    changes: dict[str, object] = {}
+    for name in type(options).model_fields:
+        value = getattr(options, name)
+        if isinstance(value, Path) and not value.is_absolute():
+            changes[name] = base_dir / value
+        elif isinstance(value, OptionsModel):
+            changes[name] = _rebased(value, base_dir)
+    return options.model_copy(update=changes) if changes else options
+
+
 def _thaw(value: object) -> Any:
     """Return plain ``dict`` and ``list`` containers for a frozen value."""
     if isinstance(value, Mapping):
@@ -114,10 +126,14 @@ class ProviderSelection:
         provider: The registered name of the adapter.
         options: Raw, JSON-like options. The adapter validates them against its
             own :class:`OptionsModel` through :meth:`parse_options`.
+        base_dir: The folder a relative path in the options is relative to:
+            the folder of the configuration file the options came from. Without
+            it a relative path is relative to the working directory.
     """
 
     provider: str
     options: Mapping[str, object] = field(default_factory=dict)
+    base_dir: Path | None = None
 
     def __post_init__(self) -> None:
         require_identifier("provider", self.provider)
@@ -133,7 +149,7 @@ class ProviderSelection:
                 message names the fields and never repeats their values.
         """
         try:
-            return model.model_validate(_thaw(self.options))
+            parsed = model.model_validate(_thaw(self.options))
         except ValidationError as exc:
             problems = "; ".join(
                 f"{'.'.join(str(part) for part in error['loc']) or '<root>'}: {error['msg']}"
@@ -142,6 +158,7 @@ class ProviderSelection:
             raise ConfigurationError(
                 f"invalid options for provider {self.provider!r}: {problems}"
             ) from None
+        return _rebased(parsed, self.base_dir) if self.base_dir is not None else parsed
 
 
 @dataclass(frozen=True, slots=True)

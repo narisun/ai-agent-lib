@@ -6,8 +6,17 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 dependencies = [
-    "ai-agent-lib-core",
+    # With what a generated MCP server needs to start, so that its tools can be pinned.
+    "ai-agent-lib-core[duckdb,mcp]",
+    "click>=8.1",
+    "jinja2>=3.1",
+    "pyyaml>=6.0",
+    # Formats the code the templates produce, with the settings a workspace uses.
+    "ruff>=0.6",
 ]
+
+[project.scripts]
+agentlib = "ai_agent_lib_cli.__main__:main"
 
 [tool.uv.sources]
 ai-agent-lib-core = { workspace = true }

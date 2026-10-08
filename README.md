@@ -6,6 +6,21 @@ library supplies configuration, identity, audit and the other cross-cutting
 concerns behind small interfaces, so any of them can be swapped by
 configuration and faked in a unit test.
 
+## Start a workspace
+
+```bash
+uv run --project <path-to-this-repository> --package ai-agent-lib-cli agentlib init my-platform
+cd my-platform && uv sync --all-packages
+uv run agentlib new mcp hello-mcp
+uv run agentlib new agent hello-agent --mcp hello
+uv sync --all-packages && uv run pytest
+```
+
+That gives a working agent and MCP server with their tests, on the local
+adapters, with no account and no network. The rest of this page is what that
+generated code is made of. The commands are described in
+[`packages/ai-agent-lib-cli`](packages/ai-agent-lib-cli/README.md).
+
 ## What a graph author writes
 
 ```python
@@ -124,7 +139,7 @@ The entry point answers with one JSON document. It does not stream.
 | --- | --- |
 | `packages/ai-agent-lib-core` | Contracts, configuration, container, pipelines, local adapters, LangGraph bindings and the testing kit |
 | `packages/ai-agent-lib-aws` | AWS adapters, loaded automatically when the package is installed: Bedrock, Secrets Manager, Firehose, Redshift, S3, PostgreSQL and Bedrock guardrails. See its [README](packages/ai-agent-lib-aws/README.md) |
-| `packages/ai-agent-lib-cli` | The `agentlib` developer tool. Empty for now |
+| `packages/ai-agent-lib-cli` | The `agentlib` command: creates a workspace and adds hello-world agents and MCP servers with their tests. See its [README](packages/ai-agent-lib-cli/README.md) |
 | `examples/accounts-agent` | The reference agent |
 | `examples/accounts-mcp` | The reference MCP server, with its queries, rules and registries |
 | `policies/bundle` | The platform's Rego bundle for OPA, and its tests |
@@ -191,3 +206,24 @@ async with fakes.container() as services:
     ...
 assert fakes.audit.records[0].event == "model.call"
 ```
+
+A service is also tested as it is configured: its own `.env.example`, the real
+rules file, registries and CSV data, with only the model scripted and local
+state kept in a temporary folder.
+
+```python
+from ai_agent_lib_core import ServiceContainer
+from ai_agent_lib_core.testing import audit_records, load_test_config, scripted_providers
+
+config = load_test_config(SERVICE / ".env.example", state_dir=tmp_path)
+async with ServiceContainer(config, scripted_providers("scripted answer")) as services:
+    ...
+assert audit_records(tmp_path)[0]["attributes"]["policy_reason_code"] == "agent-uses-its-models"
+```
+
+`ai_agent_lib_core.testing.mcp` has `call_tool_as`, which calls a tool of an
+in-process MCP server for a caller with given roles, and
+`InProcessMcpConnector`, which lets an agent reach a server with no network.
+
+A relative path in a `.env` file is relative to that file, so a service finds
+its files whatever folder it is started from.

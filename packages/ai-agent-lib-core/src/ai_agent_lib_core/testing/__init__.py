@@ -31,6 +31,12 @@ from ai_agent_lib_core.testing.fakes import (
     SequentialIds,
 )
 from ai_agent_lib_core.testing.harness import FAKE_PROVIDER, Fakes, fake_providers
+from ai_agent_lib_core.testing.local import (
+    TEST_AGENT,
+    audit_records,
+    load_test_config,
+    scripted_providers,
+)
 
 __all__ = [
     "ACCOUNT_COLUMNS",
@@ -38,6 +44,7 @@ __all__ = [
     "ACCOUNT_QUERIES",
     "ACCOUNT_ROWS",
     "FAKE_PROVIDER",
+    "TEST_AGENT",
     "FakeChatModel",
     "FakeChatModelProvider",
     "FakeDataSource",
@@ -55,8 +62,11 @@ __all__ = [
     "RecordingTelemetry",
     "SequentialIds",
     "accounts_api",
+    "audit_records",
     "fake_accounts_source",
     "fake_providers",
+    "load_test_config",
+    "scripted_providers",
     "write_accounts_endpoints",
     "write_accounts_files",
 ]

@@ -1,0 +1,78 @@
+"""The agent's tools and behaviour, tested with the library's fakes.
+
+These are the fastest tests: nothing is real except your own code. Script the
+model with the replies it should give, run the agent, and check what happened.
+"""
+
+from __future__ import annotations
+
+from ai_agent_lib_core import Principal, RequestContext
+from ai_agent_lib_core.pipeline import frame_untrusted
+from ai_agent_lib_core.testing import FakeChatModelProvider, Fakes
+from langchain_core.messages import AIMessage
+
+from {{ package }} import APPLICATION, ask
+from {{ package }}.tools import greet
+
+
+def context(subject: str = "u-1", thread: str = "th-1") -> RequestContext:
+    return RequestContext(
+        principal=Principal(subject=subject, tenant="t-1"),
+        application=APPLICATION,
+        request_id="r-1",
+        thread_id=thread,
+    )
+
+
+def asks_to_greet(name: str) -> AIMessage:
+    """What a model replies when it decides to call the greet tool."""
+    return AIMessage(
+        content="", tool_calls=[{"name": "greet", "args": {"name": name}, "id": "call-1"}]
+    )
+
+
+# ---------------------------------------------------------------------- tools
+
+
+def test_greet_greets_by_name() -> None:
+    assert greet("Ada") == "Hello, Ada!"
+    assert greet("  Grace ") == "Hello, Grace!"
+
+
+def test_greet_says_so_when_there_is_no_name() -> None:
+    assert greet("   ") == "There is nobody to greet: the name is empty."
+
+
+# ---------------------------------------------------------------------- agent
+
+
+async def test_the_agent_calls_its_tool_and_answers() -> None:
+    fakes = Fakes(model=FakeChatModelProvider([asks_to_greet("Ada"), "I said hello to Ada."]))
+    async with fakes.container() as services:
+        reply = await ask(services, context(), "Say hello to Ada.")
+
+    assert reply == "I said hello to Ada."
+    prompts = fakes.model.models[0].calls
+    assert prompts[0][0].type == "system"
+    # The model is shown the tool result marked as data, not as an instruction.
+    assert prompts[1][-1].content == frame_untrusted("greet", "Hello, Ada!")
+    # Every model call and tool call is on the audit log, under the agent's name.
+    assert [record.event for record in fakes.audit.records] == [
+        "model.call",
+        "tool.call",
+        "model.call",
+    ]
+    assert {record.application for record in fakes.audit.records} == {APPLICATION}
+
+
+async def test_the_agent_remembers_a_conversation_per_caller() -> None:
+    fakes = Fakes(model=FakeChatModelProvider(["one", "two", "three"]))
+    async with fakes.container() as services:
+        await ask(services, context(), "first question")
+        await ask(services, context(), "second question")
+        await ask(services, context(subject="u-2"), "someone else's question")
+
+    second_prompt, other_prompt = fakes.model.models[1].calls[0], fakes.model.models[2].calls[0]
+    assert [m.content for m in second_prompt[1:]] == ["first question", "one", "second question"]
+    # The same thread name from another caller is another conversation.
+    assert [m.content for m in other_prompt[1:]] == ["someone else's question"]
