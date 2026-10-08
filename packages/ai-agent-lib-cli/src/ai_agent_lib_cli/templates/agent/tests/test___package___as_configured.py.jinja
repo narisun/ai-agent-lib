@@ -11,26 +11,20 @@ from pathlib import Path
 from ai_agent_lib_core import ServiceContainer
 from ai_agent_lib_core.testing import (
     audit_records,
+    calls_tool,
     last_shown_to_model,
     load_test_config,
     scripted_providers,
 )
-from langchain_core.messages import AIMessage
 
 from {{ package }} import APPLICATION, answer, build_graph
 
 SERVICE = Path(__file__).resolve().parents[1]
 
 
-def asks_to_greet(name: str) -> AIMessage:
-    return AIMessage(
-        content="", tool_calls=[{"name": "greet", "args": {"name": name}, "id": "call-1"}]
-    )
-
-
 async def test_the_rules_allow_the_agent_its_model_and_its_tool(tmp_path: Path) -> None:
     config = load_test_config(SERVICE / ".env.example", state_dir=tmp_path)
-    providers = scripted_providers(asks_to_greet("Ada"), "I said hello to Ada.")
+    providers = scripted_providers(calls_tool("greet", name="Ada"), "I said hello to Ada.")
     async with ServiceContainer(config, providers) as services:
         await services.validate()
         # No token: on a developer's machine the development identity stands in.

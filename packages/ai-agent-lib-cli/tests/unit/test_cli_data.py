@@ -504,8 +504,8 @@ def test_an_agent_linked_to_such_a_server_is_tested_against_its_first_tool(
     assert run("new", "mcp", "claims-mcp", "--from-csv", exports, "--workspace", workspace) == 0
     assert run("new", "agent", "claims-agent", "--mcp", "claims", "--workspace", workspace) == 0
     test = (workspace / "tests/test_claims_agent_with_claims_mcp.py").read_text(encoding="utf-8")
-    assert '"name": "claims_claims_2026_by_claim_id"' in test
-    assert "'claim_id': 9001" in test
+    assert 'calls_tool("claims.claims_2026_by_claim_id", claim_id=9001)' in test
+    assert "CALLS_THE_TOOL" in test
     assert "assert MASK in shown" in test
     assert "Cleo Carr" not in test
     samples = (workspace / SAMPLES).read_text(encoding="utf-8")

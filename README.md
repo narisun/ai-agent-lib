@@ -113,6 +113,7 @@ async def main() -> None:
 | Route | Answers |
 | --- | --- |
 | `POST /invoke` | Takes `{"input": ..., "thread_id": "..."}` and a bearer token. The identity provider decides who the caller is; `run` gets their request context. A refused token is 401, a policy denial 403, and a failure is reported by a code, never by the error's text |
+| `POST /invoke/stream` | Only when `agent_app(..., stream=steps)` is given. The same input and token; the answer is server-sent events: one `update` per item `steps` yields, then `end` with the thread and request IDs, or `error` with a code |
 | `GET /healthz` | 200 while the process is up. No token |
 | `GET /readyz` | 200 once startup validation has passed, 503 before that and while the service drains. No token |
 
@@ -133,7 +134,9 @@ app = server.streamable_http_app(stateless_http=True, json_response=True, host=h
 await serve(app, lifecycle, host=host, port=port)
 ```
 
-The entry point answers with one JSON document. It does not stream.
+To stream, pass a function that yields what each step produced, for example
+the items of `graph.astream(..., stream_mode="updates", **services.invocation(context))`.
+Every step still runs through the pipelines. A generated agent does this already.
 
 ### Logs and telemetry
 
@@ -151,17 +154,40 @@ duration and request ID, one `tool_call` line per MCP tool call with the tool,
 how the call ended and its duration, draining, stopped, and failures of what
 the service depends on.
 They never hold what a caller asked or a model answered; that is not in the
-audit log either. Loggers outside the library are quiet below WARNING,
-anything shaped like a credential is replaced, and an error is logged by its
-type and the place it was raised, not by its message.
+audit log either. Loggers outside the library are quiet below WARNING, and
+anything shaped like a credential is replaced. An error is logged with its
+facts as fields: `error_type`, `error_at`, `error_expected`, `error_actual`,
+`error_fix`, `error_notes` and the line of your code that led to it.
 
 `configure_telemetry` installs OpenTelemetry providers that send traces and
 metrics to a collector over OTLP. The OpenTelemetry SDK reads where the
 collector is from its own standard variables. Each agent request is one
-`agent.invoke` span and each MCP tool call one `mcp.tool_call` span; the
-library's own events and metrics join them when the
-audit option `tracing` is on. Call the function it returns when the service
-stops.
+`agent.invoke` span, with a child span for each model, tool and query call
+named and labelled by the OpenTelemetry GenAI conventions (`chat {model}`,
+`execute_tool {tool}`). The trace continues into the MCP servers the agent
+calls. Spans per call, events and metrics are on when
+`EAP_TELEMETRY=opentelemetry`. Call the function `configure_telemetry` returns
+when the service stops.
+
+### When it fails
+
+Every error the library raises says what the code expected, what it got, and
+how to fix it, with notes on which adapter and which variable were involved:
+
+```text
+helper: ConfigurationError: the options of provider 'jsonl' are not valid (2 problems)
+  expected: path: a path, written as text; only known options: fsync, path, tracing
+  got: path = 5; an unknown option 'fsynk' (did you mean 'fsync'?)
+  fix: correct the options; the developer guide lists every option with its default
+  note: while building the audit adapter 'jsonl', chosen by EAP_AUDIT_PROVIDER with options from EAP_AUDIT_OPTIONS
+  raised at: .../ai_agent_lib_core/contracts/options.py:279 in parse_options
+  your code: agents/helper/src/helper/__main__.py:21 in _run
+```
+
+Generated entry points print it with `report_error(program, error,
+details=shows_details(config))`. Secrets, tokens and what a caller sent never
+appear in a message; a value that helps to debug goes in `error.detail`, shown
+only on a developer's machine.
 
 ### Is it configured correctly?
 
@@ -170,6 +196,16 @@ runs each one's startup check and returns one result per adapter, with what is
 wrong and how to fix it. `diagnose(config)` from `ai_agent_lib_core.di` does
 the same from a configuration that may not start at all. Neither calls a
 model. `agentlib doctor` prints the results for every service of a workspace.
+
+## Deploying
+
+`agentlib deploy SERVICE` reads the settings the service will run with in AWS
+from `deploy.env` in its folder, asks each selected adapter what it needs from
+IAM, and writes a Terraform root module for ECS Fargate (with the OPA and
+OpenTelemetry collector sidecars when the settings use them), the task's
+environment, a least-privilege task policy with a reason for every statement,
+and a Dockerfile. `--plan` shows all of it and writes nothing. Nothing is
+applied: you run `terraform`.
 
 ## Layout
 

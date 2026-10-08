@@ -18,7 +18,8 @@ from langgraph.checkpoint.base import (
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-from ai_agent_lib_core.contracts import ConfigurationError, OptionsModel, PolicyDenied, Scope
+from ai_agent_lib_core.adapters.checkpoint_options import SqliteCheckpointOptions
+from ai_agent_lib_core.contracts import ConfigurationError, PolicyDenied, Scope
 
 __all__ = [
     "THREAD_NAMESPACE",
@@ -253,16 +254,6 @@ class InMemoryCheckpointBackend:
     def checkpointer(self) -> BaseCheckpointSaver[Any]:
         """The in-memory checkpointer."""
         return self._saver
-
-
-class SqliteCheckpointOptions(OptionsModel):
-    """Options for the SQLite checkpoint backend.
-
-    Attributes:
-        path: The database file. Parent directories are created.
-    """
-
-    path: Path = Path(".agentlib/checkpoints.sqlite")
 
 
 class SqliteCheckpointBackend:

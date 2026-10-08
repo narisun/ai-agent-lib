@@ -122,14 +122,14 @@ async def test_missing_directories_are_configuration_errors(tmp_path: Path) -> N
         DuckDbCsvOptions(data_dir=tmp_path / "absent", queries_dir=queries_dir),
         FrozenClock(),
     )
-    with pytest.raises(ConfigurationError, match="data directory not found"):
+    with pytest.raises(ConfigurationError, match="the data folder does not exist"):
         await no_data.start()
     no_queries = DuckDbCsvDataSource(
         "accounts",
         DuckDbCsvOptions(data_dir=tmp_path / "data", queries_dir=tmp_path / "absent"),
         FrozenClock(),
     )
-    with pytest.raises(ConfigurationError, match="query directory not found"):
+    with pytest.raises(ConfigurationError, match="the queries folder does not exist"):
         await no_queries.start()
 
 

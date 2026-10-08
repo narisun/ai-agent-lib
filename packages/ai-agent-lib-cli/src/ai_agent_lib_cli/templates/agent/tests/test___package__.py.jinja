@@ -8,8 +8,7 @@ from __future__ import annotations
 
 from ai_agent_lib_core import Principal, RequestContext
 from ai_agent_lib_core.pipeline import frame_untrusted
-from ai_agent_lib_core.testing import FakeChatModelProvider, Fakes
-from langchain_core.messages import AIMessage
+from ai_agent_lib_core.testing import FakeChatModelProvider, Fakes, calls_tool
 
 from {{ package }} import APPLICATION, ask
 from {{ package }}.tools import greet
@@ -21,13 +20,6 @@ def context(subject: str = "u-1", thread: str = "th-1") -> RequestContext:
         application=APPLICATION,
         request_id="r-1",
         thread_id=thread,
-    )
-
-
-def asks_to_greet(name: str) -> AIMessage:
-    """What a model replies when it decides to call the greet tool."""
-    return AIMessage(
-        content="", tool_calls=[{"name": "greet", "args": {"name": name}, "id": "call-1"}]
     )
 
 
@@ -47,7 +39,7 @@ def test_greet_says_so_when_there_is_no_name() -> None:
 
 
 async def test_the_agent_calls_its_tool_and_answers() -> None:
-    fakes = Fakes(model=FakeChatModelProvider([asks_to_greet("Ada"), "I said hello to Ada."]))
+    fakes = Fakes(model=FakeChatModelProvider([calls_tool("greet", name="Ada"), "I said hello to Ada."]))
     async with fakes.container() as services:
         reply = await ask(services, context(), "Say hello to Ada.")
 

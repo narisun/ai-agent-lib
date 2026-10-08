@@ -1,0 +1,61 @@
+# {{ name }} on ECS Fargate. agentlib wrote this file once; it is yours to change.
+# settings.tf and permissions.tf are rewritten by every 'agentlib deploy {{ name }}'.
+
+terraform {
+  required_version = ">= 1.5"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = var.region
+}
+
+module "service" {
+  source = "../modules/agentlib-service"
+
+  name             = "{{ name }}"
+  region           = var.region
+  image            = var.image
+  command          = local.command
+  port             = local.port
+  environment      = local.environment
+  task_policy_json = local.task_policy_json
+  opa_image        = local.uses_opa ? var.opa_image : null
+  collector        = local.collector
+
+  cluster_arn        = var.cluster_arn
+  subnet_ids         = var.subnet_ids
+  security_group_ids = var.security_group_ids
+  target_group_arn   = var.target_group_arn
+  desired_count      = var.desired_count
+  tags               = var.tags
+}
+
+# The settings select the opa policy adapter on this task's loopback address,
+# so the task needs the OPA sidecar's image.
+resource "terraform_data" "opa_image_given" {
+  count = local.uses_opa ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = var.opa_image != null
+      error_message = "The settings use OPA beside the service: set opa_image to the image built from deploy/opa/Dockerfile."
+    }
+  }
+}
+
+output "task_role_arn" {
+  description = "The role {{ name }} runs as."
+  value       = module.service.task_role_arn
+}
+
+output "log_group_name" {
+  description = "Where the logs of {{ name }} go."
+  value       = module.service.log_group_name
+}

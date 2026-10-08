@@ -157,6 +157,9 @@ class StaticIdentityVerifier:
             )
         if self._options.audience is not None and audience != self._options.audience:
             raise PolicyDenied(
-                "the development token is for another service", reason_code="credential_audience"
+                "the development token is for another service",
+                reason_code="credential_audience",
+                expected=f"a token for {self._options.audience!r}",
+                fix="issue the development token for this service's audience",
             )
         return principal

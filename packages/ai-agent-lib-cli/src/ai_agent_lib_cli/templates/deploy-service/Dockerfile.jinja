@@ -1,0 +1,25 @@
+# The image of {{ name }}. Build it from the workspace folder:
+#   docker build -f deploy/{{ name }}/Dockerfile -t {{ name }} .
+FROM python:3.11-slim
+
+COPY --from=ghcr.io/astral-sh/uv:0.5.4 /uv /usr/local/bin/uv
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_PROJECT_ENVIRONMENT=/app/.venv
+
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+COPY agents agents
+COPY mcp-servers mcp-servers
+# Only what {{ name }} needs, exactly as uv.lock pins it, without the dev tools.
+RUN uv sync --frozen --no-dev --package {{ name }}
+
+# The service runs as a user with no rights over its own code.
+RUN useradd --system --uid 10001 --no-create-home service
+USER 10001
+WORKDIR /app/{{ folder }}
+ENV PATH=/app/.venv/bin:$PATH \
+    PYTHONDONTWRITEBYTECODE=1
+EXPOSE {{ port }}
+CMD {{ command_json }}

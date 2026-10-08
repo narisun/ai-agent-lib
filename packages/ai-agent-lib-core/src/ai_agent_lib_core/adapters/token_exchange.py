@@ -22,6 +22,7 @@ from ai_agent_lib_core.contracts import (
     PrincipalKind,
     RequestContext,
     TransientError,
+    describe,
 )
 
 __all__ = ["OAuthTokenExchanger"]
@@ -177,8 +178,8 @@ class OAuthTokenExchanger:
                 )
         except httpx.HTTPError as exc:
             raise TransientError(
-                f"{_WHAT}: the identity provider could not be reached ({type(exc).__name__})"
-            ) from None
+                f"{_WHAT}: the identity provider could not be reached ({describe(exc)})"
+            ) from exc
         try:
             reply = response.json()
         except ValueError:

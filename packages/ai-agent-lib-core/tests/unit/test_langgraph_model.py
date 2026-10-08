@@ -74,6 +74,11 @@ async def test_a_call_reaches_the_provider_and_is_audited_without_content() -> N
         "policy_reason_code": "allowed",
         "policy_bundle_revision": "fake",
         "policy_cached": False,
+        # One attempt, and what the request has used of its budget so far.
+        "attempts": 1,
+        "budget_model_calls": 1,
+        "budget_tool_calls": 0,
+        "budget_tokens": 5,
     }
     assert "confidential" not in str(record.to_dict())
     assert "the answer" not in str(record.to_dict())
@@ -140,14 +145,28 @@ class _ThrottlingProvider(FakeChatModelProvider):
 
 
 async def test_vendor_errors_are_mapped_to_the_taxonomy_and_audited_as_failed() -> None:
-    fakes = Fakes(model=_ThrottlingProvider([_VendorError("429 body with prompt text")]))
+    # Three throttles: the first attempt and both retries a model call gets by default.
+    errors = [_VendorError("429 body with prompt text") for _ in range(3)]
+    fakes = Fakes(model=_ThrottlingProvider(errors))
     async with fakes.container() as services:
         with bind_request_context(CONTEXT), pytest.raises(TransientError) as caught:
             await services.model().ainvoke(QUESTION)
     assert isinstance(caught.value.__cause__, _VendorError)
+    assert caught.value.__notes__ == ["tried 3 times, the last error is shown"]
     (record,) = fakes.audit.records
     assert record.outcome is AuditOutcome.FAILED
     assert record.error_type == "TransientError"
+    assert record.attributes["attempts"] == 3
+
+
+async def test_a_throttle_that_clears_is_tried_again_and_audited_once() -> None:
+    fakes = Fakes(model=_ThrottlingProvider([_VendorError("429"), "the answer"]))
+    async with fakes.container() as services:
+        with bind_request_context(CONTEXT):
+            reply = await services.model().ainvoke(QUESTION)
+    assert reply.content == "the answer"
+    (record,) = fakes.audit.records
+    assert (record.outcome, record.attributes["attempts"]) == (AuditOutcome.SUCCESS, 2)
 
 
 async def test_unrecognised_errors_pass_through_unchanged() -> None:

@@ -10,7 +10,7 @@ apart.
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Annotated, Literal
 
@@ -31,6 +31,7 @@ __all__ = [
     "RULES_SCHEMA",
     "Rule",
     "evaluate_rules",
+    "explain_no_match",
     "parse_obligations",
     "parse_rules_document",
 ]
@@ -150,23 +151,90 @@ class Rule:
 
     def matches(self, request: PolicyRequest) -> bool:
         """Return whether the grant covers ``request``."""
-        if request.action not in self.actions:
-            return False
-        if self.roles is not None and not self.roles & request.principal.roles:
-            return False
-        if self.agents is not None and request.principal.actor not in self.agents:
-            return False
-        if self.kinds is not None and request.principal.kind not in self.kinds:
-            return False
-        if self.applications is not None and request.application not in self.applications:
-            return False
-        if not any(pattern.fullmatch(request.resource.name) for pattern in self.resources):
-            return False
-        if self.max_classification is not None:
-            classification = request.resource.classification
-            if classification is None or classification > self.max_classification:
-                return False
-        return True
+        return not self.mismatches(request)
+
+    def mismatches(self, request: PolicyRequest) -> list[str]:
+        """Return each way in which the grant does not cover ``request``, for a developer.
+
+        The texts name actions, applications, resources, roles and agents,
+        never who the caller is.
+        """
+        checks = (
+            self._action_gap,
+            self._application_gap,
+            self._resource_gap,
+            self._role_gap,
+            self._agent_gap,
+            self._kind_gap,
+            self._classification_gap,
+        )
+        return [gap for gap in (check(request) for check in checks) if gap is not None]
+
+    def _action_gap(self, request: PolicyRequest) -> str | None:
+        if request.action in self.actions:
+            return None
+        return f"it covers {_listed(a.value for a in self.actions)}, not {request.action.value}"
+
+    def _application_gap(self, request: PolicyRequest) -> str | None:
+        if self.applications is None or request.application in self.applications:
+            return None
+        return f"it covers application {_listed(self.applications)}, not {request.application!r}"
+
+    def _resource_gap(self, request: PolicyRequest) -> str | None:
+        if any(pattern.fullmatch(request.resource.name) for pattern in self.resources):
+            return None
+        shown = _listed(_unpattern(pattern) for pattern in self.resources)
+        return f"it covers resources {shown}, not {request.resource.name!r}"
+
+    def _role_gap(self, request: PolicyRequest) -> str | None:
+        if self.roles is None or self.roles & request.principal.roles:
+            return None
+        has = _listed(request.principal.roles) if request.principal.roles else "no roles"
+        return f"it needs one of the roles {_listed(self.roles)}; the caller has {has}"
+
+    def _agent_gap(self, request: PolicyRequest) -> str | None:
+        actor = request.principal.actor
+        if self.agents is None or actor in self.agents:
+            return None
+        came = f"through {actor!r}" if actor is not None else "directly, not through an agent"
+        return f"it needs the request to come through {_listed(self.agents)}; it came {came}"
+
+    def _kind_gap(self, request: PolicyRequest) -> str | None:
+        if self.kinds is None or request.principal.kind in self.kinds:
+            return None
+        kinds = _listed(kind.value for kind in self.kinds)
+        return f"it covers {kinds} callers, not {request.principal.kind.value}"
+
+    def _classification_gap(self, request: PolicyRequest) -> str | None:
+        limit, found = self.max_classification, request.resource.classification
+        if limit is None or (found is not None and found <= limit):
+            return None
+        level = found.name.lower() if found is not None else "unknown"
+        return f"it covers data up to {limit.name.lower()}; the resource is {level}"
+
+
+def _unpattern(pattern: re.Pattern[str]) -> str:
+    """Show a compiled resource pattern as it was written, with ``*``."""
+    return re.sub(r"\\(.)", r"\1", pattern.pattern.replace(".*", "*"))
+
+
+def _listed(names: Iterable[str]) -> str:
+    return ", ".join(repr(name) for name in sorted(names))
+
+
+def explain_no_match(rules: tuple[Rule, ...], request: PolicyRequest, *, closest: int = 2) -> str:
+    """Say why no rule allowed ``request``: which rules came closest and what each needs."""
+    if not rules:
+        return "the rules file has no rules"
+    ranked = sorted(
+        ((len(rule.mismatches(request)), index, rule) for index, rule in enumerate(rules)),
+        key=lambda item: (item[0], item[1]),
+    )
+    near = [rule for count, _, rule in ranked if count][:closest]
+    if all(request.action not in rule.actions for rule in rules):
+        return f"no rule covers the action {request.action.value}"
+    parts = [f"rule {rule.id!r}: " + "; ".join(rule.mismatches(request)) for rule in near]
+    return "no rule matched; the closest were " + " | ".join(parts)
 
 
 def _pattern(text: str) -> re.Pattern[str]:

@@ -16,13 +16,25 @@ from pathlib import Path
 from types import FrameType
 
 from ai_agent_lib_cli.errors import CliError
+from ai_agent_lib_core.contracts import describe
 
-__all__ = ["GraphReader", "ServiceRunner", "read_graph", "run_code", "run_service"]
+__all__ = [
+    "GraphReader",
+    "ServiceRunner",
+    "ToolRunner",
+    "read_graph",
+    "run_code",
+    "run_service",
+    "run_tool",
+]
 
 ServiceRunner = Callable[[Path, str, Sequence[str]], int]
 """Given a service folder, a module and arguments, runs the module and returns its exit code."""
 
 GraphReader = Callable[[Path, str], str]
+
+ToolRunner = Callable[[str, Sequence[str], Path], int]
+"""Runs a Python tool module, such as ruff or pytest, in a folder; returns its exit code."""
 """Given an agent's folder and its package name, returns its graph as a Mermaid diagram."""
 
 _TIMEOUT_SECONDS = 120
@@ -68,9 +80,7 @@ def run_code(folder: Path, code: str, *arguments: str) -> str:
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        raise CliError(
-            f"the code of {folder.name} could not be run ({type(exc).__name__})"
-        ) from None
+        raise CliError(f"the code of {folder.name} could not be run ({describe(exc)})") from exc
     if done.returncode != 0:
         last = (done.stderr.strip().splitlines() or ["no output"])[-1]
         raise CliError(f"the code of {folder.name} failed: {last}")
@@ -158,6 +168,23 @@ def run_service(folder: Path, module: str, arguments: Sequence[str]) -> int:
     with _passing_requests_on() as started:
         process = subprocess.Popen(  # noqa: S603 - this interpreter, a module of the service
             [sys.executable, "-c", _MODULE, module, *arguments], cwd=folder
+        )
+        started.append(process)
+        return process.wait()
+
+
+def run_tool(module: str, arguments: Sequence[str], folder: Path) -> int:
+    """Run ``python -m module arguments`` in ``folder``, with this terminal as its own.
+
+    The tool is the one installed beside this command, in the workspace's
+    environment. A request to stop this command is passed on to it.
+
+    Returns:
+        The tool's exit code.
+    """
+    with _passing_requests_on() as started:
+        process = subprocess.Popen(  # noqa: S603 - this interpreter, a known tool module
+            [sys.executable, "-m", module, *arguments], cwd=folder
         )
         started.append(process)
         return process.wait()

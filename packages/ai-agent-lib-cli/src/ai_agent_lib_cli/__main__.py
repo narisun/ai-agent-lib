@@ -11,6 +11,7 @@ from ai_agent_lib_cli.app import cli
 from ai_agent_lib_cli.errors import EXIT_FAILED, EXIT_OK, EXIT_USAGE, CliError
 from ai_agent_lib_cli.toolbox import Toolbox
 from ai_agent_lib_core.contracts import AgentLibError
+from ai_agent_lib_core.observability import explain
 
 __all__ = ["main"]
 
@@ -19,8 +20,9 @@ def main(argv: Sequence[str] | None = None, toolbox: Toolbox | None = None) -> i
     """Run the command line and return its exit code.
 
     0 means done, 1 means the command was understood and could not be done,
-    2 means the command line itself was wrong. A problem is one line on
-    standard error, never a traceback.
+    2 means the command line itself was wrong. A problem is reported on
+    standard error in a few lines: what went wrong, what was expected and
+    what was found, and what to do. A bug in the command is a traceback.
 
     Args:
         argv: The command line. By default the process's own.
@@ -43,8 +45,11 @@ def main(argv: Sequence[str] | None = None, toolbox: Toolbox | None = None) -> i
     except click.Abort:
         click.echo("agentlib: stopped", err=True)
         return EXIT_FAILED
-    except (CliError, AgentLibError) as problem:
+    except CliError as problem:
         click.echo(f"agentlib: error: {problem}", err=True)
+        return EXIT_FAILED
+    except AgentLibError as problem:
+        click.echo(f"agentlib: error: {explain(problem)}", err=True)
         return EXIT_FAILED
     return result if isinstance(result, int) else EXIT_OK
 

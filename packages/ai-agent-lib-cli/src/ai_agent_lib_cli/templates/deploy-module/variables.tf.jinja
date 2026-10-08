@@ -1,0 +1,127 @@
+variable "name" {
+  description = "The service's name. Names the task family, the ECS service, its roles and its log group."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9-]{0,47}$", var.name))
+    error_message = "name must be lower case letters, digits and hyphens, at most 48 characters, starting with a letter."
+  }
+}
+
+variable "region" {
+  description = "The region the service runs in."
+  type        = string
+}
+
+variable "image" {
+  description = "The service's container image, pinned by digest or by an immutable tag."
+  type        = string
+}
+
+variable "command" {
+  description = "The command that starts the service in the container."
+  type        = list(string)
+}
+
+variable "port" {
+  description = "The port the service listens on."
+  type        = number
+}
+
+variable "environment" {
+  description = "The service's settings: its EAP_ variables. Never a secret: secrets stay in Secrets Manager."
+  type        = map(string)
+  default     = {}
+}
+
+variable "task_policy_json" {
+  description = "The permissions the service's adapters need, as an IAM policy document. null when they need none."
+  type        = string
+  default     = null
+}
+
+variable "cluster_arn" {
+  description = "The ECS cluster to run in."
+  type        = string
+}
+
+variable "subnet_ids" {
+  description = "Private subnets for the tasks."
+  type        = list(string)
+}
+
+variable "security_group_ids" {
+  description = "Security groups for the tasks."
+  type        = list(string)
+}
+
+variable "target_group_arn" {
+  description = "A load balancer target group to register the tasks with, or null for none."
+  type        = string
+  default     = null
+}
+
+variable "desired_count" {
+  description = "How many tasks to run."
+  type        = number
+  default     = 2
+}
+
+variable "cpu" {
+  description = "CPU units for the whole task, sidecars included."
+  type        = number
+  default     = 1024
+}
+
+variable "memory" {
+  description = "Memory in MiB for the whole task, sidecars included."
+  type        = number
+  default     = 2048
+}
+
+variable "cpu_architecture" {
+  description = "X86_64 or ARM64. It must match the images."
+  type        = string
+  default     = "X86_64"
+
+  validation {
+    condition     = contains(["X86_64", "ARM64"], var.cpu_architecture)
+    error_message = "cpu_architecture must be X86_64 or ARM64."
+  }
+}
+
+variable "opa_image" {
+  description = "The OPA sidecar's image, with the platform bundle and the workspace's rules in it, or null when the service does not use OPA."
+  type        = string
+  default     = null
+}
+
+variable "collector" {
+  description = "Run an OpenTelemetry collector sidecar that sends traces to X-Ray and metrics to CloudWatch."
+  type        = bool
+  default     = false
+}
+
+variable "collector_image" {
+  description = "The collector sidecar's image."
+  type        = string
+  default     = "public.ecr.aws/aws-observability/aws-otel-collector:v0.40.0"
+}
+
+variable "log_retention_days" {
+  description = "How long the containers' logs are kept."
+  type        = number
+  default     = 30
+}
+
+variable "log_kms_key_arn" {
+  description = "A KMS key to encrypt the logs with, or null for the CloudWatch default."
+  type        = string
+  default     = null
+}
+
+variable "tags" {
+  description = "Tags for every resource."
+  type        = map(string)
+  default     = {}
+}

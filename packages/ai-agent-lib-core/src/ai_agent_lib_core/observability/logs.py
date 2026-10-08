@@ -16,25 +16,25 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import sys
-import traceback
 from datetime import UTC, datetime
 from typing import IO, Any
 
-from ai_agent_lib_core.contracts import AgentLibError
+from ai_agent_lib_core.contracts.redaction import REDACTED, redact
+from ai_agent_lib_core.observability.errors import error_fields
 from ai_agent_lib_core.pipeline.context import bound_request_context
 
-__all__ = ["LIBRARY_LOGGERS", "JsonLogFormatter", "configure_logging", "redact"]
+__all__ = ["LIBRARY_LOGGERS", "REDACTED", "JsonLogFormatter", "configure_logging", "redact"]
 
 LIBRARY_LOGGERS = ("ai_agent_lib_core", "ai_agent_lib_aws", "uvicorn.error")
 """The loggers that speak at the service's level. Every other one starts at WARNING."""
 
-REDACTED = "[redacted]"
 _MAX_MESSAGE = 2_000
 _MAX_FIELD = 300
 _MAX_FRAMES = 8
 _HANDLER_MARK = "_agentlib_handler"
+_DETAIL = "detail"
+"""An ``extra`` that may hold caller content: written only when details are on."""
 
 # What a record carries by itself. Anything else on it was passed as ``extra``.
 # ``color_message`` is the server's own message again, with terminal colours.
@@ -45,26 +45,9 @@ _STANDARD = frozenset(logging.makeLogRecord({}).__dict__) | {
     "color_message",
 }
 
-_CREDENTIALS = (
-    # An Authorization header value, whatever follows the scheme.
-    re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}"),
-    # A JSON web token.
-    re.compile(r"\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]*"),
-    # An AWS access key ID.
-    re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
-    # key=value and "key": "value" where the key names a credential.
-    re.compile(
-        r"(?i)([\"']?[A-Za-z0-9_-]*(?:password|passwd|secret|token|api[_-]?key|authorization)"
-        r"[A-Za-z0-9_-]*[\"']?\s*[=:]\s*)(\"[^\"]*\"|'[^']*'|[^\s,;&]+)"
-    ),
-)
 
-
-def redact(text: str) -> str:
-    """Return ``text`` with anything shaped like a credential replaced."""
-    for index, pattern in enumerate(_CREDENTIALS):
-        text = pattern.sub(rf"\1{REDACTED}" if index in (0, 3) else REDACTED, text)
-    return text
+def _detail(value: object) -> str:
+    return redact(str(value))[:_MAX_MESSAGE]
 
 
 def _scalar(value: object) -> str | int | float | bool | None:
@@ -73,28 +56,30 @@ def _scalar(value: object) -> str | int | float | bool | None:
     return redact(str(value))[:_MAX_FIELD]
 
 
-def _where(error: BaseException) -> list[str]:
-    """Return where an error was raised, innermost last, without any values."""
-    frames = traceback.extract_tb(error.__traceback__)[-_MAX_FRAMES:]
-    return [f"{frame.filename}:{frame.lineno} in {frame.name}" for frame in frames]
-
-
 class JsonLogFormatter(logging.Formatter):
     """Writes a record as one line of JSON.
 
     Every line has ``time``, ``level``, ``logger``, ``message`` and
     ``service``. Inside a request it also has ``request_id`` and
     ``application``. Values passed as ``extra`` are added when they are plain
-    values. An error adds ``error_type`` and ``error_at``; its message is added
-    only for the library's own errors, whose messages never hold content.
+    values. An error adds ``error_type``, ``error_at``, what led to it
+    (``error_causes``) and the nearest line of the service's own code
+    (``error_in_your_code``). The library's own errors also add their message,
+    ``error_expected``, ``error_actual`` and ``error_fix``, which never hold
+    caller content. An ``extra`` called ``detail`` may hold caller content and
+    is written only when ``details`` is on.
 
     Args:
         service: The name of the service, written on every line.
+        details: Also write what may hold caller content: an error's
+            ``detail`` and the messages of other libraries' errors. For a
+            developer's machine; leave it off where logs are kept.
     """
 
-    def __init__(self, service: str) -> None:
+    def __init__(self, service: str, *, details: bool = False) -> None:
         super().__init__()
         self._service = service
+        self._details = details
 
     def format(self, record: logging.LogRecord) -> str:
         """Return the record as one line of JSON."""
@@ -110,14 +95,14 @@ class JsonLogFormatter(logging.Formatter):
             line["request_id"] = context.request_id
             line["application"] = context.application
         for key, value in record.__dict__.items():
-            if key not in _STANDARD and not key.startswith("_"):
-                line.setdefault(key, _scalar(value))
+            if key in _STANDARD or key.startswith("_"):
+                continue
+            if key == _DETAIL and not self._details:
+                continue
+            line.setdefault(key, _scalar(value) if key != _DETAIL else _detail(value))
         error = record.exc_info[1] if record.exc_info else None
         if error is not None:
-            line["error_type"] = type(error).__name__
-            line["error_at"] = _where(error)
-            if isinstance(error, AgentLibError):
-                line["error"] = redact(str(error))[:_MAX_MESSAGE]
+            line.update(error_fields(error, details=self._details))
         return json.dumps(line, ensure_ascii=False, default=str)
 
 
@@ -126,6 +111,7 @@ def configure_logging(
     *,
     level: int | str = logging.INFO,
     stream: IO[str] | None = None,
+    details: bool = False,
 ) -> logging.Handler:
     """Send every log record to ``stream`` as one line of JSON.
 
@@ -139,12 +125,15 @@ def configure_logging(
             it is higher.
         stream: Where the lines go. Standard output by default: on a container
             platform that is the log.
+        details: Also log what may hold caller content, such as the message
+            of an unexpected error in a tool. Turn it on only on a developer's
+            machine: ``details=config.deployment_env is DeploymentEnv.LOCAL``.
 
     Returns:
         The handler that was installed.
     """
     handler = logging.StreamHandler(stream if stream is not None else sys.stdout)
-    handler.setFormatter(JsonLogFormatter(service))
+    handler.setFormatter(JsonLogFormatter(service, details=details))
     setattr(handler, _HANDLER_MARK, True)
     root = logging.getLogger()
     for existing in list(root.handlers):

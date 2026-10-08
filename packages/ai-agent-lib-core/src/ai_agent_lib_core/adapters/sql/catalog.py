@@ -222,7 +222,15 @@ class QueryCatalog:
             ConfigurationError: If the directory is missing or a query is invalid.
         """
         if not directory.is_dir():
-            raise ConfigurationError(f"query directory not found: {directory}")
+            raise ConfigurationError(
+                "the queries folder does not exist",
+                expected="a folder of .sql files, one named query each",
+                actual=f"nothing at {directory}",
+                fix=(
+                    "correct queries_dir; a relative path is relative to the folder of the "
+                    "service's .env file"
+                ),
+            )
         return cls(
             (_load_file(path, dialect) for path in sorted(directory.glob("*.sql"))), dialect=dialect
         )

@@ -323,7 +323,7 @@ class RedshiftDataSource:
         except ConfigurationError:
             raise
         except AgentLibError as exc:
-            raise ConfigurationError(str(exc)) from None
+            raise ConfigurationError.from_error(exc) from exc
 
     async def aclose(self) -> None:
         """Forget the loaded queries. Safe to call more than once."""
@@ -378,10 +378,17 @@ class RedshiftDataSource:
             if status == _FINISHED:
                 return
             if status == _FAILED:
-                # The database's message can repeat parameter values, so it is left out.
+                # The database's message can repeat parameter values, so it is the
+                # detail: shown on a developer's machine, never in deployed logs.
+                message = str(reply.get("Error") or "no message")
                 raise AgentLibError(
                     f"query {label!r} failed on data source {self._name!r} "
-                    f"(statement {statement_id})"
+                    f"(statement {statement_id})",
+                    fix=(
+                        "run the query's SQL in the Redshift query editor with the same "
+                        "parameters; the statement ID finds it in SYS_QUERY_HISTORY"
+                    ),
+                    detail=f"the database said: {message}",
                 )
             if status == _ABORTED:
                 raise TransientError(

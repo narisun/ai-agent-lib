@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import sys
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
 from typing import Any
 
 from langchain_core.messages import HumanMessage
 
 from accounts_agent.graph import APPLICATION, build_graph, registered_mcp_tools
-from ai_agent_lib_core import AgentLibError, RequestContext, ServiceContainer, ValidationFailed
+from ai_agent_lib_core import RequestContext, ServiceConfig, ServiceContainer, ValidationFailed
+from ai_agent_lib_core.config import load_service_config
 from ai_agent_lib_core.integrations.http import ServiceLifecycle, agent_app, serve
-from ai_agent_lib_core.observability import configure_logging
+from ai_agent_lib_core.observability import configure_logging, report_error, shows_details
 
 __all__ = ["build_app", "main"]
 
@@ -32,19 +32,43 @@ async def build_app(services: ServiceContainer, lifecycle: ServiceLifecycle) -> 
     graph = build_graph(services, await registered_mcp_tools(services))
 
     async def run(context: RequestContext, given: Any) -> dict[str, str]:
-        question = given.get("question") if isinstance(given, dict) else None
-        if not isinstance(question, str) or not question.strip():
-            raise ValidationFailed("the input must be an object with a 'question'")
         result = await graph.ainvoke(
-            {"messages": [HumanMessage(question)]}, **services.invocation(context)
+            {"messages": [HumanMessage(_question(given))]}, **services.invocation(context)
         )
         return {"answer": str(result["messages"][-1].content)}
 
-    return agent_app(services, run, application=APPLICATION, lifecycle=lifecycle)
+    async def stream(context: RequestContext, given: Any) -> AsyncIterator[dict[str, Any]]:
+        # POST /invoke/stream sends each graph step as a server-sent event.
+        async for update in graph.astream(
+            {"messages": [HumanMessage(_question(given))]},
+            stream_mode="updates",
+            **services.invocation(context),
+        ):
+            for node, change in update.items():
+                added = change.get("messages", []) if isinstance(change, dict) else []
+                yield {
+                    "node": node,
+                    "messages": [
+                        {"type": message.type, "content": str(message.content)} for message in added
+                    ],
+                }
+
+    return agent_app(services, run, application=APPLICATION, lifecycle=lifecycle, stream=stream)
 
 
-async def _serve(host: str, port: int) -> None:
-    async with ServiceContainer.from_env() as services:
+def _question(given: Any) -> str:
+    question = given.get("question") if isinstance(given, dict) else None
+    if not isinstance(question, str) or not question.strip():
+        raise ValidationFailed(
+            "the input is not a question",
+            expected='an object such as {"question": "What is the balance of 4411?"}',
+            actual="no non-empty 'question' in it",
+        )
+    return question
+
+
+async def _serve(config: ServiceConfig, host: str, port: int) -> None:
+    async with ServiceContainer(config) as services:
         # serve() runs services.validate() once it is listening, so the health
         # route answers while the readiness route still says no.
         lifecycle = ServiceLifecycle(services.validate)
@@ -57,13 +81,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--host", default="127.0.0.1", help="address to listen on")
     parser.add_argument("--port", type=int, default=8000, help="port to listen on")
     arguments = parser.parse_args(argv)
-    # One line of JSON per event on standard output, with no content in it.
-    configure_logging(APPLICATION)
+    config: ServiceConfig | None = None
     try:
-        asyncio.run(_serve(arguments.host, arguments.port))
-    except AgentLibError as error:
-        sys.stderr.write(f"accounts-agent-serve: {type(error).__name__}: {error}\n")
-        return 1
+        config = load_service_config()
+        # One line of JSON per event on standard output. On a developer's
+        # machine a line about an error also says what the error said.
+        configure_logging(APPLICATION, details=shows_details(config))
+        asyncio.run(_serve(config, arguments.host, arguments.port))
+    except Exception as error:  # noqa: BLE001 - every failure is explained, then the exit code
+        return report_error("accounts-agent-serve", error, details=shows_details(config))
     return 0
 
 

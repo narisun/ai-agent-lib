@@ -31,7 +31,7 @@ from ai_agent_lib_cli.dataplan import (
 from ai_agent_lib_cli.errors import CliError
 from ai_agent_lib_cli.names import PLAIN_NAME
 from ai_agent_lib_cli.proposals import is_sensitive, stand_in
-from ai_agent_lib_core.contracts import ParameterType
+from ai_agent_lib_core.contracts import ParameterType, describe
 
 __all__ = ["OpenApiReading", "read_openapi", "snake"]
 
@@ -447,7 +447,7 @@ def _load(path: Path) -> Mapping[str, Any]:
         text = path.read_text(encoding="utf-8")
         raw = json.loads(text) if path.suffix.lower() == ".json" else yaml.safe_load(text)
     except (OSError, ValueError, yaml.YAMLError) as exc:
-        raise CliError(f"{path} cannot be read as JSON or YAML ({type(exc).__name__})") from None
+        raise CliError(f"{path} cannot be read as JSON or YAML ({describe(exc)})") from exc
     if not isinstance(raw, Mapping) or not isinstance(raw.get("paths"), Mapping):
         raise CliError(f"{path} is not an OpenAPI document: it has no paths")
     if not str(raw.get("openapi", "")).startswith("3."):

@@ -306,6 +306,18 @@ class TelemetryContract(abc.ABC):
         telemetry.event("tool.call", {})
         telemetry.duration("tool.call", 0.0, {})
 
+    def test_a_span_opens_takes_facts_as_it_ends_and_never_raises(self) -> None:
+        telemetry = self.make_telemetry()
+        with telemetry.span("chat model-x", {"gen_ai.operation.name": "chat"}) as note:
+            note({"agentlib.outcome": "success", "gen_ai.usage.input_tokens": 3, "none": None})
+        with telemetry.span("execute_tool lookup", {}) as note:
+            note({"agentlib.outcome": "failed"}, ValueError("the private text"))
+
+    def test_an_error_inside_a_span_passes_through_it(self) -> None:
+        telemetry = self.make_telemetry()
+        with pytest.raises(KeyError), telemetry.span("query a.b", {}):
+            raise KeyError("x")
+
 
 class ChatModelProviderContract(abc.ABC):
     """What every :class:`ChatModelProvider` must do, without calling a model."""

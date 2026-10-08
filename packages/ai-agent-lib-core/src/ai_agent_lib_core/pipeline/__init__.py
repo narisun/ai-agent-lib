@@ -1,11 +1,16 @@
 """The interceptor contract and the fixed-order request pipelines."""
 
-from ai_agent_lib_core.pipeline.assembly import build_model_pipeline, build_tool_pipeline
+from ai_agent_lib_core.pipeline.assembly import (
+    Operations,
+    build_model_pipeline,
+    build_tool_pipeline,
+)
 from ai_agent_lib_core.pipeline.audit import (
     AuditableCall,
     AuditInterceptor,
     record_refused_sign_in,
 )
+from ai_agent_lib_core.pipeline.budget import BudgetInterceptor, BudgetLedger
 from ai_agent_lib_core.pipeline.calls import DataCall, Evidence, ModelCall, ToolCall
 from ai_agent_lib_core.pipeline.context import bind_request_context, bound_request_context
 from ai_agent_lib_core.pipeline.data import (
@@ -34,6 +39,7 @@ from ai_agent_lib_core.pipeline.registry import (
     allowed_agent,
     name_actors,
 )
+from ai_agent_lib_core.pipeline.resilience import ResilienceInterceptor
 from ai_agent_lib_core.pipeline.stages import DataStage, ModelStage, Pipeline, ToolStage
 from ai_agent_lib_core.pipeline.structured import StructuredOutputInterceptor
 
@@ -41,6 +47,8 @@ __all__ = [
     "AgentCheck",
     "AuditInterceptor",
     "AuditableCall",
+    "BudgetInterceptor",
+    "BudgetLedger",
     "DataCall",
     "DataPolicyInterceptor",
     "DataStage",
@@ -54,9 +62,11 @@ __all__ = [
     "ModelCall",
     "ModelPolicyInterceptor",
     "ModelStage",
+    "Operations",
     "OutputGuardrailInterceptor",
     "Pipeline",
     "RegistryInterceptor",
+    "ResilienceInterceptor",
     "StructuredOutputInterceptor",
     "ToolCall",
     "ToolPolicyInterceptor",

@@ -1,0 +1,48 @@
+variable "region" {
+  description = "The region to run in."
+  type        = string
+}
+
+variable "image" {
+  description = "The image of {{ name }}, built from deploy/{{ name }}/Dockerfile and pinned by digest."
+  type        = string
+}
+
+variable "opa_image" {
+  description = "The OPA sidecar's image, built from deploy/opa/Dockerfile. Needed when the settings use OPA beside the service."
+  type        = string
+  default     = null
+}
+
+variable "cluster_arn" {
+  description = "The ECS cluster to run in."
+  type        = string
+}
+
+variable "subnet_ids" {
+  description = "Private subnets for the tasks."
+  type        = list(string)
+}
+
+variable "security_group_ids" {
+  description = "Security groups for the tasks."
+  type        = list(string)
+}
+
+variable "target_group_arn" {
+  description = "A load balancer target group for the tasks, or null for none."
+  type        = string
+  default     = null
+}
+
+variable "desired_count" {
+  description = "How many tasks to run."
+  type        = number
+  default     = 2
+}
+
+variable "tags" {
+  description = "Tags for every resource."
+  type        = map(string)
+  default     = {}
+}

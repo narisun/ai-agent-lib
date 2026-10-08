@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
 from typing import Annotated, Any, TypedDict
 
 from ai_agent_lib_core import RequestContext, ServiceContainer
@@ -15,7 +15,15 @@ from langgraph.prebuilt import ToolNode, tools_condition
 
 from {{ package }}.tools import greet
 
-__all__ = ["APPLICATION", "State", "answer", "ask", "build_graph", "registered_mcp_tools"]
+__all__ = [
+    "APPLICATION",
+    "State",
+    "answer",
+    "ask",
+    "build_graph",
+    "registered_mcp_tools",
+    "steps",
+]
 
 APPLICATION = "{{ name }}"
 """The agent's name in the registry, in policy and in the audit log."""
@@ -79,6 +87,37 @@ async def answer(
         **services.invocation(context),  # touchpoint 5
     )
     return str(result["messages"][-1].content)
+
+
+async def steps(
+    graph: CompiledStateGraph[Any, Any, Any, Any],
+    services: ServiceContainer,
+    context: RequestContext,
+    question: str,
+) -> AsyncIterator[dict[str, Any]]:
+    """Run a built graph for one question and yield each step as it ends.
+
+    Each step names the graph node that ran and the messages it added, so a
+    caller sees tool calls and the answer as they happen.
+    """
+    async for update in graph.astream(
+        {"messages": [HumanMessage(question)]},
+        stream_mode="updates",
+        **services.invocation(context),
+    ):
+        for node, change in update.items():
+            added = change.get("messages", []) if isinstance(change, dict) else []
+            yield {
+                "node": node,
+                "messages": [
+                    {
+                        "type": message.type,
+                        "content": str(message.content),
+                        "tool_calls": [call["name"] for call in getattr(message, "tool_calls", [])],
+                    }
+                    for message in added
+                ],
+            }
 
 
 async def ask(services: ServiceContainer, context: RequestContext, question: str) -> str:

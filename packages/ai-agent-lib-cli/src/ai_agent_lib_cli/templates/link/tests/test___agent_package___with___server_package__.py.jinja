@@ -19,6 +19,7 @@ from ai_agent_lib_core.contracts import MASK
 {% endif %}
 from ai_agent_lib_core.testing import (
     audit_records,
+    calls_tool,
     last_shown_to_model,
     load_test_config,
 {% if rest %}
@@ -27,7 +28,6 @@ from ai_agent_lib_core.testing import (
     scripted_providers,
 )
 from ai_agent_lib_core.testing.mcp import InProcessMcpConnector
-from langchain_core.messages import AIMessage
 
 from {{ agent_package }} import APPLICATION as AGENT
 from {{ agent_package }} import answer, build_graph
@@ -45,30 +45,11 @@ API_RESPONSES = json.loads(
 
 
 {% if sample %}
-def asks_who_is_in(team: str) -> AIMessage:
-    """What a model replies when it decides to call the server's tool.
-
-    A model sees an MCP tool under the server's ID and the tool's name, joined
-    by an underscore.
-    """
-    call = {"name": "{{ server_id }}_people_by_team", "args": {"team": team}, "id": "call-1"}
-    return AIMessage(content="", tool_calls=[call])
+# A model calls an MCP tool by its registered name; calls_tool spells it the way
+# a model API needs it.
 {% else %}
 QUESTION = "What does {{ server_id }} have?"
-
-
-def calls_the_tool() -> AIMessage:
-    """What a model replies when it decides to call the server's tool.
-
-    A model sees an MCP tool under the server's ID and the tool's name, joined
-    by an underscore.
-    """
-    call = {
-        "name": "{{ server_id }}_{{ query.name }}",
-        "args": {{ query.example_arguments }},
-        "id": "call-1",
-    }
-    return AIMessage(content="", tool_calls=[call])
+CALLS_THE_TOOL = calls_tool("{{ server_id }}.{{ query.name }}"{% if query.example_keywords %}, {{ query.example_keywords }}{% endif %})
 {% endif %}
 
 
@@ -101,7 +82,7 @@ async def test_the_agent_answers_from_the_server_and_an_analyst_sees_no_email(
     tmp_path: Path,
 ) -> None:
     shown = await ask_as(
-        ["analyst"], tmp_path, "Who is in payments?", asks_who_is_in("payments"), "Two people."
+        ["analyst"], tmp_path, "Who is in payments?", calls_tool("{{ server_id }}.people_by_team", team="payments"), "Two people."
     )
     # The model was shown the table as data, with the column the caller may not see masked.
     assert shown.startswith('<untrusted_tool_result tool="{{ server_id }}.people_by_team">')
@@ -120,7 +101,7 @@ async def test_the_agent_answers_from_the_server_and_an_analyst_sees_no_email(
 
 async def test_a_manager_is_shown_the_email(tmp_path: Path) -> None:
     shown = await ask_as(
-        ["manager"], tmp_path, "Who is in payments?", asks_who_is_in("payments"), "Two people."
+        ["manager"], tmp_path, "Who is in payments?", calls_tool("{{ server_id }}.people_by_team", team="payments"), "Two people."
     )
     assert "cleo.carr@example.test" in shown
     assert MASK not in shown
@@ -130,13 +111,13 @@ async def test_a_caller_the_server_does_not_allow_gets_a_refusal_the_model_can_e
     tmp_path: Path,
 ) -> None:
     shown = await ask_as(
-        ["intern"], tmp_path, "Who is in payments?", asks_who_is_in("payments"), "I may not."
+        ["intern"], tmp_path, "Who is in payments?", calls_tool("{{ server_id }}.people_by_team", team="payments"), "I may not."
     )
     assert "The call was denied" in shown
     assert "Cleo Carr" not in shown
 {% else %}
 async def test_the_agent_answers_from_the_server_as_an_analyst(tmp_path: Path) -> None:
-    shown = await ask_as(["analyst"], tmp_path, QUESTION, calls_the_tool(), "Here it is.")
+    shown = await ask_as(["analyst"], tmp_path, QUESTION, CALLS_THE_TOOL, "Here it is.")
     # The model was shown the table as data.
     assert shown.startswith('<untrusted_tool_result tool="{{ server_id }}.{{ query.name }}">')
 {% if query.masked and query.returns_rows %}
@@ -155,7 +136,7 @@ async def test_the_agent_answers_from_the_server_as_an_analyst(tmp_path: Path) -
 
 {% if query.masked and query.returns_rows %}
 async def test_a_manager_is_shown_every_column(tmp_path: Path) -> None:
-    shown = await ask_as(["manager"], tmp_path, QUESTION, calls_the_tool(), "Here it is.")
+    shown = await ask_as(["manager"], tmp_path, QUESTION, CALLS_THE_TOOL, "Here it is.")
     assert shown.startswith('<untrusted_tool_result tool="{{ server_id }}.{{ query.name }}">')
     assert MASK not in shown
 
@@ -164,6 +145,6 @@ async def test_a_manager_is_shown_every_column(tmp_path: Path) -> None:
 async def test_a_caller_the_server_does_not_allow_gets_a_refusal_the_model_can_explain(
     tmp_path: Path,
 ) -> None:
-    shown = await ask_as(["intern"], tmp_path, QUESTION, calls_the_tool(), "I may not.")
+    shown = await ask_as(["intern"], tmp_path, QUESTION, CALLS_THE_TOOL, "I may not.")
     assert "The call was denied" in shown
 {% endif %}

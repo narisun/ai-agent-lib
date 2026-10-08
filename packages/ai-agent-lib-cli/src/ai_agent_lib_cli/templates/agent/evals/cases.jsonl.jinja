@@ -1,0 +1,6 @@
+# Cases for the eval of {{ name }}: one JSON object per line.
+# "input" is what the agent is asked; "expected" is what a good answer has.
+# Add a case for every bug a person reports, and for each kind of question.
+{"id": "greet-ada", "input": {"question": "Say hello to Ada."}, "expected": {"mentions": "Ada"}}
+{"id": "greet-grace", "input": {"question": "Please greet Grace for me."}, "expected": {"mentions": "Grace"}}
+{"id": "greet-nobody", "input": {"question": "Greet someone whose name is empty."}, "expected": {"mentions": "nobody"}, "tags": ["edge"]}

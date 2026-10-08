@@ -4,21 +4,21 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import sys
 from collections.abc import Sequence
 
 from accounts_mcp.server import APPLICATION, SERVER_ID, build_server
-from ai_agent_lib_core import AgentLibError, ServiceContainer
+from ai_agent_lib_core import ServiceConfig, ServiceContainer
+from ai_agent_lib_core.config import load_service_config
 from ai_agent_lib_core.contracts import DeploymentEnv
 from ai_agent_lib_core.integrations.http import ServiceLifecycle, add_health_routes, serve
 from ai_agent_lib_core.integrations.mcp import verify_registration
-from ai_agent_lib_core.observability import configure_logging
+from ai_agent_lib_core.observability import configure_logging, report_error, shows_details
 
 __all__ = ["main"]
 
 
-async def _serve(host: str, port: int) -> None:
-    async with ServiceContainer.from_env() as services:
+async def _serve(config: ServiceConfig, host: str, port: int) -> None:
+    async with ServiceContainer(config) as services:
         server = build_server(services)
         # Health and readiness answer without a token; a load balancer has none.
         lifecycle = ServiceLifecycle(services.validate)
@@ -40,14 +40,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--host", default="127.0.0.1", help="address to listen on")
     parser.add_argument("--port", type=int, default=8001, help="port to listen on")
     arguments = parser.parse_args(argv)
-    # One line of JSON per event on standard output, with no content in it.
-    # Before the server is built, so that nothing else sets up logging first.
-    configure_logging(APPLICATION)
+    config: ServiceConfig | None = None
     try:
-        asyncio.run(_serve(arguments.host, arguments.port))
-    except AgentLibError as error:
-        sys.stderr.write(f"accounts-mcp: {type(error).__name__}: {error}\n")
-        return 1
+        config = load_service_config()
+        # One line of JSON per event on standard output, set up before the server
+        # is built so that nothing else sets up logging first. On a developer's
+        # machine a line about an error also says what the error said.
+        configure_logging(APPLICATION, details=shows_details(config))
+        asyncio.run(_serve(config, arguments.host, arguments.port))
+    except Exception as error:  # noqa: BLE001 - every failure is explained, then the exit code
+        return report_error("accounts-mcp", error, details=shows_details(config))
     return 0
 
 

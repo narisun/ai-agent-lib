@@ -24,7 +24,7 @@ from ai_agent_lib_core.adapters.registry_documents import (
     parse_tools_document,
     tools_document,
 )
-from ai_agent_lib_core.contracts import AgentEntry, AgentLibError, ServerEntry
+from ai_agent_lib_core.contracts import AgentEntry, AgentLibError, ServerEntry, describe
 
 __all__ = [
     "AGENTS_FILE",
@@ -79,7 +79,7 @@ def _load(path: Path, what: str) -> object | None:
     try:
         document: object = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError) as exc:
-        raise CliError(f"{what} ({path}) cannot be read ({type(exc).__name__})") from None
+        raise CliError(f"{what} ({path}) cannot be read ({describe(exc)})") from exc
     return document
 
 

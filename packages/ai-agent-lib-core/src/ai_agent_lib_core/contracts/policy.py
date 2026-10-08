@@ -132,6 +132,10 @@ class Decision:
         obligations: Conditions attached to an allow. Always empty on a deny.
         bundle_revision: The version of the policy that decided, when known.
         cached: Whether the answer was reused from an earlier identical question.
+        explanation: Why a deny was given, for the developer who reads it: for
+            example which rule came closest and what it needs. It names rules,
+            actions, resources and roles, never who the caller is. ``None``
+            when the policy system does not say.
     """
 
     allow: bool
@@ -140,6 +144,7 @@ class Decision:
     obligations: Obligations = field(default_factory=Obligations)
     bundle_revision: str | None = None
     cached: bool = False
+    explanation: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.allow, bool):
@@ -169,7 +174,12 @@ class Decision:
 
     @classmethod
     def denied(
-        cls, decision_id: str, reason_code: str = "denied", *, bundle_revision: str | None = None
+        cls,
+        decision_id: str,
+        reason_code: str = "denied",
+        *,
+        bundle_revision: str | None = None,
+        explanation: str | None = None,
     ) -> Decision:
         """Return a deny."""
         return cls(
@@ -177,6 +187,7 @@ class Decision:
             reason_code=reason_code,
             decision_id=decision_id,
             bundle_revision=bundle_revision,
+            explanation=explanation,
         )
 
 

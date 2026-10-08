@@ -15,6 +15,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path, PurePosixPath
 
 from ai_agent_lib_cli.errors import CliError
+from ai_agent_lib_core.contracts import describe
 
 __all__ = ["LINE_LENGTH", "TARGET_VERSION", "Formatter", "format_python"]
 
@@ -50,9 +51,7 @@ def _ruff(folder: Path, *arguments: str) -> None:
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        raise CliError(
-            f"the generated code could not be formatted ({type(exc).__name__})"
-        ) from None
+        raise CliError(f"the generated code could not be formatted ({describe(exc)})") from exc
     if done.returncode != 0:
         last = ((done.stderr or done.stdout).strip().splitlines() or ["no output"])[-1]
         raise CliError(f"the generated code could not be formatted: {last}")

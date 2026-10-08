@@ -14,7 +14,7 @@ from ai_agent_lib_core.contracts import (
     CheckResult,
     ServiceConfig,
 )
-from ai_agent_lib_core.di.container import ServiceContainer, fix_for
+from ai_agent_lib_core.di.container import ServiceContainer
 from ai_agent_lib_core.di.providers import ServiceProviders
 
 __all__ = ["diagnose"]
@@ -35,7 +35,7 @@ def _model(services: ServiceContainer) -> CheckResult | None:
         reference, provider = services.resolve_model(DEFAULT_MODEL_ALIAS)
         provider.create(reference.model_id)
     except AgentLibError as problem:
-        return CheckResult(_MODEL, ok=False, detail=str(problem), fix=fix_for(problem))
+        return CheckResult.failed(_MODEL, problem)
     return CheckResult(
         _MODEL, ok=True, detail=f"{reference.provider} serves {reference.model_id!r}"
     )
@@ -57,7 +57,7 @@ async def diagnose(
     try:
         await services.start()
     except AgentLibError as problem:
-        return (CheckResult(_STARTUP, ok=False, detail=str(problem), fix=fix_for(problem)),)
+        return (CheckResult.failed(_STARTUP, problem),)
     try:
         results = list(await services.check())
         model = _model(services)

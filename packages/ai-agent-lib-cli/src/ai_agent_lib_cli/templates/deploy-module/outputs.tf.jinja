@@ -1,0 +1,19 @@
+output "service_name" {
+  description = "The ECS service's name."
+  value       = aws_ecs_service.this.name
+}
+
+output "task_definition_arn" {
+  description = "The task definition the service runs."
+  value       = aws_ecs_task_definition.this.arn
+}
+
+output "task_role_arn" {
+  description = "The role the service's code runs as. It holds exactly the permissions its adapters declared."
+  value       = aws_iam_role.task.arn
+}
+
+output "log_group_name" {
+  description = "Where the containers' logs go."
+  value       = aws_cloudwatch_log_group.this.name
+}

@@ -36,6 +36,7 @@ from ai_agent_lib_core.contracts import (
     QueryResult,
     SourceMetadata,
     TransientError,
+    describe,
 )
 
 if TYPE_CHECKING:
@@ -112,7 +113,15 @@ class DuckDbCsvDataSource:
 
         data_dir = self._options.data_dir
         if not data_dir.is_dir():
-            raise ConfigurationError(f"data source {self._name!r}: data directory not found")
+            raise ConfigurationError(
+                f"data source {self._name!r}: the data folder does not exist",
+                expected="a folder of .csv files, one per table",
+                actual=f"nothing at {data_dir}",
+                fix=(
+                    "correct data_dir; a relative path is relative to the folder of the "
+                    "service's .env file"
+                ),
+            )
         connection = duckdb.connect(":memory:")
         try:
             for path in sorted(data_dir.glob("*.csv")):
@@ -126,7 +135,9 @@ class DuckDbCsvDataSource:
                     connection.read_csv(str(path)).create(table)
                 except duckdb.Error as exc:
                     raise ConfigurationError(
-                        f"data source {self._name!r}: {path.name} could not be loaded"
+                        f"data source {self._name!r}: {path.name} could not be loaded",
+                        expected="a CSV file with a header row",
+                        actual=describe(exc),
                     ) from exc
             # From here on the engine can read only what was loaded above.
             connection.execute("SET enable_external_access = false")
@@ -138,7 +149,7 @@ class DuckDbCsvDataSource:
                 except duckdb.Error as exc:
                     raise ConfigurationError(
                         f"data source {self._name!r}: query {name!r} does not fit the loaded "
-                        f"tables ({type(exc).__name__})"
+                        f"tables ({describe(exc)})"
                     ) from exc
         except BaseException:
             connection.close()
@@ -204,9 +215,12 @@ class DuckDbCsvDataSource:
             columns = tuple(str(column[0]).lower() for column in cursor.description or ())
             return columns, cursor.fetchmany(compiled.row_cap + 1)
         except duckdb.Error as exc:
-            # The engine's message can repeat parameter values, so it stays in the cause.
+            # The engine's message can repeat parameter values, so it is the detail:
+            # shown on a developer's machine, never in deployed logs.
             raise AgentLibError(
-                f"query {name!r} failed on data source {self._name!r} ({type(exc).__name__})"
+                f"query {name!r} failed on data source {self._name!r} ({type(exc).__name__})",
+                fix="run the query's SQL on the CSV files with the same parameters to see why",
+                detail=describe(exc),
             ) from exc
         finally:
             cursor.close()

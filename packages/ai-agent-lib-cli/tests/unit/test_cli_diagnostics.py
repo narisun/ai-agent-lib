@@ -177,7 +177,9 @@ def test_config_explain_shows_each_setting_its_origin_and_no_secret(
 
     env.write_text("NOT_OURS=1\n" + variable_for(Key.DEPLOYMENT_ENV) + "=mars\n", encoding="utf-8")
     assert run("config", "explain", "hello-agent", "--workspace", workspace) == 1
-    assert "must be one of" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "is not one of the values it takes" in err
+    assert "got: 'mars'" in err
 
 
 # ------------------------------------------------------------------- policy test

@@ -27,6 +27,7 @@ from ai_agent_lib_core.contracts import (
     Decision,
     IdGenerator,
     PolicyRequest,
+    describe,
 )
 
 __all__ = ["OpaPolicyDecisionPoint", "OpaPolicyOptions"]
@@ -187,8 +188,8 @@ class OpaPolicyDecisionPoint:
             response = await self._client.get(self._health_url)
         except httpx.HTTPError as exc:
             raise ConfigurationError(
-                f"{_WHAT}: the server could not be reached ({type(exc).__name__})"
-            ) from None
+                f"{_WHAT}: the server could not be reached ({describe(exc)})"
+            ) from exc
         if response.status_code != httpx.codes.OK:
             raise ConfigurationError(
                 f"{_WHAT}: the server's health check returned HTTP {response.status_code}"

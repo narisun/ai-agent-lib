@@ -106,6 +106,7 @@ mypy_path = [
     "$MYPY_CONFIG_FILE_DIR/examples/accounts-mcp/src",
     "$MYPY_CONFIG_FILE_DIR/examples/accounts-mcp/tests",
     "$MYPY_CONFIG_FILE_DIR/tests",
+    "$MYPY_CONFIG_FILE_DIR/docs/guide",
 ]
 files = [
     "packages/ai-agent-lib-core/src",
@@ -119,6 +120,7 @@ files = [
     "examples/accounts-mcp/src",
     "examples/accounts-mcp/tests",
     "tests",
+    "docs/guide",
 ]
 
 # ------------------------------------------------------------------------- pytest
@@ -126,7 +128,7 @@ files = [
 minversion = "8.0"
 testpaths = ["packages", "examples", "tests"]
 # Lets the repository-level tests import their shared helpers.
-pythonpath = ["tests", "examples/accounts-mcp/tests"]
+pythonpath = ["tests", "examples/accounts-mcp/tests", "docs/guide"]
 addopts = [
     "--import-mode=importlib",
     "--strict-markers",
@@ -242,6 +244,19 @@ source_modules = [
 forbidden_modules = ["mcp", "mcp_types"]
 # di and the LangGraph bindings reach the SDK only through integrations.mcp.
 allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+name = "the request path never imports evaluation"
+type = "forbidden"
+source_modules = [
+    "ai_agent_lib_core.adapters",
+    "ai_agent_lib_core.config",
+    "ai_agent_lib_core.contracts",
+    "ai_agent_lib_core.di",
+    "ai_agent_lib_core.integrations",
+    "ai_agent_lib_core.pipeline",
+]
+forbidden_modules = ["ai_agent_lib_core.evaluation"]
 
 [[tool.importlinter.contracts]]
 name = "core never imports the AWS SDK, the AWS package or the CLI"

@@ -4,8 +4,9 @@ This package imports nothing else from the library, no agent framework and no
 cloud SDK. Everything else depends on it.
 """
 
+from ai_agent_lib_core.contracts.access import Access, AccessQuery, AccessRule, no_access
 from ai_agent_lib_core.contracts.audit import AUDIT_SCHEMA, AuditOutcome, AuditRecord, AuditValue
-from ai_agent_lib_core.contracts.checks import CheckResult
+from ai_agent_lib_core.contracts.checks import CheckResult, generic_fix
 from ai_agent_lib_core.contracts.data import (
     MASK,
     DataSource,
@@ -28,6 +29,10 @@ from ai_agent_lib_core.contracts.errors import (
     PolicyDenied,
     TransientError,
     ValidationFailed,
+    causes,
+    describe,
+    kind_of,
+    shown_value,
 )
 from ai_agent_lib_core.contracts.guardrails import (
     GuardrailCheck,
@@ -44,15 +49,21 @@ from ai_agent_lib_core.contracts.identity import (
 from ai_agent_lib_core.contracts.options import (
     DEFAULT_MODEL_ALIAS,
     AuditOptions,
+    BudgetLimits,
+    CallLimits,
     DeploymentEnv,
     ExternalSettings,
+    Limits,
     ModelRef,
     ModelSection,
+    NoOptions,
     OptionsModel,
     Profile,
     ProviderSelection,
     Section,
     ServiceConfig,
+    TelemetryMode,
+    options_error,
 )
 from ai_agent_lib_core.contracts.policy import (
     DECISION_SCHEMA,
@@ -72,6 +83,7 @@ from ai_agent_lib_core.contracts.ports import (
     IdGenerator,
     ModelCapabilities,
     SecretsProvider,
+    SpanNotes,
     SupportsAsyncClose,
     SupportsValidation,
     Telemetry,
@@ -100,6 +112,9 @@ __all__ = [
     "DEFAULT_MODEL_ALIAS",
     "MASK",
     "REGISTRY_SCHEMA",
+    "Access",
+    "AccessQuery",
+    "AccessRule",
     "AgentEntry",
     "AgentLibError",
     "AgentRegistry",
@@ -110,6 +125,8 @@ __all__ = [
     "AuditSink",
     "AuditValue",
     "BudgetExceeded",
+    "BudgetLimits",
+    "CallLimits",
     "ChatModelProvider",
     "CheckResult",
     "CheckpointBackend",
@@ -131,9 +148,11 @@ __all__ = [
     "IdGenerator",
     "IdentityVerifier",
     "IntegrityError",
+    "Limits",
     "ModelCapabilities",
     "ModelRef",
     "ModelSection",
+    "NoOptions",
     "Obligations",
     "OptionsModel",
     "ParameterType",
@@ -159,10 +178,12 @@ __all__ = [
     "ServerEntry",
     "ServiceConfig",
     "SourceMetadata",
+    "SpanNotes",
     "StructuredOutput",
     "SupportsAsyncClose",
     "SupportsValidation",
     "Telemetry",
+    "TelemetryMode",
     "TokenAuthenticator",
     "TokenExchanger",
     "ToolEntry",
@@ -170,5 +191,12 @@ __all__ = [
     "ToolSnapshot",
     "TransientError",
     "ValidationFailed",
+    "causes",
+    "describe",
+    "generic_fix",
+    "kind_of",
+    "no_access",
+    "options_error",
     "schema_fingerprint",
+    "shown_value",
 ]

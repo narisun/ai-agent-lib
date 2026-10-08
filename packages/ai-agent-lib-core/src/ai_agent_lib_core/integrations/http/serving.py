@@ -20,7 +20,7 @@ from typing import Any
 
 import uvicorn
 
-from ai_agent_lib_core.contracts import ConfigurationError
+from ai_agent_lib_core.contracts import ConfigurationError, describe
 from ai_agent_lib_core.integrations.http.lifecycle import ServiceLifecycle
 
 __all__ = ["serve"]
@@ -114,7 +114,7 @@ def _bind(host: str, port: int, uds: str | None) -> socket.socket:
     except OSError as exc:
         where = uds or f"{host}:{port}"
         raise ConfigurationError(
-            f"the service could not listen on {where} ({type(exc).__name__})"
+            f"the service could not listen on {where} ({describe(exc)})"
         ) from exc
 
 

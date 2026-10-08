@@ -41,6 +41,7 @@ from ai_agent_lib_core.integrations.langgraph.tools import govern_tools
 from ai_agent_lib_core.pipeline import (
     ModelCall,
     ModelStage,
+    Operations,
     Pipeline,
     ToolCall,
     ToolStage,
@@ -70,6 +71,7 @@ class LangGraphBindings:
         guardrails: The guardrail port.
         frame_tool_results: Whether tool results are framed as untrusted data.
         bridge: Gives the bridge used by synchronous calls.
+        operations: Timeouts, retries and budgets of model and tool calls.
     """
 
     def __init__(
@@ -87,6 +89,7 @@ class LangGraphBindings:
         guardrails: GuardrailCheck,
         frame_tool_results: bool,
         bridge: Callable[[], LoopBridge],
+        operations: Operations | None = None,
     ) -> None:
         self._resolve_model = resolve_model
         self._checkpoint_backend = checkpoint_backend
@@ -102,6 +105,7 @@ class LangGraphBindings:
             guardrails=guardrails,
             response_text=message_text,
             structured_payload=structured_payload,
+            operations=operations,
         )
         self._tool_pipeline: Pipeline[ToolStage, ToolCall, Any] = build_tool_pipeline(
             audit=audit,
@@ -113,6 +117,7 @@ class LangGraphBindings:
             environment=environment,
             guardrails=guardrails,
             frame_results=frame_tool_results,
+            operations=operations,
         )
 
     def model(self, alias: str = DEFAULT_MODEL_ALIAS) -> GovernedChatModel:

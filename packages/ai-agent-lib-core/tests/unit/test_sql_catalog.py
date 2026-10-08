@@ -103,7 +103,7 @@ def test_the_file_name_must_be_a_plain_identifier(tmp_path: Path) -> None:
 
 
 def test_a_missing_directory_is_a_configuration_error(tmp_path: Path) -> None:
-    with pytest.raises(ConfigurationError, match="not found"):
+    with pytest.raises(ConfigurationError, match="the queries folder does not exist"):
         QueryCatalog.load(tmp_path / "missing")
 
 
@@ -125,11 +125,11 @@ def test_parameters_are_converted_to_their_declared_types(catalog: QueryCatalog)
     [
         ({}, "needs parameter 'region'"),
         ({"region": None}, "needs parameter 'region'"),
-        ({"region": "east", "extra": 1}, r"no parameter\(s\) named: \['extra'\]"),
-        ({"region": 7}, "'region' must be a string"),
-        ({"region": "east", "min_balance": "lots"}, "'min_balance' must be a number"),
-        ({"region": "east", "min_balance": True}, "'min_balance' must be a number"),
-        ({"region": "east", "min_balance": float("nan")}, "'min_balance' must be a number"),
+        ({"region": "east", "extra": 1}, "was given parameters it does not declare"),
+        ({"region": 7}, "'region' is not a string\n  expected: a string\n  got: a number"),
+        ({"region": "east", "min_balance": "lots"}, "got: text of 4 characters"),
+        ({"region": "east", "min_balance": True}, "got: true or false"),
+        ({"region": "east", "min_balance": float("nan")}, "'min_balance' is not a number"),
     ],
 )
 def test_bad_parameters_are_rejected_without_echoing_values(
@@ -154,7 +154,7 @@ def test_every_parameter_type_has_strict_conversion(tmp_path: Path) -> None:
     assert bound["d"] == date(2026, 1, 2)
     assert isinstance(bound["t"], datetime)
     for name, bad in [("i", 1.5), ("i", True), ("b", 1), ("d", "tomorrow"), ("t", 12345)]:
-        with pytest.raises(ValidationFailed, match=f"'{name}' must be"):
+        with pytest.raises(ValidationFailed, match=f"'{name}' is not an? "):
             catalog.bind("q", {**good, name: bad})
 
 

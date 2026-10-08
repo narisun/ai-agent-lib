@@ -1,0 +1,51 @@
+# The library's gate, on Linux and on Windows, at the oldest and the newest
+# Python it supports. It runs what a contributor runs before sharing a change.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.11", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: uv sync --all-packages --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+      - run: uv run lint-imports
+      - run: uv run pytest -q
+      - name: The developer guide matches the code
+        run: uv run python docs/guide/build_guide.py --check
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+      - uses: open-policy-agent/setup-opa@v2
+        with:
+          version: latest
+      # For the deployment module: fmt, validate and its mocked-provider tests.
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+      - run: uv sync --all-packages --locked
+      - run: uv run pytest -q -m integration

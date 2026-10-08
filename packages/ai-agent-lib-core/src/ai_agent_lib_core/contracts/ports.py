@@ -8,6 +8,7 @@ not have to inherit from anything.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol, runtime_checkable
@@ -28,6 +29,7 @@ __all__ = [
     "IdentityVerifier",
     "ModelCapabilities",
     "SecretsProvider",
+    "SpanNotes",
     "SupportsAsyncClose",
     "SupportsValidation",
     "Telemetry",
@@ -81,8 +83,24 @@ class AuditSink(Protocol):
         ...
 
 
+class SpanNotes(Protocol):
+    """Adds facts to an open span as the work it covers ends."""
+
+    def __call__(
+        self, attributes: Mapping[str, AuditValue], error: BaseException | None = None
+    ) -> None:
+        """Add ``attributes``; with ``error``, mark the span as failed, by the error's type only."""
+        ...
+
+
 class Telemetry(Protocol):
     """Metadata-only operational signals. Never carries content."""
+
+    def span(
+        self, name: str, attributes: Mapping[str, AuditValue]
+    ) -> AbstractContextManager[SpanNotes]:
+        """Open a span around one governed call, as a child of the current span."""
+        ...
 
     def event(self, name: str, attributes: Mapping[str, AuditValue]) -> None:
         """Record that something happened."""

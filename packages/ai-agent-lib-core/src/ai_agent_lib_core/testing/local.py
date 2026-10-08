@@ -22,12 +22,18 @@ from ai_agent_lib_core.adapters import (
     FileRegistrySource,
 )
 from ai_agent_lib_core.adapters.registry_documents import agents_document
-from ai_agent_lib_core.config import ConfigResolver, DotenvConfigSource
+from ai_agent_lib_core.config import (
+    ConfigResolver,
+    DotenvConfigSource,
+    EnvironConfigSource,
+    LayeredConfigSource,
+)
 from ai_agent_lib_core.contracts import (
     AgentEntry,
     Classification,
     ConfigurationError,
     ModelSection,
+    NoOptions,
     Section,
     ServiceConfig,
 )
@@ -40,6 +46,7 @@ __all__ = [
     "TEST_AGENT",
     "audit_records",
     "last_shown_to_model",
+    "load_eval_config",
     "load_test_config",
     "scripted_model",
     "scripted_providers",
@@ -99,6 +106,36 @@ def _with_roles(config: ServiceConfig, roles: Sequence[str]) -> ServiceConfig:
     )
 
 
+def _with_state_in(config: ServiceConfig, state_dir: Path) -> ServiceConfig:
+    """Write a local audit log and checkpoint database under ``state_dir``."""
+    for section, provider, file_name in (
+        (Section.AUDIT, _JSONL, AUDIT_FILE),
+        (Section.CHECKPOINT, _SQLITE, CHECKPOINT_FILE),
+    ):
+        selection = config.section(section)
+        if selection.provider == provider:
+            options = {**selection.options, "path": str(state_dir / file_name)}
+            config = config.with_section(section, replace(selection, options=options))
+    return config
+
+
+def load_eval_config(dotenv_path: Path, *, state_dir: Path) -> ServiceConfig:
+    """Resolve a service's configuration for an eval, with its real model.
+
+    Unlike :func:`load_test_config`, this reads the process environment and
+    then the file, the way the service itself starts, so a model and its key
+    can come from either. It never selects the fake model; check
+    ``config.model.provider`` and skip the eval when no real model is set.
+
+    Args:
+        dotenv_path: The service's ``.env``, which a developer keeps out of version control.
+        state_dir: Where the eval's audit log and checkpoints go.
+    """
+    source = LayeredConfigSource(EnvironConfigSource(), DotenvConfigSource(dotenv_path))
+    config = ConfigResolver(source, base_dir=dotenv_path.resolve().parent).resolve()
+    return _with_state_in(config, state_dir)
+
+
 def load_test_config(
     dotenv_path: Path,
     *,
@@ -134,14 +171,7 @@ def load_test_config(
     """
     source = DotenvConfigSource(dotenv_path, required=True)
     config = ConfigResolver(source, base_dir=dotenv_path.resolve().parent).resolve()
-    for section, provider, file_name in (
-        (Section.AUDIT, _JSONL, AUDIT_FILE),
-        (Section.CHECKPOINT, _SQLITE, CHECKPOINT_FILE),
-    ):
-        selection = config.section(section)
-        if selection.provider == provider:
-            options = {**selection.options, "path": str(state_dir / file_name)}
-            config = config.with_section(section, replace(selection, options=options))
+    config = _with_state_in(config, state_dir)
     if fake_model:
         config = replace(
             config, model=ModelSection(provider=FAKE_PROVIDER, model_id=_FAKE_MODEL_ID)
@@ -164,7 +194,9 @@ def scripted_providers(*replies: Any) -> ServiceProviders:
     def fake_model(context: BuildContext) -> FakeChatModelProvider:  # noqa: ARG001 - no options
         return FakeChatModelProvider(list(replies))
 
-    return ServiceProviders.default().register(MODEL_PORT, FAKE_PROVIDER, fake_model, replace=True)
+    return ServiceProviders.default().register(
+        MODEL_PORT, FAKE_PROVIDER, fake_model, local_only=True, options=NoOptions, replace=True
+    )
 
 
 def scripted_model(services: ServiceContainer) -> FakeChatModelProvider:

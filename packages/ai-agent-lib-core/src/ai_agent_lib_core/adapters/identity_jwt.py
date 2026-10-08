@@ -33,6 +33,7 @@ from ai_agent_lib_core.contracts import (
     PrincipalKind,
     RequestContext,
     TokenExchanger,
+    describe,
 )
 
 if TYPE_CHECKING:
@@ -296,8 +297,15 @@ def resolve_jwt_options(options: JwtIdentityOptions) -> JwtSettings:
     )
 
 
-def _denied(message: str, reason_code: str) -> PolicyDenied:
-    return PolicyDenied(message, reason_code=reason_code)
+def _denied(
+    message: str,
+    reason_code: str,
+    *,
+    expected: str | None = None,
+    actual: str | None = None,
+    fix: str | None = None,
+) -> PolicyDenied:
+    return PolicyDenied(message, reason_code=reason_code, expected=expected, actual=actual, fix=fix)
 
 
 def _words(value: object) -> frozenset[str]:
@@ -338,8 +346,8 @@ class _SigningKeys:
             document = response.json() if response.status_code == httpx.codes.OK else None
         except (httpx.HTTPError, ValueError) as exc:
             raise ConfigurationError(
-                f"{_WHAT}: the signing keys could not be read ({type(exc).__name__})"
-            ) from None
+                f"{_WHAT}: the signing keys could not be read ({describe(exc)})"
+            ) from exc
         listed = document.get("keys") if isinstance(document, Mapping) else None
         keys: dict[str, PyJWK] = {}
         for entry in listed if isinstance(listed, list) else ():
@@ -507,9 +515,22 @@ class JwtIdentityVerifier:
                 },
             )
         except jwt.InvalidAudienceError:
-            raise _denied("the token is for another service", "credential_audience") from None
+            raise _denied(
+                "the token is for another service",
+                "credential_audience",
+                expected="a token whose aud is " + " or ".join(map(repr, settings.audiences)),
+                fix=(
+                    "the caller must ask the identity provider for a token for this service "
+                    "(its scope or resource); or correct audience in the identity options"
+                ),
+            ) from None
         except jwt.InvalidIssuerError:
-            raise _denied("the token is from another issuer", "credential_issuer") from None
+            raise _denied(
+                "the token is from another issuer",
+                "credential_issuer",
+                expected=f"a token whose iss is {settings.issuer!r}",
+                fix="check tenant_id and token_version, or issuer, in the identity options",
+            ) from None
         except jwt.PyJWTError:
             raise _denied("the token is not valid", "credential_invalid") from None
         self._check_validity_period(claims)
@@ -522,7 +543,12 @@ class JwtIdentityVerifier:
         if isinstance(expires, bool) or not isinstance(expires, int | float):
             raise _denied("the token is not valid", "credential_invalid")
         if now >= expires + leeway:
-            raise _denied("the token has expired", "credential_expired")
+            raise _denied(
+                "the token has expired",
+                "credential_expired",
+                actual=f"it expired {round(now - expires)} seconds ago",
+                fix="the caller must get a new token",
+            )
         if not_before is not None and (
             isinstance(not_before, bool)
             or not isinstance(not_before, int | float)

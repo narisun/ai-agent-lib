@@ -1,0 +1,30 @@
+# agentlib-service
+
+A Terraform module that runs one agentlib service on ECS Fargate.
+
+`agentlib deploy SERVICE` copies it here and writes a root module for the service
+under `deploy/SERVICE/` that calls it. Read that folder's README first.
+
+This folder is agentlib's: every `agentlib deploy` rewrites it, so an upgrade of the
+library brings its fixes. Change what it does through its variables, or copy it
+under another name and point your root module at the copy.
+
+Its tests need no AWS account: `terraform init -backend=false && terraform test`.
+
+What it makes:
+
+- a task definition with the service, an OPA sidecar when `opa_image` is set, and
+  an OpenTelemetry collector sidecar when `collector` is true;
+- an ECS service with a deployment circuit breaker that rolls back a bad release;
+- a task role with exactly the permissions in `task_policy_json` (which
+  `agentlib deploy` derives from the adapters the service's settings select),
+  plus what the collector needs to send traces to X-Ray and metrics to CloudWatch;
+- an execution role that can pull images and write this service's logs only;
+- a log group, `/agentlib/NAME`.
+
+Every container has a read-only root file system; `/tmp` is the writable place.
+OPA listens on the task's loopback address only. The tasks get no public IP.
+
+It does not make the cluster, the network, the load balancer, the image
+repositories, the secrets, or the AWS resources the adapters use: those belong
+to the platform the service is deployed into.

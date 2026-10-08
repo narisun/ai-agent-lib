@@ -15,6 +15,7 @@ from ai_agent_lib_core.contracts import (
     AuditRecord,
     ConfigurationError,
     IntegrityError,
+    describe,
 )
 
 __all__ = ["FirehoseAuditOptions", "FirehoseAuditSink"]
@@ -76,7 +77,7 @@ class FirehoseAuditSink:
         except (AgentLibError, aws.BotoCoreError, aws.ClientError, OSError) as exc:
             raise IntegrityError(
                 f"{_WHAT}: the audit record was not accepted by stream {self._stream!r} "
-                f"({type(exc).__name__})"
+                f"({describe(exc)})"
             ) from exc
         record_id = reply.get("RecordId") if isinstance(reply, dict) else None
         if not isinstance(record_id, str) or not record_id:
@@ -100,7 +101,7 @@ class FirehoseAuditSink:
                 f"{_WHAT}: stream {self._stream!r} cannot be used ({code})"
             ) from None
         except AgentLibError as exc:
-            raise ConfigurationError(str(exc)) from None
+            raise ConfigurationError.from_error(exc) from exc
         status = reply.get("DeliveryStreamDescription", {}).get("DeliveryStreamStatus")
         if status != _ACTIVE:
             raise ConfigurationError(f"{_WHAT}: stream {self._stream!r} is not active")

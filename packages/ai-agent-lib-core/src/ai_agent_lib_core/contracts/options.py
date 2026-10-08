@@ -7,30 +7,38 @@ section it needs.
 
 from __future__ import annotations
 
+import difflib
 import enum
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, TypeVar
 
-from pydantic import BaseModel, ConfigDict, SecretStr, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError, model_validator
 
 from ai_agent_lib_core.contracts._validation import require_identifier
-from ai_agent_lib_core.contracts.errors import ConfigurationError
+from ai_agent_lib_core.contracts.errors import ConfigurationError, shown_value
 
 __all__ = [
     "DEFAULT_MODEL_ALIAS",
     "AuditOptions",
+    "BudgetLimits",
+    "CallLimits",
     "DeploymentEnv",
     "ExternalSettings",
+    "Limits",
     "ModelRef",
     "ModelSection",
+    "NoOptions",
     "OptionsModel",
     "Profile",
     "ProviderSelection",
     "Section",
     "ServiceConfig",
+    "TelemetryMode",
+    "options_error",
 ]
 
 DEFAULT_MODEL_ALIAS = "default"
@@ -49,6 +57,13 @@ class DeploymentEnv(enum.StrEnum):
     LOCAL = "local"
     DEV = "dev"
     PROD = "prod"
+
+
+class TelemetryMode(enum.StrEnum):
+    """Whether a service sends operational traces and metrics."""
+
+    OFF = "off"
+    OPENTELEMETRY = "opentelemetry"
 
 
 class Section(enum.StrEnum):
@@ -71,6 +86,10 @@ class OptionsModel(BaseModel):
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class NoOptions(OptionsModel):
+    """The options of an adapter that takes none: any option is refused."""
 
 
 class AuditOptions(OptionsModel):
@@ -118,6 +137,124 @@ def _thaw(value: object) -> Any:
     return value
 
 
+def _needs(message: str) -> str:
+    """Pydantic's description of what a value must be, in plain words."""
+    text = re.sub(r" for <class '[\w.]+'>", "", message)
+    for prefix in ("Input should be ", "Value error, "):
+        text = text.removeprefix(prefix)
+    if text.startswith("Input is not a valid "):
+        kind = text.removeprefix("Input is not a valid ")
+        return "a path, written as text" if kind == "path" else f"a valid {kind}"
+    return text
+
+
+def options_error(owner: str, model: type[BaseModel], exc: ValidationError) -> ConfigurationError:
+    """Turn a validation failure of an options model into an error a developer can act on.
+
+    For each problem it says where it is, what the option needs and what was
+    given; for an unknown option it suggests the closest known one.
+
+    Args:
+        owner: What the options belong to, for example ``"provider 'jsonl'"``.
+        model: The options model that was validated.
+        exc: What validation found.
+    """
+    known = sorted(field.alias or name for name, field in model.model_fields.items())
+    expected: list[str] = []
+    actual: list[str] = []
+    for error in exc.errors(include_url=False):
+        place = ".".join(str(part) for part in error["loc"]) or "the options"
+        if error["type"] == "extra_forbidden":
+            close = difflib.get_close_matches(str(error["loc"][-1]), known, n=1)
+            hint = f" (did you mean {close[0]!r}?)" if close else ""
+            expected.append(f"only known options: {', '.join(known)}")
+            actual.append(f"an unknown option {place!r}{hint}")
+        elif error["type"] == "missing":
+            expected.append(f"{place}: a value; it is required")
+            actual.append(f"no {place}")
+        else:
+            expected.append(f"{place}: {_needs(error['msg'])}")
+            actual.append(f"{place} = {shown_value(error.get('input'))}")
+    count = len(actual)
+    return ConfigurationError(
+        f"the options of {owner} are not valid ({count} problem{'s' if count != 1 else ''})",
+        expected="; ".join(dict.fromkeys(expected)),
+        actual="; ".join(actual),
+        fix="correct the options; the developer guide lists every option with its default",
+    )
+
+
+class CallLimits(OptionsModel):
+    """How long one kind of call may take, and how often it is tried again.
+
+    Attributes:
+        timeout_seconds: How long one attempt may take before it is given up as
+            a transient failure. ``null`` for no limit.
+        retries: How many more attempts a transient failure gets: throttling,
+            a timeout or a server error. A tool call is tried again only when
+            the tool only reads. A denial is never tried again.
+        backoff_seconds: The wait before the first retry. Each later wait is
+            twice the one before, with random jitter.
+        max_backoff_seconds: The longest wait between two attempts.
+    """
+
+    timeout_seconds: float | None = Field(default=None, gt=0)
+    retries: int = Field(default=0, ge=0, le=10)
+    backoff_seconds: float = Field(default=0.5, ge=0)
+    max_backoff_seconds: float = Field(default=8.0, ge=0)
+
+
+class BudgetLimits(OptionsModel):
+    """How much one request may use before it is stopped. ``null`` for no limit.
+
+    A request is everything done for one ``request_id``. The budget is the loop
+    guard of a graph that keeps calling its model or its tools.
+
+    Attributes:
+        model_calls: The most model calls one request may make.
+        tool_calls: The most tool calls one request may make.
+        tokens: The most input and output tokens its model calls may use together.
+    """
+
+    model_calls: int | None = Field(default=50, ge=1)
+    tool_calls: int | None = Field(default=100, ge=1)
+    tokens: int | None = Field(default=None, ge=1)
+
+
+def _model_limits() -> CallLimits:
+    return CallLimits(timeout_seconds=120.0, retries=2)
+
+
+def _tool_limits() -> CallLimits:
+    return CallLimits(timeout_seconds=60.0, retries=1)
+
+
+class Limits(OptionsModel):
+    """Timeouts, retries and budgets: the operational limits of governed calls.
+
+    Attributes:
+        model: Limits of a model call.
+        tool: Limits of a tool call.
+        budget: What one request may use.
+    """
+
+    model: CallLimits = Field(default_factory=_model_limits)
+    tool: CallLimits = Field(default_factory=_tool_limits)
+    budget: BudgetLimits = Field(default_factory=BudgetLimits)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _over_the_defaults(cls, given: Any) -> Any:
+        """Let a key given for ``model`` or ``tool`` change that one limit and keep the rest."""
+        if not isinstance(given, Mapping):
+            return given
+        merged = dict(given)
+        for name, defaults in (("model", _model_limits()), ("tool", _tool_limits())):
+            if isinstance(given.get(name), Mapping):
+                merged[name] = {**defaults.model_dump(), **given[name]}
+        return merged
+
+
 @dataclass(frozen=True, slots=True)
 class ProviderSelection:
     """Which adapter serves a section, and that adapter's raw options.
@@ -151,13 +288,7 @@ class ProviderSelection:
         try:
             parsed = model.model_validate(_thaw(self.options))
         except ValidationError as exc:
-            problems = "; ".join(
-                f"{'.'.join(str(part) for part in error['loc']) or '<root>'}: {error['msg']}"
-                for error in exc.errors(include_input=False, include_url=False)
-            )
-            raise ConfigurationError(
-                f"invalid options for provider {self.provider!r}: {problems}"
-            ) from None
+            raise options_error(f"provider {self.provider!r}", model, exc) from None
         return _rebased(parsed, self.base_dir) if self.base_dir is not None else parsed
 
 
@@ -247,7 +378,8 @@ class ServiceConfig:
     Attributes:
         profile: The named set of default adapters that was applied.
         deployment_env: Where the process is running.
-        runtime_policy: The named bundle of operational controls, if any.
+        telemetry: Whether operational traces and metrics are sent.
+        limits: Timeouts, retries and budgets of governed calls.
         tls_ca_bundle: The enterprise CA file, used by the AWS clients.
         model: Model providers and aliases.
         sections: The adapter selected for each section.
@@ -260,7 +392,8 @@ class ServiceConfig:
 
     profile: Profile = Profile.LOCAL
     deployment_env: DeploymentEnv = DeploymentEnv.LOCAL
-    runtime_policy: str | None = None
+    telemetry: TelemetryMode = TelemetryMode.OFF
+    limits: Limits = field(default_factory=Limits)
     tls_ca_bundle: Path | None = None
     model: ModelSection = field(
         default_factory=lambda: ModelSection(provider="fake", model_id="fake-model")

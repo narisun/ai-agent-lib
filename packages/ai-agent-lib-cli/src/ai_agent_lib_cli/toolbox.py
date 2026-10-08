@@ -17,7 +17,14 @@ import click
 from ai_agent_lib_cli.formatting import Formatter, format_python
 from ai_agent_lib_cli.pins import PinReader, read_pins
 from ai_agent_lib_cli.policy import OpaStarter, opa_server
-from ai_agent_lib_cli.processes import GraphReader, ServiceRunner, read_graph, run_service
+from ai_agent_lib_cli.processes import (
+    GraphReader,
+    ServiceRunner,
+    ToolRunner,
+    read_graph,
+    run_service,
+    run_tool,
+)
 from ai_agent_lib_cli.read_redshift import CatalogReader, fetch_catalog
 from ai_agent_lib_cli.render import TemplateRenderer
 from ai_agent_lib_cli.scaffold import Scaffolder
@@ -47,6 +54,7 @@ class Toolbox:
         format_python: Formats generated Python.
         read_pins: Asks a generated MCP server for the pins of its tools.
         run_service: Runs a service until it ends.
+        run_tool: Runs a Python tool, such as ruff or pytest, in a folder.
         read_graph: Asks a generated agent for its graph.
         fetch_catalog: Reads tables and columns from the Redshift catalogue.
         opa_server: Starts a local OPA.
@@ -57,6 +65,7 @@ class Toolbox:
     format_python: Formatter = format_python
     read_pins: PinReader = read_pins
     run_service: ServiceRunner = run_service
+    run_tool: ToolRunner = run_tool
     read_graph: GraphReader = read_graph
     fetch_catalog: CatalogReader = fetch_catalog
     opa_server: OpaStarter = opa_server

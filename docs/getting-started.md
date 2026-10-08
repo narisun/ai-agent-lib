@@ -75,8 +75,24 @@ curl -s localhost:8000/invoke -H 'content-type: application/json' \
   -d '{"input": {"question": "Say hello to Ada."}, "thread_id": "demo"}'
 ```
 
+Or watch each step of the graph as it ends, as server-sent events:
+
+```bash
+curl -sN localhost:8000/invoke/stream -H 'content-type: application/json' \
+  -d '{"input": {"question": "Say hello to Ada."}}'
+```
+
 Ctrl-C stops a service. A service logs one line of JSON per event; none of
 them holds what was asked or answered.
+
+Before you share a change, run what CI runs:
+
+```bash
+uv run agentlib check        # lint, format, types, tests and the policy samples
+```
+
+When something fails, the message says what was expected, what came instead,
+how to fix it, and which line of your code led there.
 
 ## 4. Change the agent, test first
 
@@ -270,6 +286,13 @@ uv run hello-agent "Say hello to Ada."
 The tests do not change: they read `.env.example` and script the model, so
 they stay offline and repeatable.
 
+With a real model the agent's eval can run. It asks the questions in
+`agents/hello-agent/evals/cases.jsonl` and checks the answers against a bar:
+
+```bash
+uv run agentlib eval hello-agent
+```
+
 ## 9. Keep up with the library
 
 ```bash
@@ -279,6 +302,19 @@ uv run agentlib update --diff
 A generated file you have not changed is replaced with what the templates
 write now. A file you changed is left alone and listed, with the difference.
 Commit `agentlib.lock`: it is how `update` tells the two apart.
+
+## 10. Deploy it
+
+```bash
+uv run agentlib deploy hello-agent          # writes agents/hello-agent/deploy.env to fill in
+uv run agentlib deploy hello-agent --plan   # every permission the adapters need, and why
+uv run agentlib deploy hello-agent          # writes deploy/hello-agent/: Terraform and a Dockerfile
+```
+
+`deploy.env` holds the settings the agent runs with in AWS, never a secret.
+The plan lists each adapter, the IAM actions it calls and on what, the
+sidecars the task runs, and anything to check by hand. Read
+`deploy/hello-agent/README.md` for building the images and running Terraform.
 
 ## Where to read more
 

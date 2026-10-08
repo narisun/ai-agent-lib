@@ -117,6 +117,7 @@ def test_init_creates_a_workspace_that_holds_nothing_yet(
     assert "uv run agentlib new mcp hello-mcp" in out
     files = tree(workspace)
     assert sorted(files) == [
+        ".github/workflows/check.yml",
         ".gitignore",
         "README.md",
         "agentlib.lock",
@@ -226,6 +227,7 @@ def test_new_agent_adds_an_agent_linked_to_the_servers_it_names(
         ".env",
         ".env.example",
         "README.md",
+        "evals/cases.jsonl",
         "pyproject.toml",
         "src/hello_agent/__init__.py",
         "src/hello_agent/__main__.py",
@@ -236,6 +238,7 @@ def test_new_agent_adds_an_agent_linked_to_the_servers_it_names(
         "src/hello_agent/tools.py",
         "tests/test_hello_agent.py",
         "tests/test_hello_agent_as_configured.py",
+        "tests/test_hello_agent_eval.py",
         "tests/test_hello_agent_service.py",
     }
     assert "tests/test_hello_agent_with_hello_mcp.py" in files

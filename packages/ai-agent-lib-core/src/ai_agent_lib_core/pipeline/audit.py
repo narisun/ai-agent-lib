@@ -49,9 +49,37 @@ class AuditableCall(Protocol):
         """The few, low-cardinality facts that label telemetry."""
         ...
 
+    @property
+    def span_name(self) -> str:
+        """The name of the span around the call."""
+        ...
+
+    def span_attributes(self) -> Mapping[str, AuditValue]:
+        """The attributes the span around the call opens with."""
+        ...
+
 
 CallT = TypeVar("CallT", bound=AuditableCall)
 ResponseT = TypeVar("ResponseT")
+
+
+_USAGE = {
+    "input_tokens": "gen_ai.usage.input_tokens",
+    "output_tokens": "gen_ai.usage.output_tokens",
+}
+
+
+def _ended(
+    outcome: AuditOutcome,
+    extra: Mapping[str, AuditValue],
+    refusal: BaseException | None = None,
+) -> dict[str, AuditValue]:
+    """What a span learns as its call ends: the outcome, the token usage, a denial's reason."""
+    attributes: dict[str, AuditValue] = {"agentlib.outcome": outcome.value}
+    attributes.update({_USAGE[key]: value for key, value in extra.items() if key in _USAGE})
+    if isinstance(refusal, PolicyDenied):
+        attributes["agentlib.reason_code"] = refusal.reason_code
+    return attributes
 
 
 class AuditInterceptor(Generic[CallT, ResponseT]):
@@ -85,24 +113,29 @@ class AuditInterceptor(Generic[CallT, ResponseT]):
         self._describe_response = describe_response
 
     async def __call__(self, request: CallT, call_next: Handler[CallT, ResponseT]) -> ResponseT:
-        """Run the call and record how it ended."""
-        started = self._clock.monotonic()
-        try:
-            response = await call_next(request)
-        except asyncio.CancelledError as cancelled:
-            await self._record(
-                request, started, AuditOutcome.FAILED, cancelled, {}, best_effort=True
-            )
-            raise
-        except _REFUSALS as refusal:
-            await self._record(request, started, AuditOutcome.DENIED, refusal, {})
-            raise
-        except Exception as error:
-            await self._record(request, started, AuditOutcome.FAILED, error, {})
-            raise
-        extra = self._describe_response(response) if self._describe_response else {}
-        await self._record(request, started, AuditOutcome.SUCCESS, None, extra)
-        return response
+        """Run the call inside a span, and record how it ended."""
+        with self._telemetry.span(request.span_name, request.span_attributes()) as note:
+            started = self._clock.monotonic()
+            try:
+                response = await call_next(request)
+            except asyncio.CancelledError as cancelled:
+                note(_ended(AuditOutcome.FAILED, {}), cancelled)
+                await self._record(
+                    request, started, AuditOutcome.FAILED, cancelled, {}, best_effort=True
+                )
+                raise
+            except _REFUSALS as refusal:
+                note(_ended(AuditOutcome.DENIED, {}, refusal), refusal)
+                await self._record(request, started, AuditOutcome.DENIED, refusal, {})
+                raise
+            except Exception as error:
+                note(_ended(AuditOutcome.FAILED, {}), error)
+                await self._record(request, started, AuditOutcome.FAILED, error, {})
+                raise
+            extra = self._describe_response(response) if self._describe_response else {}
+            note(_ended(AuditOutcome.SUCCESS, extra))
+            await self._record(request, started, AuditOutcome.SUCCESS, None, extra)
+            return response
 
     async def _record(
         self,

@@ -59,12 +59,18 @@ EAP_TLS_CA_BUNDLE=/path/to/enterprise-ca.pem
 
 ## Permissions each adapter needs
 
+Each adapter declares what it needs, from its own options, in
+`ai_agent_lib_aws.access`; `agentlib deploy SERVICE --plan` lists it for a
+service's settings, narrowed to the resources they name, and writes it as the
+task's policy. A test checks that every SDK call an adapter makes, startup
+checks included, is declared. In short:
+
 | Adapter | IAM actions |
 | --- | --- |
-| `bedrock` model | `bedrock:InvokeModel`, `bedrock:InvokeModelWithResponseStream` |
+| `bedrock` model | `bedrock:InvokeModel`, `bedrock:InvokeModelWithResponseStream`; `bedrock:GetInferenceProfile` for an inference profile |
 | `secrets_manager` | `secretsmanager:GetSecretValue` |
-| `firehose` | `firehose:PutRecord`, `firehose:DescribeDeliveryStream` |
-| `redshift_data` | `redshift-data:ExecuteStatement`, `DescribeStatement`, `GetStatementResult`, `CancelStatement`; and `redshift-serverless:GetCredentials` for a workgroup or `redshift:GetClusterCredentials` for a cluster with `db_user` |
+| `firehose` | `firehose:PutRecord`, and `firehose:DescribeDeliveryStream` for the startup check |
+| `redshift_data` | `redshift-data:ExecuteStatement`, `DescribeStatement`, `GetStatementResult`, `CancelStatement`; and `redshift-serverless:GetCredentials` for a workgroup, `redshift:GetClusterCredentials` for a cluster with `db_user`, `redshift:GetClusterCredentialsWithIAM` for a cluster with neither, or `secretsmanager:GetSecretValue` on `secret_arn` |
 | `s3_file` | `s3:GetObject` on the two objects |
 | `postgres` | `rds-db:connect` for the database user |
 | `bedrock` guardrails | `bedrock:ApplyGuardrail` |

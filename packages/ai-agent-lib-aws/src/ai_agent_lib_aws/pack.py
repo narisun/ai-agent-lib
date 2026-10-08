@@ -2,6 +2,15 @@
 
 from __future__ import annotations
 
+from ai_agent_lib_aws.access import (
+    bedrock_guardrails_access,
+    bedrock_model_access,
+    firehose_audit_access,
+    postgres_checkpoint_access,
+    redshift_data_access,
+    s3_registry_access,
+    secrets_manager_access,
+)
 from ai_agent_lib_aws.audit_firehose import FirehoseAuditOptions, FirehoseAuditSink
 from ai_agent_lib_aws.data_redshift import RedshiftDataOptions, RedshiftDataSource
 from ai_agent_lib_aws.guardrails_bedrock import (
@@ -17,11 +26,22 @@ from ai_agent_lib_core.contracts import (
     CheckpointBackend,
     ConfigurationError,
     DeploymentEnv,
+    NoOptions,
+    OptionsModel,
     Section,
 )
 from ai_agent_lib_core.kit import DATA_PORT, MODEL_PORT, BuildContext, ServiceProviders
 
 __all__ = ["register_aws_adapters"]
+
+
+def _postgres_options() -> type[OptionsModel] | None:
+    """The postgres store's options model, when its database driver is installed."""
+    try:
+        from ai_agent_lib_aws.checkpoint_postgres import PostgresCheckpointOptions
+    except ImportError:
+        return None
+    return PostgresCheckpointOptions
 
 
 class _Sessions:
@@ -107,11 +127,60 @@ def register_aws_adapters(
         await backend.start()
         return backend
 
-    providers.register(MODEL_PORT, "bedrock", bedrock_model, replace=replace)
-    providers.register(Section.CHECKPOINT, "postgres", postgres_checkpoint, replace=replace)
-    providers.register(Section.GUARDRAILS, "bedrock", bedrock_guardrails, replace=replace)
-    providers.register(DATA_PORT, "redshift_data", redshift_data, replace=replace)
-    providers.register(Section.AUDIT, "firehose", firehose_audit, replace=replace)
-    providers.register(Section.REGISTRY, "s3_file", s3_registry, replace=replace)
-    providers.register(Section.SECRETS, "secrets_manager", secrets_manager, replace=replace)
+    providers.register(
+        MODEL_PORT,
+        "bedrock",
+        bedrock_model,
+        options=NoOptions,
+        access=bedrock_model_access,
+        replace=replace,
+    )
+    providers.register(
+        Section.CHECKPOINT,
+        "postgres",
+        postgres_checkpoint,
+        options=_postgres_options(),
+        access=postgres_checkpoint_access,
+        replace=replace,
+    )
+    providers.register(
+        Section.GUARDRAILS,
+        "bedrock",
+        bedrock_guardrails,
+        options=BedrockGuardrailsOptions,
+        access=bedrock_guardrails_access,
+        replace=replace,
+    )
+    providers.register(
+        DATA_PORT,
+        "redshift_data",
+        redshift_data,
+        options=RedshiftDataOptions,
+        access=redshift_data_access,
+        replace=replace,
+    )
+    providers.register(
+        Section.AUDIT,
+        "firehose",
+        firehose_audit,
+        options=FirehoseAuditOptions,
+        access=firehose_audit_access,
+        replace=replace,
+    )
+    providers.register(
+        Section.REGISTRY,
+        "s3_file",
+        s3_registry,
+        options=S3RegistryOptions,
+        access=s3_registry_access,
+        replace=replace,
+    )
+    providers.register(
+        Section.SECRETS,
+        "secrets_manager",
+        secrets_manager,
+        options=SecretsManagerOptions,
+        access=secrets_manager_access,
+        replace=replace,
+    )
     return providers

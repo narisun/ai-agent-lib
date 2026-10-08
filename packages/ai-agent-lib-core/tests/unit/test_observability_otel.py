@@ -110,7 +110,7 @@ async def test_an_agent_request_is_one_span_that_holds_the_governed_calls(
     )
     tracers.add_span_processor(SimpleSpanProcessor(spans))
     telemetry = OpenTelemetryTelemetry(meters)
-    monkeypatch.setattr(trace, "get_tracer", lambda name: tracers.get_tracer(name))
+    monkeypatch.setattr(trace, "get_tracer", lambda name, **_: tracers.get_tracer(name))
 
     async def run(context: RequestContext, given: Any) -> Any:
         telemetry.event("tool.call", {"outcome": "success"})
@@ -145,7 +145,7 @@ async def test_a_tool_call_of_a_server_is_one_span_that_holds_its_governed_steps
         "notes-mcp", span_exporter=spans, metric_reader=InMemoryMetricReader()
     )
     tracers.add_span_processor(SimpleSpanProcessor(spans))
-    monkeypatch.setattr(trace, "get_tracer", lambda name: tracers.get_tracer(name))
+    monkeypatch.setattr(trace, "get_tracer", lambda name, **_: tracers.get_tracer(name))
     tool = ToolEntry(name="notes.read", version="1", classification=Classification.INTERNAL)
     entry = ServerEntry(
         id="notes", owner="tests", url="http://127.0.0.1:1/mcp", audience="notes-mcp", tools=(tool,)
@@ -178,8 +178,68 @@ async def test_a_tool_call_of_a_server_is_one_span_that_holds_its_governed_steps
         "agentlib.tool": "notes.read",
         "agentlib.request_id": "r-9",
     }
-    assert "tool.call" in [event.name for event in span.events]
-    assert "salary" not in str(span.to_json())
-    assert "private" not in str(span.to_json())
+    # The governed call is a child span, named and labelled after the GenAI conventions.
+    (child,) = [s for s in spans.get_finished_spans() if s.name == "execute_tool notes.read"]
+    assert child.parent is not None
+    assert child.parent.span_id == span.context.span_id
+    assert dict(child.attributes or {}) == {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "notes.read",
+        "agentlib.read_only": False,
+        "agentlib.mcp_server": "notes",
+        "agentlib.outcome": "success",
+    }
+    assert "tool.call" in [event.name for event in child.events]
+    for finished in spans.get_finished_spans():
+        assert "salary" not in str(finished.to_json())
+        assert "private" not in str(finished.to_json())
     tracers.shutdown()
     meters.shutdown()
+
+
+async def test_each_governed_call_is_a_span_with_its_outcome_and_usage() -> None:
+    from langchain_core.messages import AIMessage, HumanMessage
+
+    from ai_agent_lib_core import PolicyDenied, Principal, bind_request_context
+    from ai_agent_lib_core.testing import FakeChatModelProvider, FakePolicyDecisionPoint, Fakes
+
+    reply = AIMessage(
+        content="fine",
+        usage_metadata={"input_tokens": 12, "output_tokens": 3, "total_tokens": 15},
+    )
+    fakes = Fakes(
+        model=FakeChatModelProvider([reply]),
+        policy=FakePolicyDecisionPoint(
+            lambda request: "no_rule" if request.resource.name == "secret_tool" else True
+        ),
+    )
+    context = RequestContext(
+        principal=Principal(subject="u-1", tenant="t-1"),
+        application="accounts-agent",
+        request_id="r-1",
+        thread_id="th-1",
+    )
+
+    def secret_tool(note: str) -> str:
+        """Never allowed."""
+        return note
+
+    async with fakes.container() as services:
+        (tool,) = services.tools([secret_tool])
+        with bind_request_context(context):
+            await services.model().ainvoke([HumanMessage("a private question")])
+            with pytest.raises(PolicyDenied):
+                await tool.ainvoke({"note": "a private note"})
+
+    chat, denied = fakes.telemetry.spans
+    assert chat.name == "chat fake-model"
+    assert chat.attributes["gen_ai.operation.name"] == "chat"
+    assert chat.attributes["gen_ai.request.model"] == "fake-model"
+    assert chat.attributes["gen_ai.usage.input_tokens"] == 12
+    assert chat.attributes["gen_ai.usage.output_tokens"] == 3
+    assert chat.attributes["agentlib.outcome"] == "success"
+    assert denied.name == "execute_tool secret_tool"
+    assert denied.attributes["agentlib.outcome"] == "denied"
+    assert denied.attributes["agentlib.reason_code"] == "no_rule"
+    assert denied.error_type == "PolicyDenied"
+    assert "private" not in str([chat, denied])

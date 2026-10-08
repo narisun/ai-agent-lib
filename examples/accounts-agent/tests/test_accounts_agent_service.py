@@ -7,6 +7,7 @@ a Unix socket and stops it while a request is running.
 from __future__ import annotations
 
 import asyncio
+import json
 import shutil
 import sys
 import tempfile
@@ -88,6 +89,34 @@ async def test_a_conversation_continues_per_caller_across_requests() -> None:
     prompts = kit.model.models[0].calls
     assert [m.content for m in prompts[1][1:]] == ["first question", "one", "second question"]
     assert [m.content for m in prompts[2][1:]] == ["someone else's question"]
+
+
+async def test_a_streamed_run_sends_each_step_then_the_end() -> None:
+    lookup = AIMessage(
+        content="",
+        tool_calls=[{"name": "lookup_balance", "args": {"account": "4411"}, "id": "call-1"}],
+    )
+    kit = fakes(lookup, "It is 1,250.00 USD.")
+    async with kit.container() as services:
+        lifecycle = ServiceLifecycle(services.validate)
+        app = await build_app(services, lifecycle)
+        await lifecycle.start()
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://agent.test") as http:
+            reply = await http.post("/invoke/stream", json=ask("Balance of 4411?"), headers=ANN)
+
+    assert reply.headers["content-type"].startswith("text/event-stream")
+    events = [
+        (block.split("\n")[0].removeprefix("event: "), json.loads(block.split("data: ", 1)[1]))
+        for block in reply.text.strip().split("\n\n")
+    ]
+    names = [name for name, _ in events]
+    assert names[-1] == "end"
+    assert set(names[:-1]) == {"update"}
+    nodes = [data["node"] for name, data in events if name == "update"]
+    assert "tools" in nodes
+    assert events[-2][1]["messages"][-1]["content"] == "It is 1,250.00 USD."
+    assert events[-1][1]["thread_id"] == "th-1"
 
 
 @pytest.fixture

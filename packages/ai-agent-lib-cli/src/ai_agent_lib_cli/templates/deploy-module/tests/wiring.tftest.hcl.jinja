@@ -1,0 +1,48 @@
+# Checks the wiring with a mocked AWS provider: no account needed.
+# Run it with: terraform init -backend=false && terraform test
+mock_provider "aws" {
+  mock_data "aws_caller_identity" { defaults = { account_id = "123456789012" } }
+  mock_data "aws_iam_policy_document" { defaults = { json = "{\"Version\":\"2012-10-17\",\"Statement\":[]}" } }
+}
+variables {
+  name               = "helper"
+  region             = "eu-west-1"
+  image              = "img"
+  command            = ["helper-serve"]
+  port               = 8000
+  environment        = { SETTING = "value" }
+  cluster_arn        = "arn:aws:ecs:eu-west-1:123456789012:cluster/c"
+  subnet_ids         = ["s"]
+  security_group_ids = ["g"]
+}
+run "sidecars_follow_the_inputs" {
+  command = plan
+  variables {
+    opa_image        = "opa"
+    collector        = true
+    task_policy_json = "{}"
+  }
+  assert {
+    condition     = [for c in jsondecode(aws_ecs_task_definition.this.container_definitions) : c.name] == ["service", "opa", "collector"]
+    error_message = "containers"
+  }
+  assert {
+    condition     = length(aws_iam_role_policy.adapters) == 1 && length(aws_iam_role_policy.collector) == 1
+    error_message = "policies"
+  }
+  assert {
+    condition     = contains([for e in jsondecode(aws_ecs_task_definition.this.container_definitions)[0].environment : e.name], "AWS_REGION")
+    error_message = "region"
+  }
+}
+run "nothing_extra_without_them" {
+  command = plan
+  assert {
+    condition     = [for c in jsondecode(aws_ecs_task_definition.this.container_definitions) : c.name] == ["service"]
+    error_message = "containers"
+  }
+  assert {
+    condition     = length(aws_iam_role_policy.adapters) == 0 && length(aws_iam_role_policy.collector) == 0
+    error_message = "policies"
+  }
+}

@@ -41,6 +41,7 @@ from ai_agent_lib_core.contracts import (
     PolicyResource,
     Principal,
     PrincipalKind,
+    describe,
 )
 
 __all__ = [
@@ -140,7 +141,7 @@ def _parse(text: str, what: str) -> list[Sample]:
     try:
         document = _SamplesDocument.model_validate(yaml.safe_load(text))
     except yaml.YAMLError as exc:
-        raise CliError(f"{what} is not valid YAML ({type(exc).__name__})") from None
+        raise CliError(f"{what} is not valid YAML ({describe(exc)})") from exc
     except ValidationError as exc:
         problems = "; ".join(
             f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}"

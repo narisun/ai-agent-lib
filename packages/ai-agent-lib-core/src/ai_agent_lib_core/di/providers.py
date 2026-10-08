@@ -17,12 +17,15 @@ from types import MappingProxyType
 from pydantic import SecretStr
 
 from ai_agent_lib_core.contracts import (
+    AccessRule,
     Clock,
     ConfigurationError,
     DeploymentEnv,
     ExternalSettings,
     IdGenerator,
+    OptionsModel,
     ProviderSelection,
+    describe,
 )
 
 __all__ = [
@@ -120,12 +123,22 @@ class ProviderSpec:
         name: The name configuration uses to select it.
         factory: Builds the adapter.
         local_only: Whether it may be used only in local development.
+        options: The model its options must satisfy, so that they can be
+            checked before anything is built and documented from the code.
+            :class:`~ai_agent_lib_core.contracts.NoOptions` for an adapter that
+            takes none; ``None`` when the adapter does not say.
+        access: What the adapter needs from the cloud it runs in, given its
+            options, so a deployment grants only that.
+            :func:`~ai_agent_lib_core.contracts.no_access` for an adapter that
+            needs nothing; ``None`` when the adapter does not say.
     """
 
     port: str
     name: str
     factory: Factory
     local_only: bool = False
+    options: type[OptionsModel] | None = None
+    access: AccessRule | None = None
 
 
 def _normalize(distribution: str) -> str:
@@ -173,6 +186,8 @@ class ServiceProviders:
         factory: Factory,
         *,
         local_only: bool = False,
+        options: type[OptionsModel] | None = None,
+        access: AccessRule | None = None,
         replace: bool = False,
     ) -> ServiceProviders:
         """Add an adapter and return the registry, so calls can be chained.
@@ -182,6 +197,10 @@ class ServiceProviders:
             name: The name configuration uses to select it.
             factory: Builds the adapter.
             local_only: Whether it may be used only in local development.
+            options: The options model the factory parses, checked at startup
+                before anything is built. ``NoOptions`` for none.
+            access: What the adapter needs from the cloud, given its options.
+                ``no_access`` for nothing.
             replace: Allow overwriting an existing registration.
 
         Raises:
@@ -196,7 +215,12 @@ class ServiceProviders:
         if key in self._specs and not replace:
             raise ValueError(f"provider {name!r} is already registered for {port}")
         self._specs[key] = ProviderSpec(
-            port=str(port), name=name, factory=factory, local_only=local_only
+            port=str(port),
+            name=name,
+            factory=factory,
+            local_only=local_only,
+            options=options,
+            access=access,
         )
         return self
 
@@ -213,8 +237,10 @@ class ServiceProviders:
         hint = _INSTALL_HINTS.get(key)
         if hint is not None:
             raise ConfigurationError(
-                f"provider {name!r} for {port} is not available; install it with "
-                f"'pip install {hint}'"
+                f"provider {name!r} for {port} is not available",
+                expected=f"the {hint} distribution, which provides it, installed",
+                actual=f"{hint} is not installed",
+                fix=f"add \"{hint}\" to the service's dependencies, or 'pip install {hint}'",
             )
         known = ", ".join(self.names(port)) or "none"
         raise ConfigurationError(
@@ -248,8 +274,7 @@ class ServiceProviders:
                 register_pack = entry_point.load()
             except Exception as exc:
                 raise ConfigurationError(
-                    f"the provider pack of {distribution} could not be loaded "
-                    f"({type(exc).__name__})"
+                    f"the provider pack of {distribution} could not be loaded ({describe(exc)})"
                 ) from exc
             register_pack(self)
         return self

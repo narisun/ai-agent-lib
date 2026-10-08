@@ -13,14 +13,14 @@ import json
 import logging
 import re
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
 
 from opentelemetry import trace
 from starlette.applications import Starlette
 from starlette.requests import ClientDisconnect, Request
-from starlette.responses import JSONResponse, Response
+from starlette.responses import JSONResponse, Response, StreamingResponse
 from starlette.routing import Route
 
 from ai_agent_lib_core.contracts import (
@@ -40,8 +40,10 @@ __all__ = [
     "HEALTH_PATH",
     "INVOKE_PATH",
     "READY_PATH",
+    "STREAM_PATH",
     "AgentServices",
     "Run",
+    "Stream",
     "SupportsCustomRoutes",
     "add_health_routes",
     "agent_app",
@@ -51,6 +53,7 @@ __all__ = [
 HEALTH_PATH = "/healthz"
 READY_PATH = "/readyz"
 INVOKE_PATH = "/invoke"
+STREAM_PATH = "/invoke/stream"
 
 REQUEST_ID_HEADER = "x-request-id"
 _SAFE_ID = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
@@ -65,6 +68,14 @@ Run = Callable[[RequestContext, Any], Awaitable[Any]]
 
 It is given the caller's request context and the ``input`` of the request, and
 returns the output, which must be something JSON can hold.
+"""
+
+
+Stream = Callable[[RequestContext, Any], AsyncIterator[Any]]
+"""Runs the agent once and yields what it has done so far, step by step.
+
+Each item must be something JSON can hold, such as the update of one graph
+node. Every model and tool call inside is governed as in :data:`Run`.
 """
 
 
@@ -176,6 +187,13 @@ def _status_of(error: AgentLibError) -> tuple[int, str]:
     return 500, "internal"
 
 
+def _level_of(error: AgentLibError) -> int:
+    """Refusals are the caller's problem; anything else is the service's."""
+    if isinstance(error, PolicyDenied | ValidationFailed | BudgetExceeded | ExecutionPaused):
+        return logging.WARNING
+    return logging.ERROR
+
+
 def _failure(error: AgentLibError, request_id: str) -> JSONResponse:
     """Describe a failed run to the caller: a code, never the error's own text."""
     status, name = _status_of(error)
@@ -204,8 +222,10 @@ class _Invoke:
         application: str,
         lifecycle: ServiceLifecycle,
         max_body_bytes: int,
+        route: str = INVOKE_PATH,
     ) -> None:
         self._services = services
+        self._route = route
         self._run = run
         self._application = application
         self._lifecycle = lifecycle
@@ -219,7 +239,7 @@ class _Invoke:
             logging.ERROR if response.status_code >= _SERVER_ERROR else logging.INFO,
             "request",
             extra={
-                "route": INVOKE_PATH,
+                "route": self._route,
                 "status": response.status_code,
                 "duration_ms": round((time.perf_counter() - started) * 1000),
                 "request_id": response.headers.get(REQUEST_ID_HEADER),
@@ -270,8 +290,14 @@ class _Invoke:
                 request_id=request_id,
             )
         except PolicyDenied as refusal:
+            _LOG.info(
+                "the caller was refused at sign-in",
+                exc_info=refusal,
+                extra={"request_id": request_id, "reason_code": refusal.reason_code},
+            )
             return self._unauthorized(refusal.reason_code)
         except AgentLibError as error:
+            _LOG.error("the caller could not be signed in", exc_info=error)
             return _failure(error, request_id or self._services.ids.new_id())
 
     async def _answer(self, context: RequestContext, given: object) -> Response:
@@ -289,9 +315,19 @@ class _Invoke:
             ):
                 output = await self._run(context, given)
         except AgentLibError as error:
+            # What was expected and what was found are logged: the library's
+            # errors never put caller content in those.
+            _LOG.log(
+                _level_of(error),
+                "the run ended with %s",
+                type(error).__name__,
+                exc_info=error,
+                extra={"request_id": context.request_id},
+            )
             return _failure(error, context.request_id)
         except Exception:  # noqa: BLE001 - a bug must become a reply and a log line
-            # Its type and where it was raised are logged, never its text.
+            # Its type, where it was raised and the line of the agent's own code
+            # are logged; its text only where logging is set up with details.
             _LOG.exception("the run failed unexpectedly", extra={"request_id": context.request_id})
             return _error(_SERVER_ERROR, "internal", request_id=context.request_id)
         return JSONResponse(
@@ -309,6 +345,78 @@ class _Invoke:
         return response
 
 
+class _StreamRoute(_Invoke):
+    """The route that runs the agent for one request and sends each step as it happens.
+
+    The reply is a stream of server-sent events: ``update`` for each item the
+    agent yields, then ``end``; or ``error`` with a code, never the error's text.
+    """
+
+    def __init__(
+        self,
+        services: AgentServices,
+        stream: Stream,
+        application: str,
+        lifecycle: ServiceLifecycle,
+        max_body_bytes: int,
+    ) -> None:
+        super().__init__(
+            services, _unused_run, application, lifecycle, max_body_bytes, route=STREAM_PATH
+        )
+        self._stream = stream
+
+    async def _answer(self, context: RequestContext, given: object) -> Response:
+        return StreamingResponse(
+            self._events(context, given),
+            media_type="text/event-stream",
+            headers={REQUEST_ID_HEADER: context.request_id, "cache-control": "no-cache"},
+        )
+
+    async def _events(self, context: RequestContext, given: object) -> AsyncIterator[str]:
+        tracer = trace.get_tracer(_INSTRUMENTATION)
+        attributes = {
+            "agentlib.application": self._application,
+            "agentlib.request_id": context.request_id,
+        }
+        ending: dict[str, object] = {
+            "thread_id": context.thread_id,
+            "request_id": context.request_id,
+        }
+        try:
+            with (
+                bind_request_context(context),
+                tracer.start_as_current_span("agent.stream", attributes=attributes),
+            ):
+                async for item in self._stream(context, given):
+                    yield _event("update", item)
+        except AgentLibError as error:
+            _LOG.log(
+                _level_of(error),
+                "the run ended with %s",
+                type(error).__name__,
+                exc_info=error,
+                extra={"request_id": context.request_id},
+            )
+            _, name = _status_of(error)
+            reason = {"reason": error.reason_code} if isinstance(error, PolicyDenied) else {}
+            yield _event("error", {"error": name, **reason, **ending})
+            return
+        except Exception:  # noqa: BLE001 - a bug must become an event and a log line
+            _LOG.exception("the run failed unexpectedly", extra={"request_id": context.request_id})
+            yield _event("error", {"error": "internal", **ending})
+            return
+        yield _event("end", ending)
+
+
+async def _unused_run(context: RequestContext, given: Any) -> Any:  # noqa: ARG001  # pragma: no cover
+    raise AssertionError("the streaming route never runs the agent all at once")
+
+
+def _event(name: str, data: object) -> str:
+    """One server-sent event. JSON holds no raw line breaks, so one data line suffices."""
+    return f"event: {name}\ndata: {json.dumps(data, default=str)}\n\n"
+
+
 def agent_app(
     services: AgentServices,
     run: Run,
@@ -316,6 +424,7 @@ def agent_app(
     application: str,
     lifecycle: ServiceLifecycle,
     max_body_bytes: int = 1_000_000,
+    stream: Stream | None = None,
 ) -> Starlette:
     """Build the HTTP application of an agent.
 
@@ -332,8 +441,13 @@ def agent_app(
             policy, the registry and the audit log.
         lifecycle: The service's lifecycle. Requests are refused once it stops.
         max_body_bytes: The largest request body accepted.
+        stream: Runs the agent and yields each step. With it, ``POST
+            /invoke/stream`` takes the same body and answers with server-sent
+            events, so a chat front end can show progress.
     """
     invoke = _Invoke(services, run, application, lifecycle, max_body_bytes)
-    return Starlette(
-        routes=[Route(INVOKE_PATH, invoke.handle, methods=["POST"]), *health_routes(lifecycle)]
-    )
+    routes = [Route(INVOKE_PATH, invoke.handle, methods=["POST"])]
+    if stream is not None:
+        streaming = _StreamRoute(services, stream, application, lifecycle, max_body_bytes)
+        routes.append(Route(STREAM_PATH, streaming.handle, methods=["POST"]))
+    return Starlette(routes=[*routes, *health_routes(lifecycle)])

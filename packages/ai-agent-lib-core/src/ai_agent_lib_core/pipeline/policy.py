@@ -25,8 +25,18 @@ __all__ = ["ModelPolicyInterceptor", "ToolPolicyInterceptor", "enforce_decision"
 ResponseT = TypeVar("ResponseT")
 
 
-def enforce_decision(decision: Decision, evidence: Evidence | None = None) -> Decision:
+def enforce_decision(
+    decision: Decision,
+    evidence: Evidence | None = None,
+    request: PolicyRequest | None = None,
+) -> Decision:
     """Record a decision as evidence and raise unless it is an allow.
+
+    Args:
+        decision: The policy's answer.
+        evidence: Where the decision is recorded for the audit log.
+        request: The question that was asked, so that a denial can say what
+            was refused and what rule would allow it.
 
     Raises:
         PolicyDenied: If the decision is a deny.
@@ -39,8 +49,37 @@ def enforce_decision(decision: Decision, evidence: Evidence | None = None) -> De
             policy_cached=decision.cached,
         )
     if not decision.allow:
-        raise PolicyDenied("the policy does not allow this", reason_code=decision.reason_code)
+        raise _denial(decision, request)
     return decision
+
+
+def _denial(decision: Decision, request: PolicyRequest | None) -> PolicyDenied:
+    """Say what was refused, why, and what a rule that allows it looks like."""
+    if request is None:
+        return PolicyDenied(
+            "the policy does not allow this",
+            reason_code=decision.reason_code,
+            actual=decision.explanation,
+        )
+    action, resource = request.action.value, request.resource
+    roles = sorted(request.principal.roles)
+    wanted = (
+        f"a rule with actions [{action}], applications [{request.application}] and "
+        f'resources ["{resource.name}"]'
+    )
+    if roles:
+        wanted += f", for one of the caller's roles [{', '.join(roles)}]"
+    return PolicyDenied(
+        f"the policy does not allow {action} on the {resource.kind} {resource.name!r} "
+        f"for the application {request.application!r}",
+        reason_code=decision.reason_code,
+        expected=wanted,
+        actual=decision.explanation or f"the policy decided {decision.reason_code!r}",
+        fix=(
+            "add or widen that rule in the rules file (policies/agentlib/rules/data.yaml in "
+            "a workspace), then check it with 'agentlib policy test'"
+        ),
+    )
 
 
 def _refuse_obligations(decision: Decision, what: str) -> None:
@@ -95,23 +134,19 @@ class ToolPolicyInterceptor(Generic[ResponseT]):
         attributes: dict[str, AuditValue] = {"read_only": request.read_only}
         if request.server is not None:
             attributes["server"] = request.server
-        decision = enforce_decision(
-            await self._policy.decide(
-                PolicyRequest(
-                    principal=context.principal,
-                    action=PolicyAction.TOOL_CALL,
-                    resource=PolicyResource(
-                        kind="tool",
-                        name=_tool_resource_name(request),
-                        classification=_classification(facts.get("tool_classification")),
-                        attributes=attributes,
-                    ),
-                    application=context.application,
-                    environment=self._environment,
-                )
+        question = PolicyRequest(
+            principal=context.principal,
+            action=PolicyAction.TOOL_CALL,
+            resource=PolicyResource(
+                kind="tool",
+                name=_tool_resource_name(request),
+                classification=_classification(facts.get("tool_classification")),
+                attributes=attributes,
             ),
-            request.evidence,
+            application=context.application,
+            environment=self._environment,
         )
+        decision = enforce_decision(await self._policy.decide(question), request.evidence, question)
         _refuse_obligations(decision, "tool call")
         return await call_next(request)
 
@@ -135,22 +170,18 @@ class ModelPolicyInterceptor(Generic[ResponseT]):
     ) -> ResponseT:
         """Continue only if the policy allows the call."""
         context: RequestContext = require_identified(request.context, self._clock)
-        decision = enforce_decision(
-            await self._policy.decide(
-                PolicyRequest(
-                    principal=context.principal,
-                    action=PolicyAction.MODEL_ROUTE,
-                    resource=PolicyResource(
-                        kind="model",
-                        name=request.alias,
-                        attributes={"model_id": request.model_id},
-                    ),
-                    application=context.application,
-                    environment=self._environment,
-                    attributes={"model_provider": request.provider},
-                )
+        question = PolicyRequest(
+            principal=context.principal,
+            action=PolicyAction.MODEL_ROUTE,
+            resource=PolicyResource(
+                kind="model",
+                name=request.alias,
+                attributes={"model_id": request.model_id},
             ),
-            request.evidence,
+            application=context.application,
+            environment=self._environment,
+            attributes={"model_provider": request.provider},
         )
+        decision = enforce_decision(await self._policy.decide(question), request.evidence, question)
         _refuse_obligations(decision, "model call")
         return await call_next(request)

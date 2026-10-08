@@ -488,7 +488,7 @@ async def test_lifecycle_is_checked(tmp_path: Path) -> None:
         source.describe()
     with pytest.raises(ConfigurationError, match="not started"):
         await source.validate()
-    with pytest.raises(ConfigurationError, match="query directory not found"):
+    with pytest.raises(ConfigurationError, match="the queries folder does not exist"):
         await source.start()
 
     empty = RestDataSource("bank", options(tmp_path), FrozenClock())

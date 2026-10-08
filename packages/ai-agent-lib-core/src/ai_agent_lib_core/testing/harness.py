@@ -124,7 +124,12 @@ class Fakes:
             ids=self.ids,
             telemetry=self.telemetry,
             mcp_connector=self.mcp_connector,
+            sleep=_no_wait,
         )
+
+
+async def _no_wait(seconds: float) -> None:  # noqa: ARG001 - a test does not wait between retries
+    return None
 
 
 def fake_providers(

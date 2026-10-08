@@ -15,11 +15,13 @@ from ai_agent_lib_core.config.bindings import (
     SECRET_KEY_PREFIX,
     SECRET_VARIABLE_PREFIX,
     Binding,
+    Key,
     ValueKind,
 )
 
 __all__ = [
     "EnvSetting",
+    "default_text",
     "render_env_example",
     "render_env_file",
     "render_reference",
@@ -47,9 +49,44 @@ def _notes(binding: Binding) -> str:
     return "; ".join(notes)
 
 
+def _profile_defaults() -> dict[str, dict[str, str]]:
+    """What resolving an empty configuration gives under each profile, by key."""
+    from ai_agent_lib_core.config.resolver import ConfigResolver
+    from ai_agent_lib_core.config.sources import MappingConfigSource
+    from ai_agent_lib_core.contracts import Profile
+
+    found: dict[str, dict[str, str]] = {}
+    for profile in Profile:
+        source = MappingConfigSource({variable_for(Key.PROFILE): profile.value})
+        for key, value in ConfigResolver(source).explain().shown.items():
+            found.setdefault(key, {})[profile.value] = value
+    return found
+
+
+def default_text(binding: Binding) -> str:
+    """Say what applies when ``binding``'s variable is not set, in Markdown.
+
+    Defaults chosen by the profile are read by resolving an empty
+    configuration, so the text cannot drift from the resolver.
+    """
+    if binding.key == Key.PROFILE:
+        return f"`{_profile_defaults()[Key.PROFILE]['local']}`"
+    by_profile = _profile_defaults().get(binding.key)
+    if by_profile:
+        values = set(by_profile.values())
+        if len(values) == 1:
+            return f"`{values.pop()}`"
+        return ", ".join(f"{profile}: `{value}`" for profile, value in by_profile.items())
+    return binding.default or "not set"
+
+
 def _table(bindings: Sequence[Binding]) -> list[str]:
-    lines = ["| Variable | Purpose | Notes |", "| --- | --- | --- |"]
-    lines += [f"| `{b.name}` | {b.description} | {_notes(b)} |" for b in bindings]
+    lines = ["| Variable | Purpose | Default | Notes |", "| --- | --- | --- | --- |"]
+    lines += [
+        f"| `{b.name}` | {b.description}{'<br>' + b.details if b.details else ''} "
+        f"| {default_text(b)} | {_notes(b)} |"
+        for b in bindings
+    ]
     return lines
 
 
@@ -65,7 +102,7 @@ def render_reference(bindings: Sequence[Binding] = DEFAULT_BINDINGS) -> str:
         "## Variables owned by the library",
         "",
         *_table(owned),
-        f"| `{_SECRET_PATTERN}` | {_SECRET_PURPOSE} | sensitive |",
+        f"| `{_SECRET_PATTERN}` | {_SECRET_PURPOSE} | not set | sensitive |",
         "",
         "## Variables that belong to other tools",
         "",
@@ -86,6 +123,7 @@ def render_env_example(bindings: Sequence[Binding] = DEFAULT_BINDINGS) -> str:
     ]
     for binding in bindings:
         lines.append(f"# {binding.description}")
+        lines.append(f"# Default: {default_text(binding).replace('`', '')}")
         lines.append(f"# {binding.name}={binding.example}")
         lines.append("")
     lines += [f"# {_SECRET_PURPOSE.replace('`', '')}", f"# {_SECRET_PATTERN}=", ""]

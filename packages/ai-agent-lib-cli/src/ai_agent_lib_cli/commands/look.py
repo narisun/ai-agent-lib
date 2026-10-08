@@ -1,4 +1,4 @@
-"""The commands that look and run without writing: doctor, config explain, run and graph."""
+"""The commands that look and run without writing: doctor, config, run and graph."""
 
 from __future__ import annotations
 
@@ -16,9 +16,17 @@ from ai_agent_lib_cli.diagnostics import (
 )
 from ai_agent_lib_cli.errors import CliError
 from ai_agent_lib_cli.names import package_name
+from ai_agent_lib_cli.options_listing import (
+    LIMITS,
+    adapter_lines,
+    limit_lines,
+    option_lines,
+    options_schema,
+)
 from ai_agent_lib_cli.toolbox import Toolbox
 from ai_agent_lib_cli.workspace import AGENTS_FOLDER, load_answers
 from ai_agent_lib_core.contracts import CheckResult
+from ai_agent_lib_core.di import ServiceProviders
 
 __all__ = ["config", "doctor", "graph", "run"]
 
@@ -63,6 +71,35 @@ def doctor(tools: Toolbox, service: str | None, no_pins: bool, workspace: Path |
 @click.group()
 def config() -> None:
     """Look at how a service is configured."""
+
+
+@config.command("options")
+@click.argument("port", required=False)
+@click.argument("name", required=False)
+@click.option(
+    "--schema", is_flag=True, help="Print the adapter's options as JSON Schema, for an editor."
+)
+def config_options(port: str | None, name: str | None, schema: bool) -> None:
+    """List the adapters of each PORT, or the options of the adapter NAME with their defaults."""
+    providers = ServiceProviders.default()
+    if schema:
+        if port is None or name is None:
+            raise CliError(
+                "--schema needs a PORT and a NAME",
+                fix="e.g. agentlib config options audit jsonl --schema",
+            )
+        click.echo(options_schema(providers, port, name))
+        return
+    if port == LIMITS:
+        lines = limit_lines()
+    elif port is None:
+        lines = adapter_lines(providers)
+    elif name is None:
+        lines = adapter_lines(providers, [port])
+    else:
+        lines = option_lines(providers, port, name)
+    for line in lines:
+        click.echo(line)
 
 
 @config.command("explain")

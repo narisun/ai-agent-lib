@@ -27,6 +27,7 @@ from ai_agent_lib_core.contracts import (
     DeploymentEnv,
     Obligations,
     PolicyAction,
+    PolicyDecisionPoint,
     PolicyDenied,
     PolicyRequest,
     PolicyResource,
@@ -538,9 +539,7 @@ CONTEXT = RequestContext(
 class Stage:
     """Both pipelines over one fake policy, with the audit records they write."""
 
-    def __init__(
-        self, policy: FakePolicyDecisionPoint, registry: FakeRegistry | None = None
-    ) -> None:
+    def __init__(self, policy: PolicyDecisionPoint, registry: FakeRegistry | None = None) -> None:
         self.audit = InMemoryAuditSink()
         self.reached: list[object] = []
         common = {
@@ -711,3 +710,63 @@ def test_the_decision_input_names_the_agents_acting_for_the_caller() -> None:
     }
     service = Principal(subject="sp-1", tenant="t-9", kind=PrincipalKind.SERVICE)
     assert question(principal=service).to_input()["principal"]["kind"] == "service"  # type: ignore[index]
+
+
+# ------------------------------------------------- a denial says how to fix it
+
+NEAR_MISS_RULES = """\
+schema: agentlib.rules/v1
+rules:
+  - id: managers-call-the-tools
+    actions: [tool.call]
+    applications: [accounts-agent]
+    roles: [manager]
+    resources: ["accounts/*"]
+  - id: helper-uses-models
+    actions: [model.route]
+    applications: [helper]
+    resources: [default]
+"""
+
+
+async def test_the_rules_say_which_rule_came_closest_and_what_it_needs(tmp_path: Path) -> None:
+    policy = RulesPolicyDecisionPoint(rules_file(tmp_path, NEAR_MISS_RULES), SequentialIds("d"))
+    denied = await policy.decide(
+        question(
+            action=PolicyAction.TOOL_CALL,
+            application="accounts-agent",
+            resource=PolicyResource(kind="tool", name="accounts/lookup"),
+        )
+    )
+    assert denied.explanation == (
+        "no rule matched; the closest were rule 'managers-call-the-tools': it needs one of "
+        "the roles 'manager'; the caller has 'admin', 'analyst' | rule 'helper-uses-models': "
+        "it covers 'model.route', not tool.call; it covers application 'helper', not "
+        "'accounts-agent'; it covers resources 'default', not 'accounts/lookup'"
+    )
+    assert "u-123" not in str(denied.explanation)
+    nothing = await policy.decide(question(action=PolicyAction.MEMORY_READ))
+    assert nothing.explanation == "no rule covers the action memory.read"
+
+
+async def test_a_denial_names_what_was_refused_the_rule_that_would_allow_it_and_why(
+    tmp_path: Path,
+) -> None:
+    policy = RulesPolicyDecisionPoint(rules_file(tmp_path, NEAR_MISS_RULES), SequentialIds("d"))
+    stage = Stage(policy)
+    with pytest.raises(PolicyDenied) as caught:
+        await stage.tool(ToolCall(context=CONTEXT, tool="lookup_balance"))
+    error = caught.value
+    assert error.message == (
+        "the policy does not allow tool.call on the tool 'lookup_balance' for the application "
+        "'accounts-agent'"
+    )
+    assert error.expected == (
+        "a rule with actions [tool.call], applications [accounts-agent] and resources "
+        '["lookup_balance"], for one of the caller\'s roles [admin, analyst]'
+    )
+    assert error.actual is not None
+    assert error.actual.startswith("no rule matched; the closest were rule 'managers-call")
+    assert error.fix is not None
+    assert "agentlib policy test" in error.fix
+    assert "reason: no_matching_rule" in str(error)

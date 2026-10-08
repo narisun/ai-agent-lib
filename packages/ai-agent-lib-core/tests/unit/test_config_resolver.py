@@ -35,7 +35,6 @@ def test_nothing_set_gives_the_local_profile() -> None:
     assert config.section(Section.SECRETS).provider == "env"
     assert config.section(Section.IDENTITY).provider == "static"
     assert config.section(Section.CHECKPOINT).provider == "sqlite"
-    assert config.runtime_policy is None
     assert config.secrets == {}
 
 
@@ -105,8 +104,15 @@ def test_a_blank_value_counts_as_not_set(blank: str) -> None:
 
 def test_enum_values_are_validated_and_case_insensitive() -> None:
     assert resolve({"EAP_PROFILE": "AWS"}).profile is Profile.AWS
-    with pytest.raises(ConfigurationError, match=r"EAP_PROFILE must be one of: local, aws"):
+    with pytest.raises(ConfigurationError) as caught:
         resolve({"EAP_PROFILE": "moon"})
+    error = caught.value
+    assert error.message == "EAP_PROFILE is not one of the values it takes"
+    assert (error.expected, error.actual) == ("one of: local, aws", "'moon'")
+    assert error.fix == "set EAP_PROFILE=local"
+    with pytest.raises(ConfigurationError) as near:
+        resolve({"EAP_PROFILE": "aw"})
+    assert near.value.fix == "set EAP_PROFILE=aws"
     with pytest.raises(ConfigurationError, match="EAP_DEPLOYMENT_ENV"):
         resolve({"EAP_DEPLOYMENT_ENV": "staging"})
 
@@ -124,7 +130,7 @@ def test_invalid_json_names_the_variable_and_never_repeats_the_value() -> None:
 
 
 def test_options_must_be_a_json_object() -> None:
-    with pytest.raises(ConfigurationError, match="EAP_AUDIT_OPTIONS must be a JSON object"):
+    with pytest.raises(ConfigurationError, match="EAP_AUDIT_OPTIONS is not a JSON object"):
         resolve({"EAP_AUDIT_OPTIONS": "[1, 2]"})
 
 
@@ -230,7 +236,7 @@ def test_errors_name_the_current_variable_from_the_table() -> None:
         *(binding for binding in DEFAULT_BINDINGS if binding.key != Key.PROFILE),
         Binding(name="EAP_PRESET", key=Key.PROFILE, description="Default adapter set."),
     )
-    with pytest.raises(ConfigurationError, match="EAP_PRESET must be one of"):
+    with pytest.raises(ConfigurationError, match="EAP_PRESET is not one of the values it takes"):
         ConfigResolver(MappingConfigSource({"EAP_PRESET": "moon"}), bindings=table).resolve()
 
 
@@ -265,10 +271,10 @@ def test_named_data_sources_each_select_an_adapter_with_its_own_options() -> Non
 @pytest.mark.parametrize(
     ("value", "problem"),
     [
-        ("[]", "must be a JSON object"),
-        ('{"accounts": "duckdb_csv"}', 'must be an object with "kind"'),
-        ('{"accounts": {"data_dir": "data"}}', 'must be an object with "kind"'),
-        ('{"accounts": {"kind": 7}}', 'must be an object with "kind"'),
+        ("[]", "is not a JSON object"),
+        ('{"accounts": "duckdb_csv"}', "does not say which adapter reads it"),
+        ('{"accounts": {"data_dir": "data"}}', "does not say which adapter reads it"),
+        ('{"accounts": {"kind": 7}}', "does not say which adapter reads it"),
         ('{"accounts": {"kind": " rest"}}', "whitespace"),
         ('{"": {"kind": "rest"}}', "a data source name must start"),
         ('{"My Accounts": {"kind": "rest"}}', "a data source name must start"),

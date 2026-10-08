@@ -338,7 +338,7 @@ async def test_arguments_are_checked_against_the_schema_before_anything_is_sent(
         connections = len(world.connector.connections)
         with bind_request_context(CONTEXT):
             for bad in ({}, {"region": 5}, {"region": "west", "min_balance": "lots"}):
-                with pytest.raises(ValidationFailed, match="do not match its schema"):
+                with pytest.raises(ValidationFailed, match="do not match its input schema"):
                     await tool.ainvoke(bad)
         assert len(world.connector.connections) == connections
     assert world.ran == []
@@ -594,3 +594,28 @@ async def test_a_deployed_agent_sends_tokens_only_over_tls(url: str, allowed: bo
     # On a developer's machine any registered address may be used.
     async with World(server_entry=entry) as world:
         assert len(await world.agent_services.mcp_tools("accounts")) == 1
+
+
+async def test_the_servers_span_joins_the_agents_trace(monkeypatch: pytest.MonkeyPatch) -> None:
+    from opentelemetry import trace
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+    spans = InMemorySpanExporter()
+    tracers = TracerProvider()
+    tracers.add_span_processor(SimpleSpanProcessor(spans))
+    monkeypatch.setattr(trace, "get_tracer", lambda name, **_: tracers.get_tracer(name))
+    async with World() as world:
+        tool = await world.lookup_tool()
+        with (
+            tracers.get_tracer("test").start_as_current_span("agent.invoke") as request,
+            bind_request_context(CONTEXT),
+        ):
+            await tool.ainvoke({"region": "west"})
+
+    (served,) = [span for span in spans.get_finished_spans() if span.name == "mcp.tool_call"]
+    assert served.context.trace_id == request.get_span_context().trace_id
+    assert served.parent is not None
+    assert served.parent.span_id == request.get_span_context().span_id
+    tracers.shutdown()

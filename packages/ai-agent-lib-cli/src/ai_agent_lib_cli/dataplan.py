@@ -125,6 +125,11 @@ class PlannedQuery:
         """The arguments of an example call, as Python source."""
         return repr({p.name: p.example for p in self.parameters})
 
+    @property
+    def example_keywords(self) -> str:
+        """The arguments of an example call, as keyword arguments in Python source."""
+        return ", ".join(f"{p.name}={p.example!r}" for p in self.parameters)
+
 
 @dataclass(frozen=True, slots=True)
 class DataPlan:

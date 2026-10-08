@@ -90,7 +90,12 @@ def structured_payload(message: AIMessage, name: str) -> object:
     """
     calls = [call for call in message.tool_calls if call["name"] == name]
     if len(calls) > 1:
-        raise ValidationFailed("the model produced more than one structured output")
+        raise ValidationFailed(
+            "the model produced more than one structured output",
+            expected=f"one call of the tool {name!r}",
+            actual=f"{len(calls)} calls of it",
+            fix="ask for a single answer in the instructions",
+        )
     if calls:
         return calls[0]["args"]
     return message_text(message)

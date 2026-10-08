@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Collection, Mapping, Sequence
 from contextvars import ContextVar
 from dataclasses import dataclass, field
@@ -21,6 +22,7 @@ from ai_agent_lib_core.pipeline import Handler, Pipeline, ToolCall, ToolStage
 __all__ = ["GovernedTool", "govern_tools"]
 
 _TOOL_CALL = "tool_call"
+_LOG = logging.getLogger(__name__)
 
 # The ID of the model's tool call, for the duration of one invocation. LangChain
 # hands it to a tool only through an injected argument, so it is kept here for
@@ -160,17 +162,31 @@ class GovernedTool(BaseTool):
         if not isinstance(invocation, _Invocation):
             raise TypeError("the tool call payload was replaced inside the pipeline")
         arguments = dict(invocation.arguments)
-        if invocation.tool_call_id is None:
-            return await self._inner.ainvoke(arguments, invocation.config)
-        reply = await self._inner.ainvoke(
-            {
-                "name": self._inner.name,
-                "args": arguments,
-                "id": invocation.tool_call_id,
-                "type": _TOOL_CALL,
-            },
-            invocation.config,
-        )
+        try:
+            if invocation.tool_call_id is None:
+                return await self._inner.ainvoke(arguments, invocation.config)
+            reply = await self._inner.ainvoke(
+                {
+                    "name": self._inner.name,
+                    "args": arguments,
+                    "id": invocation.tool_call_id,
+                    "type": _TOOL_CALL,
+                },
+                invocation.config,
+            )
+        except Exception as error:
+            # The tool's own code raised. The framework usually turns this into a
+            # message for the model, so without this line the developer would
+            # never see it: its type, where it was raised and the line of the
+            # tool's code are logged; its message only with logging details on.
+            _LOG.warning(
+                "the tool %s raised %s",
+                self.name,
+                type(error).__name__,
+                exc_info=error,
+                extra={"tool": self.name},
+            )
+            raise
         if isinstance(reply, ToolMessage):
             # The pipeline checks and frames the content; the message is rebuilt after it.
             invocation.reply = reply

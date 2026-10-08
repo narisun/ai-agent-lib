@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import enum
+import re
 from dataclasses import replace
 from typing import Generic, TypeVar
 
@@ -21,6 +22,14 @@ from ai_agent_lib_core.pipeline.calls import ToolCall
 from ai_agent_lib_core.pipeline.interceptor import Handler
 
 __all__ = ["AgentCheck", "RegistryInterceptor", "allowed_agent", "name_actors"]
+
+_TOOL_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
+
+
+def _shown(name: str) -> str:
+    """A tool name a caller sent, quoted, unless it is not shaped like one and may be content."""
+    return repr(name) if _TOOL_NAME.match(name) else "with a malformed name"
+
 
 ResponseT = TypeVar("ResponseT")
 
@@ -77,13 +86,28 @@ def allowed_agent(agent: AgentEntry | None, name: str, server: ServerEntry) -> A
             listed for the server.
     """
     if agent is None:
-        raise PolicyDenied(f"agent {name!r} is not registered", reason_code="agent_unregistered")
+        raise PolicyDenied(
+            f"agent {name!r} is not registered",
+            reason_code="agent_unregistered",
+            fix=(
+                f"add {name!r} to the agent registry (agentlib new agent does this), or "
+                "check that the caller's token names the agent by its registered ID or client ID"
+            ),
+        )
     if agent.status is EntryStatus.DISABLED:
-        raise PolicyDenied(f"agent {name!r} is disabled", reason_code="agent_disabled")
+        raise PolicyDenied(
+            f"agent {name!r} is disabled",
+            reason_code="agent_disabled",
+            fix="set its status to active in the agent registry, if it should run again",
+        )
     if server.id not in agent.mcp_servers:
+        listed = ", ".join(repr(s) for s in agent.mcp_servers) or "none"
         raise PolicyDenied(
             f"agent {name!r} is not listed for MCP server {server.id!r}",
             reason_code="server_not_allowed",
+            expected=f"{server.id!r} among the agent's mcp_servers",
+            actual=f"its mcp_servers are: {listed}",
+            fix=f"run 'agentlib link {name} {server.id}', or add it to the agent registry",
         )
     return agent
 
@@ -132,9 +156,15 @@ class RegistryInterceptor(Generic[ResponseT]):
             )
         tool = server.tool(request.tool)
         if tool is None:
+            registered = ", ".join(repr(t.name) for t in server.tools) or "none"
             raise PolicyDenied(
-                f"tool {request.tool!r} is not registered for MCP server {request.server!r}",
+                f"tool {_shown(request.tool)} is not registered for MCP server {request.server!r}",
                 reason_code="tool_unregistered",
+                expected=f"one of the server's registered tools: {registered}",
+                fix=(
+                    f"add the tool under server {request.server!r} in the tool registry, then "
+                    f"pin it with 'agentlib registry pin {request.server}'"
+                ),
             )
 
         agents = self._registry.agents

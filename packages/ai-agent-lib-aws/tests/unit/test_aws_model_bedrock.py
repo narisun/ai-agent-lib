@@ -50,7 +50,13 @@ def container(sessions: AwsSessionFactory, fakes: Fakes) -> ServiceContainer:
     """A service configured for Bedrock by variables alone, with everything else faked."""
     resolved = ConfigResolver(
         MappingConfigSource(
-            {"EAP_MODEL_PROVIDER": "bedrock", "EAP_MODEL_ID": MODEL, "AWS_REGION": "eu-west-1"}
+            {
+                "EAP_MODEL_PROVIDER": "bedrock",
+                "EAP_MODEL_ID": MODEL,
+                "AWS_REGION": "eu-west-1",
+                # One attempt: these tests are about how an error is reported.
+                "EAP_LIMITS": '{"model": {"retries": 0}}',
+            }
         )
     ).resolve()
     config = resolved

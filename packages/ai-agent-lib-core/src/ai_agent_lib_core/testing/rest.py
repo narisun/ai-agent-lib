@@ -80,4 +80,4 @@ def rest_stub_providers(
         return source
 
     chosen = providers if providers is not None else ServiceProviders.default()
-    return chosen.register(DATA_PORT, "rest", stubbed, replace=True)
+    return chosen.register(DATA_PORT, "rest", stubbed, options=RestOptions, replace=True)

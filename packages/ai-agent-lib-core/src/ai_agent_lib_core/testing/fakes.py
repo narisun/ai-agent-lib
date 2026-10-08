@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -32,6 +33,7 @@ from ai_agent_lib_core.contracts import (
     RequestContext,
     ServerEntry,
     SourceMetadata,
+    SpanNotes,
     ToolSnapshot,
     ValidationFailed,
 )
@@ -48,6 +50,7 @@ __all__ = [
     "GuardrailAnswer",
     "InMemoryAuditSink",
     "PolicyAnswer",
+    "RecordedSpan",
     "RecordingTelemetry",
     "SequentialIds",
 ]
@@ -108,12 +111,41 @@ class InMemoryAuditSink:
         self.records.append(record)
 
 
+@dataclass
+class RecordedSpan:
+    """One span a :class:`RecordingTelemetry` was asked to open.
+
+    Attributes:
+        name: Its name.
+        attributes: Its attributes, from when it opened and as it ended.
+        error_type: The type of the error it ended with, if any.
+    """
+
+    name: str
+    attributes: dict[str, AuditValue]
+    error_type: str | None = None
+
+
 class RecordingTelemetry:
     """Telemetry that remembers every signal."""
 
     def __init__(self) -> None:
         self.events: list[tuple[str, dict[str, AuditValue]]] = []
         self.durations: list[tuple[str, float, dict[str, AuditValue]]] = []
+        self.spans: list[RecordedSpan] = []
+
+    @contextmanager
+    def span(self, name: str, attributes: Mapping[str, AuditValue]) -> Iterator[SpanNotes]:
+        """Remember the span and what it is told as it ends."""
+        recorded = RecordedSpan(name, dict(attributes))
+        self.spans.append(recorded)
+
+        def note(attributes: Mapping[str, AuditValue], error: BaseException | None = None) -> None:
+            recorded.attributes.update(attributes)
+            if error is not None:
+                recorded.error_type = type(error).__name__
+
+        yield note
 
     def event(self, name: str, attributes: Mapping[str, AuditValue]) -> None:
         """Remember the event."""

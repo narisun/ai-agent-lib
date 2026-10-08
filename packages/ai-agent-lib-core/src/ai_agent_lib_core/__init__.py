@@ -26,7 +26,7 @@ from ai_agent_lib_core.contracts import (
     TransientError,
     ValidationFailed,
 )
-from ai_agent_lib_core.di import ServiceContainer, ServiceProviders
+from ai_agent_lib_core.di import ServiceContainer, ServiceProviders, SyncServices
 from ai_agent_lib_core.pipeline import bind_request_context
 
 __all__ = [
@@ -45,6 +45,7 @@ __all__ = [
     "ServiceContainer",
     "ServiceProviders",
     "StructuredOutput",
+    "SyncServices",
     "TransientError",
     "ValidationFailed",
     "bind_request_context",

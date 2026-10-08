@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING
 from ai_agent_lib_cli.dataplan import Example
 from ai_agent_lib_cli.errors import CliError
 from ai_agent_lib_cli.proposals import ColumnInfo, TableInfo, is_plain_name
-from ai_agent_lib_core.contracts import ParameterType
+from ai_agent_lib_core.contracts import ParameterType, describe
 
 if TYPE_CHECKING:
     import duckdb
@@ -139,9 +139,7 @@ def read_csv_folder(folder: Path) -> CsvFolder:
                 described = connection.execute(f"DESCRIBE {name}").fetchall()
                 counted = connection.execute(f"SELECT count(*) FROM {name}").fetchone()  # noqa: S608
             except duckdb.Error as exc:
-                raise CliError(
-                    f"{path.name} could not be read as CSV ({type(exc).__name__})"
-                ) from None
+                raise CliError(f"{path.name} could not be read as CSV ({describe(exc)})") from exc
             columns, left_out = [], []
             for column_name, engine_type, *_ in described:
                 if is_plain_name(str(column_name).lower()):

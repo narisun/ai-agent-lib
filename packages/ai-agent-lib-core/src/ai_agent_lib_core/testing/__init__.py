@@ -35,10 +35,12 @@ from ai_agent_lib_core.testing.local import (
     TEST_AGENT,
     audit_records,
     last_shown_to_model,
+    load_eval_config,
     load_test_config,
     scripted_model,
     scripted_providers,
 )
+from ai_agent_lib_core.testing.replies import calls_tool, calls_tools, structured_reply
 from ai_agent_lib_core.testing.rest import rest_stub_providers, rest_stub_transport
 
 __all__ = [
@@ -66,14 +68,18 @@ __all__ = [
     "SequentialIds",
     "accounts_api",
     "audit_records",
+    "calls_tool",
+    "calls_tools",
     "fake_accounts_source",
     "fake_providers",
     "last_shown_to_model",
+    "load_eval_config",
     "load_test_config",
     "rest_stub_providers",
     "rest_stub_transport",
     "scripted_model",
     "scripted_providers",
+    "structured_reply",
     "write_accounts_endpoints",
     "write_accounts_files",
 ]

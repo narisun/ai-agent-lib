@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars and fill in. The values below are examples.
+region             = "eu-west-1"
+image              = "123456789012.dkr.ecr.eu-west-1.amazonaws.com/{{ name }}@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+opa_image          = "123456789012.dkr.ecr.eu-west-1.amazonaws.com/{{ name }}-opa@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+cluster_arn        = "arn:aws:ecs:eu-west-1:123456789012:cluster/agents"
+subnet_ids         = ["subnet-0123456789abcdef0", "subnet-0fedcba9876543210"]
+security_group_ids = ["sg-0123456789abcdef0"]
+target_group_arn   = null
+desired_count      = 2
+tags               = { service = "{{ name }}" }

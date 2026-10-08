@@ -29,13 +29,28 @@ dev = [
     "mypy>=1.11",
     "pytest>=8.2",
     "pytest-asyncio>=1.4",
+    # Tests that reach the network by accident fail instead of passing slowly.
+    "pytest-socket>=0.7",
     "ruff>=0.6",
 ]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["agents", "mcp-servers", "tests"]
-addopts = ["--import-mode=importlib", "--strict-markers", "-ra"]
+addopts = [
+    "--import-mode=importlib",
+    "--strict-markers",
+    "-ra",
+    # No test reaches beyond this machine. Loopback stays open: asyncio needs it
+    # on Windows, and a test of a local service such as OPA uses it.
+    "--allow-hosts=127.0.0.1,::1",
+    # Opt in with -m integration or -m eval.
+    "-m", "not integration and not eval",
+]
+markers = [
+    "integration: needs something outside the process, such as OPA or a cloud account",
+    "eval: runs a real model against a dataset; see evals/ in each agent",
+]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 

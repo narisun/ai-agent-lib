@@ -21,6 +21,7 @@ from ai_agent_lib_core.contracts import (
     OptionsModel,
     ToolRegistry,
     ToolSnapshot,
+    describe,
 )
 from ai_agent_lib_core.kit import RegistryDocument, load_registries
 
@@ -129,8 +130,8 @@ class S3RegistrySource:
             raise ConfigurationError(f"{what}: the object could not be read ({code})") from None
         except aws.BotoCoreError as exc:
             raise ConfigurationError(
-                f"{what}: the object could not be read ({type(exc).__name__})"
-            ) from None
+                f"{what}: the object could not be read ({describe(exc)})"
+            ) from exc
         if len(content) > _MAX_BYTES:
             raise ConfigurationError(f"{what}: the object is larger than a registry may be")
         return RegistryDocument(

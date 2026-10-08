@@ -14,7 +14,7 @@ from mcp.server.auth.settings import AuthSettings
 from mcp.server.context import CallNext, HandlerResult, ServerRequestContext
 from mcp.server.mcpserver import MCPServer
 from mcp_types import CallToolResult, TextContent
-from opentelemetry import trace
+from opentelemetry import propagate, trace
 from pydantic import SecretStr
 
 from ai_agent_lib_core.contracts import (
@@ -41,6 +41,7 @@ from ai_agent_lib_core.integrations.mcp.wire import (
     META_REQUEST_ID,
     META_THREAD_ID,
     is_error_result,
+    mcp_result_text,
 )
 from ai_agent_lib_core.pipeline import (
     Evidence,
@@ -78,6 +79,13 @@ _SUCCESS, _TOOL_ERROR, _DENIED, _INVALID, _FAILED, _ERROR = (
     "failed",
     "error",
 )
+_LEVELS = {
+    _TOOL_ERROR: logging.WARNING,
+    _INVALID: logging.WARNING,
+    _FAILED: logging.ERROR,
+    _ERROR: logging.ERROR,
+}
+"""A refusal is the caller's business; a tool that raised, or a failure, is the service's."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -219,6 +227,15 @@ def resource_server_settings(issuer: str, server: ServerEntry) -> AuthSettings:
         ) from None
 
 
+@dataclass(frozen=True, slots=True)
+class _Ended:
+    """How one tool call ended, for its log line."""
+
+    outcome: str
+    error: AgentLibError | None = None
+    detail: str | None = None
+
+
 class GovernedToolsMiddleware:
     """Runs every ``tools/call`` request through the tool pipeline.
 
@@ -287,45 +304,67 @@ class GovernedToolsMiddleware:
             payload=_Pending(ctx, call_next),
             evidence=evidence,
         )
-        return await self._observed(call)
+        return await self._observed(call, ctx.meta)
 
-    async def _observed(self, call: ToolCall) -> HandlerResult:
-        """Run one call inside a span, and log one line about how it ended."""
+    async def _observed(self, call: ToolCall, meta: Any = None) -> HandlerResult:
+        """Run one call inside a span, and log one line about how it ended.
+
+        The span continues the caller's trace when the call carries W3C trace
+        context in its metadata, as the library's own MCP client sends it.
+        """
         tool = call.tool if _TOOL_NAME.match(call.tool) else _UNNAMED
         request_id = call.context.request_id if call.context is not None else None
         attributes = {"agentlib.application": self._application, "agentlib.tool": tool}
         if request_id is not None:
             attributes["agentlib.request_id"] = request_id
         started = time.perf_counter()
-        outcome = _ERROR  # what stands if the tool raises something of its own
+        ended = _Ended(_ERROR)  # what stands if the tool raises something of its own
         try:
             tracer = trace.get_tracer(_INSTRUMENTATION)
-            with tracer.start_as_current_span("mcp.tool_call", attributes=attributes):
-                result, outcome = await self._answer(call)
+            parent = propagate.extract(meta) if isinstance(meta, Mapping) else None
+            with tracer.start_as_current_span(
+                "mcp.tool_call",
+                context=parent,
+                kind=trace.SpanKind.SERVER,
+                attributes=attributes,
+            ):
+                result, ended = await self._answer(call)
                 return result
         finally:
+            extra: dict[str, object] = {
+                "tool": tool,
+                "outcome": ended.outcome,
+                "duration_ms": round((time.perf_counter() - started) * 1000),
+                "request_id": request_id,
+            }
+            if isinstance(ended.error, PolicyDenied):
+                extra["reason_code"] = ended.error.reason_code
+            if ended.detail is not None:
+                # What the tool's own code raised. It may hold caller content, so
+                # it is written only where logging is set up with details.
+                extra["detail"] = ended.detail
             _LOG.log(
-                logging.ERROR if outcome in (_FAILED, _ERROR) else logging.INFO,
+                _LEVELS.get(ended.outcome, logging.INFO),
                 "tool_call",
-                extra={
-                    "tool": tool,
-                    "outcome": outcome,
-                    "duration_ms": round((time.perf_counter() - started) * 1000),
-                    "request_id": request_id,
-                },
+                exc_info=ended.error,
+                extra=extra,
             )
 
-    async def _answer(self, call: ToolCall) -> tuple[HandlerResult, str]:
+    async def _answer(self, call: ToolCall) -> tuple[HandlerResult, _Ended]:
         """Run the pipeline; return what the caller is told and how the call ended."""
         try:
             result = await self._handler(call)
         except PolicyDenied as denied:
-            return _error(f"The call was denied (reason: {denied.reason_code})."), _DENIED
+            reply = _error(f"The call was denied (reason: {denied.reason_code}).")
+            return reply, _Ended(_DENIED, denied)
         except ValidationFailed as invalid:
-            return _error(f"The call was refused: {invalid}."), _INVALID
+            return _error(f"The call was refused: {invalid.summary}."), _Ended(_INVALID, invalid)
         except AgentLibError as error:
-            return _error(f"The call failed ({type(error).__name__})."), _FAILED
-        return result, _TOOL_ERROR if is_error_result(result) else _SUCCESS
+            reply = _error(f"The call failed ({type(error).__name__}).")
+            return reply, _Ended(_FAILED, error)
+        if is_error_result(result):
+            return result, _Ended(_TOOL_ERROR, detail=mcp_result_text(result))
+        return result, _Ended(_SUCCESS)
 
     async def _request_context(
         self, request: ServerRequestContext[Any, Any], evidence: Evidence

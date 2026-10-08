@@ -12,7 +12,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, TypeVar
 
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 
 from ai_agent_lib_core.config.bindings import (
     DEFAULT_BINDINGS,
@@ -33,12 +33,17 @@ from ai_agent_lib_core.contracts import (
     ConfigurationError,
     DeploymentEnv,
     ExternalSettings,
+    Limits,
     ModelRef,
     ModelSection,
     Profile,
     ProviderSelection,
     Section,
     ServiceConfig,
+    TelemetryMode,
+    kind_of,
+    options_error,
+    shown_value,
 )
 
 __all__ = ["MASKED", "ConfigResolver", "Resolution"]
@@ -46,7 +51,7 @@ __all__ = ["MASKED", "ConfigResolver", "Resolution"]
 MASKED = "********"
 """What is shown in place of a sensitive value."""
 
-EnumT = TypeVar("EnumT", Profile, DeploymentEnv)
+EnumT = TypeVar("EnumT", Profile, DeploymentEnv, TelemetryMode)
 
 _ALIAS_FIELDS = frozenset({"provider", "model_id"})
 _DATA_SOURCE_KIND = "kind"
@@ -115,6 +120,7 @@ class ConfigResolver:
 
         profile = self._enum(values, Key.PROFILE, Profile, Profile.LOCAL)
         deployment_env = self._enum(values, Key.DEPLOYMENT_ENV, DeploymentEnv, DeploymentEnv.LOCAL)
+        telemetry = self._enum(values, Key.TELEMETRY, TelemetryMode, TelemetryMode.OFF)
         self._refuse_local_on_a_managed_runtime(values, deployment_env)
         defaults = self._profile_defaults[profile]
         profile_origin = f"profile {profile.value}"
@@ -140,7 +146,8 @@ class ConfigResolver:
         config = ServiceConfig(
             profile=profile,
             deployment_env=deployment_env,
-            runtime_policy=values.get(Key.RUNTIME_POLICY),
+            telemetry=telemetry,
+            limits=self._limits(values),
             tls_ca_bundle=self._path(values, Key.TLS_CA_BUNDLE),
             model=model,
             sections=sections,
@@ -161,10 +168,11 @@ class ConfigResolver:
         shown = {key: self._display(key, value) for key, value in values.items()}
         shown.setdefault(Key.PROFILE, profile.value)
         shown.setdefault(Key.DEPLOYMENT_ENV, deployment_env.value)
+        shown.setdefault(Key.TELEMETRY, telemetry.value)
         shown.setdefault(Key.MODEL_PROVIDER, model_provider)
         for section, selection in sections.items():
             shown.setdefault(provider_key(section), selection.provider)
-        for key in (Key.PROFILE, Key.DEPLOYMENT_ENV):
+        for key in (Key.PROFILE, Key.DEPLOYMENT_ENV, Key.TELEMETRY):
             origins.setdefault(key, "default")
         return Resolution(
             config=config,
@@ -196,7 +204,15 @@ class ConfigResolver:
         for name in unknown:
             close = difflib.get_close_matches(name, owned, n=1)
             details.append(f"{name} (did you mean {close[0]}?)" if close else name)
-        raise ConfigurationError(f"unknown configuration variable(s): {', '.join(details)}")
+        raise ConfigurationError(
+            f"unknown configuration variable{'s' if len(details) != 1 else ''}: "
+            f"{', '.join(details)}",
+            expected=f"only the {PREFIX} variables the library defines",
+            fix=(
+                "rename or remove it; every variable is listed with its default in "
+                "docs/variables.md and the developer guide"
+            ),
+        )
 
     def _read(self) -> tuple[dict[str, str], dict[str, str], list[str]]:
         """Read every bound variable, applying alternate and deprecated names."""
@@ -289,7 +305,13 @@ class ConfigResolver:
             return kind(raw.lower())
         except ValueError:
             allowed = ", ".join(member.value for member in kind)
-            raise ConfigurationError(f"{self._name(key)} must be one of: {allowed}") from None
+            close = difflib.get_close_matches(raw.lower(), [m.value for m in kind], n=1)
+            raise ConfigurationError(
+                f"{self._name(key)} is not one of the values it takes",
+                expected=f"one of: {allowed}",
+                actual=shown_value(raw),
+                fix=f"set {self._name(key)}={close[0] if close else next(iter(kind)).value}",
+            ) from None
 
     def _path(self, values: Mapping[str, str], key: str) -> Path | None:
         raw = values.get(key)
@@ -312,7 +334,13 @@ class ConfigResolver:
         except json.JSONDecodeError as exc:
             # The value is not repeated: it may hold credentials.
             raise ConfigurationError(
-                f"{binding.name} is not valid JSON (line {exc.lineno}, column {exc.colno})"
+                f"{binding.name} is not valid JSON",
+                expected="a JSON object, with keys and text in double quotes",
+                actual=f"{exc.msg.lower()} at line {exc.lineno}, column {exc.colno}",
+                fix=(
+                    f'write it as {binding.name}={{"key": "value"}} on one line; in a .env '
+                    "file do not put quotes around the whole value"
+                ),
             ) from None
 
     def _json_object(self, values: Mapping[str, str], key: str) -> Mapping[str, object]:
@@ -320,8 +348,18 @@ class ConfigResolver:
         if parsed is None:
             return {}
         if not isinstance(parsed, dict):
-            raise ConfigurationError(f"{self._name(key)} must be a JSON object")
+            raise ConfigurationError(
+                f"{self._name(key)} is not a JSON object",
+                expected='a JSON object such as {"key": "value"}',
+                actual=kind_of(parsed),
+            )
         return parsed
+
+    def _limits(self, values: Mapping[str, str]) -> Limits:
+        try:
+            return Limits.model_validate(self._json_object(values, Key.LIMITS))
+        except ValidationError as exc:
+            raise options_error(self._name(Key.LIMITS), Limits, exc) from None
 
     def _aliases(self, values: Mapping[str, str], default_provider: str) -> dict[str, ModelRef]:
         name = self._name(Key.MODEL_ALIASES)
@@ -331,11 +369,18 @@ class ConfigResolver:
                 spec = {"model_id": spec}
             if not isinstance(spec, dict) or not isinstance(spec.get("model_id"), str):
                 raise ConfigurationError(
-                    f'{name}: alias {alias!r} must be a model ID or an object with "model_id"'
+                    f"{name}: alias {alias!r} names no model",
+                    expected='a model ID, or an object with "model_id" and an optional "provider"',
+                    actual=kind_of(spec),
+                    fix=f'write {name}={{"{alias}": {{"model_id": "..."}}}}',
                 )
             extra = sorted(set(spec) - _ALIAS_FIELDS)
             if extra:
-                raise ConfigurationError(f"{name}: alias {alias!r} has unknown field(s): {extra}")
+                raise ConfigurationError(
+                    f"{name}: alias {alias!r} has fields it does not take",
+                    expected='only "model_id" and "provider"',
+                    actual=f"also {', '.join(repr(field) for field in extra)}",
+                )
             provider = spec.get("provider", default_provider)
             if not isinstance(provider, str):
                 raise ConfigurationError(f"{name}: alias {alias!r} has an invalid provider")
@@ -356,7 +401,13 @@ class ConfigResolver:
                 )
             if not isinstance(spec, dict) or not isinstance(spec.get(_DATA_SOURCE_KIND), str):
                 raise ConfigurationError(
-                    f'{name}: data source {source!r} must be an object with "{_DATA_SOURCE_KIND}"'
+                    f"{name}: data source {source!r} does not say which adapter reads it",
+                    expected=f'an object with "{_DATA_SOURCE_KIND}", such as '
+                    f'{{"{_DATA_SOURCE_KIND}": "duckdb_csv", "data_dir": "data", '
+                    '"queries_dir": "queries"}',
+                    actual=kind_of(spec)
+                    if not isinstance(spec, dict)
+                    else f'an object without "{_DATA_SOURCE_KIND}"',
                 )
             options = {key: value for key, value in spec.items() if key != _DATA_SOURCE_KIND}
             try:

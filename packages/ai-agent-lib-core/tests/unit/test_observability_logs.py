@@ -299,8 +299,9 @@ async def test_each_tool_call_of_a_server_is_one_line_without_arguments_or_resul
     assert [(c["tool"], c["outcome"], c["level"]) for c in calls] == [
         ("notes.read", "success", "INFO"),
         ("notes.locked", "denied", "INFO"),
-        ("notes.broken", "tool_error", "INFO"),
-        ("notes.buggy", "tool_error", "INFO"),
+        # The tool's own code raised: the line says so, and with details on, what it said.
+        ("notes.broken", "tool_error", "WARNING"),
+        ("notes.buggy", "tool_error", "WARNING"),
         # A name that is not shaped like a tool's name could be content: it is not logged.
         ("unnamed", "denied", "INFO"),
     ]
@@ -332,3 +333,114 @@ async def test_a_failed_refresh_of_the_signing_keys_is_logged(logs: Logs) -> Non
     assert "signing keys" in line["reason"]
     assert token not in logs.text()
     await identity.aclose()
+
+
+# ------------------------------------------------- errors tell the developer why
+
+
+async def test_a_run_that_ends_with_a_library_error_logs_what_was_expected(logs: Logs) -> None:
+    async def run(context: RequestContext, given: Any) -> Any:
+        if given == "bug":
+            raise RuntimeError("the question was: what is Ann's balance?")
+        raise ValidationFailed(
+            "the reply does not match the schema",
+            expected="category to be one of 'billing', 'fraud'",
+            actual="text of 6 characters",
+            detail="category was 'refund'",
+        )
+
+    lifecycle = ServiceLifecycle(_ready)
+    await lifecycle.start()
+    app = agent_app(Services(), run, application="accounts-agent", lifecycle=lifecycle)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://agent.test") as http:
+        good = {"authorization": "Bearer good", "x-request-id": "r-8"}
+        invalid = await http.post("/invoke", json={"input": "x"}, headers=good)
+        await http.post("/invoke", json={"input": "bug"}, headers=good)
+        await http.post("/invoke", json={"input": "x"}, headers={"authorization": "Bearer bad"})
+
+    assert invalid.status_code == 400
+    lines = logs.lines()
+    ended = next(line for line in lines if line["message"] == "the run ended with ValidationFailed")
+    assert ended["level"] == "WARNING"
+    assert ended["error_expected"] == "category to be one of 'billing', 'fraud'"
+    assert ended["error_actual"] == "text of 6 characters"
+    assert ended["request_id"] == "r-8"
+    # The line of the run's own code that raised is named.
+    assert ended["error_in_your_code"].endswith("in run")
+    bug = next(line for line in lines if line["message"] == "the run failed unexpectedly")
+    assert bug["error_in_your_code"].endswith("in run")
+    refused = next(line for line in lines if line["message"] == "the caller was refused at sign-in")
+    assert (refused["reason_code"], refused["error_reason"]) == ("invalid_token", "invalid_token")
+    for content in ("refund", "Ann's balance"):
+        assert content not in logs.text()
+
+
+async def test_with_details_on_a_developer_sees_what_a_tool_raised() -> None:
+    stream = io.StringIO()
+    handler = configure_logging("notes-mcp", stream=stream, details=True)
+    try:
+        entry = ServerEntry(
+            id="notes",
+            owner="tests",
+            url="http://127.0.0.1:1/mcp",
+            audience="notes-mcp",
+            tools=(
+                ToolEntry(name="notes.buggy", version="1", classification=Classification.INTERNAL),
+            ),
+        )
+        clock = FrozenClock()
+        fakes = Fakes(
+            clock=clock,
+            identity=StaticIdentityVerifier(StaticIdentityOptions(audience="notes-mcp"), clock),
+            registry=FakeRegistry(servers=[entry]),
+        )
+        async with fakes.container() as services:
+            server: MCPServer[Any] = MCPServer(
+                "notes-mcp", middleware=[services.mcp_middleware("notes", application="notes-mcp")]
+            )
+
+            @server.tool(name="notes.buggy")
+            async def buggy(title: str) -> str:
+                raise KeyError(title)
+
+            async with Client(server) as client:
+                await client.call_tool("notes.buggy", {"title": "minutes"})
+    finally:
+        logging.getLogger().removeHandler(handler)
+    lines = [json.loads(line) for line in stream.getvalue().splitlines()]
+    (call,) = [line for line in lines if line["message"] == "tool_call"]
+    assert (call["outcome"], call["level"]) == ("tool_error", "WARNING")
+    assert call["detail"] == "Error executing tool notes.buggy"
+    # The MCP SDK logs the exception itself; the line names its cause and the tool's code.
+    (raised,) = [line for line in lines if "raised an unexpected exception" in line["message"]]
+    assert raised["error_causes"][0].startswith("KeyError: 'minutes'")
+    assert raised["error_in_your_code"].endswith("in buggy")
+
+
+async def test_a_governed_tool_that_raises_is_logged_with_the_line_that_raised(
+    logs: Logs,
+) -> None:
+    def lookup(account: str) -> str:
+        """Return the balance of an account."""
+        raise LookupError("the ledger is closed")
+
+    fakes = Fakes()
+    async with fakes.container() as services:
+        (tool,) = services.tools([lookup])
+        context = RequestContext(
+            principal=Principal(subject="u-1", tenant="t-1"),
+            application="accounts-agent",
+            request_id="r-3",
+            thread_id="th-1",
+        )
+        with bind_request_context(context), pytest.raises(LookupError):
+            await tool.ainvoke({"account": "4411"})
+
+    (line,) = [line for line in logs.lines() if line["message"].startswith("the tool lookup")]
+    assert line["message"] == "the tool lookup raised LookupError"
+    assert line["level"] == "WARNING"
+    assert line["tool"] == "lookup"
+    assert line["error_in_your_code"].endswith("in lookup")
+    # Its message may hold content: only with details on.
+    assert "the ledger is closed" not in logs.text()

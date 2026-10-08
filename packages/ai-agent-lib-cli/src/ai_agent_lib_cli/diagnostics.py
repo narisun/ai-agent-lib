@@ -20,7 +20,7 @@ from ai_agent_lib_core.adapters import (
 )
 from ai_agent_lib_core.config import DEFAULT_BINDINGS, load_service_config, service_resolver
 from ai_agent_lib_core.contracts import AgentLibError, CheckResult
-from ai_agent_lib_core.di import diagnose, fix_for
+from ai_agent_lib_core.di import diagnose
 from ai_agent_lib_core.observability import redact
 
 __all__ = [
@@ -65,7 +65,7 @@ async def check_service(folder: Path) -> tuple[CheckResult, ...]:
     try:
         config = load_service_config(dotenv)
     except AgentLibError as problem:
-        return (CheckResult("settings", ok=False, detail=str(problem), fix=fix_for(problem)),)
+        return (CheckResult.failed("settings", problem),)
     return (CheckResult("settings", ok=True, detail="resolved"), *await diagnose(config))
 
 
@@ -123,16 +123,18 @@ def check_workspace(
             )
         )
     except AgentLibError as problem:
-        fix = "Correct the registry file the message names."
-        return (CheckResult("registries", ok=False, detail=str(problem), fix=fix),)
+        failed = CheckResult.failed("registries", problem)
+        fix = failed.fix or "Correct the registry file the message names."
+        return (CheckResult("registries", ok=False, detail=failed.detail, fix=fix),)
     results.append(CheckResult("registries", ok=True, detail="valid and consistent"))
     try:
         RulesPolicyDecisionPoint(
             RulesPolicyOptions(path=root.joinpath(*RULES_FILE.parts)), UuidGenerator()
         )
     except AgentLibError as problem:
-        fix = f"Correct {RULES_FILE}."
-        results.append(CheckResult("rules", ok=False, detail=str(problem), fix=fix))
+        failed = CheckResult.failed("rules", problem)
+        fix = failed.fix or f"Correct {RULES_FILE}."
+        results.append(CheckResult("rules", ok=False, detail=failed.detail, fix=fix))
     else:
         results.append(CheckResult("rules", ok=True, detail="valid"))
     if pin_reader is not None:

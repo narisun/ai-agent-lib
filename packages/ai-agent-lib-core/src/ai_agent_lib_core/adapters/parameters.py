@@ -15,9 +15,16 @@ from ai_agent_lib_core.contracts import (
     QueryDescription,
     QueryParameter,
     ValidationFailed,
+    kind_of,
 )
+from ai_agent_lib_core.contracts.redaction import redact, shorten
 
 __all__ = ["bind_parameters", "coerce_parameter"]
+
+
+def _a(word: str) -> str:
+    return f"an {word}" if word[:1] in "aeiou" else f"a {word}"
+
 
 _TRUE, _FALSE = frozenset({"true", "yes"}), frozenset({"false", "no"})
 
@@ -90,7 +97,12 @@ def coerce_parameter(parameter: QueryParameter, value: object) -> object:
     except (ValueError, InvalidOperation):
         coerced = _REFUSED
     if coerced is _REFUSED:
-        raise ValidationFailed(f"parameter {parameter.name!r} must be a {parameter.type.value}")
+        raise ValidationFailed(
+            f"parameter {parameter.name!r} is not {_a(parameter.type.value)}",
+            expected=_a(parameter.type.value),
+            actual=kind_of(value),
+            detail=f"the value was {shorten(redact(repr(value)), 200)}",
+        )
     return coerced
 
 
@@ -109,13 +121,21 @@ def bind_parameters(
     given = dict(parameters or {})
     unknown = sorted(set(given) - set(declared))
     if unknown:
-        raise ValidationFailed(f"query {description.name!r} has no parameter(s) named: {unknown}")
+        raise ValidationFailed(
+            f"query {description.name!r} was given parameters it does not declare",
+            expected="only " + (", ".join(repr(name) for name in declared) or "no parameters"),
+            actual="also " + ", ".join(repr(name) for name in unknown),
+        )
     bound: dict[str, object] = {}
     for parameter in declared.values():
         if given.get(parameter.name) is not None:
             bound[parameter.name] = coerce_parameter(parameter, given[parameter.name])
         elif parameter.required:
-            raise ValidationFailed(f"query {description.name!r} needs parameter {parameter.name!r}")
+            raise ValidationFailed(
+                f"query {description.name!r} needs parameter {parameter.name!r}",
+                expected=f"{_a(parameter.type.value)} for {parameter.name!r}",
+                actual="no value for it",
+            )
         else:
             bound[parameter.name] = parameter.default
     return bound

@@ -554,7 +554,7 @@ def test_an_agent_linked_to_a_rest_server_is_tested_with_the_same_answers(
     test = (workspace / "tests/test_fx_agent_with_rates_mcp.py").read_text(encoding="utf-8")
     assert 'ROOT / "mcp-servers" / "rates-mcp" / "tests/api_responses.json"' in test
     assert "server_config, rest_stub_providers(API_RESPONSES)" in test
-    assert '"name": "rates_list_currencies"' in test
+    assert 'CALLS_THE_TOOL = calls_tool("rates.list_currencies"' in test
     # The first tool masks nothing, so there is nothing to say about masks.
     assert "MASK" not in test
 

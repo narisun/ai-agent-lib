@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import Any, Protocol
@@ -15,6 +14,7 @@ from langchain_core.tools import BaseTool
 from mcp import Client, MCPError
 from mcp.client.streamable_http import streamable_http_client
 from mcp_types import Tool
+from opentelemetry import propagate
 from pydantic import PrivateAttr, SecretStr
 
 from ai_agent_lib_core.contracts import (
@@ -27,8 +27,10 @@ from ai_agent_lib_core.contracts import (
     ToolEntry,
     TransientError,
     ValidationFailed,
+    describe,
     schema_fingerprint,
 )
+from ai_agent_lib_core.contracts.structured import model_safe_name, schema_mismatch
 from ai_agent_lib_core.integrations.langgraph.bridge import LoopBridge
 from ai_agent_lib_core.integrations.langgraph.context import current_request_context
 from ai_agent_lib_core.integrations.langgraph.tools import GovernedTool
@@ -43,7 +45,6 @@ from ai_agent_lib_core.pipeline import Pipeline, ToolCall, ToolStage
 
 __all__ = ["GovernedMcpTool", "HttpMcpConnector", "McpConnector", "load_mcp_tools"]
 
-_MODEL_SAFE = re.compile(r"[^A-Za-z0-9_-]")
 _MAX_REPORTED = 5
 _MAX_PAGES = 100
 
@@ -147,7 +148,7 @@ class GovernedMcpTool(GovernedTool):
                 f"tool {entry.name!r} of MCP server {server.id!r} has an invalid input schema"
             ) from None
         tool = cls(
-            name=_MODEL_SAFE.sub("_", entry.name)[:64],
+            name=model_safe_name(entry.name),
             description=offered.description or entry.description or entry.name,
             args_schema=offered.input_schema,
             read_only=entry.read_only,
@@ -176,13 +177,13 @@ class GovernedMcpTool(GovernedTool):
         if not isinstance(context, RequestContext):
             raise TypeError("the tool call reached the MCP server without a request context")
         arguments = dict(call.arguments)
-        problems = sorted(
-            {f"{e.json_path}: {e.validator}" for e in self._validator.iter_errors(arguments)}
-        )
-        if problems:
+        mismatch = schema_mismatch(self._validator, arguments)
+        if mismatch is not None:
             raise ValidationFailed(
-                f"the arguments for tool {self._mcp_name!r} do not match its schema "
-                f"({'; '.join(problems[:_MAX_REPORTED])})"
+                f"the arguments for tool {self._mcp_name!r} do not match its input schema",
+                expected=mismatch.expected,
+                actual=mismatch.actual,
+                detail=mismatch.detail,
             )
         audience = self._server.audience or self._server.id
         token = (
@@ -196,6 +197,8 @@ class GovernedMcpTool(GovernedTool):
             META_CLASSIFICATION_CEILING: context.classification_ceiling.name.lower(),
             **self._connector.credential_meta(token),
         }
+        # W3C trace context, so the server's spans join this request's trace.
+        propagate.inject(meta)
         where = f"MCP server {self._server.id!r}, tool {self._mcp_name!r}"
         try:
             async with self._connector.connect(self._server, token) as client:
@@ -203,7 +206,11 @@ class GovernedMcpTool(GovernedTool):
         except BaseException as raised:
             error = _unwrap(raised)
             if isinstance(error, MCPError):
-                raise AgentLibError(f"{where}: the server answered with an error") from None
+                raise AgentLibError(
+                    f"{where}: the server answered with an error",
+                    actual=describe(error),
+                    fix="look at the server's log line for this request ID",
+                ) from None
             if _refused_at_the_door(error):
                 # Not a passing fault: the same token would be refused again.
                 raise PolicyDenied(
@@ -212,8 +219,9 @@ class GovernedMcpTool(GovernedTool):
                 ) from None
             if isinstance(error, httpx2.HTTPError | OSError | TimeoutError):
                 raise TransientError(
-                    f"{where}: the server could not be reached ({type(error).__name__})"
-                ) from None
+                    f"{where}: the server could not be reached ({describe(error)})",
+                    expected=f"an MCP server answering at {self._server.url}",
+                ) from error
             raise
         text = mcp_result_text(result)
         if is_error_result(result):
@@ -279,11 +287,21 @@ async def load_mcp_tools(
             raise PolicyDenied(
                 f"MCP server {server.id!r} did not accept this agent's own token",
                 reason_code="server_refused_token",
+                expected=f"a token for the server's audience {server.audience or server.id!r}",
+                fix=(
+                    "check the server's audience in the tool registry against the audience "
+                    "its identity provider accepts"
+                ),
             ) from None
         if isinstance(error, MCPError | httpx2.HTTPError | OSError | TimeoutError):
             raise TransientError(
-                f"MCP server {server.id!r} could not be reached ({type(error).__name__})"
-            ) from None
+                f"MCP server {server.id!r} could not be reached ({describe(error)})",
+                expected=f"an MCP server answering at {server.url}",
+                fix=(
+                    f"start it (in a workspace: agentlib run {server.id}), or correct its "
+                    "url in the tool registry"
+                ),
+            ) from error
         raise
     tools: list[BaseTool] = []
     names: set[str] = set()

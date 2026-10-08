@@ -9,15 +9,103 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
+from jsonschema.exceptions import ValidationError as SchemaViolation
 from pydantic import BaseModel
 from pydantic import ValidationError as PydanticValidationError
 
-from ai_agent_lib_core.contracts.errors import ValidationFailed
+from ai_agent_lib_core.contracts.errors import ValidationFailed, kind_of
+from ai_agent_lib_core.contracts.redaction import redact, shorten
 
-__all__ = ["StructuredOutput"]
+__all__ = ["SchemaMismatch", "StructuredOutput", "schema_mismatch"]
 
 _NAME = re.compile(r"[^A-Za-z0-9_-]")
+_MAX_NAME = 64
+
+
+def model_safe_name(name: str) -> str:
+    """Return ``name`` as model APIs accept a tool name: other characters become ``_``.
+
+    ``directory.people_by_team`` becomes ``directory_people_by_team``, and the
+    name is cut to 64 characters. MCP tools and structured outputs are offered
+    to a model under these names.
+    """
+    return _NAME.sub("_", name)[:_MAX_NAME]
+
+
 _MAX_REPORTED = 5
+_MAX_DETAIL = 1_000
+
+_BOUNDS = {
+    "maxLength": "at most {} characters",
+    "minLength": "at least {} characters",
+    "maximum": "at most {}",
+    "minimum": "at least {}",
+    "exclusiveMaximum": "less than {}",
+    "exclusiveMinimum": "more than {}",
+    "maxItems": "at most {} items",
+    "minItems": "at least {} items",
+    "pattern": "text matching {}",
+    "format": "text in the format {}",
+}
+
+
+def _wanted(violation: SchemaViolation) -> str:
+    """Say what the schema wanted at one place, from the schema alone."""
+    rule, value = violation.validator, violation.validator_value
+    if rule == "enum" and isinstance(value, list):
+        return "one of " + ", ".join(json.dumps(item) for item in value)
+    if rule == "const":
+        return json.dumps(value)
+    if rule == "type":
+        return " or ".join(value) if isinstance(value, list) else str(value)
+    if rule == "required" and isinstance(value, list):
+        present = violation.instance if isinstance(violation.instance, Mapping) else {}
+        missing = [name for name in value if name not in present]
+        return "the properties " + ", ".join(repr(name) for name in missing)
+    if rule == "additionalProperties":
+        return "no properties other than those in the schema"
+    if rule == "items" and value is False:
+        return "no items beyond the ones the schema lists"
+    if rule in _BOUNDS:
+        return _BOUNDS[str(rule)].format(json.dumps(value))
+    return f"to satisfy {rule!r}"
+
+
+def _found(violation: SchemaViolation) -> str:
+    """Say what was there instead, by its kind, never its value."""
+    if violation.validator == "required":
+        return "they are missing"
+    if violation.validator == "additionalProperties" and isinstance(violation.instance, Mapping):
+        return f"an object with {len(violation.instance)} properties"
+    return kind_of(violation.instance)
+
+
+class SchemaMismatch:
+    """What did not match a schema: places, wants and finds, and the raw messages.
+
+    Attributes:
+        expected: What the schema wants at each place, from the schema alone.
+        actual: What was found at each place, by kind, never by value.
+        detail: The validator's own messages, which repeat the values.
+    """
+
+    def __init__(self, violations: list[SchemaViolation]) -> None:
+        ordered = sorted(violations, key=lambda v: (v.json_path, str(v.validator)))
+        shown = ordered[:_MAX_REPORTED]
+        more = len(ordered) - len(shown)
+        tail = f"; and {more} more" if more else ""
+        self.count = len(ordered)
+        self.expected = "; ".join(f"{v.json_path}: {_wanted(v)}" for v in shown) + tail
+        self.actual = "; ".join(f"{v.json_path}: {_found(v)}" for v in shown) + tail
+        self.detail = shorten(
+            redact("; ".join(f"{v.json_path}: {v.message}" for v in shown)), _MAX_DETAIL
+        )
+
+
+def schema_mismatch(validator: Draft202012Validator, value: object) -> SchemaMismatch | None:
+    """Return what in ``value`` does not match the schema, or ``None`` if it matches."""
+    violations = list(validator.iter_errors(value))
+    return SchemaMismatch(violations) if violations else None
 
 
 def _reject_constant(name: str) -> Any:
@@ -86,7 +174,7 @@ class StructuredOutput:
         if external:
             raise ValueError("the schema may only refer to its own definitions")
         self._schema = document
-        self._name = _NAME.sub("_", name or fallback)[:64]
+        self._name = model_safe_name(name or fallback)
         self._validator = Draft202012Validator(
             document, format_checker=Draft202012Validator.FORMAT_CHECKER
         )
@@ -125,30 +213,34 @@ class StructuredOutput:
             ValidationFailed: Naming the places that do not match. The values
                 themselves are not repeated: they came from a model.
         """
-        problems = sorted(
-            {
-                f"{error.json_path}: {error.validator}"
-                for error in self._validator.iter_errors(value)
-            }
-        )
-        if problems:
-            shown = "; ".join(problems[:_MAX_REPORTED])
-            more = (
-                f" and {len(problems) - _MAX_REPORTED} more"
-                if len(problems) > _MAX_REPORTED
-                else ""
+        mismatch = schema_mismatch(self._validator, value)
+        if mismatch is not None:
+            raise ValidationFailed(
+                f"the output does not match the schema {self._name!r} "
+                f"({mismatch.count} problem{'s' if mismatch.count != 1 else ''})",
+                expected=mismatch.expected,
+                actual=mismatch.actual,
+                fix=(
+                    "make the instructions say what each field must hold, or loosen the "
+                    "schema; the detail, shown on a developer's machine, has the values"
+                ),
+                detail=mismatch.detail,
             )
-            raise ValidationFailed(f"the output does not match the schema ({shown}{more})")
         if self._model is None:
             return value
         try:
             return self._model.model_validate(value)
         except PydanticValidationError as exc:
-            places = sorted(
-                {".".join(str(part) for part in error["loc"]) or "<root>" for error in exc.errors()}
-            )
+            problems = exc.errors(include_url=False)[:_MAX_REPORTED]
+            places = [".".join(str(part) for part in error["loc"]) or "$" for error in problems]
+            pairs = list(zip(places, problems, strict=True))
             raise ValidationFailed(
-                f"the output does not match the model ({', '.join(places[:_MAX_REPORTED])})"
+                f"the output does not pass the checks of {self._model.__name__}",
+                expected="; ".join(f"{place}: {error['msg']}" for place, error in pairs),
+                actual="; ".join(
+                    f"{place}: {kind_of(error.get('input'))}" for place, error in pairs
+                ),
+                detail=shorten(redact(str(exc)), _MAX_DETAIL),
             ) from None
 
     def parse(self, text: str) -> Any:
@@ -164,8 +256,14 @@ class StructuredOutput:
             value = json.loads(
                 text, parse_constant=_reject_constant, object_pairs_hook=_reject_duplicates
             )
-        except (ValueError, RecursionError):
-            raise ValidationFailed("the output is not strict JSON") from None
+        except (ValueError, RecursionError) as exc:
+            raise ValidationFailed(
+                "the output is not strict JSON",
+                expected="one JSON value and nothing else: no prose, no code fence",
+                actual=shorten(str(exc), 200),
+                fix="answer through the schema's tool, which with_structured_output asks for",
+                detail=shorten(redact(text), _MAX_DETAIL),
+            ) from None
         return self.validate(value)
 
     def __repr__(self) -> str:

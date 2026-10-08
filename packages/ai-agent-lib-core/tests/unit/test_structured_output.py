@@ -73,14 +73,20 @@ def test_a_matching_value_is_returned_and_a_model_class_gives_an_instance() -> N
 @pytest.mark.parametrize(
     ("value", "place"),
     [
-        ({"balance": 1}, r"\$: required"),
-        ({"account": "44", "balance": 1}, r"\$\.account: pattern"),
-        ({"account": "4411", "balance": -1}, r"\$\.balance: minimum"),
-        ({"account": "4411", "balance": "12"}, r"\$\.balance: type"),
-        ({"account": "4411", "balance": 1, "note": "x"}, r"\$: additionalProperties"),
-        ({"account": "4411", "balance": 1, "as_of": "yesterday"}, r"\$\.as_of: format"),
-        ({"account": "4411", "balance": 1, "tags": ["retail", "x"]}, r"\$\.tags: items"),
-        ([1, 2], r"\$: type"),
+        ({"balance": 1}, r"expected: \$: the properties 'account'\n  got: \$: they are missing"),
+        ({"account": "44", "balance": 1}, r"\$\.account: text matching \"\^\[0-9\]\{4\}\$\""),
+        (
+            {"account": "4411", "balance": -1},
+            r"expected: \$\.balance: at least 0\n  got: \$\.balance: a number",
+        ),
+        (
+            {"account": "4411", "balance": "12"},
+            r"\$\.balance: number\n  got: \$\.balance: text of 2",
+        ),
+        ({"account": "4411", "balance": 1, "note": "x"}, r"\$: no properties other than"),
+        ({"account": "4411", "balance": 1, "as_of": "yesterday"}, r"\$\.as_of: text in the format"),
+        ({"account": "4411", "balance": 1, "tags": ["retail", "x"]}, r"\$\.tags: no items beyond"),
+        ([1, 2], r"expected: \$: object\n  got: \$: a list of 2 items"),
     ],
 )
 def test_a_value_that_does_not_match_is_refused_by_place_not_by_content(
@@ -90,6 +96,8 @@ def test_a_value_that_does_not_match_is_refused_by_place_not_by_content(
         StructuredOutput(SCHEMA).validate(value)
     assert "yesterday" not in str(caught.value)
     assert "note" not in str(caught.value)
+    # The values themselves are kept for a developer's machine only.
+    assert caught.value.detail
 
 
 def test_many_problems_are_summarised() -> None:
@@ -109,8 +117,9 @@ def test_a_model_class_adds_its_own_validation() -> None:
             if self.number % 2:
                 raise ValueError("odd")
 
-    with pytest.raises(ValidationFailed, match="does not match the model"):
+    with pytest.raises(ValidationFailed, match="does not pass the checks of Even") as caught:
         StructuredOutput(Even).validate({"number": 3})
+    assert caught.value.actual == "$: an object with 1 key"
 
 
 @pytest.mark.parametrize(
@@ -168,7 +177,7 @@ def test_local_references_are_allowed_and_the_schema_is_copied() -> None:
     }
     output = StructuredOutput(schema, name="owner record!")
     schema["properties"] = {}
-    with pytest.raises(ValidationFailed, match=r"\$\.owner: required"):
+    with pytest.raises(ValidationFailed, match=r"\$\.owner: the properties 'name'"):
         output.validate({"owner": {}})
     output.schema["type"] = "array"
     assert output.schema["type"] == "object"
@@ -232,7 +241,7 @@ async def test_a_reply_that_does_not_match_fails_the_call_and_is_recorded() -> N
         model = services.model().with_structured_output(SCHEMA)
         with (
             bind_request_context(CONTEXT),
-            pytest.raises(ValidationFailed, match=r"\$\.balance: type"),
+            pytest.raises(ValidationFailed, match=r"\$\.balance: number"),
         ):
             await model.ainvoke(QUESTION)
     (record,) = fakes.audit.records

@@ -6,6 +6,7 @@ their own objects into them, so the interceptors never import a framework.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
@@ -19,6 +20,15 @@ from ai_agent_lib_core.contracts import (
 )
 
 __all__ = ["DataCall", "Evidence", "ModelCall", "ToolCall"]
+
+_SHOWN_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
+_GEN_AI_PROVIDERS = {"bedrock": "aws.bedrock", "anthropic": "anthropic"}
+"""Provider names as the OpenTelemetry GenAI conventions spell them."""
+
+
+def _shown(name: str) -> str:
+    """A name as a span may carry it: one a caller sent that is not shaped like a name is not."""
+    return name if _SHOWN_NAME.match(name) else "unnamed"
 
 
 class Evidence:
@@ -71,6 +81,20 @@ class ModelCall:
 
     event = "model.call"
 
+    @property
+    def span_name(self) -> str:
+        """The span's name, as the GenAI conventions name a chat call."""
+        return f"chat {_shown(self.model_id)}"
+
+    def span_attributes(self) -> Mapping[str, AuditValue]:
+        """The span's attributes, with the GenAI conventions' names."""
+        return {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.provider.name": _GEN_AI_PROVIDERS.get(self.provider, self.provider),
+            "gen_ai.request.model": self.model_id,
+            "agentlib.model_alias": self.alias,
+        }
+
     def signal_attributes(self) -> Mapping[str, AuditValue]:
         """Return the few, low-cardinality facts that label telemetry."""
         return {
@@ -113,6 +137,22 @@ class ToolCall:
     def __post_init__(self) -> None:
         object.__setattr__(self, "arguments", MappingProxyType(dict(self.arguments)))
 
+    @property
+    def span_name(self) -> str:
+        """The span's name, as the GenAI conventions name a tool call."""
+        return f"execute_tool {_shown(self.tool)}"
+
+    def span_attributes(self) -> Mapping[str, AuditValue]:
+        """The span's attributes, with the GenAI conventions' names."""
+        attributes: dict[str, AuditValue] = {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": _shown(self.tool),
+            "agentlib.read_only": self.read_only,
+        }
+        if self.server is not None:
+            attributes["agentlib.mcp_server"] = self.server
+        return attributes
+
     def signal_attributes(self) -> Mapping[str, AuditValue]:
         """Return the few, low-cardinality facts that label telemetry."""
         signal: dict[str, AuditValue] = {"tool": self.tool, "read_only": self.read_only}
@@ -152,6 +192,21 @@ class DataCall:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "parameters", MappingProxyType(dict(self.parameters)))
+
+    @property
+    def span_name(self) -> str:
+        """The span's name: the named query on its data source."""
+        return f"query {self.source}.{self.query}"
+
+    def span_attributes(self) -> Mapping[str, AuditValue]:
+        """The span's attributes. Never the parameter values."""
+        return {
+            "db.operation.name": "query",
+            "db.query.summary": f"{self.source}.{self.query}",
+            "agentlib.data_source": self.source,
+            "agentlib.query": self.query,
+            "agentlib.classification": self.classification.name.lower(),
+        }
 
     def signal_attributes(self) -> Mapping[str, AuditValue]:
         """Return the few, low-cardinality facts that label telemetry."""

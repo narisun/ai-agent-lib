@@ -22,7 +22,7 @@ from ai_agent_lib_core.contracts import (
     Section,
     ServiceConfig,
 )
-from ai_agent_lib_core.di import ServiceContainer, ServiceProviders
+from ai_agent_lib_core.di import DATA_PORT, MODEL_PORT, ServiceContainer, ServiceProviders
 from ai_agent_lib_core.testing import RecordingTelemetry
 from ai_agent_lib_core.testing.contracts import make_audit_record
 
@@ -70,8 +70,29 @@ async def test_local_adapters_are_built_from_their_own_sections(tmp_path: Path) 
 
 async def test_a_mistyped_adapter_option_stops_startup(tmp_path: Path) -> None:
     config = local_config(tmp_path, fsynk=True)
-    with pytest.raises(ConfigurationError, match=r"provider 'jsonl'.*fsynk"):
+    with pytest.raises(ConfigurationError) as caught:
         await ServiceContainer(config, registry()).start()
+    error = caught.value
+    assert error.message == "the options of provider 'jsonl' are not valid (1 problem)"
+    assert error.expected == "only known options: fsync, path, tracing"
+    assert error.actual == "an unknown option 'fsynk' (did you mean 'fsync'?)"
+    # Which variable to correct is named on the way out of the container.
+    assert any("EAP_AUDIT_OPTIONS" in note for note in error.__notes__)
+
+
+async def test_a_wrong_option_value_says_what_was_expected_and_what_was_given(
+    tmp_path: Path,
+) -> None:
+    config = local_config(tmp_path, fsync="yes please", path=["a", "b"])
+    with pytest.raises(ConfigurationError) as caught:
+        await ServiceContainer(config, registry()).start()
+    error = caught.value
+    assert error.expected is not None
+    assert "fsync: a valid boolean" in error.expected
+    assert error.actual is not None
+    assert "fsync = 'yes please'" in error.actual
+    # A value that is not short and plain is described, not shown.
+    assert "path = a list of 2 items" in error.actual
 
 
 async def test_development_adapters_cannot_start_in_production(tmp_path: Path) -> None:
@@ -108,3 +129,67 @@ async def test_a_service_that_keeps_no_graph_state_selects_no_checkpoint_store(
         with pytest.raises(ConfigurationError, match="checkpoint provider is 'none'"):
             services.compile_kwargs()
     assert ServiceProviders.default().lookup(Section.CHECKPOINT, "none").local_only is False
+
+
+async def test_a_wrong_tracing_switch_names_the_value_and_the_variable(tmp_path: Path) -> None:
+    config = local_config(tmp_path, tracing="x" * 60)
+    with pytest.raises(ConfigurationError) as caught:
+        ServiceContainer(config, registry())
+    error = caught.value
+    # A long value could be a credential pasted in the wrong place: it is described.
+    assert (error.expected, error.actual) == ("true or false", "text of 60 characters")
+    assert error.fix is not None
+    assert "EAP_AUDIT_OPTIONS" in error.fix
+
+
+def test_every_adapter_that_ships_declares_its_options() -> None:
+    providers = ServiceProviders.default()
+    ports = [MODEL_PORT, *(section.value for section in Section), DATA_PORT]
+    undeclared = [
+        f"{port}/{name}"
+        for port in ports
+        for name in providers.names(port)
+        if providers.lookup(port, name).options is None
+    ]
+    assert undeclared == []
+
+
+def test_every_adapter_that_ships_says_what_it_needs_from_the_cloud() -> None:
+    # A deployment grants a service only what its adapters declare, so none may stay silent.
+    providers = ServiceProviders.default()
+    ports = [MODEL_PORT, *(section.value for section in Section), DATA_PORT]
+    silent = [
+        f"{port}/{name}"
+        for port in ports
+        for name in providers.names(port)
+        if providers.lookup(port, name).access is None
+    ]
+    assert silent == []
+
+
+async def test_every_options_problem_is_reported_before_anything_is_built(
+    tmp_path: Path,
+) -> None:
+    config = ServiceConfig.for_testing(
+        sections={
+            Section.SECRETS: ProviderSelection("env", {"prefix": "x"}),
+            Section.AUDIT: ProviderSelection("jsonl", {"fsynk": True}),
+        },
+    )
+    built: list[str] = []
+
+    def watched(context: object) -> object:
+        built.append("built")
+        return object()
+
+    providers = registry()
+    providers.register(Section.IDENTITY, "fake", watched, replace=True)
+    with pytest.raises(ConfigurationError) as caught:
+        await ServiceContainer(config, providers).start()
+    error = caught.value
+    assert error.message == "the options of 2 adapters are not valid"
+    assert error.actual is not None
+    assert "an unknown option 'prefix'" in error.actual
+    assert "EAP_SECRETS_OPTIONS" in error.actual
+    assert "did you mean 'fsync'?" in error.actual
+    assert built == []

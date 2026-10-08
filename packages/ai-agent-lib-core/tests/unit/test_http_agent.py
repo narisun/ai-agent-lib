@@ -292,3 +292,89 @@ async def test_a_service_told_to_stop_while_starting_never_becomes_ready() -> No
     lifecycle.begin_drain()
     assert lifecycle.state.value == "stopping"
     assert not lifecycle.accepting
+
+
+# ------------------------------------------------------------------ streaming
+
+
+async def _steps(context: RequestContext, given: Any) -> Any:
+    yield {"node": "agent", "text": "thinking"}
+    if given == "deny":
+        raise PolicyDenied("no rule allows this", reason_code="no_rule")
+    if given == "bug":
+        raise RuntimeError("the question was private")
+    yield {"node": "agent", "text": "done"}
+
+
+async def _never(context: RequestContext, given: Any) -> Any:
+    return {"ok": True}
+
+
+def _events(body: str) -> list[tuple[str, Any]]:
+    import json as _json
+
+    found = []
+    for block in body.strip().split("\n\n"):
+        lines = dict(line.split(": ", 1) for line in block.splitlines())
+        found.append((lines["event"], _json.loads(lines["data"])))
+    return found
+
+
+async def test_a_streamed_run_sends_each_step_then_the_end() -> None:
+    lifecycle = ServiceLifecycle(_no_check)
+    await lifecycle.start()
+    app = agent_app(
+        _StreamServices(), _never, application="accounts-agent", lifecycle=lifecycle, stream=_steps
+    )
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://agent.test") as http:
+        headers = {"authorization": "Bearer good", "x-request-id": "r-5"}
+        ok = await http.post(
+            "/invoke/stream", json={"input": "go", "thread_id": "t-1"}, headers=headers
+        )
+        denied = await http.post("/invoke/stream", json={"input": "deny"}, headers=headers)
+        bug = await http.post("/invoke/stream", json={"input": "bug"}, headers=headers)
+        refused = await http.post("/invoke/stream", json={"input": "go"})
+    assert ok.status_code == 200
+    assert ok.headers["content-type"].startswith("text/event-stream")
+    assert _events(ok.text) == [
+        ("update", {"node": "agent", "text": "thinking"}),
+        ("update", {"node": "agent", "text": "done"}),
+        ("end", {"thread_id": "t-1", "request_id": "r-5"}),
+    ]
+    assert _events(denied.text)[-1][1]["error"] == "denied"
+    assert _events(denied.text)[-1][1]["reason"] == "no_rule"
+    assert _events(bug.text)[-1][1]["error"] == "internal"
+    assert "private" not in bug.text
+    assert refused.status_code == 401
+
+
+async def test_without_a_stream_function_there_is_no_streaming_route() -> None:
+    lifecycle = ServiceLifecycle(_no_check)
+    await lifecycle.start()
+    app = agent_app(_StreamServices(), _never, application="a", lifecycle=lifecycle)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://agent.test") as http:
+        reply = await http.post("/invoke/stream", json={"input": "go"})
+    assert reply.status_code == 404
+
+
+async def _no_check() -> None:
+    return None
+
+
+class _StreamServices:
+    ids = SequentialIds()
+
+    async def authenticate(
+        self, credential: str | None, *, application: str, thread_id: str,
+        request_id: str | None = None,
+    ) -> RequestContext:  # fmt: skip
+        if credential != "good":
+            raise PolicyDenied("unknown caller", reason_code="invalid_token")
+        return RequestContext(
+            principal=Principal(subject="ann", tenant="t-1"),
+            application=application,
+            request_id=request_id or "r-1",
+            thread_id=thread_id,
+        )

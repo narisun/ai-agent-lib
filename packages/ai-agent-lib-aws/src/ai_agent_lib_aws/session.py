@@ -23,6 +23,7 @@ from ai_agent_lib_core.contracts import (
     CredentialsExpiredError,
     ExternalSettings,
     TransientError,
+    describe,
 )
 
 __all__ = ["AwsSessionFactory", "classify_aws_error"]
@@ -186,8 +187,8 @@ class AwsSessionFactory:
         except aws.BotoCoreError as exc:
             mapped = classify_aws_error(exc, what="the AWS session", sign_in=self.sign_in)
             raise mapped or ConfigurationError(
-                f"the AWS session could not be created ({type(exc).__name__})"
-            ) from None
+                f"the AWS session could not be created ({describe(exc)})"
+            ) from exc
 
     @classmethod
     def from_settings(
@@ -249,8 +250,8 @@ class AwsSessionFactory:
         except (aws.BotoCoreError, aws.ClientError, ValueError) as exc:
             mapped = classify_aws_error(exc, what=what, sign_in=self.sign_in)
             raise mapped or ConfigurationError(
-                f"{what} could not be created ({type(exc).__name__})"
-            ) from None
+                f"{what} could not be created ({describe(exc)})"
+            ) from exc
         return client
 
     def _create(self, service: str, *, proxied: bool) -> Any:

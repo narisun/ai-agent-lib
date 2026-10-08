@@ -8,13 +8,15 @@ import sys
 from collections.abc import Sequence
 
 from accounts_agent.graph import APPLICATION, ask
-from ai_agent_lib_core import AgentLibError, ServiceContainer
+from ai_agent_lib_core import ServiceConfig, ServiceContainer
+from ai_agent_lib_core.config import load_service_config
+from ai_agent_lib_core.observability import report_error, shows_details
 
 __all__ = ["main"]
 
 
-async def _run(question: str, thread_id: str) -> str:
-    async with ServiceContainer.from_env() as services:
+async def _run(config: ServiceConfig, question: str, thread_id: str) -> str:
+    async with ServiceContainer(config) as services:
         await services.validate()
         # A deployed agent passes the bearer token it was sent, and the identity
         # provider's signature decides who the caller is. On a developer's
@@ -29,11 +31,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("question", help="the question to ask")
     parser.add_argument("--thread", default="default", help="conversation to continue")
     arguments = parser.parse_args(argv)
+    config: ServiceConfig | None = None
     try:
-        answer = asyncio.run(_run(arguments.question, arguments.thread))
-    except AgentLibError as error:
-        sys.stderr.write(f"accounts-agent: {type(error).__name__}: {error}\n")
-        return 1
+        config = load_service_config()
+        answer = asyncio.run(_run(config, arguments.question, arguments.thread))
+    except Exception as error:  # noqa: BLE001 - every failure is explained, then the exit code
+        return report_error("accounts-agent", error, details=shows_details(config))
     sys.stdout.write(answer + "\n")
     return 0
 

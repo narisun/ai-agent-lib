@@ -1,0 +1,30 @@
+# Deploying {{ name }}
+
+`agentlib deploy {{ name }}` wrote this folder from `{{ folder }}/deploy.env`, the
+settings {{ name }} runs with in AWS. Nothing here holds a secret.
+
+| File | Whose |
+| --- | --- |
+| `settings.tf` | agentlib's: the task's environment, from `deploy.env` |
+| `permissions.tf` | agentlib's: what each adapter said it needs from AWS, and why |
+| `main.tf`, `variables.tf`, `Dockerfile` | yours: written once, never overwritten |
+
+Change `deploy.env`, never `settings.tf` or `permissions.tf`, and run the command again.
+
+## Steps
+
+1. Review the plan: `agentlib deploy {{ name }} --plan`. It lists every adapter, every
+   permission and the reason for it, the sidecars, and anything to check by hand.
+2. Write the files: `agentlib deploy {{ name }}`.
+3. Build and push the images, from the workspace folder:
+
+   ```
+   docker build -f deploy/{{ name }}/Dockerfile -t {{ name }} .
+   docker build -f deploy/opa/Dockerfile -t {{ name }}-opa .   # when the plan lists the OPA sidecar
+   ```
+
+4. Copy `terraform.tfvars.example` to `terraform.tfvars` and fill it in.
+5. `terraform init`, `terraform plan`, read it, `terraform apply`.
+
+In `permissions.tf`, a line starting `# check:` marks a resource agentlib could not
+narrow from the settings alone, such as an ID AWS assigns. Narrow it before production.

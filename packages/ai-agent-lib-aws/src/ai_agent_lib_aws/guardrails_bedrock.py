@@ -33,6 +33,7 @@ from ai_agent_lib_core.contracts import (
     GuardrailPoint,
     GuardrailVerdict,
     RequestContext,
+    describe,
 )
 from ai_agent_lib_core.kit import GuardrailsOptions
 
@@ -204,7 +205,7 @@ class BedrockGuardrails:
         except ConfigurationError:
             raise
         except AgentLibError as exc:
-            raise ConfigurationError(str(exc)) from None
+            raise ConfigurationError.from_error(exc) from exc
 
     async def _apply(self, source: str, text: str) -> Mapping[str, Any]:
         options = self._options
@@ -225,7 +226,7 @@ class BedrockGuardrails:
             )
             # The service's message can repeat the text, so it stays in the cause.
             raise AgentLibError(
-                f"{_WHAT} could not check the text ({code or type(exc).__name__})"
+                f"{_WHAT} could not check the text ({code or describe(exc)})"
             ) from exc
         if not isinstance(reply, Mapping) or not isinstance(reply.get("action"), str):
             raise AgentLibError(f"{_WHAT} gave no verdict")

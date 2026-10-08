@@ -26,7 +26,7 @@ from psycopg_pool import AsyncConnectionPool, PoolTimeout
 from pydantic import Field, model_validator
 
 from ai_agent_lib_aws.session import AwsSessionFactory
-from ai_agent_lib_core.contracts import AgentLibError, ConfigurationError, OptionsModel
+from ai_agent_lib_core.contracts import AgentLibError, ConfigurationError, OptionsModel, describe
 
 __all__ = ["PostgresCheckpointBackend", "PostgresCheckpointOptions"]
 
@@ -175,8 +175,11 @@ class PostgresCheckpointBackend:
             async with await psycopg.AsyncConnection.connect(**arguments) as connection:
                 await AsyncPostgresSaver(connection).setup()
         except psycopg.Error as exc:
+            # The server's message can name things in the database: it is the detail.
             raise ConfigurationError(
-                f"{_WHAT}: the tables could not be created ({type(exc).__name__})"
+                f"{_WHAT}: the tables could not be created ({type(exc).__name__})",
+                fix="create them once as an administrator; the service never needs to",
+                detail=describe(exc),
             ) from exc
 
     async def connection_arguments(self) -> dict[str, Any]:
@@ -222,12 +225,18 @@ class PostgresCheckpointBackend:
         except (psycopg.Error, PoolTimeout) as exc:
             raise self._unreachable(exc) from exc
         except AgentLibError as exc:
-            raise ConfigurationError(str(exc)) from None
+            raise ConfigurationError.from_error(exc) from exc
 
     def _unreachable(self, error: BaseException) -> ConfigurationError:
+        # The server's message can name roles and databases: it is the detail.
         return ConfigurationError(
             f"{_WHAT}: the database at {self._options.host!r} could not be reached or "
-            f"signed in to ({type(error).__name__})"
+            f"signed in to ({type(error).__name__})",
+            fix=(
+                "check the host and port, that this task's security group can reach the "
+                "database, and that the role may sign in with IAM (rds-db:connect)"
+            ),
+            detail=describe(error),
         )
 
     async def _check_tables(self, pool: Any) -> None:
@@ -247,7 +256,7 @@ class PostgresCheckpointBackend:
         except (psycopg.Error, PoolTimeout) as exc:
             raise self._unreachable(exc) from exc
         except AgentLibError as exc:
-            raise ConfigurationError(str(exc)) from None
+            raise ConfigurationError.from_error(exc) from exc
         version = row["v"] if row is not None else -1
         if version < _NEEDED_VERSION:
             raise ConfigurationError(

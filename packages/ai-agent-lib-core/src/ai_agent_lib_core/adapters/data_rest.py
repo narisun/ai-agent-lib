@@ -66,6 +66,7 @@ from ai_agent_lib_core.contracts import (
     SourceMetadata,
     TransientError,
     ValidationFailed,
+    describe,
 )
 
 __all__ = ["RestDataSource", "RestOptions"]
@@ -357,7 +358,15 @@ class RestDataSource:
             raise RuntimeError("the data source is already started")
         directory = self._options.queries_dir
         if not directory.is_dir():
-            raise ConfigurationError(f"data source {self._name!r}: query directory not found")
+            raise ConfigurationError(
+                f"data source {self._name!r}: the queries folder does not exist",
+                expected="a folder of .yaml endpoint definitions",
+                actual=f"nothing at {directory}",
+                fix=(
+                    "correct queries_dir; a relative path is relative to the folder of the "
+                    "service's .env file"
+                ),
+            )
         endpoints = {}
         for path in sorted(directory.glob("*.yaml")):
             try:
@@ -499,8 +508,8 @@ class RestDataSource:
             raise TransientError(f"{where}: the API did not answer in time") from None
         except httpx.TransportError as exc:
             raise TransientError(
-                f"{where}: the API could not be reached ({type(exc).__name__})"
-            ) from None
+                f"{where}: the API could not be reached ({describe(exc)})"
+            ) from exc
 
         if httpx.codes.is_success(status):
             try:
@@ -510,18 +519,43 @@ class RestDataSource:
         if status == httpx.codes.NOT_FOUND and endpoint.empty_on_not_found:
             return None
         if status in _TRANSIENT_STATUS or httpx.codes.is_server_error(status):
-            raise TransientError(f"{where}: the API returned HTTP {status}")
+            raise TransientError(
+                f"{where}: the API returned HTTP {status}",
+                expected="a 2xx answer",
+                actual=f"HTTP {status}, which may clear on its own",
+            )
         if status == httpx.codes.UNAUTHORIZED:
-            raise CredentialsExpiredError(f"{where}: the API did not accept the credentials")
+            raise CredentialsExpiredError(
+                f"{where}: the API did not accept the credentials",
+                actual="HTTP 401",
+                fix="check the secret named by auth_secret, and auth_header and auth_scheme",
+            )
         if status == httpx.codes.FORBIDDEN:
             raise PolicyDenied(
-                f"{where}: the API forbade this request", reason_code="upstream_forbidden"
+                f"{where}: the API forbade this request",
+                reason_code="upstream_forbidden",
+                actual="HTTP 403 from the API",
+                fix="ask the API's owner to grant this service's credentials access",
             )
         if httpx.codes.is_redirect(status):
-            raise AgentLibError(f"{where}: the API redirected, and redirects are not followed")
+            raise AgentLibError(
+                f"{where}: the API redirected, and redirects are not followed",
+                actual=f"HTTP {status}",
+                fix="set base_url to the address the API redirects to",
+            )
         if httpx.codes.is_client_error(status):
-            raise ValidationFailed(f"{where}: the API refused the request with HTTP {status}")
-        raise AgentLibError(f"{where}: the API returned HTTP {status}")
+            hint = (
+                "check base_url and the endpoint's path"
+                if status == httpx.codes.NOT_FOUND
+                else "check the endpoint's parameters against the API's documentation"
+            )
+            raise ValidationFailed(
+                f"{where}: the API refused the request with HTTP {status}",
+                expected="a 2xx answer",
+                actual=f"HTTP {status}",
+                fix=hint,
+            )
+        raise AgentLibError(f"{where}: the API returned HTTP {status}", actual=f"HTTP {status}")
 
     async def _read(self, response: httpx.Response, where: str) -> bytes:
         limit = self._options.max_response_bytes

@@ -55,6 +55,10 @@ model in `agents/hello-agent/.env` when you want one.
 | `agentlib graph AGENT` | Prints the agent's graph as a Mermaid diagram |
 | `agentlib policy test [--opa]` | Decides the sample requests in `tests/policy-samples.yaml` and compares with what each expects |
 | `agentlib update [--diff]` | Brings generated files up to what this version writes, leaving the files you changed alone |
+| `agentlib config options [PORT [NAME]] [--schema]` | Lists every adapter, and each adapter's options with types, defaults and meanings; `--schema` prints JSON Schema for an editor |
+| `agentlib check [--opa] [--keep-going]` | Runs what CI runs: ruff, the format check, mypy, pytest and the policy samples. Names the step that failed |
+| `agentlib eval [SERVICE]` | Runs the evals of one service or all: its tests marked `eval`, with the real model in its `.env` |
+| `agentlib deploy SERVICE [--plan]` | Writes the Terraform and Dockerfiles that run the service on ECS Fargate, from the settings in its `deploy.env`; every IAM permission comes from the adapter that needs it. `--plan` shows it all and writes nothing |
 
 At a terminal a missing answer is asked for, one question at a time. Given as
 options, or with no terminal, nothing is asked. `agentlib <command> --help`
@@ -193,6 +197,10 @@ deleted is not brought back. Commit the lock file.
   when an entry is added, linked or pinned. Their values are kept.
 - **Touch the registries, rules, samples or `.env` files on update.**
   `agentlib update` only writes source, tests and documentation.
+- **Deploy anything.** `agentlib deploy` writes files. It never calls AWS and
+  never runs `terraform`; after its first run it rewrites only the files it
+  derives (`settings.tf`, `permissions.tf`, the reference module and the OPA
+  image), never yours.
 
 ## Working on agentlib
 

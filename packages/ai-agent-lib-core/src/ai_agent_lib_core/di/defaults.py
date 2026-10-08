@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 from typing import TYPE_CHECKING, cast
 
 from ai_agent_lib_core.adapters import (
@@ -33,12 +34,16 @@ from ai_agent_lib_core.adapters import (
     StaticIdentityVerifier,
     resolve_jwt_options,
 )
+from ai_agent_lib_core.adapters.checkpoint_options import SqliteCheckpointOptions
 from ai_agent_lib_core.adapters.http_support import tls_verification
+from ai_agent_lib_core.config import secret_key, variable_for
 from ai_agent_lib_core.contracts import (
     ConfigurationError,
+    NoOptions,
     PolicyDecisionPoint,
     SecretsProvider,
     Section,
+    no_access,
 )
 from ai_agent_lib_core.di.providers import DATA_PORT, MODEL_PORT
 
@@ -54,7 +59,10 @@ def _jsonl_audit(context: BuildContext) -> JsonlAuditSink:
 
 
 def _env_secrets(context: BuildContext) -> EnvSecretsProvider:
-    return EnvSecretsProvider(context.secret_values)
+    def how_to_set(name: str) -> str:
+        return f"set {variable_for(secret_key(name))} in the service's .env or its environment"
+
+    return EnvSecretsProvider(context.secret_values, how_to_set)
 
 
 def _static_identity(context: BuildContext) -> StaticIdentityVerifier:
@@ -103,7 +111,6 @@ async def _sqlite_checkpoint(context: BuildContext) -> CheckpointBackend:
     # Imported here so that code which never builds a graph does not load LangGraph.
     from ai_agent_lib_core.integrations.langgraph import (
         SqliteCheckpointBackend,
-        SqliteCheckpointOptions,
     )
 
     backend = SqliteCheckpointBackend(context.selection.parse_options(SqliteCheckpointOptions))
@@ -171,18 +178,30 @@ async def _rest(context: BuildContext) -> RestDataSource:
 
 
 def register_local_adapters(providers: ServiceProviders) -> None:
-    """Register every local adapter that ships with core."""
-    providers.register(MODEL_PORT, "fake", _fake_model, local_only=True)
-    providers.register(MODEL_PORT, "anthropic", _anthropic_model)
-    providers.register(Section.SECRETS, "env", _env_secrets)
-    providers.register(Section.AUDIT, "jsonl", _jsonl_audit, local_only=True)
-    providers.register(Section.IDENTITY, "static", _static_identity, local_only=True)
-    providers.register(Section.IDENTITY, "jwt", _jwt_identity)
-    providers.register(Section.CHECKPOINT, "sqlite", _sqlite_checkpoint, local_only=True)
-    providers.register(Section.CHECKPOINT, "none", _no_checkpoint)
-    providers.register(Section.REGISTRY, "file", _file_registry)
-    providers.register(Section.POLICY, "rules", _rules_policy, local_only=True)
-    providers.register(Section.POLICY, "opa", _opa_policy)
-    providers.register(Section.GUARDRAILS, "patterns", _pattern_guardrails)
-    providers.register(DATA_PORT, "duckdb_csv", _duckdb_csv, local_only=True)
-    providers.register(DATA_PORT, "rest", _rest)
+    """Register every local adapter that ships with core.
+
+    None of them needs anything from a cloud account, so each says so.
+    """
+    register = functools.partial(providers.register, access=no_access)
+    register(MODEL_PORT, "fake", _fake_model, local_only=True, options=NoOptions)
+    register(MODEL_PORT, "anthropic", _anthropic_model, options=NoOptions)
+    register(Section.SECRETS, "env", _env_secrets, options=NoOptions)
+    register(Section.AUDIT, "jsonl", _jsonl_audit, local_only=True, options=JsonlAuditOptions)
+    register(
+        Section.IDENTITY, "static", _static_identity, local_only=True, options=StaticIdentityOptions
+    )
+    register(Section.IDENTITY, "jwt", _jwt_identity, options=JwtIdentityOptions)
+    register(
+        Section.CHECKPOINT,
+        "sqlite",
+        _sqlite_checkpoint,
+        local_only=True,
+        options=SqliteCheckpointOptions,
+    )
+    register(Section.CHECKPOINT, "none", _no_checkpoint, options=NoOptions)
+    register(Section.REGISTRY, "file", _file_registry, options=FileRegistryOptions)
+    register(Section.POLICY, "rules", _rules_policy, local_only=True, options=RulesPolicyOptions)
+    register(Section.POLICY, "opa", _opa_policy, options=OpaPolicyOptions)
+    register(Section.GUARDRAILS, "patterns", _pattern_guardrails, options=PatternGuardrailsOptions)
+    register(DATA_PORT, "duckdb_csv", _duckdb_csv, local_only=True, options=DuckDbCsvOptions)
+    register(DATA_PORT, "rest", _rest, options=RestOptions)

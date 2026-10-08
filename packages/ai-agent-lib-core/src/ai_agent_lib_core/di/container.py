@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from collections.abc import Callable, Collection, Sequence
+from collections.abc import Awaitable, Callable, Collection, Sequence
 from datetime import datetime
 from pathlib import Path
 from types import TracebackType
@@ -15,7 +15,13 @@ from pydantic import SecretStr
 from ai_agent_lib_core.adapters.http_support import checked_base_url
 from ai_agent_lib_core.adapters.system import SystemClock, UuidGenerator
 from ai_agent_lib_core.adapters.telemetry import NullTelemetry, OpenTelemetryTelemetry
-from ai_agent_lib_core.config import load_service_config
+from ai_agent_lib_core.config import (
+    Key,
+    load_service_config,
+    options_key,
+    provider_key,
+    variable_for,
+)
 from ai_agent_lib_core.contracts import (
     DEFAULT_MODEL_ALIAS,
     AgentLibError,
@@ -26,7 +32,6 @@ from ai_agent_lib_core.contracts import (
     Classification,
     Clock,
     ConfigurationError,
-    CredentialsExpiredError,
     DataSource,
     DeploymentEnv,
     GuardrailCheck,
@@ -45,9 +50,11 @@ from ai_agent_lib_core.contracts import (
     SupportsAsyncClose,
     SupportsValidation,
     Telemetry,
+    TelemetryMode,
     TokenAuthenticator,
     TokenExchanger,
-    TransientError,
+    generic_fix,
+    shown_value,
 )
 from ai_agent_lib_core.di.providers import (
     DATA_PORT,
@@ -58,7 +65,9 @@ from ai_agent_lib_core.di.providers import (
 )
 from ai_agent_lib_core.pipeline import (
     AgentCheck,
+    BudgetLedger,
     GovernedDataSource,
+    Operations,
     Pipeline,
     ToolCall,
     ToolStage,
@@ -84,17 +93,8 @@ _Key = tuple[str, str, str]
 
 
 def fix_for(problem: BaseException) -> str:
-    """Return what a person does about a failed check, by the kind of failure."""
-    if isinstance(problem, CredentialsExpiredError):
-        return "Sign in again, with the command the message names, and run the check again."
-    if isinstance(problem, TransientError):
-        return (
-            "Check that the service is running and can be reached from here "
-            "(network, proxy, VPN), then run the check again."
-        )
-    if isinstance(problem, ConfigurationError):
-        return "Correct the setting the message names, in the service's .env or its environment."
-    return ""
+    """Return what a person does about a failed check: the error's own fix, or one by its kind."""
+    return generic_fix(problem)
 
 
 class ServiceContainer:
@@ -115,6 +115,7 @@ class ServiceContainer:
             option of the audit section: OpenTelemetry when on, a no-op when off.
         mcp_connector: Opens connections to MCP servers. Defaults to
             Streamable HTTP; a test passes an in-process connector.
+        sleep: Waits between retries. A test passes one that does not wait.
     """
 
     def __init__(
@@ -126,6 +127,7 @@ class ServiceContainer:
         ids: IdGenerator | None = None,
         telemetry: Telemetry | None = None,
         mcp_connector: McpConnector | None = None,
+        sleep: Callable[[float], Awaitable[None]] | None = None,
     ) -> None:
         self._config = config
         self._providers = providers if providers is not None else ServiceProviders.default()
@@ -143,6 +145,12 @@ class ServiceContainer:
         self._langgraph: LangGraphBindings | None = None
         self._governed_sources: dict[str, GovernedDataSource] = {}
         self._mcp_connector = mcp_connector
+        self._operations = Operations(
+            limits=config.limits,
+            ledger=BudgetLedger(),
+            variable=variable_for(Key.LIMITS),
+            sleep=sleep if sleep is not None else asyncio.sleep,
+        )
 
     @classmethod
     def from_env(
@@ -180,6 +188,7 @@ class ServiceContainer:
         selected = self._selected()
         for port, name, _ in selected:
             self._check_allowed(self._providers.lookup(port, name))
+        self._check_options(selected)
         self._providers.freeze()
         self._loop = asyncio.get_running_loop()
         self._started = True
@@ -204,9 +213,14 @@ class ServiceContainer:
                 try:
                     await service.validate()
                 except ConfigurationError as exc:
-                    problems.append(f"{self._label(key)}: {exc}")
+                    problems.append(f"{self._label(key)}: {exc.summary}")
         if problems:
-            raise ConfigurationError("startup validation failed: " + "; ".join(problems))
+            count = len(problems)
+            raise ConfigurationError(
+                f"startup validation failed for {count} adapter{'s' if count != 1 else ''}",
+                actual=" | ".join(problems),
+                fix="run 'agentlib doctor' for one line per adapter with what to do",
+            )
 
     async def check(self) -> tuple[CheckResult, ...]:
         """Check every built adapter and report each one, usable or not.
@@ -225,9 +239,7 @@ class ServiceContainer:
             try:
                 await service.validate()
             except AgentLibError as problem:
-                results.append(
-                    CheckResult(label, ok=False, detail=str(problem), fix=fix_for(problem))
-                )
+                results.append(CheckResult.failed(label, problem))
             else:
                 results.append(CheckResult(label, ok=True, detail="checked"))
         return tuple(results)
@@ -337,7 +349,20 @@ class ServiceContainer:
 
     def resolve_model(self, alias: str) -> tuple[ModelRef, ChatModelProvider]:
         """Return the concrete model behind ``alias`` and the provider that serves it."""
-        ref = self._config.model.resolve(alias)
+        try:
+            ref = self._config.model.resolve(alias)
+        except ConfigurationError as error:
+            if alias == DEFAULT_MODEL_ALIAS:
+                error.fix = (
+                    f"set {variable_for(Key.MODEL_ID)} to a model ID, for example in the "
+                    "service's .env; use 'fake-model' with the fake provider"
+                )
+            else:
+                error.fix = (
+                    f'add "{alias}" to {variable_for(Key.MODEL_ALIASES)}, for example '
+                    f'{{"{alias}": {{"model_id": "..."}}}}'
+                )
+            raise
         return ref, self.model_provider(ref.provider)
 
     def data_source(self, name: str) -> GovernedDataSource:
@@ -357,7 +382,12 @@ class ServiceContainer:
         if selection is None:
             known = ", ".join(sorted(self._config.data_sources)) or "none"
             raise ConfigurationError(
-                f"data source {name!r} is not configured; configured data sources: {known}"
+                f"data source {name!r} is not configured",
+                expected=f"{name!r} among the configured data sources",
+                actual=f"configured data sources: {known}",
+                fix=(
+                    f'add {{"{name}": {{"kind": "...", ...}}}} to {variable_for(Key.DATA_SOURCES)}'
+                ),
             )
         adapter = cast(DataSource, self._services[(DATA_PORT, selection.provider, name)])
         governed = GovernedDataSource(
@@ -548,6 +578,7 @@ class ServiceContainer:
             environment=self._config.deployment_env.value,
             guardrails=self.guardrails,
             response_text=mcp_result_text,
+            operations=self._operations,
         )
         return GovernedToolsMiddleware(
             server=entry.id,
@@ -629,7 +660,13 @@ class ServiceContainer:
         if entry is None:
             known = ", ".join(e.id for e in self.registry.tools.entries()) or "none"
             raise ConfigurationError(
-                f"MCP server {server!r} is not in the tool registry; registered servers: {known}"
+                f"MCP server {server!r} is not in the tool registry",
+                expected=f"{server!r} among the registered servers",
+                actual=f"registered servers: {known}",
+                fix=(
+                    f"register it (agentlib new mcp does this), or check "
+                    f"{variable_for(options_key(Section.REGISTRY))} points at the right registry"
+                ),
             )
         return entry
 
@@ -652,6 +689,7 @@ class ServiceContainer:
                 guardrails=self.guardrails,
                 frame_tool_results=self._frame_tool_results(),
                 bridge=self._bridge,
+                operations=self._operations,
             )
         return self._langgraph
 
@@ -659,7 +697,10 @@ class ServiceContainer:
         from ai_agent_lib_core.integrations.langgraph import LoopBridge
 
         if self._loop is None:
-            raise RuntimeError("the container is not started; use it with 'async with'")
+            raise RuntimeError(
+                "the service container is not started: use it as "
+                "'async with ServiceContainer(config) as services:' or await start() first"
+            )
         return LoopBridge(self._loop)
 
     # ------------------------------------------------------------------ internals
@@ -668,14 +709,30 @@ class ServiceContainer:
     def _default_telemetry(config: ServiceConfig) -> Telemetry:
         tracing = config.section(Section.AUDIT).options.get("tracing", False)
         if not isinstance(tracing, bool):
-            raise ConfigurationError("the audit option 'tracing' must be true or false")
-        return OpenTelemetryTelemetry() if tracing else NullTelemetry()
+            raise ConfigurationError(
+                "the audit option 'tracing' is not true or false",
+                expected="true or false",
+                actual=shown_value(tracing),
+                fix=(
+                    'write "tracing": true or "tracing": false in '
+                    f"{variable_for(options_key(Section.AUDIT))}, or set "
+                    f"{variable_for(Key.TELEMETRY)}=opentelemetry instead"
+                ),
+            )
+        wanted = tracing or config.telemetry is TelemetryMode.OPENTELEMETRY
+        return OpenTelemetryTelemetry() if wanted else NullTelemetry()
 
     def _frame_tool_results(self) -> bool:
         framing = self._config.section(Section.GUARDRAILS).options.get("frame_tool_results", True)
         if not isinstance(framing, bool):
             raise ConfigurationError(
-                "the guardrails option 'frame_tool_results' must be true or false"
+                "the guardrails option 'frame_tool_results' is not true or false",
+                expected="true or false",
+                actual=shown_value(framing),
+                fix=(
+                    'write "frame_tool_results": true in '
+                    f"{variable_for(options_key(Section.GUARDRAILS))}"
+                ),
             )
         return framing
 
@@ -683,7 +740,10 @@ class ServiceContainer:
         if self._closed:
             raise RuntimeError("the container is closed")
         if not self._started:
-            raise RuntimeError("the container is not started; use it with 'async with'")
+            raise RuntimeError(
+                "the service container is not started: use it as "
+                "'async with ServiceContainer(config) as services:' or await start() first"
+            )
 
     def _selected(self) -> list[_Key]:
         """Return every adapter the configuration selects, in build order."""
@@ -713,7 +773,13 @@ class ServiceContainer:
         if spec.local_only and env is not DeploymentEnv.LOCAL:
             raise ConfigurationError(
                 f"provider {spec.name!r} for {spec.port} is for local development only "
-                f"and cannot be used when the deployment environment is {env.value!r}"
+                f"and cannot be used when the deployment environment is {env.value!r}",
+                expected=f"a {spec.port} provider meant for a deployed service",
+                actual=f"{spec.name!r}, which is local only",
+                fix=(
+                    f"select a server-side provider for {spec.port} (the aws profile does), "
+                    f"or set {variable_for(Key.DEPLOYMENT_ENV)}=local on a developer's machine"
+                ),
             )
 
     def _selection_for(self, key: _Key) -> ProviderSelection:
@@ -749,11 +815,59 @@ class ServiceContainer:
             service = spec.factory(context)
             if inspect.isawaitable(service):
                 service = await service
+        except AgentLibError as error:
+            error.add_note(self._where_configured(key))
+            raise
         finally:
             self._building.pop()
         self._services[key] = service
         self._build_order.append(key)
         return service
+
+    def _check_options(self, selected: Sequence[_Key]) -> None:
+        """Check every selected adapter's options before building any of them.
+
+        So a mistyped option stops startup at once, with every such problem
+        listed, rather than after a database or a stream has been reached.
+        """
+        problems: list[ConfigurationError] = []
+        for key in selected:
+            port, name, _ = key
+            model = self._providers.lookup(port, name).options
+            if model is None:
+                continue
+            try:
+                self._selection_for(key).parse_options(model)
+            except ConfigurationError as error:
+                error.add_note(self._where_configured(key))
+                problems.append(error)
+        if len(problems) == 1:
+            raise problems[0]
+        if problems:
+            raise ConfigurationError(
+                f"the options of {len(problems)} adapters are not valid",
+                actual=" | ".join(f"{error.summary} [{error.__notes__[-1]}]" for error in problems),
+                fix="correct each; the developer guide lists every option with its default",
+            )
+
+    @staticmethod
+    def _where_configured(key: _Key) -> str:
+        """Name the variables that chose and configured the adapter being built."""
+        port, name, instance = key
+        if port == MODEL_PORT:
+            chosen = f"{variable_for(Key.MODEL_PROVIDER)} or {variable_for(Key.MODEL_ALIASES)}"
+            return f"while building the model provider {name!r}, chosen by {chosen}"
+        if port == DATA_PORT:
+            return (
+                f"while building the data source {instance!r} of kind {name!r}, "
+                f"configured in {variable_for(Key.DATA_SOURCES)}"
+            )
+        section = Section(port)
+        return (
+            f"while building the {port} adapter {name!r}, chosen by "
+            f"{variable_for(provider_key(section))} with options from "
+            f"{variable_for(options_key(section))}"
+        )
 
     def _resolve_built(self, port: str) -> object:
         """Give a factory a dependency that was built before it."""

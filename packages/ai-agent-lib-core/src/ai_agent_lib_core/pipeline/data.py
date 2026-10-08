@@ -76,23 +76,19 @@ class DataPolicyInterceptor(Generic[ResponseT]):
                 "which is above what this request may handle",
                 reason_code="classification_exceeded",
             )
-        decision = enforce_decision(
-            await self._policy.decide(
-                PolicyRequest(
-                    principal=context.principal,
-                    action=PolicyAction.DATA_QUERY,
-                    resource=PolicyResource(
-                        kind="query",
-                        name=f"{request.source}.{request.query}",
-                        classification=request.classification,
-                        attributes={"source": request.source, "query": request.query},
-                    ),
-                    application=context.application,
-                    environment=self._environment,
-                )
+        question = PolicyRequest(
+            principal=context.principal,
+            action=PolicyAction.DATA_QUERY,
+            resource=PolicyResource(
+                kind="query",
+                name=f"{request.source}.{request.query}",
+                classification=request.classification,
+                attributes={"source": request.source, "query": request.query},
             ),
-            request.evidence,
+            application=context.application,
+            environment=self._environment,
         )
+        decision = enforce_decision(await self._policy.decide(question), request.evidence, question)
         if context.principal.actor is not None:
             request.evidence.add(calling_agent=context.principal.actor)
         obligations = decision.obligations

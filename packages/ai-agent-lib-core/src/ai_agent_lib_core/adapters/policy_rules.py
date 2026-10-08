@@ -13,6 +13,7 @@ from ai_agent_lib_core.adapters.policy_cache import PolicyCacheOptions
 from ai_agent_lib_core.adapters.policy_documents import (
     Rule,
     evaluate_rules,
+    explain_no_match,
     parse_rules_document,
 )
 from ai_agent_lib_core.adapters.registry_documents import content_revision, parse_document_text
@@ -80,7 +81,12 @@ class RulesPolicyDecisionPoint:
         decision_id = self._ids.new_id()
         rule = evaluate_rules(self._rules, request)
         if rule is None:
-            return Decision.denied(decision_id, "no_matching_rule", bundle_revision=self._revision)
+            return Decision.denied(
+                decision_id,
+                "no_matching_rule",
+                bundle_revision=self._revision,
+                explanation=explain_no_match(self._rules, request),
+            )
         return Decision.allowed(
             decision_id,
             reason_code=rule.id,
