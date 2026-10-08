@@ -169,7 +169,7 @@ async def test_a_path_parameter_cannot_be_renamed(tmp_path: Path) -> None:
         "max_rows: 1\n"
         "columns: {account_id: id}\n"
     )
-    with pytest.raises(ConfigurationError, match="named by its placeholder"):
+    with pytest.raises(ConfigurationError, match="a path parameter has a 'name'"):
         await started(tmp_path, lambda request: ok([]), extra={"renamed": renamed})
 
 
@@ -363,41 +363,50 @@ async def test_an_unenforceable_obligation_is_refused_before_any_request(tmp_pat
 @pytest.mark.parametrize(
     ("definition", "problem"),
     [
-        ("- a list\n", "<root>"),
+        ("- a list\n", "the file: key: value pairs"),
         ("description: x\npath: /a\nmax_rows: 1\n", "columns"),
         ("description: x\npath: /a\nmax_rows: 0\ncolumns: {a: a}\n", "max_rows"),
         ("description: x\npath: /a\nmax_rows: 1\ncolumns: {a: a}\nverb: GET\n", "verb"),
         ("description: x\nmethod: DELETE\npath: /a\nmax_rows: 1\ncolumns: {a: a}\n", "method"),
-        ("description: x\npath: a\nmax_rows: 1\ncolumns: {a: a}\n", "must start with '/'"),
-        ("description: x\npath: /a?b=1\nmax_rows: 1\ncolumns: {a: a}\n", "no query string"),
-        ("description: x\npath: /a/{id}\nmax_rows: 1\ncolumns: {a: a}\n", "placeholders"),
+        ("description: x\npath: a\nmax_rows: 1\ncolumns: {a: a}\n", "the path is not a plain path"),
+        (
+            "description: x\npath: /a?b=1\nmax_rows: 1\ncolumns: {a: a}\n",
+            "the path is not a plain path",
+        ),
+        (
+            "description: x\npath: /a/{id}\nmax_rows: 1\ncolumns: {a: a}\n",
+            "the path and its parameters do not match",
+        ),
         (
             "description: x\npath: /a\nparameters: {id: {type: string, in: path}}\n"
             "max_rows: 1\ncolumns: {a: a}\n",
-            "placeholders",
+            "the path and its parameters do not match",
         ),
         (
             "description: x\npath: /a/{id}\n"
             "parameters: {id: {type: string, in: path, default: z}}\n"
             "max_rows: 1\ncolumns: {a: a}\n",
-            "cannot have a default",
+            "a path parameter has a default",
         ),
         (
             "description: x\npath: /a\nparameters: {q: {type: string, in: body}}\n"
             "max_rows: 1\ncolumns: {a: a}\n",
-            "GET request cannot have body",
+            "GET request has body parameters",
         ),
         (
             "description: x\npath: /a\nparameters: {n: {type: integer, default: many}}\n"
             "max_rows: 1\ncolumns: {a: a}\n",
-            "default of parameter 'n' is not a integer",
+            "default of parameter 'n' does not match its type",
         ),
         (
             "description: x\npath: /a\nparameters: {N: {type: integer}}\n"
             "max_rows: 1\ncolumns: {a: a}\n",
-            "parameter name",
+            "a parameter has a name a tool cannot use",
         ),
-        ("description: x\npath: /a\nmax_rows: 1\ncolumns: {Bad Name: a}\n", "column name"),
+        (
+            "description: x\npath: /a\nmax_rows: 1\ncolumns: {Bad Name: a}\n",
+            "a column has a name a tool cannot return",
+        ),
         (
             "description: x\npath: /a\nmax_rows: 1\ncolumns: {a: a}\nclassification: top\n",
             "classification",
@@ -425,7 +434,7 @@ async def test_yaml_cannot_build_python_objects(tmp_path: Path) -> None:
 
 
 async def test_a_definition_file_name_must_be_a_plain_identifier(tmp_path: Path) -> None:
-    with pytest.raises(ConfigurationError, match="file name is the query name"):
+    with pytest.raises(ConfigurationError, match="has a name a tool cannot use"):
         await started(tmp_path, accounts_api, extra={"Get-Accounts": LOOKUP})
 
 

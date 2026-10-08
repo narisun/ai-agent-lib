@@ -14,7 +14,7 @@ from accounts_agent.tools import lookup_balance
 from ai_agent_lib_core import PolicyDenied, Principal, RequestContext, ServiceContainer
 from ai_agent_lib_core.config import ConfigResolver, MappingConfigSource
 from ai_agent_lib_core.pipeline import frame_untrusted
-from ai_agent_lib_core.testing import FakeChatModelProvider, Fakes
+from ai_agent_lib_core.testing import FakeChatModelProvider, Fakes, calls_tool
 
 RULES = Path(__file__).parents[1] / "policies" / "agentlib" / "rules" / "data.yaml"
 
@@ -29,10 +29,7 @@ def context(subject: str = "u-1", thread: str = "th-1") -> RequestContext:
 
 
 def ask_for(account: str) -> AIMessage:
-    return AIMessage(
-        content="",
-        tool_calls=[{"name": "lookup_balance", "args": {"account": account}, "id": "call-1"}],
-    )
+    return calls_tool("lookup_balance", account=account)
 
 
 # ---------------------------------------------------------------------- tools

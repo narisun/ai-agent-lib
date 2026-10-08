@@ -226,7 +226,7 @@ def test_a_missing_rules_file_is_an_error_not_an_empty_policy(tmp_path: Path) ->
             RULES.replace("mask_columns: [holder]", "max_rows: lots"),
             "max_rows must be a whole number",
         ),
-        (RULES + RULES.split("rules:\n")[1], "rule ID used more than once"),
+        (RULES + RULES.split("rules:\n")[1], "two rules share an ID"),
         (RULES.replace("id: analysts-read", "id: Analysts Read"), "rules.0.id"),
         (RULES + "    resources: ['accounts.(by|x)']\n", "resources"),
         (RULES + "    max_classification: secret\n", "max_classification"),
@@ -770,3 +770,13 @@ async def test_a_denial_names_what_was_refused_the_rule_that_would_allow_it_and_
     assert error.fix is not None
     assert "agentlib policy test" in error.fix
     assert "reason: no_matching_rule" in str(error)
+
+
+def test_a_misspelt_field_in_a_rule_is_named_with_the_fields_of_a_rule() -> None:
+    document = {"schema": "agentlib.rules/v1", "rules": [{"id": "a", "actons": ["tool.call"]}]}
+
+    with pytest.raises(ConfigurationError) as caught:
+        parse_rules_document(document, what="policy rules")
+
+    assert "an unknown field 'rules.0.actons' (did you mean 'actions'?)" in str(caught.value.actual)
+    assert "only known fields in rules.0: actions, agents" in str(caught.value.expected)

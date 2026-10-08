@@ -19,7 +19,8 @@ The tests need no account and no network. Start a change with a test:
 | What a tool does | `tests/test_{{ package }}.py`, the tool tests at the top |
 | How the agent behaves | `tests/test_{{ package }}.py`, with a scripted model |
 | What the rules allow | `tests/test_{{ package }}_as_configured.py`, which runs the real rules file |
-| The HTTP entry point | `tests/test_{{ package }}_service.py` |
+| The HTTP entry point and streaming | `tests/test_{{ package }}_service.py` |
+| How well it answers, with a real model | `evals/cases.jsonl`, run by `agentlib eval {{ name }}` |
 
 ## Run it
 
@@ -28,6 +29,8 @@ uv run {{ name }} "Say hello to Ada."
 uv run {{ name }}-serve --port {{ port }}
 curl -s localhost:{{ port }}/invoke -H 'content-type: application/json' \
   -d '{"input": {"question": "Say hello to Ada."}, "thread_id": "demo"}'
+curl -sN localhost:{{ port }}/invoke/stream -H 'content-type: application/json' \
+  -d '{"input": {"question": "Say hello to Ada."}}'   # each step as it ends
 ```
 
 {% if model_provider == "fake" %}
@@ -62,7 +65,7 @@ audit log as JSON lines and the conversation checkpoints in SQLite.
 | `src/{{ package }}/tools.py` | The agent's own tools: plain functions |
 | `src/{{ package }}/graph.py` | The graph, and the five places the library appears in it |
 | `src/{{ package }}/__main__.py` | One question from the command line |
-| `src/{{ package }}/service.py` | Serving the agent over HTTP |
+| `src/{{ package }}/service.py` | Serving the agent over HTTP, whole answers and streamed steps |
 | `.env.example` | How the service is configured locally |
 
 ## Adding a tool
@@ -72,3 +75,15 @@ audit log as JSON lines and the conversation checkpoints in SQLite.
 3. Name it in the rule `{{ name }}-calls-its-own-tools` in
    `policies/agentlib/rules/data.yaml`. Until then every call to it is denied,
    and `tests/test_{{ package }}_as_configured.py` is where you see that.
+
+## When something fails
+
+The error says what was expected, what came instead, how to fix it, and the
+line of this agent's code that led there. Run `uv run agentlib doctor {{ name }}`
+when the agent does not start.
+
+## Deploying
+
+`uv run agentlib deploy {{ name }}` writes `deploy.env` here, for the settings
+the agent runs with in AWS. Fill it in, then `agentlib deploy {{ name }} --plan`
+shows every permission the agent's adapters need and why.

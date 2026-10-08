@@ -140,13 +140,13 @@ def test_a_missing_file_registers_nothing(tmp_path: Path) -> None:
         (TOOLS.replace("restricted", "top-secret"), "classification"),
         (TOOLS.replace("read_only: true", "read_only: sometimes"), "read_only"),
         (TOOLS.replace("id: accounts", "id: Accounts Server"), "servers.0.id"),
-        (TOOLS + TOOLS.split("servers:\n")[1], "server registered more than once"),
+        (TOOLS + TOOLS.split("servers:\n")[1], "the same server is registered more than once"),
         (
             TOOLS + "      - name: accounts.lookup\n        version: 2.0.0\n",
-            "tool of server 'accounts' registered more than once",
+            "the same tool of server 'accounts' is registered more than once",
         ),
         (TOOLS.replace("owner: treasury-data", "owner: a\n    owner: b"), "appears twice"),
-        ("- just\n- a list\n", "<root>"),
+        ("- just\n- a list\n", "the file: key: value pairs"),
         ("servers: [unclosed\n", "not valid YAML"),
     ],
 )
@@ -163,10 +163,10 @@ def test_an_invalid_tool_registry_stops_startup(tmp_path: Path, tools: str, prob
     [
         (AGENTS.replace("status: active", "status: retired"), "status"),
         (AGENTS + "    import_path: agents.accounts:build\n", "import_path"),
-        (AGENTS + AGENTS.split("agents:\n")[1], "agent registered more than once"),
+        (AGENTS + AGENTS.split("agents:\n")[1], "the same agent is registered more than once"),
         (
             AGENTS.replace("[accounts]", "[accounts, payments]"),
-            r"not in the tool registry: \['payments'\]",
+            "no tool registry entry for payments",
         ),
         (AGENTS.replace("    owner: treasury-data\n", ""), "owner"),
         (

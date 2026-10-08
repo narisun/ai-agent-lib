@@ -70,7 +70,12 @@ def _parse_header(name: str, lines: Iterable[str]) -> QueryDescription:
     for line in lines:
         match = _HEADER.match(line)
         if match is None:
-            raise ConfigurationError(f"query {name!r}: header line is not 'key: value': {line!r}")
+            raise ConfigurationError(
+                f"query {name!r}: a header line is not '-- key: value'",
+                expected="comment lines such as '-- description: ...', '-- param region: string', "
+                "'-- max_rows: 100', then the SQL",
+                actual=line[:80],
+            )
         key, value = match["key"].strip().lower(), match["value"].strip()
         param = _PARAM.match(key)
         if param is not None:
@@ -79,7 +84,11 @@ def _parse_header(name: str, lines: Iterable[str]) -> QueryDescription:
             description = value
         elif key == "max_rows":
             if not value.isdigit() or int(value) < 1:
-                raise ConfigurationError(f"query {name!r}: max_rows must be a positive integer")
+                raise ConfigurationError(
+                    f"query {name!r}: max_rows is not a positive whole number",
+                    expected="'-- max_rows: 100': the most rows one call returns",
+                    actual=value[:40],
+                )
             max_rows = int(value)
         elif key == "classification":
             try:
@@ -87,17 +96,36 @@ def _parse_header(name: str, lines: Iterable[str]) -> QueryDescription:
             except KeyError:
                 allowed = ", ".join(level.name.lower() for level in Classification)
                 raise ConfigurationError(
-                    f"query {name!r}: classification must be one of: {allowed}"
+                    f"query {name!r}: the classification is not known",
+                    expected=f"one of: {allowed}",
+                    actual=value[:40],
                 ) from None
         else:
-            raise ConfigurationError(f"query {name!r}: unknown header key {key!r}")
+            raise ConfigurationError(
+                f"query {name!r}: unknown header key {key[:40]!r}",
+                expected="description, param <name>, max_rows or classification",
+                actual=key[:40],
+            )
     if not description:
-        raise ConfigurationError(f"query {name!r}: a description is required")
+        raise ConfigurationError(
+            f"query {name!r} has no description",
+            expected="a header line '-- description: ...'; the model reads it to choose the tool",
+            fix="add the line above the SQL",
+        )
     if max_rows is None:
-        raise ConfigurationError(f"query {name!r}: max_rows is required")
+        raise ConfigurationError(
+            f"query {name!r} has no row limit",
+            expected="a header line '-- max_rows: <n>', the most rows one call returns",
+            fix="add the line above the SQL",
+        )
     names = [parameter.name for parameter in parameters]
     if len(names) != len(set(names)):
-        raise ConfigurationError(f"query {name!r}: a parameter is declared twice")
+        twice = sorted({item for item in names if names.count(item) > 1})
+        raise ConfigurationError(
+            f"query {name!r}: a parameter is declared twice",
+            expected="one '-- param <name>: <type>' line per parameter",
+            actual=f"{', '.join(twice)} declared more than once",
+        )
     return QueryDescription(
         name=name,
         description=description,
@@ -114,7 +142,9 @@ def _parse_parameter(query: str, name: str, declaration: str) -> QueryParameter:
     except ValueError:
         allowed = ", ".join(member.value for member in ParameterType)
         raise ConfigurationError(
-            f"query {query!r}: parameter {name!r} must have one of the types: {allowed}"
+            f"query {query!r}: parameter {name!r} has an unknown type",
+            expected=f"one of: {allowed}, as in '-- param {name}: string'",
+            actual=type_text[:40],
         ) from None
     parameter = QueryParameter(name=name, type=kind, required=not has_default)
     if not has_default:
@@ -123,7 +153,9 @@ def _parse_parameter(query: str, name: str, declaration: str) -> QueryParameter:
         default = coerce_parameter(parameter, default_text)
     except ValidationFailed:
         raise ConfigurationError(
-            f"query {query!r}: the default of parameter {name!r} is not a {kind.value}"
+            f"query {query!r}: the default of parameter {name!r} does not match its type",
+            expected=f"a {kind.value}",
+            actual=default_text[:40],
         ) from None
     return QueryParameter(name=name, type=kind, required=False, default=default)
 
@@ -134,24 +166,42 @@ def _parse_statement(name: str, sql: str, dialect: str) -> tuple[exp.Query, tupl
     except SqlglotError as exc:
         raise ConfigurationError(f"query {name!r}: the SQL cannot be parsed: {exc}") from None
     if len(statements) != 1:
-        raise ConfigurationError(f"query {name!r}: exactly one statement is required")
+        raise ConfigurationError(
+            f"query {name!r}: a query file holds one statement",
+            expected="exactly one SELECT",
+            actual=f"{len(statements)} statements",
+        )
     statement = statements[0]
+    read_only = ConfigurationError(
+        f"query {name!r} is not read-only",
+        expected="a SELECT that changes nothing",
+        actual="a statement that is not a SELECT, or one that writes (INSERT, UPDATE, INTO, ...)",
+        fix="named queries only read; do writes elsewhere",
+    )
     if not isinstance(statement, exp.Query):
-        raise ConfigurationError(f"query {name!r}: only read-only SELECT statements are allowed")
+        raise read_only
     forbidden = (exp.Insert, exp.Update, exp.Delete, exp.Merge, exp.Create, exp.Drop, exp.Command)
     if any(statement.find_all(*forbidden)) or statement.find(exp.Into) is not None:
-        raise ConfigurationError(f"query {name!r}: only read-only SELECT statements are allowed")
+        raise read_only
 
     outputs: list[str] = []
     for column in statement.selects:
         if column.is_star or not column.alias_or_name:
             raise ConfigurationError(
-                f"query {name!r}: every returned column must be named; 'SELECT *' and "
-                "unnamed expressions are not allowed"
+                f"query {name!r}: a returned column has no name",
+                expected="every returned column named: a column, or an expression with AS",
+                actual="'SELECT *' or an unnamed expression",
+                fix="list the columns, and name expressions: SUM(x) AS total",
             )
         outputs.append(column.alias_or_name.lower())
     if len(outputs) != len(set(outputs)):
-        raise ConfigurationError(f"query {name!r}: two returned columns share a name")
+        twice = sorted({item for item in outputs if outputs.count(item) > 1})
+        raise ConfigurationError(
+            f"query {name!r}: two returned columns share a name",
+            expected="a distinct name for every returned column",
+            actual=", ".join(twice),
+            fix="rename one with AS",
+        )
 
     order = statement.args.get("order")
     if order is not None:
@@ -163,7 +213,9 @@ def _parse_statement(name: str, sql: str, dialect: str) -> tuple[exp.Query, tupl
                 or target.name.lower() not in outputs
             ):
                 raise ConfigurationError(
-                    f"query {name!r}: ORDER BY must use the names of returned columns"
+                    f"query {name!r}: ORDER BY names something the query does not return",
+                    expected=f"names of returned columns: {', '.join(outputs)}",
+                    actual=target.sql()[:60],
                 )
     return statement, tuple(outputs)
 
@@ -172,12 +224,23 @@ def _load_file(path: Path, dialect: str) -> NamedQuery:
     name = path.stem
     if not _NAME.match(name):
         raise ConfigurationError(
-            f"query file {path.name!r}: the name must be lower-case letters, digits and underscores"
+            f"query file {path.name!r} has a name a tool cannot use",
+            expected="lower-case letters, digits and underscores, starting with a letter",
+            actual=path.stem[:60],
+            fix="rename the file; its name is the query's name",
         )
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except (OSError, UnicodeDecodeError) as exc:
         raise ConfigurationError(f"query file cannot be read: {path}") from exc
+    try:
+        return _parse_query(name, lines, dialect)
+    except ConfigurationError as error:
+        error.add_note(f"in {path}")
+        raise
+
+
+def _parse_query(name: str, lines: list[str], dialect: str) -> NamedQuery:
     split = next((i for i, line in enumerate(lines) if not line.startswith("--")), len(lines))
     description = _parse_header(name, (line for line in lines[:split] if line.strip("- ")))
     statement, outputs = _parse_statement(name, "\n".join(lines[split:]), dialect)
@@ -185,14 +248,26 @@ def _load_file(path: Path, dialect: str) -> NamedQuery:
     declared = {parameter.name for parameter in description.parameters}
     used = {placeholder.name for placeholder in statement.find_all(exp.Placeholder)}
     if "" in used or any(not _NAME.match(item) for item in used):
-        raise ConfigurationError(f"query {name!r}: parameters must be written as ':name'")
-    if used - declared:
         raise ConfigurationError(
-            f"query {name!r}: parameters used but not declared: {sorted(used - declared)}"
+            f"query {name!r}: a parameter is not written as ':name'",
+            expected="placeholders such as :region, lower-case",
+            fix="write each parameter as a colon and its declared name",
+        )
+    if used - declared:
+        missing = sorted(used - declared)
+        raise ConfigurationError(
+            f"query {name!r} uses parameters it does not declare",
+            expected="a '-- param <name>: <type>' header line for every :name in the SQL",
+            actual=f"no declaration of {', '.join(missing)}",
+            fix=f"add '-- param {missing[0]}: string' (or the right type) to the header",
         )
     if declared - used:
+        unused = sorted(declared - used)
         raise ConfigurationError(
-            f"query {name!r}: parameters declared but not used: {sorted(declared - used)}"
+            f"query {name!r} declares parameters it does not use",
+            expected="every declared parameter used in the SQL as :name",
+            actual=f"{', '.join(unused)} not used",
+            fix="use it in the SQL, or remove its '-- param' line",
         )
     return NamedQuery(description=description, expression=statement, outputs=outputs)
 

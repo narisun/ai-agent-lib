@@ -105,15 +105,16 @@ token:
 - {{ note }}
 {% endfor %}
 {% if plan.deployed %}
-- Deployed, the same query files run on the real database. Give the service
-  this value for `{{ var.data_sources }}` instead of the local one:
+- Deployed, the same query files run on the real database. In the
+  `deploy.env` that `uv run agentlib deploy {{ name }}` writes, give
+  `{{ var.data_sources }}` this value instead of the local one:
 
   ```text
   {{ plan.deployed_setting }}
   ```
 
-  What the service's role must be allowed to do is in the README of
-  `ai-agent-lib-aws`.
+  `agentlib deploy {{ name }} --plan` then lists what the service's role must
+  be allowed to do, and why.
 {% endif %}
 
 {% endif %}
@@ -133,3 +134,9 @@ token:
 The queries are written in the dialect of the production database and run
 unchanged over CSV files locally.
 {% endif %}
+
+## Deploying
+
+`uv run agentlib deploy {{ name }}` writes `deploy.env` here, for the settings
+the server runs with in AWS. Fill it in, then `agentlib deploy {{ name }} --plan`
+shows every permission its adapters need and why.

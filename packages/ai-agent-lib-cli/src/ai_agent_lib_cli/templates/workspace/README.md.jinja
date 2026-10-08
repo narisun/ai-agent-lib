@@ -37,6 +37,9 @@ uv run agentlib run <service>             # start an agent's HTTP entry point or
 uv run agentlib graph <agent>             # the agent's graph, as a Mermaid diagram
 uv run agentlib policy test               # do the rules decide the samples as expected?
 uv run agentlib update                    # take template changes from a newer agentlib
+uv run agentlib check                     # what CI runs: lint, format, types, tests, rules
+uv run agentlib eval [<service>]          # the evals, with the real model in each .env
+uv run agentlib deploy <service> --plan   # what running it on AWS takes, and why
 ```
 
 `doctor` names what is wrong and how to fix it. Run it first when a service
@@ -53,6 +56,8 @@ does not start.
 | `policies/agentlib/rules/data.yaml` | What every service allows. A request no rule matches is denied |
 | `tests/` | Tests of the workspace as a whole, and of agents together with servers |
 | `tests/policy-samples.yaml` | Requests the rules must allow or deny. Add one before you add a rule |
+| `.github/workflows/check.yml` | The gate CI runs on every change, on Linux and Windows: `agentlib check` |
+| `deploy/` | After `agentlib deploy`: Terraform and Dockerfiles for each deployed service |
 | `agentlib.toml` | The answers this workspace was generated from |
 | `agentlib.lock` | What each generated file held when it was written. Commit it: `agentlib update` uses it to leave your changes alone |
 
@@ -68,4 +73,4 @@ started from. Local state (the audit log, conversation checkpoints) is written
 to `.agentlib/` in the service's folder.
 
 Nothing here needs an account or a network connection until you select a real
-model.
+model or deploy.

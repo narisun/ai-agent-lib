@@ -10,7 +10,8 @@ from __future__ import annotations
 import difflib
 import enum
 import re
-from collections.abc import Mapping
+import typing
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from types import MappingProxyType
@@ -140,6 +141,7 @@ def _thaw(value: object) -> Any:
 def _needs(message: str) -> str:
     """Pydantic's description of what a value must be, in plain words."""
     text = re.sub(r" for <class '[\w.]+'>", "", message)
+    text = re.sub(r"a valid dictionary or instance of \w+", "key: value pairs (an object)", text)
     for prefix in ("Input should be ", "Value error, "):
         text = text.removeprefix(prefix)
     if text.startswith("Input is not a valid "):
@@ -148,7 +150,39 @@ def _needs(message: str) -> str:
     return text
 
 
-def options_error(owner: str, model: type[BaseModel], exc: ValidationError) -> ConfigurationError:
+def _model_at(model: type[BaseModel], loc: Sequence[object]) -> type[BaseModel] | None:
+    """The model that holds the field at ``loc``, following nested models, lists and maps."""
+    current: object = model
+    for part in loc:
+        while not (isinstance(current, type) and issubclass(current, BaseModel)):
+            inner = [arg for arg in typing.get_args(current) if arg is not type(None)]
+            if not inner:
+                return None
+            current = inner[-1]  # the item type of a list, or the value type of a map
+        if isinstance(part, int):
+            continue
+        field = current.model_fields.get(str(part))
+        if field is None:
+            return None
+        current = field.annotation
+    return current if isinstance(current, type) and issubclass(current, BaseModel) else None
+
+
+def _known_fields(model: type[BaseModel] | None) -> list[str]:
+    if model is None:
+        return []
+    return sorted(field.alias or name for name, field in model.model_fields.items())
+
+
+def options_error(
+    owner: str,
+    model: type[BaseModel],
+    exc: ValidationError,
+    *,
+    whole: str = "the options",
+    noun: str = "option",
+    show_values: bool = True,
+) -> ConfigurationError:
     """Turn a validation failure of an options model into an error a developer can act on.
 
     For each problem it says where it is, what the option needs and what was
@@ -158,23 +192,34 @@ def options_error(owner: str, model: type[BaseModel], exc: ValidationError) -> C
         owner: What the options belong to, for example ``"provider 'jsonl'"``.
         model: The options model that was validated.
         exc: What validation found.
+        whole: What a problem with no field is about, for example ``"the file"``.
+        noun: What a key is called, ``"option"`` or ``"field"``.
+        show_values: Whether ``got`` may show a short description of each wrong
+            value. Off for documents whose values must never be repeated.
     """
-    known = sorted(field.alias or name for name, field in model.model_fields.items())
     expected: list[str] = []
     actual: list[str] = []
     for error in exc.errors(include_url=False):
-        place = ".".join(str(part) for part in error["loc"]) or "the options"
+        place = ".".join(str(part) for part in error["loc"]) or whole
         if error["type"] == "extra_forbidden":
+            known = _known_fields(_model_at(model, error["loc"][:-1]))
             close = difflib.get_close_matches(str(error["loc"][-1]), known, n=1)
             hint = f" (did you mean {close[0]!r}?)" if close else ""
-            expected.append(f"only known options: {', '.join(known)}")
-            actual.append(f"an unknown option {place!r}{hint}")
+            parent = ".".join(str(part) for part in error["loc"][:-1])
+            within = f" in {parent}" if parent else ""
+            if known:
+                expected.append(f"only known {noun}s{within}: {', '.join(known)}")
+            actual.append(f"an unknown {noun} {place!r}{hint}")
         elif error["type"] == "missing":
             expected.append(f"{place}: a value; it is required")
             actual.append(f"no {place}")
         else:
             expected.append(f"{place}: {_needs(error['msg'])}")
-            actual.append(f"{place} = {shown_value(error.get('input'))}")
+            actual.append(
+                f"{place} = {shown_value(error.get('input'))}"
+                if show_values
+                else f"{place} is not {_needs(error['msg'])}"
+            )
     count = len(actual)
     return ConfigurationError(
         f"the options of {owner} are not valid ({count} problem{'s' if count != 1 else ''})",

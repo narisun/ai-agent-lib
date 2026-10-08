@@ -45,11 +45,13 @@ from ai_agent_lib_core.contracts.access import ACCOUNT, REGION
 from ai_agent_lib_core.di import AccessPlan, ServiceProviders, access_plan
 
 __all__ = [
+    "AWS_DISTRIBUTION",
     "DEPLOY_ENV",
     "MODULE_FOLDER",
     "OPA_FOLDER",
     "DeploymentPlan",
     "Target",
+    "depends_on_aws",
     "deployment_files",
     "hcl_string",
     "maintained_files",
@@ -70,7 +72,8 @@ OPA_FOLDER = PurePosixPath("deploy", "opa")
 
 _ALL_INTERFACES = "0.0.0.0"  # noqa: S104 - the container's port is reached through the task's network
 _LOOPBACK = frozenset({"localhost", "127.0.0.1", "::1"})
-_AWS_DISTRIBUTION = "ai-agent-lib-aws"
+AWS_DISTRIBUTION = "ai-agent-lib-aws"
+"""The distribution that holds the AWS adapters a deployed service selects."""
 _HEADER = (
     "# Written by 'agentlib deploy {name}' from {source}.\n"
     "# Do not edit: change that file and run the command again.\n"
@@ -197,9 +200,24 @@ def _uses_opa_beside_it(config: ServiceConfig) -> bool:
     return isinstance(url, str) and (urlsplit(url).hostname or "") in _LOOPBACK
 
 
-def _dependencies(root: Path, target: Target) -> str:
+def _local_data_sources(root: Path, target: Target) -> set[str]:
+    """The data sources the service's committed local settings name."""
+    path = root.joinpath(*target.folder.parts, ".env.example")
+    if not path.is_file():
+        return set()
+    text = DotenvConfigSource(path).get(variable_for(Key.DATA_SOURCES))
+    try:
+        found = json.loads(text) if text else {}
+    except ValueError:
+        return set()
+    return set(found) if isinstance(found, dict) else set()
+
+
+def depends_on_aws(root: Path, target: Target) -> bool:
+    """Whether the service's own dependencies include the AWS adapters."""
     path = root.joinpath(*target.folder.parts, "pyproject.toml")
-    return path.read_text(encoding="utf-8") if path.is_file() else ""
+    text = path.read_text(encoding="utf-8") if path.is_file() else ""
+    return re.search(rf"[\"']{re.escape(AWS_DISTRIBUTION)}[\[\"'<>=~! ]", text) is not None
 
 
 def plan_deployment(
@@ -233,17 +251,22 @@ def plan_deployment(
             adapter.label
             for adapter in access.adapters
             if registry.lookup(adapter.port, adapter.name).factory.__module__.startswith(
-                _AWS_DISTRIBUTION.replace("-", "_")
+                AWS_DISTRIBUTION.replace("-", "_")
             )
         }
     )
-    if from_aws and not re.search(
-        rf"[\"']{re.escape(_AWS_DISTRIBUTION)}[\[\"'<>=~! ]", _dependencies(root, target)
-    ):
+    if from_aws and not depends_on_aws(root, target):
         problems.append(
-            f"{', '.join(from_aws)} come from {_AWS_DISTRIBUTION}, which {target.name} does not "
-            f'depend on; add "{_AWS_DISTRIBUTION}" to the dependencies in '
+            f"{', '.join(from_aws)} come from {AWS_DISTRIBUTION}, which {target.name} does not "
+            f'depend on; add "{AWS_DISTRIBUTION}" to the dependencies in '
             f"{target.folder}/pyproject.toml and run 'uv sync --all-packages'"
+        )
+    missing = sorted(_local_data_sources(root, target) - set(config.data_sources))
+    if missing:
+        warnings.append(
+            f"the service reads the data sources {', '.join(missing)} locally, but "
+            f"{target.settings} does not configure them, so the deployed service cannot "
+            f"find them; set {variable_for(Key.DATA_SOURCES)} there"
         )
     if config.external.aws_profile is not None:
         warnings.append(

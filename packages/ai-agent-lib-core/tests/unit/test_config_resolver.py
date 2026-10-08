@@ -276,8 +276,8 @@ def test_named_data_sources_each_select_an_adapter_with_its_own_options() -> Non
         ('{"accounts": {"data_dir": "data"}}', "does not say which adapter reads it"),
         ('{"accounts": {"kind": 7}}', "does not say which adapter reads it"),
         ('{"accounts": {"kind": " rest"}}', "whitespace"),
-        ('{"": {"kind": "rest"}}', "a data source name must start"),
-        ('{"My Accounts": {"kind": "rest"}}', "a data source name must start"),
+        ('{"": {"kind": "rest"}}', "a data source has a name code cannot ask for"),
+        ('{"My Accounts": {"kind": "rest"}}', "a data source has a name code cannot ask for"),
     ],
 )
 def test_a_malformed_data_source_map_is_rejected(value: str, problem: str) -> None:

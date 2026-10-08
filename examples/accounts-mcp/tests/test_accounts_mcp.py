@@ -29,7 +29,7 @@ from ai_agent_lib_core.integrations.mcp import (
     verify_registration,
 )
 from ai_agent_lib_core.pipeline import frame_untrusted
-from ai_agent_lib_core.testing import FakeChatModelProvider, scripted_model
+from ai_agent_lib_core.testing import FakeChatModelProvider, calls_tool, scripted_model
 from ai_agent_lib_core.testing.mcp import InProcessMcpConnector
 
 
@@ -134,8 +134,8 @@ async def test_an_unknown_account_is_an_empty_table_not_an_error(
 
 
 def asks_for_the_west() -> AIMessage:
-    call = {"name": "accounts_by_region", "args": {"region": "west"}, "id": "call-1"}
-    return AIMessage(content="", tool_calls=[call])
+    # The tool is registered as accounts.by_region; the helper spells it as a model sees it.
+    return calls_tool("accounts.by_region", region="west")
 
 
 async def ask_as(

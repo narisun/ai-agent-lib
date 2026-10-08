@@ -169,7 +169,7 @@ def explain_service(folder: Path) -> tuple[Sequence[Setting], Sequence[str]]:
     try:
         resolution = service_resolver(folder / _ENV).explain()
     except AgentLibError as problem:
-        raise CliError(str(problem)) from None
+        raise CliError.from_error(problem) from None
     by_key = {binding.key: binding.name for binding in DEFAULT_BINDINGS}
     settings = [
         Setting(

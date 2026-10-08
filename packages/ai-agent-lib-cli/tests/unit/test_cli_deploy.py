@@ -59,7 +59,9 @@ def test_the_first_run_writes_a_starting_settings_file_and_nothing_else(
     assert "fix: run 'agentlib deploy helper' to write a starting one" in err
 
     assert run("deploy", "helper", "--workspace", workspace) == 0
-    assert "created  agents/helper/deploy.env" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "created  agents/helper/deploy.env" in out
+    assert 'add "ai-agent-lib-aws" to the dependencies in agents/helper/pyproject.toml' in out
     text = _settings(workspace).read_text(encoding="utf-8")
     assert "EAP_PROFILE=aws" in text
     assert "never put a secret here" in text
@@ -213,6 +215,8 @@ def test_an_mcp_server_keeps_no_conversations_and_is_served_by_its_own_command(
     assert run("deploy", "people", "--workspace", workspace) == 0
     out = capsys.readouterr().out
     assert "  service: people --host 0.0.0.0 --port" in out
+    # Its sample data source is configured locally only, and the plan says so.
+    assert "reads the data sources people locally" in out
     assert "  checkpoint none: nothing" in out
     assert "  opa:" not in out
     assert not (workspace / "deploy/opa").exists()

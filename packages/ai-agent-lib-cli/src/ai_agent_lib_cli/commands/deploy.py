@@ -8,8 +8,10 @@ import click
 
 from ai_agent_lib_cli.commands.common import print_report, workspace_option, workspace_root
 from ai_agent_lib_cli.deploy import (
+    AWS_DISTRIBUTION,
     MODULE_FOLDER,
     OPA_FOLDER,
+    depends_on_aws,
     deployment_files,
     maintained_files,
     plan_deployment,
@@ -68,9 +70,15 @@ def deploy(service: str, plan_only: bool, bundle: Path | None, workspace: Path |
     if not plan_only and not root.joinpath(*target.settings.parts).is_file():
         report = write_files(root, {target.settings: starter_settings(target)})
         print_report(report, root)
-        click.echo(
-            f"\nNext: replace the example values, then run 'agentlib deploy {service} --plan'."
-        )
+        click.echo("\nNext:")
+        if not depends_on_aws(root, target):
+            pyproject = f"{target.folder}/pyproject.toml"
+            click.echo(
+                f'  add "{AWS_DISTRIBUTION}" to the dependencies in {pyproject}, '
+                "then run 'uv sync --all-packages'"
+            )
+        click.echo(f"  fill in {target.settings}: its values are examples")
+        click.echo(f"  run 'agentlib deploy {service} --plan'")
         return
 
     plan = plan_deployment(root, answers, target)

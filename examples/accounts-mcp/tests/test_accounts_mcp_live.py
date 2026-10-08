@@ -21,7 +21,6 @@ import httpx
 import pytest
 import uvicorn
 from accounts_mcp_support import HERE, agent_config, records, scripted, server_config
-from langchain_core.messages import AIMessage
 
 from accounts_agent import APPLICATION as AGENT
 from accounts_agent import ask
@@ -40,7 +39,7 @@ from ai_agent_lib_core.contracts import MASK, SecretsProvider, Section, ServiceC
 from ai_agent_lib_core.di import BuildContext, ServiceProviders
 from ai_agent_lib_core.integrations.http import ServiceLifecycle, add_health_routes, serve
 from ai_agent_lib_core.integrations.mcp import verify_registration
-from ai_agent_lib_core.testing import last_shown_to_model
+from ai_agent_lib_core.testing import calls_tool, last_shown_to_model
 from ai_agent_lib_core.testing.oauth import FakeIdentityProvider
 
 pytestmark = [pytest.mark.integration, pytest.mark.enable_socket]
@@ -129,8 +128,7 @@ def agent_on(tmp_path: Path, port: int, roles: list[str]) -> ServiceConfig:
 
 
 async def ask_over_http(tmp_path: Path, port: int, roles: list[str]) -> tuple[str, Any]:
-    call = {"name": "accounts_by_region", "args": {"region": "west"}, "id": "call-1"}
-    providers = scripted(AIMessage(content="", tool_calls=[call]), "Two accounts.")
+    providers = scripted(calls_tool("accounts.by_region", region="west"), "Two accounts.")
     async with ServiceContainer(agent_on(tmp_path, port, roles), providers) as services:
         principal = await services.identity.verify(None)
         context = RequestContext(
@@ -283,7 +281,7 @@ async def test_a_signed_in_user_reaches_the_tool_through_token_exchange_and_opa_
                 if serving.done():
                     serving.result()
                 await asyncio.sleep(0.02)
-            call = {"name": "accounts_by_region", "args": {"region": "west"}, "id": "call-1"}
+            call = calls_tool("accounts.by_region", region="west")
 
             async def ask_as(subject: str, roles_at_the_server: list[str]) -> str:
                 # App roles are assigned per application: these are the user's at the MCP server.
@@ -291,9 +289,7 @@ async def test_a_signed_in_user_reaches_the_tool_through_token_exchange_and_opa_
                 sign_in = idp.user_token(
                     audience=AGENT_CLIENT, subject=subject, client_id="chat-ui"
                 )
-                providers = trusting(
-                    idp, scripted(AIMessage(content="", tool_calls=[call]), "Done.")
-                )
+                providers = trusting(idp, scripted(call, "Done."))
                 async with ServiceContainer(agent, providers) as agent_services:
                     context = await agent_services.authenticate(
                         sign_in, application=AGENT, thread_id=f"th-{subject}", request_id="r-entra"

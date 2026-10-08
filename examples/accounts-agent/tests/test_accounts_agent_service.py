@@ -17,14 +17,13 @@ from typing import Any
 
 import httpx
 import pytest
-from langchain_core.messages import AIMessage
 
 from accounts_agent import APPLICATION
 from accounts_agent.graph import build_graph
 from accounts_agent.service import build_app
 from ai_agent_lib_core import Principal, RequestContext
 from ai_agent_lib_core.integrations.http import ServiceLifecycle, ServiceState, serve
-from ai_agent_lib_core.testing import FakeChatModelProvider, FakeIdentityVerifier, Fakes
+from ai_agent_lib_core.testing import FakeChatModelProvider, FakeIdentityVerifier, Fakes, calls_tool
 
 ANN = {"authorization": "Bearer ann-token"}
 BO = {"authorization": "Bearer bo-token"}
@@ -47,10 +46,7 @@ def ask(question: str, thread: str = "th-1") -> dict[str, Any]:
 
 
 async def test_a_signed_in_caller_gets_an_answer_and_the_run_is_audited_as_theirs() -> None:
-    lookup = AIMessage(
-        content="",
-        tool_calls=[{"name": "lookup_balance", "args": {"account": "4411"}, "id": "call-1"}],
-    )
+    lookup = calls_tool("lookup_balance", account="4411")
     kit = fakes(lookup, "It is 1,250.00 USD.")
     async with kit.container() as services:
         lifecycle = ServiceLifecycle(services.validate)
@@ -92,10 +88,7 @@ async def test_a_conversation_continues_per_caller_across_requests() -> None:
 
 
 async def test_a_streamed_run_sends_each_step_then_the_end() -> None:
-    lookup = AIMessage(
-        content="",
-        tool_calls=[{"name": "lookup_balance", "args": {"account": "4411"}, "id": "call-1"}],
-    )
+    lookup = calls_tool("lookup_balance", account="4411")
     kit = fakes(lookup, "It is 1,250.00 USD.")
     async with kit.container() as services:
         lifecycle = ServiceLifecycle(services.validate)

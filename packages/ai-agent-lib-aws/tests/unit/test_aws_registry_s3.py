@@ -139,7 +139,7 @@ async def test_an_object_that_cannot_be_read_stops_startup(
     [
         ("{not json", TOOLS, "not valid JSON"),
         (AGENTS, json.dumps({"schema": "something/else"}), "tool registry"),
-        (AGENTS, json.dumps(tools_document(())), "not in the tool registry"),
+        (AGENTS, json.dumps(tools_document(())), "the tool registry lacks"),
         (AGENTS, "x" * (5 * 1024 * 1024 + 1), "larger than"),
     ],
 )

@@ -25,6 +25,7 @@ from ai_agent_lib_core.contracts import (
     PolicyRequest,
     PrincipalKind,
     RowFilter,
+    options_error,
 )
 
 __all__ = [
@@ -253,15 +254,24 @@ def parse_rules_document(raw: object, *, what: str = "policy rules") -> tuple[Ru
     try:
         document = _RulesDocument.model_validate(raw)
     except ValidationError as exc:
-        problems = "; ".join(
-            f"{'.'.join(str(part) for part in error['loc']) or '<root>'}: {error['msg']}"
-            for error in exc.errors(include_input=False, include_url=False)
+        found = options_error(
+            what, _RulesDocument, exc, whole="the file", noun="field", show_values=False
         )
-        raise ConfigurationError(f"{what}: {problems}") from None
+        raise ConfigurationError(
+            f"{what} do not match the agentlib.rules/v1 schema",
+            expected=found.expected,
+            actual=found.actual,
+            fix="correct the file, then run 'agentlib policy test'",
+        ) from None
     ids = [rule.id for rule in document.rules]
     repeated = sorted({rule_id for rule_id in ids if ids.count(rule_id) > 1})
     if repeated:
-        raise ConfigurationError(f"{what}: rule ID used more than once: {repeated}")
+        raise ConfigurationError(
+            f"{what}: two rules share an ID",
+            expected="a distinct id per rule: it is the reason code of the decisions it allows",
+            actual=f"{', '.join(repeated)} used more than once",
+            fix="rename one of them",
+        )
     rules = []
     for rule in document.rules:
         try:

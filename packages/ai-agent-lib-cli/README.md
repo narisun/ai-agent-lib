@@ -5,7 +5,8 @@ agents and MCP servers to it. What it writes is working code with its tests:
 a hello-world you can run and test before you change a line, and a place to
 start every later change with a failing test.
 
-Nothing it writes needs an account or a network connection.
+Nothing it writes needs an account or a network connection to run and test.
+When a service is ready for AWS, `agentlib deploy` writes what runs it there.
 
 New here? [`docs/getting-started.md`](../../docs/getting-started.md) walks
 through all of it, test first.
@@ -21,7 +22,7 @@ uv sync --all-packages                             # the workspace gets its own 
 uv run agentlib new mcp hello-mcp                  # an MCP server over sample data
 uv run agentlib new agent hello-agent --mcp hello  # an agent that may call it
 uv sync --all-packages                             # install the two new services
-uv run pytest                                      # 18 tests, all offline
+uv run pytest                                      # every test, all offline
 ```
 
 Then check the workspace and run the two services:
@@ -65,7 +66,8 @@ options, or with no terminal, nothing is asked. `agentlib <command> --help`
 lists the options.
 
 Exit codes: 0 done, 1 the command was understood and could not be done, 2 the
-command line was wrong. A problem is one line on standard error.
+command line was wrong. A problem goes to standard error as one line saying
+what went wrong, then what was expected, what was found and the fix.
 
 ## What a workspace looks like
 
@@ -78,9 +80,11 @@ my-platform/
   agentlib.lock               what each generated file held when it was written
   policies/agentlib/rules/data.yaml   what every service allows
   tests/policy-samples.yaml   requests the rules must allow or deny
-  agents/hello-agent/         src/, tests/, .env.example, .env, README.md
+  .github/workflows/check.yml the gate CI runs, on Linux and Windows
+  agents/hello-agent/         src/, tests/, evals/, .env.example, .env, README.md
   mcp-servers/hello-mcp/      src/, tests/, data/, queries/, .env.example, .env, README.md
   tests/                      the workspace as a whole, and agents with their servers
+  deploy/                     after 'agentlib deploy': Terraform and Dockerfiles
 ```
 
 Every service reads the same registry and rules files, so an agent and the
@@ -88,13 +92,15 @@ servers it calls agree on who may do what.
 
 ## The tests it writes
 
-Three kinds, from fastest to most real. All run with no network.
+From fastest to most real. All but the eval run with no network.
 
 | Test | What is real | Use it to |
 | --- | --- | --- |
 | `agents/<a>/tests/test_<a>.py` | Your code. Everything else is a fake | Drive tool and graph logic with a scripted model |
 | `test_<a>_as_configured.py`, `mcp-servers/<s>/tests/test_<s>.py` | Your code, the rules file, the registries, the CSV data, the audit log | See what a role is allowed and shown, and catch a missing rule |
+| `test_<a>_service.py` | The agent behind its HTTP entry point, called in process | Check sign-in, `/invoke` and `/invoke/stream` |
 | `tests/test_<a>_with_<s>.py` | Both services, each with its own configuration | See what the agent's caller gets from the server |
+| `test_<a>_eval.py` (marked `eval`) | The real model, over `evals/cases.jsonl` | Measure the agent; runs only with `agentlib eval` |
 
 The generated MCP server shows the pattern for governed data: a manager sees
 every column, an analyst sees `email` masked, anyone else is denied, and each
@@ -206,11 +212,12 @@ deleted is not brought back. Commit the lock file.
 
 | Module | What it does |
 | --- | --- |
-| `app.py`, `commands/` | The command line: `create` writes, `look` reads and runs, `rules` tries the policy |
+| `app.py`, `commands/` | The command line: `create` writes, `look` reads and runs, `rules` tries the policy, `check` runs the gate and evals, `deploy` writes the deployment |
 | `toolbox.py` | Everything a command uses to reach outside the process: the formatter, the pin reader, running a service, OPA, AWS, prompts |
 | `scaffold.py`, `governance.py`, `render.py` | What is written: templates, registry entries, rules and samples, all-or-nothing writes |
 | `dataplan.py`, `readers.py`, `read_*.py`, `proposals.py` | From your data to the queries a server offers |
 | `diagnostics.py`, `policy.py`, `processes.py` | Checking, deciding samples, running generated code |
+| `deploy.py` | From a service's `deploy.env` to its plan, permissions and Terraform |
 
 A command never reaches for a tool itself: it is given a `Toolbox`. A test
 gives it one with fakes, so no test patches a module:

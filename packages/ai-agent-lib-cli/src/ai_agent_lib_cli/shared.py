@@ -89,7 +89,7 @@ def read_agents(root: Path) -> tuple[AgentEntry, ...]:
     try:
         return parse_agents_document(raw) if raw is not None else ()
     except AgentLibError as exc:
-        raise CliError(str(exc)) from None
+        raise CliError.from_error(exc) from None
 
 
 def read_servers(root: Path) -> tuple[ServerEntry, ...]:
@@ -98,7 +98,7 @@ def read_servers(root: Path) -> tuple[ServerEntry, ...]:
     try:
         return parse_tools_document(raw) if raw is not None else ()
     except AgentLibError as exc:
-        raise CliError(str(exc)) from None
+        raise CliError.from_error(exc) from None
 
 
 def agents_text(agents: Sequence[AgentEntry]) -> str:
@@ -128,8 +128,14 @@ def _rule_ids(text: str, what: str) -> list[str]:
     try:
         raw = yaml.safe_load(text)
         return [rule.id for rule in parse_rules_document(raw, what=what)]
-    except (yaml.YAMLError, AgentLibError) as exc:
-        raise CliError(f"{what} is not a valid rules document: {exc}") from None
+    except AgentLibError as exc:
+        raise CliError.from_error(exc) from None
+    except yaml.YAMLError as exc:
+        raise CliError(
+            f"{what} is not valid YAML",
+            expected="a rules document: 'schema: agentlib.rules/v1' and a list of rules",
+            actual=str(exc).splitlines()[0][:120],
+        ) from None
 
 
 _LIST_KEYS = ("actions", "applications", "roles", "agents", "kinds", "resources")

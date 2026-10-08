@@ -66,30 +66,30 @@ def test_classification_defaults_to_internal(catalog: QueryCatalog) -> None:
 @pytest.mark.parametrize(
     ("body", "problem"),
     [
-        ("-- max_rows: 10\nSELECT a FROM t", "description is required"),
-        ("-- description: x\nSELECT a FROM t", "max_rows is required"),
-        ("-- description: x\n-- max_rows: 0\nSELECT a FROM t", "positive integer"),
+        ("-- max_rows: 10\nSELECT a FROM t", "has no description"),
+        ("-- description: x\nSELECT a FROM t", "has no row limit"),
+        ("-- description: x\n-- max_rows: 0\nSELECT a FROM t", "not a positive whole number"),
         ("-- description: x\n-- max_rows: 10\n-- owner: me\nSELECT a FROM t", "unknown header key"),
-        (HEADER + "-- classification: secret\nSELECT a FROM t", "classification must be one of"),
-        (HEADER + "-- param p: blob\nSELECT a FROM t WHERE b = :p", "one of the types"),
+        (HEADER + "-- classification: secret\nSELECT a FROM t", "classification is not known"),
+        (HEADER + "-- param p: blob\nSELECT a FROM t WHERE b = :p", "has an unknown type"),
         (HEADER + "-- param p: integer = x\nSELECT a FROM t WHERE b = :p", "default"),
         (HEADER + "-- param p: string\n-- param p: string\nSELECT a FROM t WHERE b = :p", "twice"),
-        (HEADER + "SELECT a FROM t WHERE b = :p", "used but not declared"),
-        (HEADER + "-- param p: string\nSELECT a FROM t", "declared but not used"),
+        (HEADER + "SELECT a FROM t WHERE b = :p", "uses parameters it does not declare"),
+        (HEADER + "-- param p: string\nSELECT a FROM t", "declares parameters it does not use"),
         (HEADER + "SELECT a FROM t WHERE b = ?", "written as ':name'"),
         (HEADER + "SELECT FROM WHERE", "cannot be parsed"),
-        (HEADER + "SELECT a FROM t; SELECT b FROM t", "exactly one statement"),
-        (HEADER + "", "exactly one statement"),
-        (HEADER + "DELETE FROM t", "read-only"),
-        (HEADER + "UPDATE t SET a = 1", "read-only"),
-        (HEADER + "CREATE TABLE x AS SELECT a FROM t", "read-only"),
-        (HEADER + "DROP TABLE t", "read-only"),
-        (HEADER + "SELECT a INTO other FROM t", "read-only"),
-        (HEADER + "SELECT * FROM t", "must be named"),
-        (HEADER + "SELECT a, a + 1 FROM t", "must be named"),
+        (HEADER + "SELECT a FROM t; SELECT b FROM t", "holds one statement"),
+        (HEADER + "", "holds one statement"),
+        (HEADER + "DELETE FROM t", "is not read-only"),
+        (HEADER + "UPDATE t SET a = 1", "is not read-only"),
+        (HEADER + "CREATE TABLE x AS SELECT a FROM t", "is not read-only"),
+        (HEADER + "DROP TABLE t", "is not read-only"),
+        (HEADER + "SELECT a INTO other FROM t", "is not read-only"),
+        (HEADER + "SELECT * FROM t", "has no name"),
+        (HEADER + "SELECT a, a + 1 FROM t", "has no name"),
         (HEADER + "SELECT a, b AS a FROM t", "share a name"),
-        (HEADER + "SELECT a FROM t ORDER BY hidden", "ORDER BY must use"),
-        (HEADER + "SELECT a FROM t ORDER BY a + 1", "ORDER BY must use"),
+        (HEADER + "SELECT a FROM t ORDER BY hidden", "ORDER BY names something"),
+        (HEADER + "SELECT a FROM t ORDER BY a + 1", "ORDER BY names something"),
     ],
 )
 def test_an_invalid_query_file_stops_loading(tmp_path: Path, body: str, problem: str) -> None:
@@ -97,8 +97,18 @@ def test_an_invalid_query_file_stops_loading(tmp_path: Path, body: str, problem:
         load_one(tmp_path, body)
 
 
+def test_a_problem_says_how_to_fix_it_and_which_file(tmp_path: Path) -> None:
+    with pytest.raises(ConfigurationError) as caught:
+        load_one(tmp_path, HEADER + "SELECT a FROM t WHERE b = :region")
+
+    error = caught.value
+    assert error.actual == "no declaration of region"
+    assert error.fix == "add '-- param region: string' (or the right type) to the header"
+    assert error.__notes__ == [f"in {tmp_path / 'q.sql'}"]
+
+
 def test_the_file_name_must_be_a_plain_identifier(tmp_path: Path) -> None:
-    with pytest.raises(ConfigurationError, match="lower-case"):
+    with pytest.raises(ConfigurationError, match="a name a tool cannot use"):
         load_one(tmp_path, HEADER + "SELECT a FROM t", name="Bad-Name")
 
 

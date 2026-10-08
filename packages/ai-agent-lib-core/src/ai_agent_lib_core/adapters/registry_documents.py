@@ -28,6 +28,7 @@ from ai_agent_lib_core.contracts import (
     ServerEntry,
     ToolEntry,
     ToolSnapshot,
+    options_error,
 )
 
 __all__ = [
@@ -117,17 +118,24 @@ def _validate(model: type[ModelT], raw: object, what: str) -> ModelT:
     try:
         return model.model_validate(raw)
     except ValidationError as exc:
-        problems = "; ".join(
-            f"{'.'.join(str(part) for part in error['loc']) or '<root>'}: {error['msg']}"
-            for error in exc.errors(include_input=False, include_url=False)
-        )
-        raise ConfigurationError(f"{what}: {problems}") from None
+        found = options_error(what, model, exc, whole="the file", noun="field", show_values=False)
+        raise ConfigurationError(
+            f"{what} does not match the registry schema",
+            expected=found.expected,
+            actual=found.actual,
+            fix="correct the file; 'agentlib doctor' checks the registries",
+        ) from None
 
 
 def _unique(what: str, kind: str, ids: list[str]) -> None:
     repeated = sorted({item for item in ids if ids.count(item) > 1})
     if repeated:
-        raise ConfigurationError(f"{what}: {kind} registered more than once: {repeated}")
+        raise ConfigurationError(
+            f"{what}: the same {kind} is registered more than once",
+            expected=f"each {kind} once",
+            actual=f"{', '.join(repeated)} more than once",
+            fix="merge the entries into one",
+        )
 
 
 def parse_document_text(text: str, *, suffix: str, what: str) -> object:
@@ -331,7 +339,10 @@ def load_registries(
         unknown = sorted(set(agent.mcp_servers) - known)
         if unknown:
             raise ConfigurationError(
-                f"{agents.what}: agent {agent.id!r} names MCP server(s) that are not in the "
-                f"tool registry: {unknown}"
+                f"{agents.what}: agent {agent.id!r} names MCP servers the tool registry lacks",
+                expected="every server in the agent's mcp_servers registered in the tool registry",
+                actual=f"no tool registry entry for {', '.join(unknown)}",
+                fix="register the server ('agentlib new mcp' or 'agentlib registry pin'), "
+                "or remove it from the agent's mcp_servers",
             )
     return agent_snapshot, tool_snapshot

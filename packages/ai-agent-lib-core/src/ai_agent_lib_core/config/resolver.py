@@ -383,11 +383,19 @@ class ConfigResolver:
                 )
             provider = spec.get("provider", default_provider)
             if not isinstance(provider, str):
-                raise ConfigurationError(f"{name}: alias {alias!r} has an invalid provider")
+                raise ConfigurationError(
+                    f"{name}: alias {alias!r} has a provider that is not a name",
+                    expected='"provider" as text, such as "bedrock"',
+                    actual=kind_of(provider),
+                )
             try:
                 aliases[alias] = ModelRef(provider=provider, model_id=spec["model_id"])
             except ValueError as exc:
-                raise ConfigurationError(f"{name}: alias {alias!r}: {exc}") from None
+                raise ConfigurationError(
+                    f"{name}: alias {alias!r} does not name a model",
+                    expected='an object with "model_id" as text, and an optional "provider"',
+                    actual=str(exc).splitlines()[0][:80] if str(exc) else kind_of(spec),
+                ) from None
         return aliases
 
     def _data_sources(self, values: Mapping[str, str]) -> dict[str, ProviderSelection]:
@@ -396,8 +404,9 @@ class ConfigResolver:
         for source, spec in self._json_object(values, Key.DATA_SOURCES).items():
             if not _DATA_SOURCE_NAME.match(source):
                 raise ConfigurationError(
-                    f"{name}: a data source name must start with a lower-case letter and "
-                    f"hold only lower-case letters, digits and underscores, unlike {source!r}"
+                    f"{name}: a data source has a name code cannot ask for",
+                    expected="lower-case letters, digits and underscores, starting with a letter",
+                    actual=source[:60],
                 )
             if not isinstance(spec, dict) or not isinstance(spec.get(_DATA_SOURCE_KIND), str):
                 raise ConfigurationError(
@@ -415,5 +424,9 @@ class ConfigResolver:
                     provider=spec[_DATA_SOURCE_KIND], options=options, base_dir=self._base_dir
                 )
             except (TypeError, ValueError) as exc:
-                raise ConfigurationError(f"{name}: data source {source!r}: {exc}") from None
+                raise ConfigurationError(
+                    f"{name}: data source {source!r} is not valid",
+                    expected=f'"{_DATA_SOURCE_KIND}" naming an adapter, and its options',
+                    actual=str(exc).splitlines()[0][:80],
+                ) from None
         return sources

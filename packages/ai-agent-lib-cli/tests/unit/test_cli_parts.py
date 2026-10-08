@@ -285,7 +285,7 @@ def test_rules_are_appended_once_and_what_is_there_is_never_changed() -> None:
 
 
 def test_a_rules_file_that_cannot_be_extended_safely_is_left_alone() -> None:
-    with pytest.raises(CliError, match="not a valid rules document"):
+    with pytest.raises(CliError, match="is not valid YAML"):
         rules_text("schema: agentlib.rules/v1\nrules: [", [RULE])
     reordered = "rules: []\nschema: agentlib.rules/v1\n"
     with pytest.raises(CliError, match="add these by hand: hello-agent-uses-its-models"):

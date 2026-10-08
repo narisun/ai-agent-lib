@@ -274,7 +274,8 @@ uv run helper "Who is in the payments team?"   <span class="c"># terminal 2: the
     prompts and domain schemas.</li>
     <li>It does not run a sign-in flow. The caller's identity provider issues tokens; the
     library verifies them and carries the verified identity.</li>
-    <li>It never loads code from configuration, and it provisions no infrastructure.</li>
+    <li>It never loads code from configuration, and it provisions nothing itself:
+    <code>agentlib deploy</code> writes Terraform that you review and apply.</li>
   </ul>
 </section>
 
@@ -291,19 +292,19 @@ uv run helper "Who is in the payments team?"   <span class="c"># terminal 2: the
   <div class="layers">
     <div class="layer"><b>contracts</b><span>Ports (Protocols), value types (<code>Principal</code>, <code>RequestContext</code>, <code>Scope</code>, <code>StructuredOutput</code>), the error taxonomy. Imports nothing else from the library.</span></div>
     <div class="layer"><b>config</b><span>The binding table, profiles and the resolver. The only module that reads the environment.</span></div>
-    <div class="layer"><b>pipeline</b><span>Interceptors for audit, identity, policy, registry, guardrails, framing and structured output, in a fixed order.</span></div>
+    <div class="layer"><b>pipeline</b><span>Interceptors for audit, budget, identity, policy, registry, guardrails, framing, structured output and resilience, in a fixed order.</span></div>
     <div class="layer"><b>adapters</b><span>Local adapters: JSONL audit, rules engine, static identity, JWT, OPA client, DuckDB over CSV, REST, SQLite, file registry, pattern guardrails.</span></div>
     <div class="layer core"><b>di</b><span><code>ServiceProviders</code> (port, name → factory), <code>ServiceContainer</code> (the facade you use), <code>doctor</code>.</span></div>
     <div class="layer"><b>integrations</b><span><code>langgraph</code> (governed model, tools, checkpointer), <code>mcp</code> (server middleware, client), <code>http</code> (agent entry point, health, graceful shutdown).</span></div>
-    <div class="layer"><b>observability · testing</b><span>JSON logs and OpenTelemetry setup; fakes, scripted models and config loaders for tests.</span></div>
+    <div class="layer"><b>observability · testing · evaluation</b><span>JSON logs, error reports and OpenTelemetry setup; fakes, scripted replies and config loaders for tests; eval cases, scorers and reports, off the request path.</span></div>
   </div>
   <h3>Distributions</h3>
   <div class="table-wrap"><table class="compact">
     <thead><tr><th>Distribution</th><th>Import</th><th>Contents</th></tr></thead>
     <tbody>
-      <tr><td><code>ai-agent-lib-core</code></td><td><code>ai_agent_lib_core</code></td><td>Everything needed to run locally: contracts, config, container, pipelines, local adapters, LangGraph, MCP and HTTP bindings, testing kit.</td></tr>
+      <tr><td><code>ai-agent-lib-core</code></td><td><code>ai_agent_lib_core</code></td><td>Everything needed to run locally: contracts, config, container, pipelines, local adapters, LangGraph, MCP and HTTP bindings, observability, testing kit, evaluation.</td></tr>
       <tr><td><code>ai-agent-lib-aws</code></td><td><code>ai_agent_lib_aws</code></td><td>Bedrock model and guardrails, Firehose audit, Secrets Manager, S3 registry, Postgres checkpoints, Redshift Data API. Registers itself through an entry point.</td></tr>
-      <tr><td><code>ai-agent-lib-cli</code></td><td><code>ai_agent_lib_cli</code></td><td>The <code>agentlib</code> command: scaffolding, doctor, run, graph, policy tests, updates.</td></tr>
+      <tr><td><code>ai-agent-lib-cli</code></td><td><code>ai_agent_lib_cli</code></td><td>The <code>agentlib</code> command: scaffolding, doctor, run, graph, policy tests, the CI gate, evals, deployment, updates.</td></tr>
     </tbody>
   </table></div>
   <h3>Technology stack</h3>
@@ -322,7 +323,7 @@ uv run helper "Who is in the payments team?"   <span class="c"># terminal 2: the
       <tr><td>Validation</td><td>Pydantic 2, JSON Schema Draft 2020-12</td><td>Typed options and structured outputs.</td></tr>
       <tr><td>Serving</td><td>Starlette + Uvicorn</td><td>Thin ASGI app with health, readiness and graceful SIGTERM.</td></tr>
       <tr><td>Tooling</td><td>uv workspaces, ruff, mypy (strict), import-linter, pytest with sockets blocked</td><td>The same gate for the library and for generated workspaces.</td></tr>
-      <tr><td>Deployment</td><td>AWS Fargate, OTel collector sidecar</td><td>One container per agent or MCP server.</td></tr>
+      <tr><td>Deployment</td><td>AWS Fargate, Terraform, OPA and OTel collector sidecars</td><td>One service per agent or MCP server, with IAM derived from its adapters.</td></tr>
     </tbody>
   </table></div>
   <h3>Import rules, enforced in CI</h3>
@@ -331,7 +332,8 @@ uv run helper "Who is in the payments team?"   <span class="c"># terminal 2: the
     <li><code>config</code> is the only module that reads the environment.</li>
     <li><code>integrations.langgraph</code> is the only core module that imports LangGraph.</li>
     <li><code>ai_agent_lib_core</code> never imports boto3 or <code>ai_agent_lib_aws</code>.</li>
-    <li>Request-path modules never import the CLI.</li>
+    <li>Request-path modules never import the CLI or the evaluation package.</li>
+    <li>A provider pack imports only <code>contracts</code> and <code>kit</code> from core.</li>
   </ul>
 </section>
 

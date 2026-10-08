@@ -67,6 +67,8 @@ from ai_agent_lib_core.contracts import (
     TransientError,
     ValidationFailed,
     describe,
+    options_error,
+    shown_value,
 )
 
 __all__ = ["RestDataSource", "RestOptions"]
@@ -154,11 +156,15 @@ def _read_spec(path: Path, name: str) -> _EndpointSpec:
     except StrictYamlError as exc:
         raise ConfigurationError(f"query {name!r}: {exc}") from None
     except ValidationError as exc:
-        problems = "; ".join(
-            f"{'.'.join(str(part) for part in error['loc']) or '<root>'}: {error['msg']}"
-            for error in exc.errors(include_input=False, include_url=False)
+        found = options_error(
+            f"endpoint {name!r}", _EndpointSpec, exc, whole="the file", noun="field"
         )
-        raise ConfigurationError(f"query {name!r}: {problems}") from None
+        raise ConfigurationError(
+            f"query {name!r}: the endpoint definition is not valid",
+            expected=found.expected,
+            actual=found.actual,
+            fix="correct the YAML; the rest data source's documentation shows a whole definition",
+        ) from None
 
 
 def _classification(name: str, text: str) -> Classification:
@@ -167,15 +173,18 @@ def _classification(name: str, text: str) -> Classification:
     except KeyError:
         allowed = ", ".join(level.name.lower() for level in Classification)
         raise ConfigurationError(
-            f"query {name!r}: classification must be one of: {allowed}"
+            f"query {name!r}: the classification is not known",
+            expected=f"one of: {allowed}",
+            actual=text[:40],
         ) from None
 
 
 def _parameter(name: str, parameter_name: str, declared: _ParameterSpec) -> QueryParameter:
     if not _NAME.match(parameter_name):
         raise ConfigurationError(
-            f"query {name!r}: parameter name {parameter_name!r} must be "
-            "lower-case letters, digits and underscores"
+            f"query {name!r}: a parameter has a name a tool cannot use",
+            expected="lower-case letters, digits and underscores; 'name:' gives the API's own name",
+            actual=parameter_name[:60],
         )
     parameter = QueryParameter(name=parameter_name, type=declared.type, required=True)
     if "default" not in declared.model_fields_set or declared.default is None:
@@ -184,8 +193,9 @@ def _parameter(name: str, parameter_name: str, declared: _ParameterSpec) -> Quer
         default = coerce_parameter(parameter, declared.default)
     except ValidationFailed:
         raise ConfigurationError(
-            f"query {name!r}: the default of parameter {parameter_name!r} "
-            f"is not a {declared.type.value}"
+            f"query {name!r}: the default of parameter {parameter_name!r} does not match its type",
+            expected=f"a {declared.type.value}",
+            actual=shown_value(declared.default),
         ) from None
     return QueryParameter(name=parameter_name, type=declared.type, required=False, default=default)
 
@@ -195,26 +205,44 @@ def _check_shape(name: str, spec: _EndpointSpec, parameters: Sequence[QueryParam
     in_path = {key for key, declared in spec.parameters.items() if declared.location == "path"}
     if not spec.path.startswith("/") or "?" in spec.path or "#" in spec.path:
         raise ConfigurationError(
-            f"query {name!r}: path must start with '/' and hold no query string or fragment"
+            f"query {name!r}: the path is not a plain path",
+            expected="a path that starts with '/', with no '?' or '#'; query parameters go "
+            "under 'parameters' with 'in: query'",
+            actual=spec.path[:80],
         )
-    if set(_PLACEHOLDER.findall(spec.path)) != in_path:
+    placeholders = set(_PLACEHOLDER.findall(spec.path))
+    if placeholders != in_path:
         raise ConfigurationError(
-            f"query {name!r}: the placeholders in the path must be exactly the parameters "
-            "declared with 'in: path'"
+            f"query {name!r}: the path and its parameters do not match",
+            expected="a parameter declared with 'in: path' for every {placeholder}, and no other",
+            actual=f"placeholders {sorted(placeholders) or 'none'}; "
+            f"path parameters {sorted(in_path) or 'none'}",
         )
     if any(not parameter.required for parameter in parameters if parameter.name in in_path):
-        raise ConfigurationError(f"query {name!r}: a path parameter cannot have a default")
+        raise ConfigurationError(
+            f"query {name!r}: a path parameter has a default",
+            expected="path parameters without 'default': the path is incomplete without them",
+            fix="remove the default, or move the parameter to 'in: query'",
+        )
     if any(d.name is not None and d.location == "path" for d in spec.parameters.values()):
         raise ConfigurationError(
-            f"query {name!r}: a path parameter is named by its placeholder, not by 'name'"
+            f"query {name!r}: a path parameter has a 'name'",
+            expected="path parameters named by their {placeholder} only",
+            fix="remove 'name' and rename the placeholder instead",
         )
     if spec.method == "GET" and any(d.location == "body" for d in spec.parameters.values()):
-        raise ConfigurationError(f"query {name!r}: a GET request cannot have body parameters")
+        raise ConfigurationError(
+            f"query {name!r}: a GET request has body parameters",
+            expected="'in: path' or 'in: query' parameters for GET",
+            fix="use 'in: query', or 'method: POST' when the API takes a body",
+        )
     for column in spec.columns:
         if not _NAME.match(column):
             raise ConfigurationError(
-                f"query {name!r}: column name {column!r} must be "
-                "lower-case letters, digits and underscores"
+                f"query {name!r}: a column has a name a tool cannot return",
+                expected="lower-case letters, digits and underscores; the right side of "
+                "'columns' is the API's field",
+                actual=column[:60],
             )
 
 
@@ -222,9 +250,19 @@ def _load_endpoint(path: Path) -> _Endpoint:
     name = path.stem
     if not _NAME.match(name):
         raise ConfigurationError(
-            f"{path.name}: the file name is the query name and must be "
-            "lower-case letters, digits and underscores"
+            f"endpoint file {path.name!r} has a name a tool cannot use",
+            expected="lower-case letters, digits and underscores, starting with a letter",
+            actual=path.stem[:60],
+            fix="rename the file; its name is the query's name",
         )
+    try:
+        return _endpoint_from(path, name)
+    except ConfigurationError as error:
+        error.add_note(f"in {path}")
+        raise
+
+
+def _endpoint_from(path: Path, name: str) -> _Endpoint:
     spec = _read_spec(path, name)
     classification = _classification(name, spec.classification)
     parameters = [

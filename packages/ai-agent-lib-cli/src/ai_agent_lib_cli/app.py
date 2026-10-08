@@ -14,10 +14,11 @@ _CONTEXT = {"help_option_names": ["-h", "--help"]}
 @click.group(context_settings=_CONTEXT)
 @click.version_option(__version__, "-V", "--version", prog_name="agentlib")
 def cli() -> None:
-    """Create and grow a local workspace of agents and MCP servers.
+    """Create, check and deploy a workspace of agents and MCP servers.
 
     Start with 'agentlib init <name>'. Every command writes working code with
-    its tests; nothing it writes needs an account or a network connection.
+    its tests, which run with no account and no network. 'agentlib deploy'
+    writes what runs a service on AWS; it applies nothing.
     """
 
 

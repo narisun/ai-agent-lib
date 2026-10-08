@@ -42,6 +42,7 @@ from ai_agent_lib_core.contracts import (
     Principal,
     PrincipalKind,
     describe,
+    options_error,
 )
 
 __all__ = [
@@ -143,15 +144,21 @@ def _parse(text: str, what: str) -> list[Sample]:
     except yaml.YAMLError as exc:
         raise CliError(f"{what} is not valid YAML ({describe(exc)})") from exc
     except ValidationError as exc:
-        problems = "; ".join(
-            f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}"
-            for error in exc.errors(include_input=False, include_url=False)
-        )
-        raise CliError(f"{what} is not a samples document: {problems}") from None
+        found = options_error(what, _SamplesDocument, exc, whole="the file", noun="field")
+        raise CliError(
+            f"{what} is not a samples document",
+            expected=found.expected,
+            actual=found.actual,
+            fix="compare with the samples 'agentlib new' writes",
+        ) from None
     names = [sample.name for sample in document.samples]
     repeated = sorted({name for name in names if names.count(name) > 1})
     if repeated:
-        raise CliError(f"{what}: these sample names are used more than once: {repeated}")
+        raise CliError(
+            f"{what}: two samples share a name",
+            expected="a distinct name per sample: a failure is reported by it",
+            actual=f"{', '.join(repeated)} used more than once",
+        )
     return document.samples
 
 
@@ -243,7 +250,7 @@ def rules_engine(rules: Path) -> RulesPolicyDecisionPoint:
     try:
         return RulesPolicyDecisionPoint(RulesPolicyOptions(path=rules), UuidGenerator())
     except AgentLibError as problem:
-        raise CliError(str(problem)) from None
+        raise CliError.from_error(problem) from None
 
 
 OpaStarter = Callable[[Path, Path], AbstractContextManager[OpaPolicyDecisionPoint]]

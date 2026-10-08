@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Self
+
+from ai_agent_lib_core.contracts import AgentLibError
+
 __all__ = ["EXIT_FAILED", "EXIT_OK", "EXIT_USAGE", "CliError"]
 
 EXIT_OK = 0
@@ -34,6 +38,23 @@ class CliError(Exception):
         self.expected = expected
         self.actual = actual
         self.fix = fix
+
+    @classmethod
+    def from_error(cls, error: AgentLibError, *, where: str | None = None) -> Self:
+        """Return a command-line error that says what ``error`` says, its facts kept apart.
+
+        Args:
+            error: The library's error.
+            where: What the error is about, put before its message, such as a file.
+        """
+        message = f"{where}: {error.message}" if where else error.message
+        notes = "; ".join(getattr(error, "__notes__", ()))
+        return cls(
+            f"{message} ({notes})" if notes else message,
+            expected=error.expected,
+            actual=error.actual,
+            fix=error.fix,
+        )
 
     def __str__(self) -> str:
         facts = [("expected", self.expected), ("got", self.actual), ("fix", self.fix)]

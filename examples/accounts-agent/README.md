@@ -31,6 +31,8 @@ EAP_MODEL_PROVIDER=fake EAP_MODEL_ID=fake-model uv run accounts-agent-serve --po
 curl -s localhost:8000/readyz
 curl -s localhost:8000/invoke -H 'content-type: application/json' \
   -d '{"input": {"question": "What is the balance of account 4411?"}, "thread_id": "demo"}'
+curl -sN localhost:8000/invoke/stream -H 'content-type: application/json' \
+  -d '{"input": {"question": "What is the balance of account 4411?"}}'   # each step as it ends
 ```
 
 On a developer's machine the static identity stands in, so no token is
@@ -50,6 +52,6 @@ The agent also uses every MCP server the agent registry lists for it. See
 | --- | --- |
 | `src/accounts_agent/graph.py` | The five places the library appears in a graph |
 | `src/accounts_agent/__main__.py` | Building the container and the request context |
-| `src/accounts_agent/service.py` | Serving the agent over HTTP: one graph, a caller per request, an orderly stop |
+| `src/accounts_agent/service.py` | Serving the agent over HTTP: one graph, a caller per request, streamed steps, an orderly stop |
 | `tests/test_accounts_agent.py` | Testing an agent offline with the library's fakes |
-| `tests/test_accounts_agent_service.py` | Testing the HTTP entry point offline, and a stop with a request in flight |
+| `tests/test_accounts_agent_service.py` | Testing the HTTP entry point offline, streaming, and a stop with a request in flight |

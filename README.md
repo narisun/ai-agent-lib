@@ -26,29 +26,36 @@ generated code is made of. The commands are described in
 ## What a graph author writes
 
 ```python
+from langchain_core.messages import HumanMessage
 from langgraph.graph import START, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
 from ai_agent_lib_core import RequestContext, ServiceContainer
 
 
-async def answer(context: RequestContext, inputs: dict) -> dict:
-    async with ServiceContainer.from_env() as services:
-        tools = services.tools([lookup_balance], read_only=["lookup_balance"])
-        model = services.model("default").bind_tools(tools)
+def build_graph(services: ServiceContainer):
+    """Built once per process, from one started container."""
+    tools = services.tools([lookup_balance], read_only=["lookup_balance"])
+    model = services.model("default").bind_tools(tools)
 
-        async def agent(state: State) -> dict:
-            return {"messages": [await model.ainvoke(state["messages"])]}
+    async def agent(state: State) -> dict:
+        return {"messages": [await model.ainvoke(state["messages"])]}
 
-        builder = StateGraph(State, context_schema=RequestContext)
-        builder.add_node("agent", agent)
-        builder.add_node("tools", ToolNode(tools))
-        builder.add_edge(START, "agent")
-        builder.add_conditional_edges("agent", tools_condition)
-        builder.add_edge("tools", "agent")
+    builder = StateGraph(State, context_schema=RequestContext)
+    builder.add_node("agent", agent)
+    builder.add_node("tools", ToolNode(tools))
+    builder.add_edge(START, "agent")
+    builder.add_conditional_edges("agent", tools_condition)
+    builder.add_edge("tools", "agent")
+    return builder.compile(**services.compile_kwargs())
 
-        graph = builder.compile(**services.compile_kwargs())
-        return await graph.ainvoke(inputs, **services.invocation(context))
+
+async def answer(graph, services: ServiceContainer, context: RequestContext, question: str) -> str:
+    """Run once per request, on behalf of the caller in ``context``."""
+    result = await graph.ainvoke(
+        {"messages": [HumanMessage(question)]}, **services.invocation(context)
+    )
+    return str(result["messages"][-1].content)
 ```
 
 Everything returned by `services` is a native LangGraph or LangChain object.
@@ -102,8 +109,7 @@ async def main() -> None:
         graph = build_graph(services)  # built once
 
         async def run(context: RequestContext, given: dict) -> dict:
-            result = await graph.ainvoke(given, **services.invocation(context))
-            return {"answer": result["messages"][-1].content}
+            return {"answer": await answer(graph, services, context, given["question"])}
 
         lifecycle = ServiceLifecycle(services.validate)
         app = agent_app(services, run, application="accounts-agent", lifecycle=lifecycle)
@@ -211,14 +217,15 @@ applied: you run `terraform`.
 
 | Path | What it is |
 | --- | --- |
-| `packages/ai-agent-lib-core` | Contracts, configuration, container, pipelines, local adapters, LangGraph bindings and the testing kit |
+| `packages/ai-agent-lib-core` | Contracts, configuration, container, pipelines, local adapters, the LangGraph, MCP and HTTP bindings, observability, the testing kit and the evaluation package |
 | `packages/ai-agent-lib-aws` | AWS adapters, loaded automatically when the package is installed: Bedrock, Secrets Manager, Firehose, Redshift, S3, PostgreSQL and Bedrock guardrails. See its [README](packages/ai-agent-lib-aws/README.md) |
-| `packages/ai-agent-lib-cli` | The `agentlib` command: creates a workspace and adds hello-world agents and MCP servers with their tests. See its [README](packages/ai-agent-lib-cli/README.md) |
+| `packages/ai-agent-lib-cli` | The `agentlib` command: creates a workspace, adds agents and MCP servers with their tests, checks, evaluates and deploys them. See its [README](packages/ai-agent-lib-cli/README.md) |
 | `examples/accounts-agent` | The reference agent |
 | `examples/accounts-mcp` | The reference MCP server, with its queries, rules and registries |
 | `policies/bundle` | The platform's Rego bundle for OPA, and its tests |
 | `tests/architecture` | Rules that keep the module boundaries in place |
-| `docs/getting-started.md` | From nothing to a tested agent and MCP server over your own data |
+| `docs/developer-guide.html` | The developer guide: concepts, practices and every reference table, generated from `docs/guide/` |
+| `docs/getting-started.md` | From nothing to a tested agent and MCP server over your own data, and on to AWS |
 | `docs/variables.md` | Every configuration variable, generated from the binding table |
 | `docs/identity.md` | How a signed-in user and the agent acting for them reach an MCP server, with Microsoft Entra ID and without |
 | `docs/adr` | Recorded decisions |
@@ -237,8 +244,10 @@ Inside `ai_agent_lib_core`:
 | `integrations.langgraph` | Governed model, tools and checkpointer | The only place that imports `langgraph` |
 | `integrations.mcp` | The server middleware and the agent-side MCP tools | The only place that imports the MCP SDK |
 | `integrations.http` | An agent's HTTP entry point, health routes and the server loop | The only place that imports Starlette and uvicorn |
-| `observability` | JSON operational logs and OpenTelemetry export for a service's entry point | `contracts`, `pipeline` |
-| `testing` | Fakes and the contract test suites | Everything |
+| `observability` | JSON operational logs, error reports and OpenTelemetry export for a service's entry point | `contracts`, `pipeline` |
+| `kit` | What a provider pack builds on: the registry and shared adapter machinery | Below `di` |
+| `testing` | Fakes, scripted replies and the contract test suites | Everything |
+| `evaluation` | Eval cases, scorers and reports, off the request path | Nothing on the request path imports it |
 
 ## Working on the library
 
@@ -251,9 +260,10 @@ uv run ruff format --check .          # formatting
 uv run mypy                           # strict type check
 uv run lint-imports                   # module boundary rules
 uv run pytest                         # all tests; network sockets are blocked
+uv run python docs/guide/build_guide.py --check   # the developer guide matches the code
 ```
 
-A change is ready when all five checks pass. Tests that need something outside
+A change is ready when all six checks pass; CI runs them on Linux and Windows. Tests that need something outside
 the process are opt-in: `uv run pytest -m integration`. With the `opa` binary
 on `PATH`, that run starts a local OPA server and checks that it and the
 in-process `rules` provider make the same decisions, then runs the reference
@@ -261,11 +271,12 @@ agent against the reference MCP server over HTTP. The Rego bundle has its own
 checks, listed in [`policies/README.md`](policies/README.md).
 
 When a configuration variable is added or renamed, change the binding table in
-`ai_agent_lib_core/config/bindings.py` and regenerate the two documents:
+`ai_agent_lib_core/config/bindings.py` and regenerate the documents made from it:
 
 ```bash
 uv run python -m ai_agent_lib_core.config reference > docs/variables.md
 uv run python -m ai_agent_lib_core.config env-example > .env.example
+uv run python docs/guide/build_guide.py
 ```
 
 ## Testing an adapter or an agent
@@ -291,13 +302,15 @@ state kept in a temporary folder.
 from ai_agent_lib_core import ServiceContainer
 from ai_agent_lib_core.testing import (
     audit_records,
+    calls_tool,
     last_shown_to_model,
     load_test_config,
     scripted_providers,
 )
 
 config = load_test_config(SERVICE / ".env.example", state_dir=tmp_path, roles=["analyst"])
-async with ServiceContainer(config, scripted_providers(asks_for_a_tool, "answer")) as services:
+replies = scripted_providers(calls_tool("accounts.by_region", region="emea"), "answer")
+async with ServiceContainer(config, replies) as services:
     ...
     assert "masked" in last_shown_to_model(services)  # the tool result, as the model saw it
 assert audit_records(tmp_path)[0]["attributes"]["policy_reason_code"] == "agent-uses-its-models"

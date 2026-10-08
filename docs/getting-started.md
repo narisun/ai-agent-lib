@@ -14,6 +14,7 @@ fail, then make it pass. The workspace `agentlib` creates is set up for that.
 
 No account and no network connection are needed after the packages are
 installed. The model is a stand-in until you choose a real one in step 8.
+Deploying, in step 10, needs Terraform and a container builder such as Docker.
 
 ## 1. Create a workspace
 
@@ -36,7 +37,7 @@ uv sync --all-packages
 uv run pytest
 ```
 
-18 tests pass. You now have:
+Every test passes, offline. You now have:
 
 | Path | What it is |
 | --- | --- |
@@ -311,6 +312,10 @@ uv run agentlib deploy hello-agent --plan   # every permission the adapters need
 uv run agentlib deploy hello-agent          # writes deploy/hello-agent/: Terraform and a Dockerfile
 ```
 
+The AWS adapters come from `ai-agent-lib-aws`: add it to the `dependencies`
+in `agents/hello-agent/pyproject.toml` and run `uv sync --all-packages`
+before the plan (the plan says so if you forget).
+
 `deploy.env` holds the settings the agent runs with in AWS, never a secret.
 The plan lists each adapter, the IAM actions it calls and on what, the
 sidecars the task runs, and anything to check by hand. Read
@@ -320,6 +325,7 @@ sidecars the task runs, and anything to check by hand. Read
 
 | For | Read |
 | --- | --- |
+| Concepts, practices, debugging, and every variable, option and flag | [`developer-guide.html`](developer-guide.html) |
 | Every `agentlib` command | [`packages/ai-agent-lib-cli/README.md`](../packages/ai-agent-lib-cli/README.md) |
 | What the generated code is made of | [`README.md`](../README.md) |
 | Every configuration variable | [`variables.md`](variables.md) |
