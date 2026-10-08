@@ -19,7 +19,7 @@ from ai_agent_lib_core.contracts import (
 )
 from ai_agent_lib_core.di.providers import DATA_PORT, MODEL_PORT, ServiceProviders
 
-__all__ = ["AccessPlan", "AdapterAccess", "access_plan"]
+__all__ = ["AccessPlan", "AdapterAccess", "access_plan", "selected_models"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,15 +81,20 @@ class AccessPlan:
         return tuple(adapter for adapter in self.adapters if adapter.local_only)
 
 
-def _models_by_provider(config: ServiceConfig) -> dict[str, list[str]]:
+def selected_models(config: ServiceConfig) -> dict[str, list[str]]:
+    """The model providers a service builds, each with the models it serves through it.
+
+    The container and the permission plan both use this, so a service is
+    granted access to exactly the models it can call. A service that
+    configures no model, such as an MCP server, builds no provider at all.
+    """
     models: dict[str, list[str]] = defaultdict(list)
-    models[config.model.provider]
     if config.model.model_id is not None:
         models[config.model.provider].append(config.model.model_id)
     for ref in config.model.aliases.values():
         if ref.model_id not in models[ref.provider]:
             models[ref.provider].append(ref.model_id)
-    return models
+    return dict(models)
 
 
 def access_plan(config: ServiceConfig, providers: ServiceProviders | None = None) -> AccessPlan:
@@ -109,7 +114,7 @@ def access_plan(config: ServiceConfig, providers: ServiceProviders | None = None
     """
     registry = providers if providers is not None else ServiceProviders.default()
     wanted: list[tuple[str, ProviderSelection, AccessQuery]] = []
-    for provider, model_ids in _models_by_provider(config).items():
+    for provider, model_ids in selected_models(config).items():
         selection = ProviderSelection(provider=provider)
         wanted.append((MODEL_PORT, selection, AccessQuery(selection, tuple(model_ids))))
     for section, selection in config.sections.items():

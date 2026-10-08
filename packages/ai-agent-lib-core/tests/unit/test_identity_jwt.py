@@ -125,6 +125,7 @@ def test_another_identity_provider_is_a_matter_of_options() -> None:
             tenant="bank",
             algorithms=["ES256", "RS256"],
             claims={"roles": "realm_roles", "actor": "client_id"},
+            service_tokens_are="without_scopes",
             exchange={
                 "client_id": "accounts-agent",
                 "token_url": "https://idp.example.test/realms/bank/token",
@@ -516,3 +517,59 @@ async def test_authenticating_is_as_strict_about_the_token_itself(
     other_scope = idp.user_token(audience=API, subject="u-7", scopes="something.else")
     assert (await checks.authenticate(other_scope)).subject == "u-7"
     assert await refusal(checks, other_scope) == "scope_missing"
+
+
+# ------------------------------------------- R3: application tokens are never users
+
+
+def generic(idp: FakeIdentityProvider, **options: Any) -> JwtIdentityVerifier:
+    """A verifier for the same issuer, configured as a generic one, with no preset."""
+    settings = resolve_jwt_options(
+        JwtIdentityOptions(
+            issuer=idp.issuer,
+            jwks_url=idp.jwks_url,
+            audience=API,
+            tenant="bank",
+            **options,
+        )
+    )
+    return JwtIdentityVerifier(settings, FrozenClock(), transport=idp.transport)
+
+
+def client_credentials_token(idp: FakeIdentityProvider) -> str:
+    """An application's own token as some issuers shape it: sub and azp differ, no scope."""
+    claims = idp.claims(audience=API, subject="unused")
+    claims.update({"sub": "reports-job@clients", "azp": "reports-job"})
+    return idp.sign(claims)
+
+
+def test_r3_a_generic_issuer_must_say_how_application_tokens_look() -> None:
+    with pytest.raises(ConfigurationError) as caught:
+        resolve_jwt_options(
+            JwtIdentityOptions(
+                issuer="https://idp.test",
+                jwks_url="https://idp.test/keys",
+                audience=API,
+                tenant="t",
+            )
+        )
+    assert "cannot tell an application's own token from a user's" in str(caught.value)
+    assert "service_tokens_are" in str(caught.value.expected)
+
+
+async def test_r3_an_application_token_is_refused_where_only_users_are_accepted(
+    idp: FakeIdentityProvider,
+) -> None:
+    by_scopes = generic(idp, service_tokens_are="without_scopes")
+    assert await refusal(by_scopes, client_credentials_token(idp)) == "service_token_refused"
+
+    by_kind = generic(idp, service_tokens_are="kind_claim", claims={"kind": "token_use"})
+    # A token that does not say what it is is refused, never taken for a user's.
+    assert await refusal(by_kind, client_credentials_token(idp)) == "credential_invalid"
+
+
+async def test_r3_a_user_token_still_passes_the_explicit_rule(idp: FakeIdentityProvider) -> None:
+    claims = idp.claims(audience=API, subject="unused")
+    claims.update({"sub": "ann", "azp": "chat-ui", "scope": "accounts.read"})
+    principal = await generic(idp, service_tokens_are="without_scopes").verify(idp.sign(claims))
+    assert (principal.subject, principal.kind) == ("ann", PrincipalKind.USER)

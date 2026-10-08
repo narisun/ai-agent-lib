@@ -27,6 +27,7 @@ from ai_agent_lib_core.contracts import (
     SupportsAsyncClose,
 )
 from ai_agent_lib_core.integrations.langgraph import ScopedCheckpointer, scoped_thread_id
+from ai_agent_lib_core.pipeline import bind_request_context
 
 __all__ = ["CheckpointBackendContract"]
 
@@ -106,11 +107,31 @@ class CheckpointBackendContract(abc.ABC):
         await graph.ainvoke({"visits": 0}, **_run_args(_context()))
         await graph.ainvoke({"visits": 0}, **_run_args(_context()))
 
-        elsewhere = _run_args(_context(**other))
-        assert await graph.aget_state(elsewhere["config"]) is not None
-        assert (await graph.aget_state(elsewhere["config"])).values == {}
+        stranger = _context(**other)
+        elsewhere = _run_args(stranger)
+        with bind_request_context(stranger):
+            assert (await graph.aget_state(elsewhere["config"])).values == {}
         assert (await graph.ainvoke({"visits": 0}, **elsewhere))["visits"] == 1
-        assert (await graph.aget_state(_run_args(_context())["config"])).values == {"visits": 2}
+        with bind_request_context(_context()):
+            assert (await graph.aget_state(_run_args(_context())["config"])).values == {"visits": 2}
+
+    @pytest.mark.parametrize(
+        "other", [{"tenant": "t-2"}, {"subject": "u-2"}, {"application": "app-2"}]
+    )
+    async def test_a_caller_cannot_read_another_callers_thread_by_its_key(
+        self, backend: CheckpointBackend, other: dict[str, str]
+    ) -> None:
+        graph = self._graph(backend)
+        owner = _context()
+        await graph.ainvoke({"visits": 0}, **_run_args(owner))
+
+        # The stranger knows the owner's storage key; it still proves nothing.
+        with bind_request_context(_context(**other)), pytest.raises(PolicyDenied) as caught:
+            await graph.aget_state(_run_args(owner)["config"])
+        assert caught.value.reason_code == "thread_not_owned"
+        with pytest.raises(PolicyDenied) as caught:
+            await graph.aget_state(_run_args(owner)["config"])
+        assert caught.value.reason_code == "identity_missing"
 
     async def test_an_unscoped_thread_id_is_refused(self, backend: CheckpointBackend) -> None:
         graph = self._graph(backend)
@@ -125,7 +146,8 @@ class CheckpointBackendContract(abc.ABC):
         await graph.ainvoke({"visits": 0}, **args)
         checkpointer = backend.checkpointer
         assert isinstance(checkpointer, BaseCheckpointSaver)
-        stored = await checkpointer.aget_tuple(args["config"])
+        with bind_request_context(args["context"]):
+            stored = await checkpointer.aget_tuple(args["config"])
         assert stored is not None
         assert _ROLE_MARKER not in repr(stored.checkpoint)
         assert _ROLE_MARKER not in repr(stored.metadata)

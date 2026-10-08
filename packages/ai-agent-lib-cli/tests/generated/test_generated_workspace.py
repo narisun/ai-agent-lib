@@ -10,6 +10,7 @@ code fails here.
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -164,11 +165,19 @@ def test_every_tool_of_every_server_was_pinned_from_the_running_code(workspace: 
 def test_the_generated_tests_pass(workspace: Path) -> None:
     done = run_in(workspace, "pytest", "-q", "-p", "no:cacheprovider")
     assert done.returncode == 0, done.stdout[-4000:] + done.stderr[-2000:]
-    # 2 workspace tests, 2 sample servers x 6, 2 agents x 7, 4 links x 3,
-    # for the server over CSV files 2 a tool for its 6 tools and 2 more,
-    # for the server over a REST API 2 a tool for its 3 tools, 2 more, and 2 for its link,
-    # and for the server over Redshift tables 2 a tool for its 2 tools, and 2 more.
-    assert "70 passed" in done.stdout, done.stdout[-500:]
+    # Success is what counts, not a total that changes whenever a template gains a test.
+    # Every generated test file must have run, and nothing may fail, error or be skipped.
+    summary = done.stdout.strip().splitlines()[-1]
+    assert re.search(r"\d+ passed", summary), summary
+    assert not re.search(r"failed|error|skipped", summary), summary
+    collected = run_in(workspace, "pytest", "--collect-only", "-q", "-p", "no:cacheprovider")
+    files = {line.split("::", 1)[0] for line in collected.stdout.splitlines() if "::" in line}
+    generated = {
+        path.relative_to(workspace).as_posix()
+        for path in workspace.rglob("test_*.py")
+        if ".venv" not in path.parts and not path.name.endswith("_eval.py")
+    }
+    assert generated <= files, sorted(generated - files)
 
 
 def test_the_generated_code_is_lint_clean_and_formatted(workspace: Path) -> None:

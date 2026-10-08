@@ -16,7 +16,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from ai_agent_lib_core.adapters import FakeChatModelProvider
 from ai_agent_lib_core.contracts import AuditOutcome, PolicyDenied, Principal, RequestContext
 from ai_agent_lib_core.di import ServiceContainer
-from ai_agent_lib_core.pipeline import frame_untrusted
+from ai_agent_lib_core.pipeline import bind_request_context, frame_untrusted
 from ai_agent_lib_core.testing import Fakes
 
 ROLE_MARKER = "role-marker-a11ce"
@@ -148,7 +148,8 @@ async def test_the_request_context_never_enters_graph_state_or_the_checkpoint() 
         graph = build_agent(services)
         run = services.invocation(context())
         result = await graph.ainvoke(question(), **run)
-        snapshot = await graph.aget_state(run["config"])
+        with bind_request_context(run["context"]):
+            snapshot = await graph.aget_state(run["config"])
     assert set(result) == {"messages"}
     assert ROLE_MARKER not in repr(result)
     assert ROLE_MARKER not in repr(snapshot.values)
@@ -158,16 +159,17 @@ async def test_the_request_context_never_enters_graph_state_or_the_checkpoint() 
     assert ROLE_MARKER not in repr(model_prompts)
 
 
-async def test_running_without_a_request_context_is_denied_at_the_first_model_call() -> None:
+async def test_running_without_a_request_context_is_denied_before_anything_runs() -> None:
     fakes = Fakes(model=script())
     async with fakes.container() as services:
         graph = build_agent(services)
         run = services.invocation(context())
         with pytest.raises(PolicyDenied) as caught:
             await graph.ainvoke(question(), run["config"])
+    # The checkpointer cannot tell whose thread it is, so the run stops at its first read.
     assert caught.value.reason_code == "identity_missing"
     assert fakes.model.models[0].calls == []
-    assert [record.outcome for record in fakes.audit.records] == [AuditOutcome.DENIED]
+    assert fakes.audit.records == []
 
 
 async def test_a_raw_thread_id_is_refused_by_the_checkpointer() -> None:

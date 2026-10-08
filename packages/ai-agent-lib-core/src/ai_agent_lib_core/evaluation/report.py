@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from statistics import mean
@@ -46,14 +47,12 @@ class EvalReport:
     @property
     def means(self) -> dict[str, float]:
         """The mean score of each metric over every case."""
-        return {
-            metric: mean(
-                score.value for r in self.results for score in r.scores if score.name == metric
-            )
-            if self.results
-            else 0.0
-            for metric in self.metrics
-        }
+        means: dict[str, float] = {}
+        for metric in self.metrics:
+            values = [s.value for r in self.results for s in r.scores if s.name == metric]
+            # A metric no case was scored on has earned nothing.
+            means[metric] = mean(values) if values else 0.0
+        return means
 
     def by_tag(self, tag: str) -> dict[str, float]:
         """The mean score of each metric over the cases with ``tag``."""
@@ -71,7 +70,17 @@ class EvalReport:
         unknown = sorted(set(bars) - set(means))
         if unknown:
             raise KeyError(f"no scorer is called {', '.join(unknown)}; scorers: {list(means)}")
-        return {metric: means[metric] for metric, bar in bars.items() if means[metric] < bar}
+        wrong = sorted(
+            metric for metric, bar in bars.items() if not math.isfinite(bar) or not 0 <= bar <= 1
+        )
+        if wrong:
+            raise ValueError(f"a bar is a number from 0 to 1; not for {', '.join(wrong)}")
+        # A mean that is not a number is below every bar, never above it.
+        return {
+            metric: means[metric]
+            for metric, bar in bars.items()
+            if not math.isfinite(means[metric]) or means[metric] < bar
+        }
 
     def require(self, bars: Mapping[str, float]) -> None:
         """Raise unless every metric meets its bar: the assertion an eval test ends with.
@@ -130,6 +139,7 @@ class EvalReport:
                 ],
             },
             indent=2,
+            allow_nan=False,
         )
 
 

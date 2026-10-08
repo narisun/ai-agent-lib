@@ -24,6 +24,8 @@ locals {
   }
 
   sidecars_first = concat(
+    # /tmp must be writable by the service's own user before it starts.
+    [{ containerName = "volume-init", condition = "SUCCESS" }],
     var.opa_image == null ? [] : [{ containerName = "opa", condition = "START" }],
     var.collector ? [{ containerName = "collector", condition = "START" }] : [],
   )
@@ -54,6 +56,21 @@ locals {
     logConfiguration = local.logging
   }
 
+  # Fargate creates the task's volume owned by root and not writable by others.
+  # This runs once, as root, before the service: /tmp becomes writable by every
+  # user, with the sticky bit, the way /tmp always is. Then it exits.
+  volume_init_container = {
+    name                   = "volume-init"
+    image                  = var.image
+    user                   = "0"
+    entryPoint             = ["sh", "-c"]
+    command                = ["chmod 1777 /tmp"]
+    essential              = false
+    readonlyRootFilesystem = true
+    mountPoints            = [{ sourceVolume = "tmp", containerPath = "/tmp", readOnly = false }]
+    logConfiguration       = local.logging
+  }
+
   # OPA listens on the task's loopback only: nothing outside the task can ask it.
   opa_container = {
     name                   = "opa"
@@ -74,7 +91,7 @@ locals {
   }
 
   containers = concat(
-    [local.service_container],
+    [local.service_container, local.volume_init_container],
     var.opa_image == null ? [] : [local.opa_container],
     var.collector ? [local.collector_container] : [],
   )

@@ -58,3 +58,12 @@ def test_a_container_that_cannot_start_raises_and_leaves_no_thread_behind() -> N
     services = SyncServices(config, Fakes().providers())
     with pytest.raises(Exception, match="missing"), services:
         pass
+    assert not services._thread.is_alive()
+
+
+def test_a_container_that_cannot_be_built_leaves_no_thread_behind() -> None:
+    services = SyncServices(Fakes().config(), Fakes().providers(), no_such_option=1)
+    with pytest.raises(TypeError), services:
+        pass
+    assert not services._thread.is_alive()
+    assert services._loop.is_closed()

@@ -59,8 +59,9 @@ from ai_agent_lib_cli.workspace import (
 
 __all__ = ["LOCK_FILE", "Scaffolder", "UpdateReport"]
 
-_AGENT_EXTRAS = "jwt,mcp,serve"
-_SERVER_EXTRAS = {"duckdb_csv": "duckdb,jwt,mcp,serve", "rest": "jwt,mcp,serve"}
+# otel: a deployed service sends traces and metrics when its settings turn them on.
+_AGENT_EXTRAS = "jwt,mcp,otel,serve"
+_SERVER_EXTRAS = {"duckdb_csv": "duckdb,jwt,mcp,otel,serve", "rest": "jwt,mcp,otel,serve"}
 _ENV, _ENV_EXAMPLE = ".env", ".env.example"
 
 LOCK_FILE = "agentlib.lock"

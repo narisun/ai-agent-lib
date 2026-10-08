@@ -29,6 +29,7 @@ from ai_agent_lib_core.integrations.langgraph import (
     SqliteCheckpointOptions,
     scoped_thread_id,
 )
+from ai_agent_lib_core.pipeline import bind_request_context
 from ai_agent_lib_core.testing import Fakes
 
 SCOPE = Scope(tenant="t-1", subject="u-1", application="app")
@@ -112,10 +113,12 @@ async def test_scoped_operations_are_delegated() -> None:
     thread_id = scoped_thread_id(SCOPE, "conversation")
     config: RunnableConfig = {"configurable": {"thread_id": thread_id}}
     await graph.ainvoke({"visits": 0}, config, context=context())
-    history = [item async for item in scoped.alist(config)]
-    assert len(history) >= 2
-    await scoped.adelete_thread(thread_id)
-    assert await scoped.aget_tuple(config) is None
+    # Outside a run the caller is named explicitly, and must own the thread.
+    with bind_request_context(context()):
+        history = [item async for item in scoped.alist(config)]
+        assert len(history) >= 2
+        await scoped.adelete_thread(thread_id)
+        assert await scoped.aget_tuple(config) is None
 
 
 # -------------------------------------------------------------------- SQLite

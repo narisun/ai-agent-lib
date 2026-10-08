@@ -545,8 +545,11 @@ class RestDataSource:
         except httpx.TimeoutException:
             raise TransientError(f"{where}: the API did not answer in time") from None
         except httpx.TransportError as exc:
+            # The transport's text can hold the address, with caller-supplied path values.
             raise TransientError(
-                f"{where}: the API could not be reached ({describe(exc)})"
+                f"{where}: the API could not be reached",
+                actual=type(exc).__name__,
+                detail=describe(exc),
             ) from exc
 
         if httpx.codes.is_success(status):

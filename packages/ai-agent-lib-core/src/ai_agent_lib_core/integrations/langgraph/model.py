@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Self
+from typing import Any, Literal, Self
 
 from langchain_core.callbacks import AsyncCallbackManagerForLLMRun, CallbackManagerForLLMRun
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -18,6 +18,7 @@ from pydantic import BaseModel, PrivateAttr
 from ai_agent_lib_core.contracts import (
     AuditValue,
     ChatModelProvider,
+    ConfigurationError,
     ModelRef,
     StructuredOutput,
     ValidationFailed,
@@ -101,6 +102,61 @@ def structured_payload(message: AIMessage, name: str) -> object:
     return message_text(message)
 
 
+def _tool_name(tool: object) -> str | None:
+    if isinstance(tool, BaseTool):
+        return tool.name
+    if isinstance(tool, Mapping):
+        function = tool.get("function")
+        named = function if isinstance(function, Mapping) else tool
+        name = named.get("name")
+        return name if isinstance(name, str) else None
+    return getattr(tool, "__name__", None)
+
+
+def _origin(tool: object) -> str:
+    server = getattr(tool, "_server", None)
+    server_id = getattr(server, "id", None)
+    return f"MCP server {server_id!r}" if server_id else "this agent's own tools"
+
+
+def _require_distinct_names(tools: Sequence[object]) -> None:
+    seen: dict[str, object] = {}
+    for tool in tools:
+        name = _tool_name(tool)
+        if name is None:
+            continue
+        if name in seen:
+            raise ConfigurationError(
+                f"two tools offered to the model have the name {name!r}",
+                expected="a distinct name for every tool the model may call",
+                actual=f"{name!r} from {_origin(seen[name])} and from {_origin(tool)}",
+                fix=(
+                    "register MCP tools under names that start with their server ID, "
+                    "such as 'accounts.search', or rename the agent's own tool"
+                ),
+            )
+        seen[name] = tool
+
+
+def _record_usage(call: ModelCall, reply: AIMessage) -> None:
+    """Add what the provider charged to the call's evidence, as soon as it answers.
+
+    A stage on the way back may still reject the reply (an output guardrail, a
+    schema check), but the tokens were spent: the budget and the audit record
+    count them either way. Retries add up.
+    """
+    usage = reply.usage_metadata
+    if usage is None:
+        return
+    facts = call.evidence.facts()
+    for key in ("input_tokens", "output_tokens"):
+        value = usage.get(key)
+        if isinstance(value, int) and not isinstance(value, bool):
+            earlier = facts.get(key)
+            total = value + (earlier if isinstance(earlier, int) else 0)
+            call.evidence.add(**{key: total})
+
+
 class GovernedChatModel(BaseChatModel):
     """A chat model that sends every call through the model pipeline.
 
@@ -117,6 +173,9 @@ class GovernedChatModel(BaseChatModel):
     alias: str
     provider_name: str
     model_id: str
+    # LangChain's own cache answers before the model's code runs, so a hit would
+    # skip identity, policy, guardrails and audit. A governed model never uses it.
+    cache: Literal[False] = False
 
     _output: StructuredOutput | None = PrivateAttr(default=None)
     _inner: BaseChatModel = PrivateAttr()
@@ -152,6 +211,10 @@ class GovernedChatModel(BaseChatModel):
                     "not a LangChain chat model"
                 )
             inner = created
+        # The provider's model would consult a process-wide LangChain cache too, and
+        # share one caller's answer with another across tenants. Caching, if it is
+        # wanted, belongs to a governed stage that scopes and audits it.
+        inner.cache = False
         model = cls(alias=alias, provider_name=ref.provider, model_id=ref.model_id)
         model._inner = inner
         model._target = target if target is not None else inner
@@ -177,7 +240,14 @@ class GovernedChatModel(BaseChatModel):
         tool_choice: str | None = None,
         **kwargs: Any,
     ) -> Runnable[Any, AIMessage]:
-        """Bind tools on the underlying model and keep the result governed."""
+        """Bind tools on the underlying model and keep the result governed.
+
+        Raises:
+            ConfigurationError: If two tools have the same name. The model calls a
+                tool by name and a ``ToolNode`` keeps one tool per name, so the
+                second would silently take the first one's calls.
+        """
+        _require_distinct_names(tools)
         if tool_choice is not None:
             kwargs["tool_choice"] = tool_choice
         bound = self._inner.bind_tools(tools, **kwargs)
@@ -273,6 +343,7 @@ class GovernedChatModel(BaseChatModel):
             raise mapped from error
         if not isinstance(reply, AIMessage):
             raise TypeError(f"the model returned {type(reply).__name__}, not an AIMessage")
+        _record_usage(call, reply)
         return reply
 
     async def _agenerate(

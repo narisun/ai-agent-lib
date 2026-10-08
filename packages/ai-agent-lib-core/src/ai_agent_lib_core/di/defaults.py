@@ -104,7 +104,9 @@ def _fake_model(context: BuildContext) -> FakeChatModelProvider:  # noqa: ARG001
 async def _anthropic_model(context: BuildContext) -> AnthropicChatModelProvider:
     secrets = cast(SecretsProvider, context.get(Section.SECRETS))
     api_key = await secrets.get_secret("anthropic_api_key")
-    return AnthropicChatModelProvider(api_key, proxy=context.external.https_proxy)
+    # The model pipeline's resilience stage owns retries, so the vendor client makes
+    # one attempt each: otherwise two pipeline retries become nine HTTP calls.
+    return AnthropicChatModelProvider(api_key, proxy=context.external.https_proxy, max_retries=0)
 
 
 async def _sqlite_checkpoint(context: BuildContext) -> CheckpointBackend:
@@ -184,13 +186,13 @@ def register_local_adapters(providers: ServiceProviders) -> None:
     """
     register = functools.partial(providers.register, access=no_access)
     register(MODEL_PORT, "fake", _fake_model, local_only=True, options=NoOptions)
-    register(MODEL_PORT, "anthropic", _anthropic_model, options=NoOptions)
+    register(MODEL_PORT, "anthropic", _anthropic_model, options=NoOptions, extra="anthropic")
     register(Section.SECRETS, "env", _env_secrets, options=NoOptions)
     register(Section.AUDIT, "jsonl", _jsonl_audit, local_only=True, options=JsonlAuditOptions)
     register(
         Section.IDENTITY, "static", _static_identity, local_only=True, options=StaticIdentityOptions
     )
-    register(Section.IDENTITY, "jwt", _jwt_identity, options=JwtIdentityOptions)
+    register(Section.IDENTITY, "jwt", _jwt_identity, options=JwtIdentityOptions, extra="jwt")
     register(
         Section.CHECKPOINT,
         "sqlite",

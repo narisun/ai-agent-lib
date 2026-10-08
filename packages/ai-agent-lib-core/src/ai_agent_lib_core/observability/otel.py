@@ -14,13 +14,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from ai_agent_lib_core.contracts import ConfigurationError
+from ai_agent_lib_core.contracts import ConfigurationError, ServiceConfig, TelemetryMode
 
 if TYPE_CHECKING:
     from opentelemetry.sdk.metrics import MeterProvider
     from opentelemetry.sdk.trace import TracerProvider
 
-__all__ = ["build_providers", "configure_telemetry"]
+__all__ = ["build_providers", "configure_telemetry", "start_telemetry"]
 
 _INSTALL = "install it with: pip install 'ai-agent-lib-core[otel]'"
 
@@ -97,3 +97,25 @@ def configure_telemetry(
         meters.shutdown()
 
     return shutdown
+
+
+def _nothing_to_flush() -> None:
+    return None
+
+
+def start_telemetry(service: str, config: ServiceConfig | None) -> Callable[[], None]:
+    """Install the providers when the configuration turns telemetry on; else do nothing.
+
+    A service's entry point calls this once, after logging is set up, and
+    calls what it returns when the service stops.
+
+    Raises:
+        ConfigurationError: If telemetry is on and the ``otel`` extra is missing.
+    """
+    if config is None or config.telemetry is not TelemetryMode.OPENTELEMETRY:
+        return _nothing_to_flush
+    try:
+        return configure_telemetry(service)
+    except ConfigurationError as error:
+        error.add_note("telemetry is set to opentelemetry in the service's settings")
+        raise

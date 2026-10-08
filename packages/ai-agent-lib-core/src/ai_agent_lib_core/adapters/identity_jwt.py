@@ -15,7 +15,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -52,6 +52,14 @@ Algorithm = Literal[
     "RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512", "EdDSA"
 ]
 ClaimRole = Literal["subject", "tenant", "roles", "actor", "scopes", "kind"]
+ServiceTokenRule = Literal["kind_claim", "without_scopes", "actor_is_subject"]
+"""How a token an application obtained for itself is told from a user's.
+
+``kind_claim``: the ``kind`` claim names it (``service_kinds`` lists the values);
+a token without the claim is refused. ``without_scopes``: a token that carries no
+delegated scope claim is an application's own. ``actor_is_subject``: the
+application (``actor``) and the subject are the same, true of some issuers only.
+"""
 ExchangeKind = Literal["on_behalf_of", "token_exchange"]
 
 _INSTALL_HINT = "install it with: pip install 'ai-agent-lib-core[jwt]'"
@@ -61,6 +69,7 @@ _GUID = re.compile(r"^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$")
 _MAX_TOKEN_CHARS = 16_384
 _MIN_REFRESH_SECONDS = 60.0
 _APP_TOKEN = "app"  # noqa: S105 - the value of a claim, not a credential
+_APP_TOKEN_KIND = _APP_TOKEN
 _ENTRA_V2 = 2
 
 _GENERIC_CLAIMS: Mapping[ClaimRole, str | None] = {
@@ -126,6 +135,11 @@ class JwtIdentityOptions(OptionsModel):
         required_scopes: Delegated scopes a user's token must all carry.
         accept_service_tokens: Accept tokens an application obtained for
             itself, with no user. Refused unless this is set.
+        service_tokens_are: How an application's own token is told from a
+            user's. Required without a preset, because issuers differ and a
+            wrong guess would let an application act as a user.
+        service_kinds: The values of the ``kind`` claim that mark an
+            application's own token, for ``kind_claim``.
         leeway_seconds: Clock difference tolerated when checking validity.
         jwks_cache_seconds: How long the signing keys are kept before they are read again.
         timeout_seconds: How long reading the signing keys may take.
@@ -148,6 +162,8 @@ class JwtIdentityOptions(OptionsModel):
     tenant: str | None = None
     required_scopes: tuple[str, ...] = ()
     accept_service_tokens: bool = False
+    service_tokens_are: ServiceTokenRule | None = None
+    service_kinds: tuple[str, ...] = Field(default=(_APP_TOKEN_KIND,), min_length=1)
     leeway_seconds: int = Field(default=60, ge=0, le=300)
     jwks_cache_seconds: int = Field(default=86_400, ge=60)
     timeout_seconds: float = Field(default=5.0, gt=0)
@@ -170,7 +186,8 @@ class JwtSettings:
     expected_tenant: str | None
     required_scopes: frozenset[str]
     accept_service_tokens: bool
-    scopes_mark_users: bool
+    service_tokens_are: ServiceTokenRule | Literal["entra"]
+    service_kinds: frozenset[str]
     leeway_seconds: int
     jwks_cache_seconds: int
     timeout_seconds: float
@@ -235,6 +252,40 @@ def _generic_defaults(options: JwtIdentityOptions) -> _Defaults:
     )
 
 
+def _service_token_rule(
+    options: JwtIdentityOptions, claims: Mapping[ClaimRole, str | None], *, entra: bool
+) -> ServiceTokenRule | Literal["entra"]:
+    """The rule that tells an application's own token from a user's, which must be explicit."""
+    rule = options.service_tokens_are
+    if rule is None and entra:
+        # Entra marks app-only tokens with idtyp when the optional claim is
+        # configured, and they never carry the delegated scp claim.
+        return "entra"
+    if rule is None:
+        raise ConfigurationError(
+            f"{_WHAT}: it cannot tell an application's own token from a user's",
+            expected='"service_tokens_are": "kind_claim", "without_scopes" or "actor_is_subject"',
+            actual="no rule, and no preset that brings one",
+            fix=(
+                "read how your issuer marks client-credentials tokens and choose the rule "
+                "that matches; a wrong rule lets an application act as a user"
+            ),
+        )
+    if rule == "kind_claim" and not claims.get("kind"):
+        raise ConfigurationError(
+            f"{_WHAT}: the kind_claim rule needs the claim that names the kind of token",
+            expected='claims.kind, such as {"kind": "idtyp"}',
+            actual="no kind claim",
+        )
+    if rule == "without_scopes" and not claims.get("scopes"):
+        raise ConfigurationError(
+            f"{_WHAT}: the without_scopes rule needs the delegated scopes claim",
+            expected='claims.scopes, such as {"scopes": "scope"}',
+            actual="no scopes claim",
+        )
+    return rule
+
+
 def _claim_names(options: JwtIdentityOptions, defaults: _Defaults) -> dict[ClaimRole, str | None]:
     claims: dict[ClaimRole, str | None] = {**defaults.claims, **options.claims}
     if not claims.get("subject"):
@@ -286,7 +337,8 @@ def resolve_jwt_options(options: JwtIdentityOptions) -> JwtSettings:
         expected_tenant=defaults.expected_tenant,
         required_scopes=frozenset(options.required_scopes),
         accept_service_tokens=options.accept_service_tokens,
-        scopes_mark_users=entra,
+        service_tokens_are=_service_token_rule(options, claims, entra=entra),
+        service_kinds=frozenset(options.service_kinds),
         leeway_seconds=options.leeway_seconds,
         jwks_cache_seconds=options.jwks_cache_seconds,
         timeout_seconds=options.timeout_seconds,
@@ -572,14 +624,7 @@ class JwtIdentityVerifier:
         actor = claim("actor")
         try:
             scopes = _words(claim("scopes"))
-            kind_value = claim("kind")
-            if kind_value is not None:
-                is_service = kind_value == _APP_TOKEN
-            elif settings.scopes_mark_users:
-                # Without the optional claim, a token with no delegated scope is an app's own.
-                is_service = names.get("scopes") not in claims
-            else:
-                is_service = isinstance(actor, str) and actor == claim("subject")
+            is_service = self._is_service_token(claims, claim)
             principal = Principal(
                 subject=claim("subject"),  # type: ignore[arg-type]
                 tenant=tenant,  # type: ignore[arg-type]
@@ -593,6 +638,29 @@ class JwtIdentityVerifier:
                 "the token does not carry the claims this service needs", "credential_invalid"
             ) from None
         return principal, scopes
+
+    def _is_service_token(
+        self, claims: Mapping[str, object], claim: Callable[[ClaimRole], object]
+    ) -> bool:
+        """Apply the configured rule; a token it cannot classify is refused."""
+        settings = self._settings
+        rule = settings.service_tokens_are
+        kind_value = claim("kind")
+        if rule == "entra":
+            if kind_value is not None:
+                return kind_value in settings.service_kinds
+            return settings.claims.get("scopes") not in claims
+        if rule == "kind_claim":
+            if not isinstance(kind_value, str):
+                raise _denied(
+                    "the token does not say whether it is a user's or an application's",
+                    "credential_invalid",
+                )
+            return kind_value in settings.service_kinds
+        if rule == "without_scopes":
+            return settings.claims.get("scopes") not in claims
+        actor = claim("actor")
+        return isinstance(actor, str) and actor == claim("subject")
 
     async def validate(self) -> None:
         """Check that the issuer's signing keys can be read.

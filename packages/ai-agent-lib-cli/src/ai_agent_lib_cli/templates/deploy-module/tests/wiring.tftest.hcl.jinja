@@ -23,7 +23,7 @@ run "sidecars_follow_the_inputs" {
     task_policy_json = "{}"
   }
   assert {
-    condition     = [for c in jsondecode(aws_ecs_task_definition.this.container_definitions) : c.name] == ["service", "opa", "collector"]
+    condition     = [for c in jsondecode(aws_ecs_task_definition.this.container_definitions) : c.name] == ["service", "volume-init", "opa", "collector"]
     error_message = "containers"
   }
   assert {
@@ -35,10 +35,22 @@ run "sidecars_follow_the_inputs" {
     error_message = "region"
   }
 }
+run "the_service_waits_for_a_writable_tmp" {
+  command = plan
+  assert {
+    condition     = contains(jsondecode(aws_ecs_task_definition.this.container_definitions)[0].dependsOn, { containerName = "volume-init", condition = "SUCCESS" })
+    error_message = "the service must start after /tmp is made writable"
+  }
+  assert {
+    condition     = jsondecode(aws_ecs_task_definition.this.container_definitions)[1].user == "0"
+    error_message = "the init container runs as root"
+  }
+}
+
 run "nothing_extra_without_them" {
   command = plan
   assert {
-    condition     = [for c in jsondecode(aws_ecs_task_definition.this.container_definitions) : c.name] == ["service"]
+    condition     = [for c in jsondecode(aws_ecs_task_definition.this.container_definitions) : c.name] == ["service", "volume-init"]
     error_message = "containers"
   }
   assert {

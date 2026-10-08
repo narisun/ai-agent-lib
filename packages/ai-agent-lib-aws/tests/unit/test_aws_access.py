@@ -67,6 +67,22 @@ def test_a_model_given_as_an_arn_is_used_exactly() -> None:
     assert _resources(bedrock_model_access(_query("bedrock", model_ids=(arn,)))) == [arn]
 
 
+def test_r18_a_system_profile_given_by_arn_reaches_its_model_and_is_looked_up() -> None:
+    arn = "arn:aws:bedrock:eu-west-1:123456789012:inference-profile/eu.anthropic.claude-x"
+    invoke, look_up = bedrock_model_access(_query("bedrock", model_ids=(arn,)))
+    assert invoke.resources == (arn, "arn:aws:bedrock:*::foundation-model/anthropic.claude-x")
+    assert look_up.resources == (arn,)
+
+
+def test_r18_an_application_profile_is_looked_up_and_its_models_flagged() -> None:
+    arn = "arn:aws:bedrock:eu-west-1:123456789012:application-inference-profile/abc123"
+    invoke, look_up = bedrock_model_access(_query("bedrock", model_ids=(arn,)))
+    assert invoke.resources == (arn, "arn:aws:bedrock:*::foundation-model/*")
+    assert "replace foundation-model/*" in invoke.note
+    assert look_up.actions == ("bedrock:GetInferenceProfile",)
+    assert look_up.resources == (arn,)
+
+
 def test_with_no_model_configured_the_wide_grant_carries_a_note() -> None:
     (found,) = bedrock_model_access(_query("bedrock"))
 

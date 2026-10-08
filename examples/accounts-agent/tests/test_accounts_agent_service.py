@@ -23,6 +23,7 @@ from accounts_agent.graph import build_graph
 from accounts_agent.service import build_app
 from ai_agent_lib_core import Principal, RequestContext
 from ai_agent_lib_core.integrations.http import ServiceLifecycle, ServiceState, serve
+from ai_agent_lib_core.pipeline import bind_request_context
 from ai_agent_lib_core.testing import FakeChatModelProvider, FakeIdentityVerifier, Fakes, calls_tool
 
 ANN = {"authorization": "Bearer ann-token"}
@@ -170,7 +171,9 @@ async def test_a_run_in_flight_finishes_and_is_checkpointed_before_the_service_s
             request_id="r-check",
             thread_id="th-slow",
         )
-        state = await build_graph(services).aget_state(services.invocation(context)["config"])
+        # Reading state outside a run names the caller; only their own thread is readable.
+        with bind_request_context(context):
+            state = await build_graph(services).aget_state(services.invocation(context)["config"])
         assert [m.content for m in state.values["messages"]] == [
             "a slow question",
             "a late answer",

@@ -13,7 +13,12 @@ from accounts_agent.graph import APPLICATION, build_graph, registered_mcp_tools
 from ai_agent_lib_core import RequestContext, ServiceConfig, ServiceContainer, ValidationFailed
 from ai_agent_lib_core.config import load_service_config
 from ai_agent_lib_core.integrations.http import ServiceLifecycle, agent_app, serve
-from ai_agent_lib_core.observability import configure_logging, report_error, shows_details
+from ai_agent_lib_core.observability import (
+    configure_logging,
+    report_error,
+    shows_details,
+    start_telemetry,
+)
 
 __all__ = ["build_app", "main"]
 
@@ -87,7 +92,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         # One line of JSON per event on standard output. On a developer's
         # machine a line about an error also says what the error said.
         configure_logging(APPLICATION, details=shows_details(config))
-        asyncio.run(_serve(config, arguments.host, arguments.port))
+        # Traces and metrics go to the collector when the settings turn them on.
+        stop_telemetry = start_telemetry(APPLICATION, config)
+        try:
+            asyncio.run(_serve(config, arguments.host, arguments.port))
+        finally:
+            stop_telemetry()  # the last spans and metrics are flushed
     except Exception as error:  # noqa: BLE001 - every failure is explained, then the exit code
         return report_error("accounts-agent-serve", error, details=shows_details(config))
     return 0

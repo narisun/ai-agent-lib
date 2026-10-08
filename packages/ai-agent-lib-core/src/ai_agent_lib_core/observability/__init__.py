@@ -13,7 +13,11 @@ from ai_agent_lib_core.observability.logs import (
     configure_logging,
     redact,
 )
-from ai_agent_lib_core.observability.otel import build_providers, configure_telemetry
+from ai_agent_lib_core.observability.otel import (
+    build_providers,
+    configure_telemetry,
+    start_telemetry,
+)
 
 __all__ = [
     "LIBRARY_LOGGERS",
@@ -26,5 +30,6 @@ __all__ = [
     "redact",
     "report_error",
     "shows_details",
+    "start_telemetry",
     "your_code",
 ]

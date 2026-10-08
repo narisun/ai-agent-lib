@@ -17,7 +17,13 @@ from pydantic import PrivateAttr
 
 from ai_agent_lib_core.integrations.langgraph.bridge import LoopBridge
 from ai_agent_lib_core.integrations.langgraph.context import current_request_context
-from ai_agent_lib_core.pipeline import Handler, Pipeline, ToolCall, ToolStage
+from ai_agent_lib_core.pipeline import (
+    Handler,
+    Pipeline,
+    ToolCall,
+    ToolStage,
+    bind_request_context,
+)
 
 __all__ = ["GovernedTool", "govern_tools"]
 
@@ -158,6 +164,14 @@ class GovernedTool(BaseTool):
         )
 
     async def _call_inner(self, call: ToolCall) -> Any:
+        if call.context is None:
+            return await self._run_inner(call)
+        # The tool runs under the context the pipeline passed on, which a stage may
+        # have narrowed: the registry lowers the classification ceiling to the agent's.
+        with bind_request_context(call.context):
+            return await self._run_inner(call)
+
+    async def _run_inner(self, call: ToolCall) -> Any:
         invocation = call.payload
         if not isinstance(invocation, _Invocation):
             raise TypeError("the tool call payload was replaced inside the pipeline")
@@ -205,16 +219,34 @@ class GovernedTool(BaseTool):
             return result
         return reply.model_copy(update={"content": result})
 
+    def _parse_input(
+        self,
+        tool_input: str | dict[str, Any],
+        tool_call_id: str | None,  # noqa: ARG002 - the base class names it
+    ) -> str | dict[str, Any]:
+        """Pass the input on as it came: the wrapped tool validates it, inside the pipeline.
+
+        LangChain validates here, before ``_arun``. A malformed call would then
+        never reach the pipeline, so no policy decision or audit record would
+        show it. The wrapped tool applies the same schema, with the same error.
+        """
+        return dict(tool_input) if isinstance(tool_input, dict) else tool_input
+
+    def _keywords(self, args: tuple[Any, ...], kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Name a single plain input, as LangChain does for a tool with one argument."""
+        if not args:
+            return kwargs
+        names = [name for name in self._inner.args if name not in self._injected]
+        if len(args) == 1 and not kwargs and names:
+            return {names[0]: args[0]}
+        raise TypeError(f"tool {self.name!r} takes its arguments by name: {', '.join(names)}")
+
     async def _arun(self, *args: Any, config: RunnableConfig, **kwargs: Any) -> Any:
-        if args:
-            raise TypeError("governed tools take keyword arguments only")
-        call = self._make_call(kwargs, config)
+        call = self._make_call(self._keywords(args, kwargs), config)
         return self._released(call, await self._handler(call))
 
     def _run(self, *args: Any, config: RunnableConfig, **kwargs: Any) -> Any:
-        if args:
-            raise TypeError("governed tools take keyword arguments only")
-        call = self._make_call(kwargs, config)
+        call = self._make_call(self._keywords(args, kwargs), config)
         return self._released(call, self._bridge().run(lambda: self._handler(call)))
 
 

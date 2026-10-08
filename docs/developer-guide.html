@@ -381,8 +381,10 @@ uv run helper "Who is in the payments team?"   <span class="c"># terminal 2: the
     made.</li>
     <li><strong>Resilience</strong> sits next to the model or the tool: it gives each attempt a
     deadline and tries a transient failure again with growing, jittered waits, within the
-    caller's deadline. A tool is tried again only when it only reads. The audit record says
-    how many attempts there were.</li>
+    caller's deadline. No attempt outlasts that deadline: when it runs out the call is denied
+    with <code>deadline_exceeded</code>, and no retry starts that the deadline leaves no time
+    for. A tool is tried again only when it only reads. The audit record says how many
+    attempts there were.</li>
   </ul>
   <p>On an MCP server the same idea applies at the door: <code>services.mcp_server_kwargs()</code>
   installs middleware that verifies the token, checks the caller's agent against the
@@ -400,7 +402,7 @@ uv run helper "Who is in the payments team?"   <span class="c"># terminal 2: the
   <div class="table-wrap"><table class="compact">
     <thead><tr><th>Concern</th><th>You call</th><th>Local</th><th>Server</th><th>Notes</th></tr></thead>
     <tbody>
-      <tr><td>Identity</td><td><code>services.authenticate(token, application=, thread_id=)</code></td><td><code>static</code> <span class="tag warn">local only</span></td><td><code>jwt</code></td><td>OAuth 2.0 access tokens; Entra ID preset. A missing token is the development identity locally and a refusal when deployed.</td></tr>
+      <tr><td>Identity</td><td><code>services.authenticate(token, application=, thread_id=)</code></td><td><code>static</code> <span class="tag warn">local only</span></td><td><code>jwt</code></td><td>OAuth 2.0 access tokens; Entra ID preset. Another issuer must say how its application tokens differ from users' (<code>service_tokens_are</code>; see <code>docs/identity.md</code>). A missing token is the development identity locally and a refusal when deployed.</td></tr>
       <tr><td>Delegation to MCP servers</td><td><code>services.mcp_tools(server)</code></td><td>development tokens</td><td><code>jwt</code> + <code>exchange</code></td><td>The caller's token is exchanged for one bound to the server's audience (on-behalf-of or RFC 8693). It is never forwarded as is.</td></tr>
       <tr><td>Authorisation</td><td>automatic in both pipelines</td><td><code>rules</code> <span class="tag warn">local only</span></td><td><code>opa</code></td><td>One <code>agentlib.rules/v1</code> document; OPA loads it as a bundle beside the platform's Rego. Default deny.</td></tr>
       <tr><td>Data entitlements</td><td><code>services.data_source(name).query(...)</code></td><td>obligations from <code>rules</code></td><td>obligations from <code>opa</code></td><td><code>mask_columns</code> and <code>max_rows</code> are applied to every result before it leaves the server.</td></tr>
@@ -408,7 +410,7 @@ uv run helper "Who is in the payments team?"   <span class="c"># terminal 2: the
       <tr><td>Guardrails</td><td>automatic</td><td><code>patterns</code></td><td><code>bedrock</code></td><td>Sizes, personal data and injection markers; flag or block per kind.</td></tr>
       <tr><td>Tool and agent registry</td><td><code>services.registry</code>, automatic checks</td><td><code>file</code></td><td><code>s3_file</code></td><td>Unregistered tools cannot be called; schema pins catch silent changes.</td></tr>
       <tr><td>Secrets</td><td>adapters ask by name</td><td><code>env</code></td><td><code>secrets_manager</code></td><td>Options name a secret (<code>auth_secret</code>), never hold its value.</td></tr>
-      <tr><td>Conversation state</td><td><code>builder.compile(**services.compile_kwargs())</code></td><td><code>sqlite</code> <span class="tag warn">local only</span></td><td><code>postgres</code></td><td>Threads are scoped by tenant and caller, so one user cannot continue another's thread. <code>none</code> for MCP servers.</td></tr>
+      <tr><td>Conversation state</td><td><code>builder.compile(**services.compile_kwargs())</code></td><td><code>sqlite</code> <span class="tag warn">local only</span></td><td><code>postgres</code></td><td>Threads are scoped by tenant and caller, so one user cannot read or continue another's thread, even knowing its key (<code>thread_not_owned</code>). Deleting by run ID is refused. <code>none</code> for MCP servers.</td></tr>
       <tr><td>Models</td><td><code>services.model("default")</code></td><td><code>anthropic</code>, <code>fake</code> <span class="tag warn">local only</span></td><td><code>bedrock</code></td><td>Code names an alias; configuration maps it to a provider and model ID.</td></tr>
       <tr><td>Data access</td><td><code>services.data_source(name)</code></td><td><code>duckdb_csv</code> <span class="tag warn">local only</span>, <code>rest</code></td><td><code>redshift_data</code>, <code>rest</code></td><td>Named queries only. SQL is written once in the Redshift dialect and runs on DuckDB locally.</td></tr>
       <tr><td>Structured output</td><td><code>model.with_structured_output(schema)</code></td><td colspan="2">the same everywhere</td><td>Validated inside the pipeline; see <a href="#structured">structured output</a>.</td></tr>
@@ -616,7 +618,7 @@ EAP_IDENTITY_OPTIONS={"audience": "directory", "subject": "dev-user", "tenant": 
           <tr><td>1 <code>services.tools()</code></td><td>Your own functions as tools, each call through the tool pipeline: policy, guardrails, framing, audit.</td></tr>
           <tr><td>2 <code>services.mcp_tools()</code></td><td>The tools of a registered server, with a token exchanged for that server per call and pins checked.</td></tr>
           <tr><td>3 <code>services.model()</code></td><td>The model behind an alias, through the model pipeline. <code>bind_tools</code> and <code>with_structured_output</code> work as in LangChain.</td></tr>
-          <tr><td>4 <code>services.compile_kwargs()</code></td><td>The configured checkpointer, with thread IDs scoped to the caller.</td></tr>
+          <tr><td>4 <code>services.compile_kwargs()</code></td><td>The configured checkpointer, with thread IDs scoped to the caller. A thread is read or written only for the caller the run's context names; outside a run, bind one with <code>bind_request_context(context)</code> before <code>aget_state</code>.</td></tr>
           <tr><td>5 <code>services.invocation(context)</code></td><td>The caller's <code>RequestContext</code> for this run, which every stage reads.</td></tr>
         </tbody>
       </table></div>
@@ -625,7 +627,9 @@ EAP_IDENTITY_OPTIONS={"audience": "directory", "subject": "dev-user", "tenant": 
       <h3>Rules and registry</h3>
       <p>Each <code>new</code> command appends the rules its service needs. The file is
       yours; <code>agentlib</code> never changes or removes a rule that is there. The first
-      matching rule allows; no match denies.</p>
+      matching rule allows; no match denies. A document that breaks the schema (an unknown
+      key, action or obligation, a duplicate id) denies every call with
+      <code>invalid_rules</code>, rather than letting part of it through.</p>
 <pre><code><span class="c"># policies/agentlib/rules/data.yaml (excerpt)</span>
 schema: agentlib.rules/v1
 rules:
@@ -923,22 +927,25 @@ uv run agentlib deploy helper          <span class="c"># writes deploy/helper/: 
   An error is logged with its facts as fields (<code>error_expected</code>,
   <code>error_actual</code>, <code>error_fix</code> and the rest; see
   <a href="#debugging">when something goes wrong</a>). Spans record an error's type, never
-  its message.</p>
+  its message: the request spans do not attach the exception, so no caller content reaches
+  the trace.</p>
   <h3>Set it up in a service</h3>
-<pre><code><span class="k">from</span> ai_agent_lib_core.observability <span class="k">import</span> configure_logging, configure_telemetry
+<pre><code><span class="k">from</span> ai_agent_lib_core.observability <span class="k">import</span> configure_logging, start_telemetry
 
 <span class="k">def</span> main() -&gt; int:
-    configure_logging(APPLICATION)                  <span class="c"># first: JSON lines on stdout</span>
-    shutdown = configure_telemetry(APPLICATION)     <span class="c"># OTLP over HTTP to the collector</span>
+    configure_logging(APPLICATION)                          <span class="c"># first: JSON lines on stdout</span>
+    stop_telemetry = start_telemetry(APPLICATION, config)   <span class="c"># OTLP to the collector when EAP_TELEMETRY is on</span>
     <span class="k">try</span>:
         asyncio.run(_serve(host, port))
     <span class="k">finally</span>:
-        shutdown()                                  <span class="c"># flush the last spans and metrics</span></code></pre>
+        stop_telemetry()                                    <span class="c"># flush the last spans and metrics</span></code></pre>
 <pre><code><span class="c"># the service's environment</span>
 EAP_TELEMETRY=opentelemetry                             <span class="c"># spans per call, events and metrics</span>
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318      <span class="c"># the sidecar collector</span>
 OTEL_RESOURCE_ATTRIBUTES=deployment.environment=prod,service.version=1.4.0</code></pre>
-  <p><code>configure_telemetry</code> needs the <code>otel</code> extra. The service name you
+  <p>Generated services already do this. <code>start_telemetry</code> does nothing when the
+  settings leave telemetry off, and calls <code>configure_telemetry</code> when they turn it
+  on, which needs the <code>otel</code> extra (generated services depend on it). The service name you
   pass becomes <code>service.name</code> and wins over <code>OTEL_SERVICE_NAME</code>; every
   other exporter setting is a standard <a href="#otel-variables">OTEL_ variable</a> read by
   the SDK. In tests pass <code>span_exporter=InMemorySpanExporter()</code> and a
@@ -1107,8 +1114,10 @@ cd deploy/helper &amp;&amp; terraform init &amp;&amp; terraform plan</code></pre
   Its values become the task's environment, so it may hold no secret: a secret variable in
   it stops the command, naming the variable and never its value. Settings for a developer's
   machine (<code>EAP_DEPLOYMENT_ENV=local</code>) and local-only adapters are refused too. An
-  adapter that comes from <code>ai-agent-lib-aws</code> needs that distribution in the
-  service's own dependencies, and the plan says so.</p>
+  adapter that comes from <code>ai-agent-lib-aws</code> needs that distribution, with the
+  adapter's extra (<code>bedrock</code>, <code>postgres</code>), in the service's own
+  dependencies; telemetry needs the core <code>otel</code> extra. The plan names each
+  requirement to add.</p>
   <p>Each adapter declares, from its own options, the IAM actions it calls and the
   resources it calls them on. The plan lists them with the reason for each, and
   <code>permissions.tf</code> holds exactly those statements. Where a resource cannot be
@@ -1149,6 +1158,7 @@ cd deploy/helper &amp;&amp; terraform init &amp;&amp; terraform plan</code></pre
     <thead><tr><th>Container</th><th>Role</th><th>Notes</th></tr></thead>
     <tbody>
       <tr><td>service</td><td>Your agent or MCP server</td><td>Runs <code>helper-serve</code> or the server's command on its port. Health check on <code>/healthz</code>; point the load balancer at <code>/readyz</code>, which turns true after <code>services.validate()</code> passes. SIGTERM stops new requests and lets calls in flight finish.</td></tr>
+      <tr><td>volume-init</td><td>Makes <code>/tmp</code> writable, then exits</td><td>Runs before the service starts (the service waits for it to succeed); not essential.</td></tr>
       <tr><td>opa</td><td>Policy decisions on the task's loopback address</td><td>When the settings select the <code>opa</code> adapter on <code>localhost</code>. The image holds the platform bundle and your <code>policies/</code> folder.</td></tr>
       <tr><td>collector</td><td>Receives OTLP on <code>localhost:4318</code></td><td>When <code>EAP_TELEMETRY=opentelemetry</code>. Sends traces to X-Ray and metrics to CloudWatch; not essential, so the service keeps running without it.</td></tr>
     </tbody>
@@ -1453,6 +1463,8 @@ cd deploy/helper &amp;&amp; terraform init &amp;&amp; terraform plan</code></pre
 <tr><td><span class="var">tenant</span></td><td>text</td><td><span class="muted">not set</span></td><td>The tenant every caller belongs to, when tokens carry no tenant claim.</td></tr>
 <tr><td><span class="var">required_scopes</span></td><td>list of text</td><td><code>[]</code></td><td>Delegated scopes a user&#x27;s token must all carry.</td></tr>
 <tr><td><span class="var">accept_service_tokens</span></td><td>true | false</td><td><code>false</code></td><td>Accept tokens an application obtained for itself, with no user. Refused unless this is set.</td></tr>
+<tr><td><span class="var">service_tokens_are</span></td><td>&quot;kind_claim&quot; | &quot;without_scopes&quot; | &quot;actor_is_subject&quot;</td><td><span class="muted">not set</span></td><td>How an application&#x27;s own token is told from a user&#x27;s. Required without a preset, because issuers differ and a wrong guess would let an application act as a user.</td></tr>
+<tr><td><span class="var">service_kinds</span></td><td>list of text</td><td><code>[&quot;app&quot;]</code></td><td>The values of the <code>kind</code> claim that mark an application&#x27;s own token, for <code>kind_claim</code>.</td></tr>
 <tr><td><span class="var">leeway_seconds</span></td><td>integer</td><td><code>60</code></td><td>Clock difference tolerated when checking validity.</td></tr>
 <tr><td><span class="var">jwks_cache_seconds</span></td><td>integer</td><td><code>86400</code></td><td>How long the signing keys are kept before they are read again.</td></tr>
 <tr><td><span class="var">timeout_seconds</span></td><td>number</td><td><code>5.0</code></td><td>How long reading the signing keys may take.</td></tr>
@@ -1818,7 +1830,7 @@ cd deploy/helper &amp;&amp; terraform init &amp;&amp; terraform plan</code></pre
 <tr><td><code>ai_agent_lib_core.contracts</code></td><td>Ports, value types, options models and errors.</td><td><code>Access</code>, <code>AccessQuery</code>, <code>AccessRule</code>, <code>AgentEntry</code>, <code>AgentLibError</code>, <code>AgentRegistry</code>, <code>AgentSnapshot</code>, <code>AUDIT_SCHEMA</code>, <code>AuditOptions</code>, <code>AuditOutcome</code>, <code>AuditRecord</code>, <code>AuditSink</code>, <code>AuditValue</code>, <code>BudgetExceeded</code>, <code>BudgetLimits</code>, <code>CallLimits</code>, <code>causes</code>, <code>ChatModelProvider</code>, <code>CheckpointBackend</code>, <code>CheckResult</code>, <code>Classification</code>, <code>Clock</code>, <code>ConfigSource</code>, <code>ConfigurationError</code>, <code>CredentialsExpiredError</code>, <code>DataSource</code>, <code>Decision</code>, <code>DECISION_SCHEMA</code>, <code>DEFAULT_MODEL_ALIAS</code>, <code>DeploymentEnv</code>, <code>describe</code>, <code>EntryStatus</code>, <code>ExecutionPaused</code>, <code>ExternalSettings</code>, <code>generic_fix</code>, <code>GuardrailCheck</code>, <code>GuardrailFinding</code>, <code>GuardrailPoint</code>, <code>GuardrailVerdict</code>, <code>IdentityVerifier</code>, <code>IdGenerator</code>, <code>IntegrityError</code>, <code>kind_of</code>, <code>Limits</code>, <code>MASK</code>, <code>ModelCapabilities</code>, <code>ModelRef</code>, <code>ModelSection</code>, <code>no_access</code>, <code>NoOptions</code>, <code>Obligations</code>, <code>options_error</code>, <code>OptionsModel</code>, <code>ParameterType</code>, <code>PolicyAction</code>, <code>PolicyDecisionPoint</code>, <code>PolicyDenied</code>, <code>PolicyRequest</code>, <code>PolicyResource</code>, <code>Principal</code>, <code>PrincipalKind</code>, <code>Profile</code>, <code>ProviderSelection</code>, <code>QueryDescription</code>, <code>QueryParameter</code>, <code>QueryResult</code>, <code>REGISTRY_SCHEMA</code>, <code>RegistrySource</code>, <code>RequestContext</code>, <code>RowFilter</code>, <code>Scalar</code>, <code>schema_fingerprint</code>, <code>Scope</code>, <code>SecretsProvider</code>, <code>Section</code>, <code>ServerEntry</code>, <code>ServiceConfig</code>, <code>shown_value</code>, <code>SourceMetadata</code>, <code>SpanNotes</code>, <code>StructuredOutput</code>, <code>SupportsAsyncClose</code>, <code>SupportsValidation</code>, <code>Telemetry</code>, <code>TelemetryMode</code>, <code>TokenAuthenticator</code>, <code>TokenExchanger</code>, <code>ToolEntry</code>, <code>ToolRegistry</code>, <code>ToolSnapshot</code>, <code>TransientError</code>, <code>ValidationFailed</code></td></tr>
 <tr><td><code>ai_agent_lib_core.config</code></td><td>Configuration: the only package that knows a variable name.</td><td><code>Binding</code>, <code>ConfigResolver</code>, <code>DEFAULT_BINDINGS</code>, <code>DotenvConfigSource</code>, <code>EnvironConfigSource</code>, <code>EnvSetting</code>, <code>Key</code>, <code>LayeredConfigSource</code>, <code>load_service_config</code>, <code>MappingConfigSource</code>, <code>MASKED</code>, <code>options_key</code>, <code>PREFIX</code>, <code>PROFILE_DEFAULTS</code>, <code>ProfileDefaults</code>, <code>provider_key</code>, <code>render_env_example</code>, <code>render_env_file</code>, <code>render_reference</code>, <code>Resolution</code>, <code>secret_key</code>, <code>service_resolver</code>, <code>ValueKind</code>, <code>variable_for</code></td></tr>
 <tr><td><code>ai_agent_lib_core.di</code></td><td>Dependency injection: the provider registry and the service container.</td><td><code>access_plan</code>, <code>AccessPlan</code>, <code>AdapterAccess</code>, <code>BuildContext</code>, <code>DATA_PORT</code>, <code>diagnose</code>, <code>ENTRY_POINT_GROUP</code>, <code>Factory</code>, <code>FIRST_PARTY_PACKS</code>, <code>fix_for</code>, <code>MODEL_PORT</code>, <code>ProviderSpec</code>, <code>ServiceContainer</code>, <code>ServiceProviders</code>, <code>SyncServices</code></td></tr>
-<tr><td><code>ai_agent_lib_core.observability</code></td><td>What the people who run a service see: operational logs, traces and metrics.</td><td><code>build_providers</code>, <code>configure_logging</code>, <code>configure_telemetry</code>, <code>error_fields</code>, <code>explain</code>, <code>JsonLogFormatter</code>, <code>LIBRARY_LOGGERS</code>, <code>redact</code>, <code>report_error</code>, <code>shows_details</code>, <code>your_code</code></td></tr>
+<tr><td><code>ai_agent_lib_core.observability</code></td><td>What the people who run a service see: operational logs, traces and metrics.</td><td><code>build_providers</code>, <code>configure_logging</code>, <code>configure_telemetry</code>, <code>error_fields</code>, <code>explain</code>, <code>JsonLogFormatter</code>, <code>LIBRARY_LOGGERS</code>, <code>redact</code>, <code>report_error</code>, <code>shows_details</code>, <code>start_telemetry</code>, <code>your_code</code></td></tr>
 <tr><td><code>ai_agent_lib_core.integrations.langgraph</code></td><td>LangGraph bindings. The only package in core that imports <code>langgraph</code>.</td><td><code>current_request_context</code>, <code>describe_model_response</code>, <code>govern_tools</code>, <code>GovernedChatModel</code>, <code>GovernedTool</code>, <code>InMemoryCheckpointBackend</code>, <code>LangGraphBindings</code>, <code>LoopBridge</code>, <code>scoped_thread_id</code>, <code>ScopedCheckpointer</code>, <code>SqliteCheckpointBackend</code>, <code>SqliteCheckpointOptions</code>, <code>THREAD_NAMESPACE</code></td></tr>
 <tr><td><code>ai_agent_lib_core.integrations.mcp</code></td><td>MCP bindings. The only package in core that imports the MCP SDK.</td><td><code>DoorTokenVerifier</code>, <code>GovernedToolsMiddleware</code>, <code>is_error_result</code>, <code>mcp_result_text</code>, <code>META_AUTHORIZATION</code>, <code>META_CLASSIFICATION_CEILING</code>, <code>META_REQUEST_ID</code>, <code>META_THREAD_ID</code>, <code>resource_server_settings</code>, <code>tool_fingerprints</code>, <code>verify_registration</code></td></tr>
 <tr><td><code>ai_agent_lib_core.integrations.http</code></td><td>HTTP serving. The only package in core that imports Starlette and uvicorn.</td><td><code>add_health_routes</code>, <code>agent_app</code>, <code>AgentServices</code>, <code>HEALTH_PATH</code>, <code>health_routes</code>, <code>INVOKE_PATH</code>, <code>READY_PATH</code>, <code>Run</code>, <code>serve</code>, <code>ServiceLifecycle</code>, <code>ServiceState</code>, <code>Stream</code>, <code>STREAM_PATH</code>, <code>SupportsCustomRoutes</code></td></tr>

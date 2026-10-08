@@ -40,7 +40,8 @@ class BedrockChatModelProvider:
             raise ConfigurationError(f"{_WHAT} is not installed; {_INSTALL_HINT}") from exc
         self._chat_model = ChatBedrockConverse
         self._sessions = sessions
-        self._runtime = sessions.client("bedrock-runtime")
+        # The model pipeline's resilience stage owns retries; one SDK attempt each.
+        self._runtime = sessions.client("bedrock-runtime", retried_by_pipeline=True)
         # The control plane client is used only to resolve an inference profile to its model.
         self._control = sessions.client("bedrock")
 

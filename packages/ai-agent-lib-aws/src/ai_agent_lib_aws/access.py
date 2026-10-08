@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 from ai_agent_lib_aws.audit_firehose import FirehoseAuditOptions
 from ai_agent_lib_aws.data_redshift import RedshiftDataOptions
@@ -36,17 +37,46 @@ _PROFILE = re.compile(r"^(?P<geo>us|us-gov|eu|apac|jp|au|ca|global)\.(?P<model>.
 _INVOKE = ("bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream")
 
 
-def _model_resources(model_id: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    """Return the model resources to invoke, and the inference profiles to look up."""
+@dataclass(frozen=True, slots=True)
+class _ModelGrant:
+    invoke: tuple[str, ...]
+    look_up: tuple[str, ...] = ()
+    note: str = ""
+
+
+_ANY_MODEL = "arn:aws:bedrock:*::foundation-model/*"
+
+
+def _model_resources(model_id: str) -> _ModelGrant:
+    """What invoking one model takes: the profile, and the models behind it."""
     if model_id.startswith("arn:"):
-        # An application inference profile or a provisioned model, named exactly.
-        return (model_id,), ((model_id,) if ":inference-profile/" in model_id else ())
+        resource = model_id.split(":", 5)[-1]
+        if resource.startswith("application-inference-profile/"):
+            # Its models are chosen when the profile is made and cannot be read
+            # from its ARN, but AWS checks the call against them too.
+            return _ModelGrant(
+                invoke=(model_id, _ANY_MODEL),
+                look_up=(model_id,),
+                note="an application inference profile's models are not in its ARN; replace "
+                "foundation-model/* with the model ARNs the profile copies",
+            )
+        if resource.startswith("inference-profile/"):
+            profile = _PROFILE.match(resource.removeprefix("inference-profile/"))
+            model = profile["model"] if profile else "*"
+            return _ModelGrant(
+                invoke=(model_id, f"arn:aws:bedrock:*::foundation-model/{model}"),
+                look_up=(model_id,),
+            )
+        # A foundation model or a provisioned model, named exactly.
+        return _ModelGrant(invoke=(model_id,))
     profile = _PROFILE.match(model_id)
     if profile is None:
-        return (f"arn:aws:bedrock:{REGION}::foundation-model/{model_id}",), ()
+        return _ModelGrant(invoke=(f"arn:aws:bedrock:{REGION}::foundation-model/{model_id}",))
     arn = f"arn:aws:bedrock:{REGION}:{ACCOUNT}:inference-profile/{model_id}"
     # The profile routes to the model in any region of its geography.
-    return (arn, f"arn:aws:bedrock:*::foundation-model/{profile['model']}"), (arn,)
+    return _ModelGrant(
+        invoke=(arn, f"arn:aws:bedrock:*::foundation-model/{profile['model']}"), look_up=(arn,)
+    )
 
 
 def bedrock_model_access(query: AccessQuery) -> Sequence[Access]:
@@ -55,7 +85,7 @@ def bedrock_model_access(query: AccessQuery) -> Sequence[Access]:
         return (
             Access(
                 actions=_INVOKE,
-                resources=(f"arn:aws:bedrock:{REGION}::foundation-model/*",),
+                resources=(_ANY_MODEL.replace("*::", f"{REGION}::", 1),),
                 why="call a Bedrock model",
                 note="no model is configured for bedrock, so every foundation model is allowed; "
                 "configure the model to narrow this",
@@ -63,11 +93,21 @@ def bedrock_model_access(query: AccessQuery) -> Sequence[Access]:
         )
     invoked: dict[str, None] = {}
     profiles: dict[str, None] = {}
+    notes: dict[str, None] = {}
     for model_id in query.model_ids:
-        models, looked_up = _model_resources(model_id)
-        invoked.update(dict.fromkeys(models))
-        profiles.update(dict.fromkeys(looked_up))
-    found = [Access(actions=_INVOKE, resources=tuple(invoked), why="call the configured models")]
+        grant = _model_resources(model_id)
+        invoked.update(dict.fromkeys(grant.invoke))
+        profiles.update(dict.fromkeys(grant.look_up))
+        if grant.note:
+            notes[grant.note] = None
+    found = [
+        Access(
+            actions=_INVOKE,
+            resources=tuple(invoked),
+            why="call the configured models",
+            note="; ".join(notes),
+        )
+    ]
     if profiles:
         found.append(
             Access(

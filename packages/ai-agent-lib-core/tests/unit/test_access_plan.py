@@ -59,7 +59,8 @@ def _providers() -> ServiceProviders:
 def test_every_core_adapter_says_it_needs_nothing_from_the_cloud() -> None:
     plan = access_plan(_local())
 
-    assert len(plan.adapters) == 1 + len(Section)
+    # No model is configured, so no model provider is built or granted anything.
+    assert len(plan.adapters) == len(Section)
     assert all(adapter.declared for adapter in plan.adapters)
     assert plan.access == ()
     # The local profile's own adapters may not be deployed, and the plan says which.
@@ -116,3 +117,8 @@ def test_bad_options_are_named_before_anything_is_derived() -> None:
 def test_an_access_needs_an_action_and_a_resource() -> None:
     with pytest.raises(ValueError, match="at least one action"):
         Access((), ("x",), "nothing")
+
+
+def test_r19_a_service_without_a_model_gets_no_model_access() -> None:
+    plan = access_plan(_local(model=ModelSection(provider="cloud")), _providers())
+    assert MODEL_PORT not in {adapter.port for adapter in plan.adapters}

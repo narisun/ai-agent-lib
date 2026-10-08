@@ -10,7 +10,7 @@ adapters are in `ai-agent-lib-aws`; installing it is enough to make them
 selectable by configuration.
 
 ```bash
-pip install "ai-agent-lib-core[mcp,serve,jwt]"   # what a generated agent or MCP server uses
+pip install "ai-agent-lib-core[jwt,mcp,otel,serve]"   # what a generated agent or MCP server uses
 ```
 
 | Extra | Adds |

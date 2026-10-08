@@ -156,3 +156,50 @@ test_a_rule_can_be_limited_to_a_kind_of_caller if {
 	as_kind("service").allow
 	not as_kind("user").allow
 }
+
+# --------------------------------------------- a malformed document grants nothing
+
+with_rule(changes) := decision if {
+	rule := object.union(
+		{"id": "analysts-query", "actions": ["data.query"], "roles": ["viewer"]},
+		changes,
+	)
+	decision := authz.decision with input as question
+		with data.agentlib.rules as {"schema": "agentlib.rules/v1", "rules": [rule]}
+}
+
+invalid := {"allow": false, "reason_code": "invalid_rules"}
+
+test_a_misspelt_key_does_not_widen_a_rule if {
+	# `role` instead of `roles`: the local engine refuses the file, and so does OPA.
+	with_rule({"role": ["viewer"]}) == invalid
+}
+
+test_every_part_of_a_rule_is_checked if {
+	with_rule({"actions": ["data.querry"]}) == invalid
+	with_rule({"actions": []}) == invalid
+	with_rule({"roles": "analyst"}) == invalid
+	with_rule({"kinds": ["robot"]}) == invalid
+	with_rule({"resources": []}) == invalid
+	with_rule({"max_classification": "secret"}) == invalid
+	with_rule({"obligations": {"mask_column": ["holder"]}}) == invalid
+	with_rule({"obligations": {"max_rows": "50"}}) == invalid
+	with_rule({"id": "Has Spaces"}) == invalid
+}
+
+test_a_valid_rule_still_decides if {
+	with_rule({"roles": ["analyst"]}).allow
+}
+
+test_two_rules_with_one_id_are_refused if {
+	rule := {"id": "same", "actions": ["data.query"], "roles": ["analyst"]}
+	decision := authz.decision with input as question
+		with data.agentlib.rules as {"schema": "agentlib.rules/v1", "rules": [rule, rule]}
+	decision == invalid
+}
+
+test_a_document_of_another_schema_is_refused if {
+	decision := authz.decision with input as question
+		with data.agentlib.rules as {"schema": "agentlib.rules/v2", "rules": []}
+	decision == invalid
+}

@@ -206,10 +206,13 @@ class GovernedMcpTool(GovernedTool):
         except BaseException as raised:
             error = _unwrap(raised)
             if isinstance(error, MCPError):
+                # The server's own text can repeat what the caller sent, so it is
+                # kept for a developer's machine only, never in the message or facts.
                 raise AgentLibError(
                     f"{where}: the server answered with an error",
-                    actual=describe(error),
+                    actual=f"an MCP error of type {type(error).__name__}",
                     fix="look at the server's log line for this request ID",
+                    detail=describe(error),
                 ) from None
             if _refused_at_the_door(error):
                 # Not a passing fault: the same token would be refused again.
@@ -219,8 +222,10 @@ class GovernedMcpTool(GovernedTool):
                 ) from None
             if isinstance(error, httpx2.HTTPError | OSError | TimeoutError):
                 raise TransientError(
-                    f"{where}: the server could not be reached ({describe(error)})",
+                    f"{where}: the server could not be reached",
                     expected=f"an MCP server answering at {self._server.url}",
+                    actual=type(error).__name__,
+                    detail=describe(error),
                 ) from error
             raise
         text = mcp_result_text(result)

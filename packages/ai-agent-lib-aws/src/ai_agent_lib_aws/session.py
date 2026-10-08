@@ -223,30 +223,38 @@ class AwsSessionFactory:
         """The command that renews the sign-in of a named profile."""
         return f"aws sso login --profile {self._profile}" if self._profile else None
 
-    def client(self, service: str) -> Any:
+    def client(self, service: str, *, retried_by_pipeline: bool = False) -> Any:
         """Return the client for an AWS service, building it on first use.
+
+        Args:
+            service: The AWS service.
+            retried_by_pipeline: The calls go through a pipeline stage that tries
+                them again itself, so the SDK makes one attempt only. Otherwise
+                the two would multiply.
 
         Raises:
             ConfigurationError: If the client cannot be built, for example
                 because no region is configured.
         """
+        attempts = 1 if retried_by_pipeline else self._max_attempts
+        key = f"{service}#{attempts}"
         with self._lock:
-            if service not in self._clients:
-                self._clients[service] = self._build(service)
-            return self._clients[service]
+            if key not in self._clients:
+                self._clients[key] = self._build(service, attempts)
+            return self._clients[key]
 
     def _verify(self, service: str) -> str | None:
         chosen = self._bedrock_ca_bundle if service in _BEDROCK_SERVICES else None
         chosen = chosen if chosen is not None else self._ca_bundle
         return str(chosen) if chosen is not None else None
 
-    def _build(self, service: str) -> Any:
+    def _build(self, service: str, attempts: int) -> Any:
         what = f"the AWS {service} client"
         try:
-            client = self._create(service, proxied=False)
+            client = self._create(service, attempts, proxied=False)
             host = str(client.meta.endpoint_url).split("://", 1)[-1].split("/", 1)[0].lower()
             if self._proxy is not None and not _bypasses_proxy(host.split(":")[0], self._no_proxy):
-                client = self._create(service, proxied=True)
+                client = self._create(service, attempts, proxied=True)
         except (aws.BotoCoreError, aws.ClientError, ValueError) as exc:
             mapped = classify_aws_error(exc, what=what, sign_in=self.sign_in)
             raise mapped or ConfigurationError(
@@ -254,11 +262,11 @@ class AwsSessionFactory:
             ) from exc
         return client
 
-    def _create(self, service: str, *, proxied: bool) -> Any:
+    def _create(self, service: str, attempts: int, *, proxied: bool) -> Any:
         config = Config(
             connect_timeout=self._connect_timeout,
             read_timeout=self._read_timeout,
-            retries={"mode": "standard", "total_max_attempts": self._max_attempts},
+            retries={"mode": "standard", "total_max_attempts": attempts},
             proxies={"https": self._proxy} if proxied and self._proxy else None,
         )
         return self._session.client(service, config=config, verify=self._verify(service))

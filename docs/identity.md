@@ -197,9 +197,23 @@ Leave out the preset and give the standard settings directly:
   "audience": "accounts-mcp",
   "tenant": "bank",
   "claims": {"roles": "realm_roles", "actor": "azp"},
+  "service_tokens_are": "without_scopes",
   "exchange": {"kind": "token_exchange", "client_id": "accounts-agent", "token_url": "https://idp.example.com/realms/bank/protocol/openid-connect/token"}
 }
 ```
+
+`service_tokens_are` is required without a preset. It says how a token an
+application obtained for itself (client credentials) is told from a user's,
+which issuers do differently:
+
+| Rule | An application's own token is one that | Choose it when |
+| --- | --- | --- |
+| `kind_claim` | carries a value of `service_kinds` (default `["app"]`) in the `kind` claim; a token without the claim is refused | the issuer marks the kind of token in a claim |
+| `without_scopes` | carries no delegated scope claim | user tokens always carry `scope` and application tokens never do |
+| `actor_is_subject` | has the same `actor` (`azp`) and subject | the issuer sets `sub` to the client ID for client credentials |
+
+A wrong rule would let an application act as a user, so there is no default.
+The Entra preset brings its own rule.
 
 `token_exchange` is OAuth 2.0 Token Exchange, RFC 8693. Entra does not offer
 that grant for this purpose; its delegation uses the JWT bearer grant of RFC

@@ -19,7 +19,8 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from ai_agent_lib_core.adapters.checkpoint_options import SqliteCheckpointOptions
-from ai_agent_lib_core.contracts import ConfigurationError, PolicyDenied, Scope
+from ai_agent_lib_core.contracts import ConfigurationError, PolicyDenied, RequestContext, Scope
+from ai_agent_lib_core.pipeline import bound_request_context
 
 __all__ = [
     "THREAD_NAMESPACE",
@@ -38,24 +39,64 @@ def scoped_thread_id(scope: Scope, thread_id: str) -> str:
     return scope.key(THREAD_NAMESPACE, thread_id)
 
 
-def _require_scoped(thread_id: object) -> str:
-    """Return ``thread_id`` if it was built by :func:`scoped_thread_id`, else deny."""
+def _asker(config: RunnableConfig | None) -> RequestContext | None:
+    """Who is asking: the context of the graph run, or one the caller bound."""
+    runtime = (config or {}).get("configurable", {}).get("__pregel_runtime")
+    context = getattr(runtime, "context", None)
+    if isinstance(context, RequestContext):
+        return context
+    return bound_request_context()
+
+
+def _require_scoped(thread_id: object, config: RunnableConfig | None = None) -> str:
+    """Return ``thread_id`` if it is a scoped key that belongs to the caller, else deny.
+
+    A key's shape proves nothing: anyone who learns another caller's key could
+    present it. So the key's scope must be the scope of the caller asking, taken
+    from the graph run or from :func:`bind_request_context`.
+    """
+    scope: Scope | None = None
     if isinstance(thread_id, str):
         try:
-            _, parts = Scope.parse_key(thread_id)
+            scope, parts = Scope.parse_key(thread_id)
         except ValueError:
             parts = ()
-        if len(parts) == 2 and parts[0] == THREAD_NAMESPACE:
-            return thread_id
-    raise PolicyDenied(
-        "the thread ID is not scoped to a tenant, subject and application; "
-        "build the run configuration with ServiceContainer.invocation()",
-        reason_code="unscoped_thread",
-    )
+        if len(parts) != 2 or parts[0] != THREAD_NAMESPACE:
+            scope = None
+    if scope is None:
+        raise PolicyDenied(
+            "the thread ID is not scoped to a tenant, subject and application; "
+            "build the run configuration with ServiceContainer.invocation()",
+            reason_code="unscoped_thread",
+        )
+    asker = _asker(config)
+    if asker is None:
+        raise PolicyDenied(
+            "a thread's state was asked for with no caller to check it against",
+            reason_code="identity_missing",
+            expected="a graph run with a request context, or a bound one",
+            fix="wrap the call in 'with bind_request_context(context):'",
+        )
+    if scope != asker.scope:
+        raise PolicyDenied(
+            "the thread belongs to another caller",
+            reason_code="thread_not_owned",
+            expected="a thread of the caller's own tenant, subject and application",
+            fix="build the thread ID from the caller's context with ServiceContainer.invocation()",
+        )
+    return str(thread_id)
 
 
 def _thread_of(config: RunnableConfig) -> str:
-    return _require_scoped(config.get("configurable", {}).get("thread_id"))
+    return _require_scoped(config.get("configurable", {}).get("thread_id"), config)
+
+
+def _unscoped_delete() -> PolicyDenied:
+    return PolicyDenied(
+        "deleting checkpoints by run is not scoped to a caller",
+        reason_code="unscoped_thread",
+        fix="delete the caller's thread with adelete_thread instead",
+    )
 
 
 class ScopedCheckpointer(BaseCheckpointSaver[Any]):
@@ -131,9 +172,9 @@ class ScopedCheckpointer(BaseCheckpointSaver[Any]):
         """Delete a scoped thread."""
         self._inner.delete_thread(_require_scoped(thread_id))
 
-    def delete_for_runs(self, run_ids: Sequence[str]) -> None:
-        """Delete the checkpoints of the given runs."""
-        self._inner.delete_for_runs(run_ids)
+    def delete_for_runs(self, run_ids: Sequence[str]) -> None:  # noqa: ARG002 - the base API
+        """Refused: runs do not name the thread, so their owner cannot be checked."""
+        raise _unscoped_delete()
 
     def copy_thread(self, source_thread_id: str, target_thread_id: str) -> None:
         """Copy one scoped thread to another."""
@@ -213,9 +254,9 @@ class ScopedCheckpointer(BaseCheckpointSaver[Any]):
         """Delete a scoped thread."""
         await self._inner.adelete_thread(_require_scoped(thread_id))
 
-    async def adelete_for_runs(self, run_ids: Sequence[str]) -> None:
-        """Delete the checkpoints of the given runs."""
-        await self._inner.adelete_for_runs(run_ids)
+    async def adelete_for_runs(self, run_ids: Sequence[str]) -> None:  # noqa: ARG002 - the base API
+        """Refused: runs do not name the thread, so their owner cannot be checked."""
+        raise _unscoped_delete()
 
     async def acopy_thread(self, source_thread_id: str, target_thread_id: str) -> None:
         """Copy one scoped thread to another."""

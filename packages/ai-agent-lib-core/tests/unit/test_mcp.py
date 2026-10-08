@@ -619,3 +619,34 @@ async def test_the_servers_span_joins_the_agents_trace(monkeypatch: pytest.Monke
     assert served.parent is not None
     assert served.parent.span_id == request.get_span_context().span_id
     tracers.shutdown()
+
+
+async def test_r10_the_servers_error_text_stays_out_of_the_logged_facts() -> None:
+    from contextlib import asynccontextmanager
+
+    from mcp import MCPError
+
+    from ai_agent_lib_core.contracts import AgentLibError
+    from ai_agent_lib_core.observability import error_fields
+
+    class _Refusing:
+        async def call_tool(self, *args: object, **kwargs: object) -> object:
+            raise MCPError(-32000, "no record for SSN 123-45-6789")
+
+    async with World() as world:
+        tool = await world.lookup_tool()
+
+        @asynccontextmanager
+        async def broken(server: object, token: object):  # type: ignore[no-untyped-def]
+            yield _Refusing()
+
+        world.connector.connect = broken  # type: ignore[method-assign]
+        with bind_request_context(CONTEXT), pytest.raises(AgentLibError) as caught:
+            await tool.ainvoke({"region": "west"})
+
+    error = caught.value
+    production = error_fields(error, details=False)
+    assert "123-45-6789" not in repr(production)
+    assert "123-45-6789" not in str(error)
+    # A developer's machine still gets the server's words.
+    assert "123-45-6789" in repr(error_fields(error, details=True))

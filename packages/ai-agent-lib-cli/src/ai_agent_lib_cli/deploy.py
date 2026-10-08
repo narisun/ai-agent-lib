@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import re
+import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
@@ -213,11 +214,68 @@ def _local_data_sources(root: Path, target: Target) -> set[str]:
     return set(found) if isinstance(found, dict) else set()
 
 
+_REQUIREMENT = re.compile(r"^\s*(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\[(?P<extras>[^\]]*)\])?")
+
+
+def _normalized(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def installed_extras(root: Path, target: Target) -> dict[str, set[str]]:
+    """The service's own dependencies: each distribution, with the extras it asks for."""
+    path = root.joinpath(*target.folder.parts, "pyproject.toml")
+    try:
+        project = tomllib.loads(path.read_text(encoding="utf-8")).get("project", {})
+    except (OSError, tomllib.TOMLDecodeError):
+        return {}
+    found: dict[str, set[str]] = {}
+    for requirement in project.get("dependencies", []):
+        match = _REQUIREMENT.match(str(requirement))
+        if match is None:
+            continue
+        extras = {item.strip() for item in (match["extras"] or "").split(",") if item.strip()}
+        found.setdefault(_normalized(match["name"]), set()).update(extras)
+    return found
+
+
 def depends_on_aws(root: Path, target: Target) -> bool:
     """Whether the service's own dependencies include the AWS adapters."""
-    path = root.joinpath(*target.folder.parts, "pyproject.toml")
-    text = path.read_text(encoding="utf-8") if path.is_file() else ""
-    return re.search(rf"[\"']{re.escape(AWS_DISTRIBUTION)}[\[\"'<>=~! ]", text) is not None
+    return AWS_DISTRIBUTION in installed_extras(root, target)
+
+
+def _missing_dependencies(
+    root: Path, target: Target, access: AccessPlan, registry: ServiceProviders
+) -> list[str]:
+    """What the image would lack: a distribution, or an extra, a selected adapter needs."""
+    have = installed_extras(root, target)
+    needed: dict[str, dict[str, list[str]]] = {}
+    for adapter in access.adapters:
+        spec = registry.lookup(adapter.port, adapter.name)
+        distribution = _normalized(spec.factory.__module__.split(".", 1)[0])
+        extras = needed.setdefault(distribution, {})
+        key = spec.extra or ""
+        extras.setdefault(key, []).append(adapter.label)
+    problems = []
+    for distribution, extras in sorted(needed.items()):
+        wanted = sorted(extra for extra in extras if extra)
+        missing = [extra for extra in wanted if extra not in have.get(distribution, set())]
+        if distribution in have and not missing:
+            continue
+        if distribution not in have and distribution == _normalized("ai-agent-lib-core"):
+            continue  # core always comes with the service's own dependencies
+        labels = sorted({label for group in extras.values() for label in group})
+        requirement = f"{distribution}[{','.join(wanted)}]" if wanted else distribution
+        what = (
+            f"the extras {', '.join(missing)} of {distribution}"
+            if distribution in have
+            else distribution
+        )
+        problems.append(
+            f"{', '.join(labels)} need {what}, which {target.name} does not install; "
+            f'list "{requirement}" in the dependencies in {target.folder}/pyproject.toml '
+            "and run 'uv sync --all-packages'"
+        )
+    return problems
 
 
 def plan_deployment(
@@ -246,20 +304,13 @@ def plan_deployment(
         "for it; add what it needs by hand"
         for adapter in access.undeclared
     ]
-    from_aws = sorted(
-        {
-            adapter.label
-            for adapter in access.adapters
-            if registry.lookup(adapter.port, adapter.name).factory.__module__.startswith(
-                AWS_DISTRIBUTION.replace("-", "_")
-            )
-        }
-    )
-    if from_aws and not depends_on_aws(root, target):
+    problems += _missing_dependencies(root, target, access, registry)
+    collector = config.telemetry is TelemetryMode.OPENTELEMETRY
+    core = installed_extras(root, target).get("ai-agent-lib-core", set())
+    if collector and "otel" not in core:
         problems.append(
-            f"{', '.join(from_aws)} come from {AWS_DISTRIBUTION}, which {target.name} does not "
-            f'depend on; add "{AWS_DISTRIBUTION}" to the dependencies in '
-            f"{target.folder}/pyproject.toml and run 'uv sync --all-packages'"
+            f"telemetry is on, but {target.name} does not install the OpenTelemetry SDK; "
+            f'add "otel" to the extras of ai-agent-lib-core in {target.folder}/pyproject.toml'
         )
     missing = sorted(_local_data_sources(root, target) - set(config.data_sources))
     if missing:
@@ -283,7 +334,7 @@ def plan_deployment(
         environment=tuple(environment),
         access=access,
         opa=_uses_opa_beside_it(config),
-        collector=config.telemetry is TelemetryMode.OPENTELEMETRY,
+        collector=collector,
         problems=tuple(problems),
         warnings=tuple(warnings),
     )

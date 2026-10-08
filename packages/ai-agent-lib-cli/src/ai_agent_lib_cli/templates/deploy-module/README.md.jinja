@@ -23,6 +23,9 @@ What it makes:
 - a log group, `/agentlib/NAME`.
 
 Every container has a read-only root file system; `/tmp` is the writable place.
+Fargate creates that volume owned by root, so a short `volume-init` container runs
+first, as root, makes it writable the way `/tmp` always is, and exits; the service,
+which runs as an unprivileged user, starts only once it has succeeded.
 OPA listens on the task's loopback address only. The tasks get no public IP.
 
 It does not make the cluster, the network, the load balancer, the image

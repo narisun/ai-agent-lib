@@ -131,6 +131,8 @@ class ProviderSpec:
             options, so a deployment grants only that.
             :func:`~ai_agent_lib_core.contracts.no_access` for an adapter that
             needs nothing; ``None`` when the adapter does not say.
+        extra: The optional extra of its distribution that it needs installed,
+            such as ``"bedrock"`` for ``ai-agent-lib-aws[bedrock]``.
     """
 
     port: str
@@ -139,6 +141,7 @@ class ProviderSpec:
     local_only: bool = False
     options: type[OptionsModel] | None = None
     access: AccessRule | None = None
+    extra: str | None = None
 
 
 def _normalize(distribution: str) -> str:
@@ -188,6 +191,7 @@ class ServiceProviders:
         local_only: bool = False,
         options: type[OptionsModel] | None = None,
         access: AccessRule | None = None,
+        extra: str | None = None,
         replace: bool = False,
     ) -> ServiceProviders:
         """Add an adapter and return the registry, so calls can be chained.
@@ -201,6 +205,7 @@ class ServiceProviders:
                 before anything is built. ``NoOptions`` for none.
             access: What the adapter needs from the cloud, given its options.
                 ``no_access`` for nothing.
+            extra: The optional extra of its distribution that it needs.
             replace: Allow overwriting an existing registration.
 
         Raises:
@@ -221,6 +226,7 @@ class ServiceProviders:
             local_only=local_only,
             options=options,
             access=access,
+            extra=extra,
         )
         return self
 

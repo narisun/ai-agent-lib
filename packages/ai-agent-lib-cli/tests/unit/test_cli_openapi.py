@@ -515,7 +515,7 @@ def test_new_mcp_from_openapi_writes_a_server_whose_tests_answer_for_the_api(
     assert "{'desk_id': 1, 'active_only': True}" in tests
     assert json.loads((service / "tests/api_responses.json").read_text(encoding="utf-8"))
     # A REST server needs no CSV engine.
-    assert "ai-agent-lib-core[jwt,mcp,serve]" in (service / "pyproject.toml").read_text()
+    assert "ai-agent-lib-core[jwt,mcp,otel,serve]" in (service / "pyproject.toml").read_text()
 
     readme = (service / "README.md").read_text(encoding="utf-8")
     assert "proposed from an OpenAPI document" in readme

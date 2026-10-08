@@ -5,7 +5,7 @@ description = "Reference MCP server for ai-agent-lib: governed account queries o
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "ai-agent-lib-core[duckdb,jwt,mcp,serve]",
+    "ai-agent-lib-core[duckdb,jwt,mcp,otel,serve]",
 ]
 
 [project.scripts]

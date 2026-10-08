@@ -45,22 +45,22 @@ name = "accounts-agent"
 version = "0.1.0"
 source = { editable = "examples/accounts-agent" }
 dependencies = [
-    { name = "ai-agent-lib-core", extra = ["jwt", "mcp", "serve"] },
+    { name = "ai-agent-lib-core", extra = ["jwt", "mcp", "otel", "serve"] },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "ai-agent-lib-core", extras = ["jwt", "mcp", "serve"], editable = "packages/ai-agent-lib-core" }]
+requires-dist = [{ name = "ai-agent-lib-core", extras = ["jwt", "mcp", "otel", "serve"], editable = "packages/ai-agent-lib-core" }]
 
 [[package]]
 name = "accounts-mcp"
 version = "0.1.0"
 source = { editable = "examples/accounts-mcp" }
 dependencies = [
-    { name = "ai-agent-lib-core", extra = ["duckdb", "jwt", "mcp", "serve"] },
+    { name = "ai-agent-lib-core", extra = ["duckdb", "jwt", "mcp", "otel", "serve"] },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "ai-agent-lib-core", extras = ["duckdb", "jwt", "mcp", "serve"], editable = "packages/ai-agent-lib-core" }]
+requires-dist = [{ name = "ai-agent-lib-core", extras = ["duckdb", "jwt", "mcp", "otel", "serve"], editable = "packages/ai-agent-lib-core" }]
 
 [[package]]
 name = "ai-agent-lib-aws"

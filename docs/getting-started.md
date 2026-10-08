@@ -312,9 +312,12 @@ uv run agentlib deploy hello-agent --plan   # every permission the adapters need
 uv run agentlib deploy hello-agent          # writes deploy/hello-agent/: Terraform and a Dockerfile
 ```
 
-The AWS adapters come from `ai-agent-lib-aws`: add it to the `dependencies`
-in `agents/hello-agent/pyproject.toml` and run `uv sync --all-packages`
-before the plan (the plan says so if you forget).
+The AWS adapters come from `ai-agent-lib-aws`: add
+`"ai-agent-lib-aws[bedrock,postgres]"` to the `dependencies` in
+`agents/hello-agent/pyproject.toml` (the extras are the Bedrock model and the
+Postgres checkpoint store) and run `uv sync --all-packages` before the plan.
+The plan names any distribution or extra the selected adapters need and the
+service lacks.
 
 `deploy.env` holds the settings the agent runs with in AWS, never a secret.
 The plan lists each adapter, the IAM actions it calls and on what, the

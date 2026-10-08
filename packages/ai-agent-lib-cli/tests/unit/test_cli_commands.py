@@ -149,7 +149,7 @@ def test_init_can_name_a_package_index_instead_of_a_checkout(tmp_path: Path) -> 
     assert '"ai-agent-lib-cli>=0.1"' in project
     assert run("new", "agent", "hello-agent", "--workspace", tmp_path / "demo") == 0
     member = (tmp_path / "demo" / "agents/hello-agent/pyproject.toml").read_text(encoding="utf-8")
-    assert '"ai-agent-lib-core[jwt,mcp,serve]>=0.1"' in member
+    assert '"ai-agent-lib-core[jwt,mcp,otel,serve]>=0.1"' in member
 
 
 def test_init_again_changes_nothing_and_keeps_what_was_added(

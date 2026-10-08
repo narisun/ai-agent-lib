@@ -28,11 +28,11 @@ def workspace(tmp_path: Path) -> Path:
     return root
 
 
-def _depend_on_aws(root: Path, folder: str) -> None:
+def _depend_on_aws(root: Path, folder: str, requirement: str = "ai-agent-lib-aws") -> None:
     pyproject = root / folder / "pyproject.toml"
     text = pyproject.read_text(encoding="utf-8")
     pyproject.write_text(
-        text.replace("dependencies = [\n", 'dependencies = [\n    "ai-agent-lib-aws",\n', 1),
+        text.replace("dependencies = [\n", f'dependencies = [\n    "{requirement}",\n', 1),
         encoding="utf-8",
     )
 
@@ -45,7 +45,7 @@ def _settings(root: Path, folder: str = "agents/helper") -> Path:
 def ready(workspace: Path, capsys: pytest.CaptureFixture[str]) -> Path:
     """A workspace whose agent has a starting deploy.env and depends on the AWS adapters."""
     assert run("deploy", "helper", "--workspace", workspace) == 0
-    _depend_on_aws(workspace, "agents/helper")
+    _depend_on_aws(workspace, "agents/helper", "ai-agent-lib-aws[bedrock,postgres]")
     capsys.readouterr()
     return workspace
 
@@ -61,7 +61,7 @@ def test_the_first_run_writes_a_starting_settings_file_and_nothing_else(
     assert run("deploy", "helper", "--workspace", workspace) == 0
     out = capsys.readouterr().out
     assert "created  agents/helper/deploy.env" in out
-    assert 'add "ai-agent-lib-aws" to the dependencies in agents/helper/pyproject.toml' in out
+    assert 'add "ai-agent-lib-aws[bedrock,postgres]" to the dependencies' in out
     text = _settings(workspace).read_text(encoding="utf-8")
     assert "EAP_PROFILE=aws" in text
     assert "never put a secret here" in text
@@ -94,10 +94,8 @@ def test_adapters_from_a_distribution_the_service_does_not_depend_on_stop_it(
 
     assert run("deploy", "helper", "--workspace", workspace) == 1
     captured = capsys.readouterr()
-    assert "which helper does not depend on" in captured.out
-    assert 'add "ai-agent-lib-aws" to the dependencies in agents/helper/pyproject.toml' in (
-        captured.out
-    )
+    assert "need ai-agent-lib-aws, which helper does not install" in captured.out
+    assert '"ai-agent-lib-aws[bedrock,postgres]" in the dependencies' in captured.out
     assert "1 problem stop the deployment" in captured.err
     assert not (workspace / "deploy").exists()
 
@@ -247,3 +245,26 @@ def test_the_written_terraform_is_formatted_valid_and_its_module_tests_pass(read
         terraform("init", "-backend=false", "-input=false", folder=folder)
         terraform("validate", folder=folder)
     terraform("test", folder=deploy / "modules" / "agentlib-service")
+
+
+def test_r20_an_extra_an_adapter_needs_is_checked_too(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert run("deploy", "helper", "--workspace", workspace) == 0
+    _depend_on_aws(workspace, "agents/helper")  # the distribution, without its extras
+    capsys.readouterr()
+
+    assert run("deploy", "helper", "--plan", "--workspace", workspace) == 1
+    out = capsys.readouterr().out
+    assert "need the extras bedrock, postgres of ai-agent-lib-aws" in out
+
+
+def test_r21_telemetry_on_needs_the_opentelemetry_sdk_in_the_image(
+    ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    pyproject = ready / "agents/helper/pyproject.toml"
+    text = pyproject.read_text(encoding="utf-8")
+    pyproject.write_text(text.replace(",otel", ""), encoding="utf-8")
+
+    assert run("deploy", "helper", "--plan", "--workspace", ready) == 1
+    assert "does not install the OpenTelemetry SDK" in capsys.readouterr().out

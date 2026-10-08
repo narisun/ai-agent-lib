@@ -357,6 +357,28 @@ async def test_a_statement_that_runs_too_long_is_cancelled(tmp_path: Path) -> No
     assert database.cancelled == ["statement-1"]
 
 
+async def test_r12_a_statement_accepted_after_the_deadline_is_still_cancelled(
+    tmp_path: Path,
+) -> None:
+    import time
+
+    source, database, _ = await started(tmp_path, timeout_seconds=0.05)
+    database.end_as = "STARTED"
+    accept = database.execute_statement
+
+    def slow_accept(**request: Any) -> dict[str, Any]:
+        time.sleep(0.3)  # the database answers well after the query's deadline
+        return accept(**request)
+
+    database.execute_statement = slow_accept  # type: ignore[method-assign]
+    with pytest.raises(TransientError, match=r"longer than 0\.05 seconds"):
+        await source.query("all_accounts")
+    assert database.cancelled == []  # no ID yet when the deadline passed
+
+    await source.aclose()  # waits for the cancellation still owed
+    assert database.cancelled == ["statement-1"]
+
+
 async def test_a_cancelled_call_cancels_its_statement(tmp_path: Path) -> None:
     source, database, _ = await started(tmp_path)
     database.end_as = "STARTED"

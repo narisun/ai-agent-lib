@@ -15,6 +15,7 @@ from ai_agent_lib_core.contracts import (
     AgentLibError,
     CallLimits,
     Clock,
+    PolicyDenied,
     RequestContext,
     TransientError,
 )
@@ -84,25 +85,38 @@ class ResilienceInterceptor(Generic[CallT, ResponseT]):
             try:
                 response = await self._attempt(request, call_next)
             except AgentLibError as error:
-                if not error.retryable or attempt == attempts or self._past_deadline(request):
+                wait = self._wait(attempt)
+                remaining = self._remaining(request)
+                # No retry that would start, or wait, past the caller's deadline.
+                out_of_time = remaining is not None and remaining <= wait
+                if not error.retryable or attempt == attempts or out_of_time:
                     request.evidence.add(attempts=attempt)
                     if error.retryable and attempt > 1:
                         error.add_note(f"tried {attempt} times, the last error is shown")
+                    if error.retryable and out_of_time and attempt < attempts:
+                        error.add_note("the request's deadline left no time to try again")
                     raise
-                await self._sleep(self._wait(attempt))
+                await self._sleep(wait)
                 continue
             request.evidence.add(attempts=attempt)
             return response
         raise AssertionError("unreachable")  # pragma: no cover - the loop returns or raises
 
     async def _attempt(self, request: CallT, call_next: Handler[CallT, ResponseT]) -> ResponseT:
-        seconds = self._limits.timeout_seconds
+        limit = self._limits.timeout_seconds
+        remaining = self._remaining(request)
+        by_deadline = remaining is not None and (limit is None or remaining < limit)
+        seconds = max(remaining, 0.0) if by_deadline and remaining is not None else limit
         if seconds is None:
             return await call_next(request)
+        if seconds <= 0:
+            raise self._deadline_passed(request)
         try:
             async with asyncio.timeout(seconds):
                 return await call_next(request)
         except TimeoutError:
+            if by_deadline:
+                raise self._deadline_passed(request) from None
             raise TransientError(
                 f"the {self._what} {request.span_name.split(' ', 1)[-1]!r} took longer than "
                 f"its limit",
@@ -111,15 +125,24 @@ class ResilienceInterceptor(Generic[CallT, ResponseT]):
                 fix=f"raise timeout_seconds in {self._variable}, or find what is slow",
             ) from None
 
+    def _deadline_passed(self, request: CallT) -> AgentLibError:
+        # The caller gave up: trying again cannot help, so this is not retryable.
+        return PolicyDenied(
+            f"the {self._what} {request.span_name.split(' ', 1)[-1]!r} ran out of the "
+            "request's time",
+            reason_code="deadline_exceeded",
+            expected="an answer before the request's deadline",
+            fix="give the request a later deadline, or find what is slow",
+        )
+
+    def _remaining(self, request: CallT) -> float | None:
+        """Seconds left before the caller's deadline, or ``None`` when it has none."""
+        context = request.context
+        if context is None or context.deadline is None:
+            return None
+        return (context.deadline - self._clock.now()).total_seconds()
+
     def _wait(self, attempt: int) -> float:
         base: float = self._limits.backoff_seconds * float(2 ** (attempt - 1))
         capped = min(base, self._limits.max_backoff_seconds)
         return float(capped * (0.5 + 0.5 * self._jitter()))
-
-    def _past_deadline(self, request: CallT) -> bool:
-        context = request.context
-        return (
-            context is not None
-            and context.deadline is not None
-            and self._clock.now() >= context.deadline
-        )

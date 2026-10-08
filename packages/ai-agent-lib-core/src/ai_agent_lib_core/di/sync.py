@@ -90,8 +90,8 @@ class SyncServices:
 
     def __enter__(self) -> Self:
         self._thread.start()
-        container = ServiceContainer(self._config, self._providers, **self._options)
         try:
+            container = ServiceContainer(self._config, self._providers, **self._options)
             self.run(container.start)
         except BaseException:
             self._stop()

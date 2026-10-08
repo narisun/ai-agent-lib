@@ -70,14 +70,14 @@ def test_a_model_is_built_over_the_injected_clients() -> None:
     sessions = offline_sessions()
     model = BedrockChatModelProvider(sessions).create(MODEL)
     assert isinstance(model, ChatBedrockConverse)
-    assert model.client is sessions.client("bedrock-runtime")
+    assert model.client is sessions.client("bedrock-runtime", retried_by_pipeline=True)
     assert model.bedrock_client is sessions.client("bedrock")
     assert model.model_id == MODEL
 
 
 async def test_the_governed_model_answers_through_bedrock_and_is_audited() -> None:
     sessions, fakes = offline_sessions(), Fakes()
-    with Stubber(sessions.client("bedrock-runtime")) as bedrock:
+    with Stubber(sessions.client("bedrock-runtime", retried_by_pipeline=True)) as bedrock:
         bedrock.add_response("converse", reply("The balance is 1,250.00 USD."))
         async with container(sessions, fakes) as services:
             with bind_request_context(CONTEXT):
@@ -106,7 +106,7 @@ async def test_a_failed_call_surfaces_as_the_librarys_own_error(
     code: str, status: int, expected: type[Exception]
 ) -> None:
     sessions, fakes = offline_sessions(profile=None, max_attempts=1), Fakes()
-    with Stubber(sessions.client("bedrock-runtime")) as bedrock:
+    with Stubber(sessions.client("bedrock-runtime", retried_by_pipeline=True)) as bedrock:
         bedrock.add_client_error(
             "converse", code, "the prompt was: a confidential question", http_status_code=status
         )
@@ -141,3 +141,12 @@ def test_a_missing_library_names_the_fix(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setitem(sys.modules, "langchain_aws", None)
     with pytest.raises(ConfigurationError, match=r"ai-agent-lib-aws\[bedrock\]"):
         BedrockChatModelProvider(offline_sessions())
+
+
+def test_r17_the_model_client_leaves_retries_to_the_pipeline() -> None:
+    sessions = offline_sessions(profile=None)
+    BedrockChatModelProvider(sessions)
+    runtime = sessions.client("bedrock-runtime", retried_by_pipeline=True)
+    assert runtime.meta.config.retries["total_max_attempts"] == 1
+    # Clients outside the model pipeline keep the SDK's own retries.
+    assert sessions.client("s3").meta.config.retries["total_max_attempts"] == 3

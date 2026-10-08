@@ -43,6 +43,7 @@ from ai_agent_lib_core.integrations.mcp.wire import (
     is_error_result,
     mcp_result_text,
 )
+from ai_agent_lib_core.integrations.spans import content_free_span
 from ai_agent_lib_core.pipeline import (
     Evidence,
     Pipeline,
@@ -320,9 +321,9 @@ class GovernedToolsMiddleware:
         started = time.perf_counter()
         ended = _Ended(_ERROR)  # what stands if the tool raises something of its own
         try:
-            tracer = trace.get_tracer(_INSTRUMENTATION)
             parent = propagate.extract(meta) if isinstance(meta, Mapping) else None
-            with tracer.start_as_current_span(
+            with content_free_span(
+                _INSTRUMENTATION,
                 "mcp.tool_call",
                 context=parent,
                 kind=trace.SpanKind.SERVER,

@@ -99,19 +99,33 @@ class BudgetInterceptor(Generic[CallT, ResponseT]):
             spent.model_calls += 1
         else:
             spent.tool_calls += 1
-        response = await call_next(request)
-        if self._usage is not None:
-            usage = self._usage(response)
-            for key in ("input_tokens", "output_tokens"):
-                value = usage.get(key)
-                if isinstance(value, int) and not isinstance(value, bool):
-                    spent.tokens += value
-        request.evidence.add(
-            budget_model_calls=spent.model_calls,
-            budget_tool_calls=spent.tool_calls,
-            budget_tokens=spent.tokens,
+        response: ResponseT | None = None
+        try:
+            response = await call_next(request)
+            return response
+        finally:
+            # Charged whether the call succeeded or a later stage rejected its reply.
+            spent.tokens += self._tokens(request, response)
+            request.evidence.add(
+                budget_model_calls=spent.model_calls,
+                budget_tool_calls=spent.tool_calls,
+                budget_tokens=spent.tokens,
+            )
+
+    def _tokens(self, request: CallT, response: ResponseT | None) -> int:
+        """The tokens the call spent: as the provider reported them, or from the reply."""
+        facts = request.evidence.facts()
+        recorded = [facts.get("input_tokens"), facts.get("output_tokens")]
+        if any(value is not None for value in recorded):
+            return sum(v for v in recorded if isinstance(v, int) and not isinstance(v, bool))
+        if self._usage is None or response is None:
+            return 0
+        usage = self._usage(response)
+        return sum(
+            value
+            for key in ("input_tokens", "output_tokens")
+            if isinstance(value := usage.get(key), int) and not isinstance(value, bool)
         )
-        return response
 
     def _check(self, spent: _Spent) -> None:
         limits = self._limits

@@ -5,7 +5,7 @@ description = "Reference agent for ai-agent-lib: answers account balance questio
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "ai-agent-lib-core[jwt,mcp,serve]",
+    "ai-agent-lib-core[jwt,mcp,otel,serve]",
 ]
 
 [project.scripts]

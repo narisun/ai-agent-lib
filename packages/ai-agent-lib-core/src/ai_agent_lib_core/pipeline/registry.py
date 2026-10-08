@@ -188,6 +188,9 @@ class RegistryInterceptor(Generic[ResponseT]):
             tool_classification=tool.classification.name.lower(),
             read_only=tool.read_only,
         )
+        # What the tool does next (a query, a nested call) runs under the lower of the
+        # request's and the agent's ceilings, not the one the request came in with.
+        context = replace(context, classification_ceiling=ceiling)
         # The registry, not the caller, says whether a tool only reads.
         return await call_next(replace(request, context=context, read_only=tool.read_only))
 

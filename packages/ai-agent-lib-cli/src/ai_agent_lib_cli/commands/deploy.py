@@ -73,8 +73,10 @@ def deploy(service: str, plan_only: bool, bundle: Path | None, workspace: Path |
         click.echo("\nNext:")
         if not depends_on_aws(root, target):
             pyproject = f"{target.folder}/pyproject.toml"
+            # The starting settings select Bedrock and Postgres for an agent.
+            extras = "[bedrock,postgres]" if target.kind == "agent" else ""
             click.echo(
-                f'  add "{AWS_DISTRIBUTION}" to the dependencies in {pyproject}, '
+                f'  add "{AWS_DISTRIBUTION}{extras}" to the dependencies in {pyproject}, '
                 "then run 'uv sync --all-packages'"
             )
         click.echo(f"  fill in {target.settings}: its values are examples")

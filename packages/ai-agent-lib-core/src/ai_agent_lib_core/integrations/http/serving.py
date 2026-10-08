@@ -136,6 +136,37 @@ async def _either(*events: asyncio.Event, serving: asyncio.Future[None]) -> None
             waiter.cancel()
 
 
+async def _started(
+    lifecycle: ServiceLifecycle, stopping: _Stop, serving: asyncio.Future[None]
+) -> bool:
+    """Run the startup check until it ends, unless a stop or the server's end comes first.
+
+    A check that hangs, say on a dependency that does not answer, must not
+    keep a stop request waiting: the check is cancelled and the service stops.
+
+    Returns:
+        Whether the check passed. ``False`` when it was cancelled.
+
+    Raises:
+        ConfigurationError: If the check failed.
+    """
+    starting: asyncio.Future[Any] = asyncio.ensure_future(lifecycle.start())
+    stopped: asyncio.Future[Any] = asyncio.ensure_future(stopping.requested.wait())
+    racing: list[asyncio.Future[Any]] = [starting, stopped, serving]
+    try:
+        await asyncio.wait(racing, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        stopped.cancel()
+    if starting.done():
+        starting.result()  # raises what the check raised
+        return True
+    starting.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await starting
+    _LOG.info("stopped before the startup check finished")
+    return False
+
+
 async def serve(
     app: Any,
     lifecycle: ServiceLifecycle,
@@ -186,7 +217,9 @@ async def serve(
         with _signals(stopping):
             await _listening(server, serving)
             _LOG.info("listening", extra={"address": uds or f"{host}:{port}"})
-            await lifecycle.start()
+            if not await _started(lifecycle, stopping, serving):
+                # Asked to stop, or the server ended, while the startup check ran.
+                return
             _LOG.info("ready")
             await _either(stopping.requested, serving=serving)
             lifecycle.begin_drain()

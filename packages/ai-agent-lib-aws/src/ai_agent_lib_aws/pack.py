@@ -133,6 +133,7 @@ def register_aws_adapters(
         bedrock_model,
         options=NoOptions,
         access=bedrock_model_access,
+        extra="bedrock",
         replace=replace,
     )
     providers.register(
@@ -141,6 +142,7 @@ def register_aws_adapters(
         postgres_checkpoint,
         options=_postgres_options(),
         access=postgres_checkpoint_access,
+        extra="postgres",
         replace=replace,
     )
     providers.register(

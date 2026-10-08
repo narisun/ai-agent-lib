@@ -9,12 +9,25 @@ from unittest import mock
 import pytest
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
-from ai_agent_lib_core.contracts import PolicyDenied, Scope
+from ai_agent_lib_core.contracts import PolicyDenied, Principal, RequestContext, Scope
 from ai_agent_lib_core.integrations.langgraph import ScopedCheckpointer, scoped_thread_id
+from ai_agent_lib_core.pipeline import bind_request_context
 
 SCOPED = scoped_thread_id(Scope("t-1", "u-1", "app"), "conversation")
 OTHER = scoped_thread_id(Scope("t-1", "u-1", "app"), "copy")
 RAW = "conversation"
+OWNER = RequestContext(
+    principal=Principal(subject="u-1", tenant="t-1"),
+    application="app",
+    request_id="r-1",
+    thread_id="conversation",
+)
+STRANGER = RequestContext(
+    principal=Principal(subject="u-2", tenant="t-1"),
+    application="app",
+    request_id="r-2",
+    thread_id="conversation",
+)
 
 
 def config(thread_id: str) -> dict[str, Any]:
@@ -50,7 +63,8 @@ async def call(target: object, name: str, thread_id: str) -> Any:
 @pytest.mark.parametrize("name", sorted(CALLS))
 async def test_a_scoped_call_is_delegated_with_the_same_arguments(name: str) -> None:
     inner = stub()
-    await call(ScopedCheckpointer(inner), name, SCOPED)
+    with bind_request_context(OWNER):
+        await call(ScopedCheckpointer(inner), name, SCOPED)
     args, kwargs = CALLS[name](SCOPED)
     getattr(inner, name).assert_called_once_with(*args, **kwargs)
 
@@ -58,31 +72,54 @@ async def test_a_scoped_call_is_delegated_with_the_same_arguments(name: str) -> 
 @pytest.mark.parametrize("name", sorted(CALLS))
 async def test_an_unscoped_call_is_refused_and_never_reaches_the_store(name: str) -> None:
     inner = stub()
-    with pytest.raises(PolicyDenied) as caught:
+    with bind_request_context(OWNER), pytest.raises(PolicyDenied) as caught:
         await call(ScopedCheckpointer(inner), name, RAW)
     assert caught.value.reason_code == "unscoped_thread"
+    getattr(inner, name).assert_not_called()
+
+
+@pytest.mark.parametrize("name", sorted(CALLS))
+async def test_another_callers_thread_is_refused_and_never_reaches_the_store(name: str) -> None:
+    # R5: a correctly shaped key is not proof of ownership.
+    inner = stub()
+    with bind_request_context(STRANGER), pytest.raises(PolicyDenied) as caught:
+        await call(ScopedCheckpointer(inner), name, SCOPED)
+    assert caught.value.reason_code == "thread_not_owned"
+    getattr(inner, name).assert_not_called()
+
+
+@pytest.mark.parametrize("name", sorted(CALLS))
+async def test_a_call_with_no_caller_is_refused(name: str) -> None:
+    inner = stub()
+    with pytest.raises(PolicyDenied) as caught:
+        await call(ScopedCheckpointer(inner), name, SCOPED)
+    assert caught.value.reason_code == "identity_missing"
     getattr(inner, name).assert_not_called()
 
 
 async def test_copying_into_an_unscoped_thread_is_refused() -> None:
     inner = stub()
     scoped = ScopedCheckpointer(inner)
-    with pytest.raises(PolicyDenied):
-        scoped.copy_thread(SCOPED, RAW)
-    with pytest.raises(PolicyDenied):
-        await scoped.acopy_thread(SCOPED, RAW)
+    with bind_request_context(OWNER):
+        with pytest.raises(PolicyDenied):
+            scoped.copy_thread(SCOPED, RAW)
+        with pytest.raises(PolicyDenied):
+            await scoped.acopy_thread(SCOPED, RAW)
     inner.copy_thread.assert_not_called()
     inner.acopy_thread.assert_not_called()
 
 
-async def test_run_scoped_and_versioning_calls_are_passed_through() -> None:
+async def test_deleting_by_run_is_refused_and_versioning_is_passed_through() -> None:
     inner = stub()
     scoped = ScopedCheckpointer(inner)
 
-    scoped.delete_for_runs(["run-1"])
-    await scoped.adelete_for_runs(["run-2"])
-    inner.delete_for_runs.assert_called_once_with(["run-1"])
-    inner.adelete_for_runs.assert_called_once_with(["run-2"])
+    # A run does not name its thread, so its owner cannot be checked.
+    with bind_request_context(OWNER), pytest.raises(PolicyDenied):
+        scoped.delete_for_runs(["run-1"])
+    with bind_request_context(OWNER), pytest.raises(PolicyDenied):
+        await scoped.adelete_for_runs(["run-2"])
+    inner.delete_for_runs.assert_not_called()
+    inner.adelete_for_runs.assert_not_called()
 
     inner.get_next_version.return_value = 2
     assert scoped.get_next_version(1, None) == 2

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import enum
+import math
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -28,6 +29,13 @@ class Score:
     name: str
     value: float
     note: str = ""
+
+    def __post_init__(self) -> None:
+        # A NaN would compare as never below a bar, and pass any of them.
+        if not math.isfinite(self.value) or not 0.0 <= self.value <= 1.0:
+            raise ValueError(
+                f"the scorer {self.name!r} gave {self.value!r}; a score is a number from 0 to 1"
+            )
 
 
 class Scorer(Protocol):

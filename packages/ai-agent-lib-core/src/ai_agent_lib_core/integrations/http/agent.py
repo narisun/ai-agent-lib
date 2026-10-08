@@ -17,7 +17,6 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from opentelemetry import trace
 from starlette.applications import Starlette
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import JSONResponse, Response, StreamingResponse
@@ -34,6 +33,7 @@ from ai_agent_lib_core.contracts import (
     ValidationFailed,
 )
 from ai_agent_lib_core.integrations.http.lifecycle import ServiceLifecycle
+from ai_agent_lib_core.integrations.spans import content_free_span
 from ai_agent_lib_core.pipeline.context import bind_request_context
 
 __all__ = [
@@ -302,7 +302,6 @@ class _Invoke:
 
     async def _answer(self, context: RequestContext, given: object) -> Response:
         """Run the agent for one caller and describe the outcome."""
-        tracer = trace.get_tracer(_INSTRUMENTATION)
         attributes = {
             "agentlib.application": self._application,
             "agentlib.request_id": context.request_id,
@@ -311,7 +310,7 @@ class _Invoke:
             # Inside the run every log line and every governed call belongs to this request.
             with (
                 bind_request_context(context),
-                tracer.start_as_current_span("agent.invoke", attributes=attributes),
+                content_free_span(_INSTRUMENTATION, "agent.invoke", attributes=attributes),
             ):
                 output = await self._run(context, given)
         except AgentLibError as error:
@@ -373,7 +372,6 @@ class _StreamRoute(_Invoke):
         )
 
     async def _events(self, context: RequestContext, given: object) -> AsyncIterator[str]:
-        tracer = trace.get_tracer(_INSTRUMENTATION)
         attributes = {
             "agentlib.application": self._application,
             "agentlib.request_id": context.request_id,
@@ -385,7 +383,7 @@ class _StreamRoute(_Invoke):
         try:
             with (
                 bind_request_context(context),
-                tracer.start_as_current_span("agent.stream", attributes=attributes),
+                content_free_span(_INSTRUMENTATION, "agent.stream", attributes=attributes),
             ):
                 async for item in self._stream(context, given):
                     yield _event("update", item)

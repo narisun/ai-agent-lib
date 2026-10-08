@@ -15,6 +15,7 @@ from ai_agent_lib_core.contracts import (
     BudgetLimits,
     CallLimits,
     Limits,
+    PolicyDenied,
     TransientError,
 )
 from ai_agent_lib_core.pipeline import (
@@ -102,15 +103,52 @@ async def test_a_tool_that_changes_something_is_never_called_twice() -> None:
     assert await stage(ToolCall(context=context(), tool="lookup", read_only=True), reader) == "done"
 
 
-async def test_no_retry_once_the_requests_deadline_has_passed() -> None:
+async def test_nothing_is_sent_once_the_requests_deadline_has_passed() -> None:
     clock = FrozenClock()
     flaky = Flaky(failures=5)
     stage: ResilienceInterceptor[Any, Any] = ResilienceInterceptor(
         CallLimits(retries=5), clock, what="model call", sleep=no_wait
     )
-    with pytest.raises(TransientError):
+    with pytest.raises(PolicyDenied) as caught:
         await stage(model_call(context(deadline=clock.now() - timedelta(seconds=1))), flaky)
+    assert caught.value.reason_code == "deadline_exceeded"
+    assert flaky.calls == 0
+
+
+async def test_r7_no_retry_that_would_wait_past_the_deadline() -> None:
+    clock = FrozenClock()
+    flaky = Flaky(failures=5)
+    stage: ResilienceInterceptor[Any, Any] = ResilienceInterceptor(
+        CallLimits(retries=5, backoff_seconds=2),
+        clock,
+        what="model call",
+        sleep=no_wait,
+        jitter=lambda: 1.0,
+    )
+    # One second left, and the first wait would be two: the first failure is the answer.
+    with pytest.raises(TransientError) as caught:
+        await stage(model_call(context(deadline=clock.now() + timedelta(seconds=1))), flaky)
     assert flaky.calls == 1
+    assert "the request's deadline left no time to try again" in caught.value.__notes__
+
+
+async def test_r7_an_attempt_is_cut_at_the_deadline_not_at_its_own_longer_limit() -> None:
+    clock = FrozenClock()
+
+    async def slow(call: object) -> str:
+        await asyncio.sleep(5)
+        return "late"
+
+    stage: ResilienceInterceptor[Any, Any] = ResilienceInterceptor(
+        CallLimits(timeout_seconds=60, retries=0), clock, what="model call", sleep=no_wait
+    )
+    deadline = clock.now() + timedelta(seconds=0.05)
+    loop = asyncio.get_running_loop()
+    started = loop.time()
+    with pytest.raises(PolicyDenied) as caught:
+        await stage(model_call(context(deadline=deadline)), slow)
+    assert caught.value.reason_code == "deadline_exceeded"
+    assert loop.time() - started < 1
 
 
 async def test_an_attempt_that_takes_too_long_is_a_transient_failure_that_says_so() -> None:

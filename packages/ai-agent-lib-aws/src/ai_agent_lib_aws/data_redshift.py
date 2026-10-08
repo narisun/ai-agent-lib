@@ -219,6 +219,10 @@ def _error_code(error: BaseException) -> str:
     return type(error).__name__
 
 
+_CLEANUP_SECONDS = 10.0
+"""How long closing waits for statements submitted late to be cancelled."""
+
+
 class RedshiftDataSource:
     """Runs named queries on Redshift through the Data API.
 
@@ -253,6 +257,8 @@ class RedshiftDataSource:
         self._client = client if client is not None else sessions.client("redshift-data")
         self._sleep = sleep
         self._catalog: QueryCatalog | None = None
+        # Late submissions and the cancellations they still owe, kept until done.
+        self._cleanups: set[asyncio.Future[Any]] = set()
 
     def __repr__(self) -> str:
         return f"RedshiftDataSource(name={self._name!r}, target={self._target.place!r})"
@@ -326,8 +332,14 @@ class RedshiftDataSource:
             raise ConfigurationError.from_error(exc) from exc
 
     async def aclose(self) -> None:
-        """Forget the loaded queries. Safe to call more than once."""
+        """Forget the loaded queries, after the cancellations still owed. Safe to repeat."""
         self._catalog = None
+        with contextlib.suppress(TimeoutError):
+            async with asyncio.timeout(_CLEANUP_SECONDS):
+                # A submission that ends schedules its cancellation: wait for both.
+                while self._cleanups:
+                    await asyncio.gather(*list(self._cleanups), return_exceptions=True)
+                    await asyncio.sleep(0)
 
     def _started(self) -> QueryCatalog:
         if self._catalog is None:
@@ -338,21 +350,50 @@ class RedshiftDataSource:
         self, label: str, request: _Request, *, limit: int
     ) -> tuple[tuple[str, ...], list[tuple[object, ...]]]:
         submitted: list[str] = []
+        # The submission runs in a thread that cancelling cannot stop. It is its own
+        # task, so a statement the database accepts after the deadline is still
+        # known, and cancelled, instead of running on with no one to stop it.
+        submission: asyncio.Future[str] | None = None
         try:
             async with asyncio.timeout(self._options.timeout_seconds):
-                statement_id = await self._submit(label, request)
+                submission = asyncio.ensure_future(self._submit(label, request))
+                statement_id = await asyncio.shield(submission)
                 submitted.append(statement_id)
                 await self._wait(label, statement_id)
                 return await self._fetch(label, statement_id, limit)
         except TimeoutError:
+            self._cancel_late(submission, submitted)
             await self._cancel(submitted)
             raise TransientError(
                 f"query {label!r} on data source {self._name!r} took longer than "
                 f"{self._options.timeout_seconds:g} seconds"
             ) from None
         except asyncio.CancelledError:
+            self._cancel_late(submission, submitted)
             await self._cancel(submitted)
             raise
+
+    def _cancel_late(self, submission: asyncio.Future[str] | None, submitted: list[str]) -> None:
+        """Cancel the statement of a submission that has not answered yet, once it does."""
+        if submission is None:
+            return
+        if submission.done():
+            if not submission.cancelled() and submission.exception() is None:
+                statement_id = submission.result()
+                if statement_id not in submitted:
+                    submitted.append(statement_id)
+            return
+
+        def cancel_when_known(finished: asyncio.Future[str]) -> None:
+            if finished.cancelled() or finished.exception() is not None:
+                return
+            cleanup = asyncio.ensure_future(self._cancel([finished.result()]))
+            self._cleanups.add(cleanup)
+            cleanup.add_done_callback(self._cleanups.discard)
+
+        submission.add_done_callback(cancel_when_known)
+        self._cleanups.add(submission)
+        submission.add_done_callback(self._cleanups.discard)
 
     async def _submit(self, label: str, request: _Request) -> str:
         arguments: dict[str, Any] = {

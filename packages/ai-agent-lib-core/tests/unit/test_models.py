@@ -223,3 +223,31 @@ async def test_a_service_that_configures_no_model_builds_no_model_provider() -> 
             services.model_provider("anthropic")
         with pytest.raises(ConfigurationError, match="model alias 'default' is not configured"):
             services.model()
+
+
+async def test_r17_the_configured_anthropic_model_leaves_retries_to_the_pipeline() -> None:
+    from ai_agent_lib_core.contracts import (
+        DeploymentEnv,
+        ExternalSettings,
+        ProviderSelection,
+        Section,
+    )
+    from ai_agent_lib_core.di import MODEL_PORT, BuildContext, ServiceProviders
+    from ai_agent_lib_core.testing import FakeSecretsProvider, FrozenClock, SequentialIds
+
+    secrets = FakeSecretsProvider({"anthropic_api_key": "sk-test-key"})
+    context = BuildContext(
+        port=MODEL_PORT,
+        selection=ProviderSelection("anthropic"),
+        deployment_env=DeploymentEnv.LOCAL,
+        tls_ca_bundle=None,
+        external=ExternalSettings(),
+        clock=FrozenClock(),
+        ids=SequentialIds(),
+        resolver=lambda port: secrets if port == Section.SECRETS else None,
+    )
+    factory = ServiceProviders.default().lookup(MODEL_PORT, "anthropic").factory
+    provider = await factory(context)  # type: ignore[misc]
+    model = provider.create("claude-model-id")
+    assert isinstance(model, ChatAnthropic)
+    assert model.max_retries == 0

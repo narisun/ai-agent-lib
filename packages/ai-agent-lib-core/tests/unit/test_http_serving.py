@@ -209,6 +209,20 @@ async def test_liveness_answers_while_the_startup_check_is_still_running(
     await asyncio.wait_for(service.task, 10)
 
 
+async def test_r11_a_stop_does_not_wait_for_a_startup_check_that_hangs(
+    socket_path: str,
+) -> None:
+    service = Running(socket_path, grace_seconds=1)
+    service.gate = asyncio.Event()  # the check never finishes on its own
+    async with asyncio.timeout(10):
+        while not Path(socket_path).exists():
+            await asyncio.sleep(0.01)
+    service.stop.set()
+    await asyncio.wait_for(service.task, 5)
+    assert not service.validated.is_set()
+    assert service.lifecycle.state is ServiceState.STOPPING
+
+
 async def test_a_failed_startup_check_stops_the_service(socket_path: str) -> None:
     service = Running(socket_path, valid=False)
     with pytest.raises(ConfigurationError, match="the audit stream is not active"):

@@ -243,3 +243,65 @@ async def test_each_governed_call_is_a_span_with_its_outcome_and_usage() -> None
     assert denied.attributes["agentlib.reason_code"] == "no_rule"
     assert denied.error_type == "PolicyDenied"
     assert "private" not in str([chat, denied])
+
+
+@pytest.mark.parametrize("route", ["/invoke", "/invoke/stream"])
+async def test_r13_a_failed_request_span_holds_the_errors_type_never_its_text(
+    monkeypatch: pytest.MonkeyPatch, route: str
+) -> None:
+    spans = InMemorySpanExporter()
+    tracers, meters = build_providers(
+        "accounts-agent", span_exporter=spans, metric_reader=InMemoryMetricReader()
+    )
+    tracers.add_span_processor(SimpleSpanProcessor(spans))
+    monkeypatch.setattr(trace, "get_tracer", lambda name, **_: tracers.get_tracer(name))
+    secret = "SSN 123-45-6789 password=hunter2"
+
+    async def run(context: RequestContext, given: Any) -> Any:
+        raise RuntimeError(secret)
+
+    async def stream(context: RequestContext, given: Any) -> Any:
+        yield {"step": 1}
+        raise RuntimeError(secret)
+
+    lifecycle = ServiceLifecycle(_ready)
+    await lifecycle.start()
+    app = agent_app(
+        Services(), run, application="accounts-agent", lifecycle=lifecycle, stream=stream
+    )
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://agent.test") as http:
+        await http.post(route, json={"input": "q"})
+
+    (span,) = [span for span in spans.get_finished_spans() if span.name.startswith("agent.")]
+    exported = str(span.to_json())
+    assert "123-45-6789" not in exported
+    assert "hunter2" not in exported
+    assert not any(event.name == "exception" for event in span.events)
+    assert dict(span.attributes or {})["error.type"] == "RuntimeError"
+    assert span.status.description == "RuntimeError"
+    tracers.shutdown()
+    meters.shutdown()
+
+
+def test_r21_telemetry_starts_only_when_the_settings_turn_it_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from ai_agent_lib_core.contracts import ServiceConfig, TelemetryMode
+    from ai_agent_lib_core.observability import otel, start_telemetry
+
+    started: list[str] = []
+
+    def configured(service: str, **_: Any) -> Any:
+        started.append(service)
+        return lambda: started.append("flushed")
+
+    monkeypatch.setattr(otel, "configure_telemetry", configured)
+    start_telemetry("accounts-agent", None)()
+    start_telemetry("accounts-agent", ServiceConfig.for_testing())()
+    assert started == []
+
+    on = ServiceConfig.for_testing(telemetry=TelemetryMode.OPENTELEMETRY)
+    stop = start_telemetry("accounts-agent", on)
+    stop()
+    assert started == ["accounts-agent", "flushed"]

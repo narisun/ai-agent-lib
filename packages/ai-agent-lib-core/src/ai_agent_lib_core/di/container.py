@@ -56,6 +56,7 @@ from ai_agent_lib_core.contracts import (
     generic_fix,
     shown_value,
 )
+from ai_agent_lib_core.di.access import selected_models
 from ai_agent_lib_core.di.providers import (
     DATA_PORT,
     MODEL_PORT,
@@ -750,13 +751,8 @@ class ServiceContainer:
         selected: list[_Key] = [
             (section.value, self._config.section(section).provider, "") for section in Section
         ]
-        model = self._config.model
-        # A service that configures no model, such as an MCP server, builds no provider.
-        default_provider = [model.provider] if model.model_id is not None else []
-        model_names = dict.fromkeys(
-            [*default_provider, *(ref.provider for ref in model.aliases.values())]
-        )
-        selected.extend((MODEL_PORT, name, "") for name in model_names)
+        # The same choice the permission plan makes: no model configured, no provider.
+        selected.extend((MODEL_PORT, name, "") for name in selected_models(self._config))
         selected.extend(
             (DATA_PORT, selection.provider, source)
             for source, selection in self._config.data_sources.items()
