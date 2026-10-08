@@ -22,7 +22,6 @@ from accounts_agent import APPLICATION as AGENT
 from accounts_agent import ask
 from accounts_mcp import APPLICATION, SERVER_ID, build_server
 from ai_agent_lib_core import Classification, Principal, RequestContext, ServiceContainer
-from ai_agent_lib_core.adapters import FakeChatModelProvider
 from ai_agent_lib_core.contracts import MASK
 from ai_agent_lib_core.integrations.mcp import (
     META_AUTHORIZATION,
@@ -30,6 +29,7 @@ from ai_agent_lib_core.integrations.mcp import (
     verify_registration,
 )
 from ai_agent_lib_core.pipeline import frame_untrusted
+from ai_agent_lib_core.testing import FakeChatModelProvider, scripted_model
 from ai_agent_lib_core.testing.mcp import InProcessMcpConnector
 
 
@@ -155,9 +155,7 @@ async def ask_as(
             classification_ceiling=Classification.RESTRICTED,
         )
         answer = await ask(services, context, "Which accounts are in the west?")
-        model = services.model_provider("fake")
-        assert isinstance(model, FakeChatModelProvider)
-        return answer, model
+        return answer, scripted_model(services)
 
 
 async def test_the_agent_answers_from_the_server_and_an_analyst_never_sees_a_holder(

@@ -8,8 +8,6 @@ or removes one that is there.
 
 from __future__ import annotations
 
-import json
-import re
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path, PurePosixPath
@@ -18,6 +16,7 @@ from typing import Any
 import yaml
 
 from ai_agent_lib_cli.errors import CliError
+from ai_agent_lib_cli.yaml_lists import extended, yaml_flow, yaml_scalar
 from ai_agent_lib_core.adapters.policy_documents import parse_rules_document
 from ai_agent_lib_core.adapters.registry_documents import (
     agents_document,
@@ -68,7 +67,6 @@ _RULES_HEADER = """\
 schema: agentlib.rules/v1
 rules: []
 """
-_NO_RULES = "rules: []"
 
 
 def _dump(document: object) -> str:
@@ -134,30 +132,19 @@ def _rule_ids(text: str, what: str) -> list[str]:
         raise CliError(f"{what} is not a valid rules document: {exc}") from None
 
 
-_PLAIN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*$")
 _LIST_KEYS = ("actions", "applications", "roles", "agents", "kinds", "resources")
-
-
-def _scalar(value: object) -> str:
-    if isinstance(value, str) and _PLAIN.match(value):
-        return value
-    return json.dumps(value)
-
-
-def _flow(values: Sequence[object]) -> str:
-    return "[" + ", ".join(_scalar(value) for value in values) + "]"
 
 
 def _rule_block(rule: Mapping[str, Any]) -> str:
     """Write one rule the way a person writes it: one line per condition."""
-    lines = [f"  - id: {_scalar(rule['id'])}"]
-    lines += [f"    {key}: {_flow(rule[key])}" for key in _LIST_KEYS if key in rule]
+    lines = [f"  - id: {yaml_scalar(rule['id'])}"]
+    lines += [f"    {key}: {yaml_flow(rule[key])}" for key in _LIST_KEYS if key in rule]
     if "max_classification" in rule:
-        lines.append(f"    max_classification: {_scalar(rule['max_classification'])}")
+        lines.append(f"    max_classification: {yaml_scalar(rule['max_classification'])}")
     if rule.get("obligations"):
         lines.append("    obligations:")
         for key, value in rule["obligations"].items():
-            written = _flow(value) if isinstance(value, list | tuple) else _scalar(value)
+            written = yaml_flow(value) if isinstance(value, list | tuple) else yaml_scalar(value)
             lines.append(f"      {key}: {written}")
     return "\n".join(lines) + "\n"
 
@@ -173,28 +160,11 @@ def rules_text(existing: str | None, rules: Sequence[Mapping[str, Any]], *, titl
         CliError: If the file is not a rules document, or its rule list is not
             the last thing in it, so that nothing can be appended safely.
     """
-    what = f"the rules file ({RULES_FILE})"
-    text = existing if existing is not None else _RULES_HEADER
-    present = set(_rule_ids(text, what))
-    missing = [rule for rule in rules if rule["id"] not in present]
-    if not missing:
-        return text
-    if text.rstrip().endswith(_NO_RULES):
-        text = text.rstrip().removesuffix(_NO_RULES) + "rules:\n"
-    blocks = [_rule_block(rule) for rule in missing]
-    if title:
-        blocks[0] = "".join(f"  # {line}\n" for line in title.splitlines()) + blocks[0]
-    separator = "" if text.endswith("rules:\n") else "\n"
-    result = text.rstrip("\n") + "\n" + separator + "\n".join(blocks)
-    wanted = present | {str(rule["id"]) for rule in missing}
-    try:
-        written = set(_rule_ids(result, what))
-    except CliError:
-        written = set()
-    if written != wanted:
-        ids = ", ".join(str(rule["id"]) for rule in missing)
-        raise CliError(
-            f"{what} could not be extended safely: keep 'rules:' as its last key, "
-            f"or add these rules by hand: {ids}"
-        )
-    return result
+    return extended(
+        existing if existing is not None else _RULES_HEADER,
+        key="rules",
+        additions={str(rule["id"]): _rule_block(rule) for rule in rules},
+        ids=lambda text: _rule_ids(text, f"the rules file ({RULES_FILE})"),
+        what=f"the rules file ({RULES_FILE})",
+        title=title,
+    )

@@ -14,7 +14,7 @@ dev = [
     "langchain-anthropic>=1.0",
     "mcp>=2.3",
     "mypy>=1.11",
-    "opentelemetry-sdk>=1.25",
+    "opentelemetry-sdk>=1.28",
     # A real PostgreSQL for the checkpoint store's integration tests. No wheel for Linux on ARM.
     "pgserver>=0.1.4; sys_platform != 'linux' or platform_machine == 'x86_64'",
     "pytest>=8.2",
@@ -184,6 +184,7 @@ type = "forbidden"
 source_modules = [
     "ai_agent_lib_core.adapters",
     "ai_agent_lib_core.config",
+    "ai_agent_lib_core.observability",
     "ai_agent_lib_core.pipeline",
 ]
 forbidden_modules = [

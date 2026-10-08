@@ -7,11 +7,12 @@ import asyncio
 import sys
 from collections.abc import Sequence
 
-from accounts_mcp.server import SERVER_ID, build_server
+from accounts_mcp.server import APPLICATION, SERVER_ID, build_server
 from ai_agent_lib_core import AgentLibError, ServiceContainer
 from ai_agent_lib_core.contracts import DeploymentEnv
 from ai_agent_lib_core.integrations.http import ServiceLifecycle, add_health_routes, serve
 from ai_agent_lib_core.integrations.mcp import verify_registration
+from ai_agent_lib_core.observability import configure_logging
 
 __all__ = ["main"]
 
@@ -39,6 +40,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--host", default="127.0.0.1", help="address to listen on")
     parser.add_argument("--port", type=int, default=8001, help="port to listen on")
     arguments = parser.parse_args(argv)
+    # One line of JSON per event on standard output, with no content in it.
+    # Before the server is built, so that nothing else sets up logging first.
+    configure_logging(APPLICATION)
     try:
         asyncio.run(_serve(arguments.host, arguments.port))
     except AgentLibError as error:

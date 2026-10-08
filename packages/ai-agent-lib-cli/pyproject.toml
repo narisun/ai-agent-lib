@@ -15,11 +15,18 @@ dependencies = [
     "ruff>=0.6",
 ]
 
+[project.optional-dependencies]
+# For 'agentlib new mcp --from-redshift', which reads the Redshift catalogue.
+aws = [
+    "ai-agent-lib-aws",
+]
+
 [project.scripts]
 agentlib = "ai_agent_lib_cli.__main__:main"
 
 [tool.uv.sources]
 ai-agent-lib-core = { workspace = true }
+ai-agent-lib-aws = { workspace = true }
 
 [build-system]
 requires = ["hatchling>=1.25"]

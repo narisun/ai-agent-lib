@@ -9,8 +9,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from ai_agent_lib_core import ServiceContainer
-from ai_agent_lib_core.adapters import FakeChatModelProvider
-from ai_agent_lib_core.testing import audit_records, load_test_config, scripted_providers
+from ai_agent_lib_core.testing import (
+    audit_records,
+    last_shown_to_model,
+    load_test_config,
+    scripted_providers,
+)
 from langchain_core.messages import AIMessage
 
 from {{ package }} import APPLICATION, answer, build_graph
@@ -32,11 +36,11 @@ async def test_the_rules_allow_the_agent_its_model_and_its_tool(tmp_path: Path) 
         # No token: on a developer's machine the development identity stands in.
         context = await services.authenticate(None, application=APPLICATION, thread_id="th-1")
         reply = await answer(build_graph(services), services, context, "Say hello to Ada.")
-        model = services.model_provider("fake")
-        assert isinstance(model, FakeChatModelProvider)
+        shown = last_shown_to_model(services)
 
     assert reply == "I said hello to Ada."
-    assert "Hello, Ada!" in str(model.models[-1].calls[1][-1].content)
+    # Before its last reply the model was shown what the tool returned.
+    assert "Hello, Ada!" in shown
     # Each step was allowed by a rule in policies/agentlib/rules/data.yaml.
     decided = [
         (record["event"], record["outcome"], record["attributes"]["policy_reason_code"])

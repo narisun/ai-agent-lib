@@ -34,9 +34,12 @@ from ai_agent_lib_core.testing.harness import FAKE_PROVIDER, Fakes, fake_provide
 from ai_agent_lib_core.testing.local import (
     TEST_AGENT,
     audit_records,
+    last_shown_to_model,
     load_test_config,
+    scripted_model,
     scripted_providers,
 )
+from ai_agent_lib_core.testing.rest import rest_stub_providers, rest_stub_transport
 
 __all__ = [
     "ACCOUNT_COLUMNS",
@@ -65,7 +68,11 @@ __all__ = [
     "audit_records",
     "fake_accounts_source",
     "fake_providers",
+    "last_shown_to_model",
     "load_test_config",
+    "rest_stub_providers",
+    "rest_stub_transport",
+    "scripted_model",
     "scripted_providers",
     "write_accounts_endpoints",
     "write_accounts_files",

@@ -15,12 +15,12 @@ APPLICATION = "{{ name }}"
 SERVER_ID = "{{ server_id }}"
 """The server's ID in the tool registry. Agents name its tools ``{{ server_id }}/<tool>``."""
 
-DATA_SOURCE = "{{ source }}"
+DATA_SOURCE = "{{ plan.source }}"
 """The name of the data source the tools read, as configured."""
 
 INSTRUCTIONS = (
-    "A greeting, and read-only tools over the people directory. Results are tables; "
-    "a column a caller may not see is returned masked."
+    {{ offers | py }}
+    " Results are tables; a column a caller may not see is returned masked."
 )
 
 
@@ -37,19 +37,25 @@ def build_server(services: ServiceContainer) -> MCPServer[Any]:
         # callers present tokens from an identity provider, the token check at the door.
         **services.mcp_server_kwargs(SERVER_ID, application=APPLICATION),
     )
-    people = services.data_source(DATA_SOURCE)  # touchpoint 2
+    source = services.data_source(DATA_SOURCE)  # touchpoint 2
+{% if sample %}
 
     @server.tool(name="{{ server_id }}.greet")
     async def greet(name: str) -> str:
         """Return a greeting for a person, given their name."""
         return f"Hello, {name.strip()}! This is {APPLICATION}."
+{% endif %}
+{% for query in plan.queries %}
 
-    @server.tool(name="{{ server_id }}.people_by_team")
-    async def people_by_team(team: str) -> dict[str, Any]:
-        """List the people in one team: platform, payments or risk."""
-        # A named query, never SQL from a caller. Policy decides the rows and
+    @server.tool(name="{{ server_id }}.{{ query.name }}")
+    async def {{ query.name }}({{ query.signature }}) -> dict[str, Any]:
+        """{{ query.description }}"""
+{% if loop.first %}
+        # A named query, never {{ "SQL" if plan.kind == "duckdb_csv" else "an address" }} from a caller. Policy decides the rows and
         # columns this caller sees before anything is returned.
-        result = await people.query("people_by_team", {"team": team})
+{% endif %}
+        result = await source.query("{{ query.name }}", {{ query.arguments }})
         return result.to_payload()
+{% endfor %}
 
     return server

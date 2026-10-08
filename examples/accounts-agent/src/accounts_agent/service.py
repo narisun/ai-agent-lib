@@ -13,6 +13,7 @@ from langchain_core.messages import HumanMessage
 from accounts_agent.graph import APPLICATION, build_graph, registered_mcp_tools
 from ai_agent_lib_core import AgentLibError, RequestContext, ServiceContainer, ValidationFailed
 from ai_agent_lib_core.integrations.http import ServiceLifecycle, agent_app, serve
+from ai_agent_lib_core.observability import configure_logging
 
 __all__ = ["build_app", "main"]
 
@@ -56,6 +57,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--host", default="127.0.0.1", help="address to listen on")
     parser.add_argument("--port", type=int, default=8000, help="port to listen on")
     arguments = parser.parse_args(argv)
+    # One line of JSON per event on standard output, with no content in it.
+    configure_logging(APPLICATION)
     try:
         asyncio.run(_serve(arguments.host, arguments.port))
     except AgentLibError as error:

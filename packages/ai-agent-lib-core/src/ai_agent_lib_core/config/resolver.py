@@ -7,7 +7,7 @@ import json
 import re
 import warnings
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, TypeVar
@@ -41,7 +41,10 @@ from ai_agent_lib_core.contracts import (
     ServiceConfig,
 )
 
-__all__ = ["ConfigResolver", "Resolution"]
+__all__ = ["MASKED", "ConfigResolver", "Resolution"]
+
+MASKED = "********"
+"""What is shown in place of a sensitive value."""
 
 EnumT = TypeVar("EnumT", Profile, DeploymentEnv)
 
@@ -60,11 +63,14 @@ class Resolution:
         config: The resolved configuration.
         origins: For each logical key, the variable or profile that supplied it.
         warnings: Messages about deprecated variable names that were used.
+        shown: For each logical key, its value as it may be displayed. The
+            value of a sensitive variable, and every secret, is masked.
     """
 
     config: ServiceConfig
     origins: Mapping[str, str]
     warnings: tuple[str, ...]
+    shown: Mapping[str, str] = field(default_factory=dict)
 
 
 class ConfigResolver:
@@ -152,7 +158,27 @@ class ConfigResolver:
             ),
             data_sources=self._data_sources(values),
         )
-        return Resolution(config=config, origins=MappingProxyType(origins), warnings=tuple(notes))
+        shown = {key: self._display(key, value) for key, value in values.items()}
+        shown.setdefault(Key.PROFILE, profile.value)
+        shown.setdefault(Key.DEPLOYMENT_ENV, deployment_env.value)
+        shown.setdefault(Key.MODEL_PROVIDER, model_provider)
+        for section, selection in sections.items():
+            shown.setdefault(provider_key(section), selection.provider)
+        for key in (Key.PROFILE, Key.DEPLOYMENT_ENV):
+            origins.setdefault(key, "default")
+        return Resolution(
+            config=config,
+            origins=MappingProxyType(origins),
+            warnings=tuple(notes),
+            shown=MappingProxyType(shown),
+        )
+
+    def _display(self, key: str, value: str) -> str:
+        """Return a value as it may be shown to a person."""
+        binding = self._by_key.get(key)
+        if key.startswith(SECRET_KEY_PREFIX) or (binding is not None and binding.sensitive):
+            return MASKED
+        return value
 
     # ------------------------------------------------------------------ reading
 

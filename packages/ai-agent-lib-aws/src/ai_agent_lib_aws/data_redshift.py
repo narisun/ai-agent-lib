@@ -26,6 +26,7 @@ from sqlglot import exp
 from sqlglot.dialects.dialect import Dialect
 from sqlglot.generator import Generator
 
+from ai_agent_lib_aws.redshift_target import RedshiftTarget, target_problem
 from ai_agent_lib_aws.session import AwsSessionFactory
 from ai_agent_lib_core.contracts import (
     AgentLibError,
@@ -90,13 +91,25 @@ class RedshiftDataOptions(OptionsModel):
 
     @model_validator(mode="after")
     def _one_target_and_one_identity(self) -> Self:
-        if (self.workgroup is None) == (self.cluster_id is None):
-            raise ValueError("set exactly one of workgroup and cluster_id")
-        if self.db_user is not None and self.cluster_id is None:
-            raise ValueError("db_user applies to a provisioned cluster; set cluster_id")
-        if self.db_user is not None and self.secret_arn is not None:
-            raise ValueError("set db_user or secret_arn, not both")
+        problem = target_problem(
+            workgroup=self.workgroup,
+            cluster_id=self.cluster_id,
+            db_user=self.db_user,
+            secret_arn=self.secret_arn,
+        )
+        if problem is not None:
+            raise ValueError(problem)
         return self
+
+    def target(self) -> RedshiftTarget:
+        """Return the database these options name, as a Data API call names it."""
+        return RedshiftTarget(
+            database=self.database,
+            workgroup=self.workgroup,
+            cluster_id=self.cluster_id,
+            db_user=self.db_user,
+            secret_arn=self.secret_arn,
+        )
 
 
 def _placeholder(generator: Generator, expression: exp.Placeholder) -> str:
@@ -234,6 +247,7 @@ class RedshiftDataSource:
     ) -> None:
         self._name = name
         self._options = options
+        self._target = options.target()
         self._sessions = sessions
         self._clock = clock
         self._client = client if client is not None else sessions.client("redshift-data")
@@ -241,8 +255,7 @@ class RedshiftDataSource:
         self._catalog: QueryCatalog | None = None
 
     def __repr__(self) -> str:
-        target = self._options.workgroup or self._options.cluster_id
-        return f"RedshiftDataSource(name={self._name!r}, target={target!r})"
+        return f"RedshiftDataSource(name={self._name!r}, target={self._target.place!r})"
 
     async def start(self) -> None:
         """Load and check the query files. Nothing is sent to the database.
@@ -342,21 +355,13 @@ class RedshiftDataSource:
             raise
 
     async def _submit(self, label: str, request: _Request) -> str:
-        options = self._options
         arguments: dict[str, Any] = {
-            "Database": options.database,
+            **self._target.arguments(),
             "Sql": request.sql,
             "StatementName": f"{self._name}.{label}"[:500],
         }
         if request.parameters:
             arguments["Parameters"] = [dict(parameter) for parameter in request.parameters]
-        optional = {
-            "WorkgroupName": options.workgroup,
-            "ClusterIdentifier": options.cluster_id,
-            "DbUser": options.db_user,
-            "SecretArn": options.secret_arn,
-        }
-        arguments.update({key: value for key, value in optional.items() if value is not None})
         reply = await self._call(label, self._client.execute_statement, **arguments)
         statement_id = reply.get("Id")
         if not isinstance(statement_id, str) or not statement_id:

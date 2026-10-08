@@ -128,7 +128,7 @@ def test_opentelemetry_adapter_emits_a_span_event_a_count_and_a_duration() -> No
     tracer_provider.add_span_processor(SimpleSpanProcessor(spans))
     reader = InMemoryMetricReader()
     meter_provider = MeterProvider(metric_readers=[reader])
-    telemetry = OpenTelemetryTelemetry(tracer_provider, meter_provider)
+    telemetry = OpenTelemetryTelemetry(meter_provider)
     attributes = {"outcome": "success", "model_alias": "default", "tokens": None}
 
     with tracer_provider.get_tracer("test").start_as_current_span("request"):

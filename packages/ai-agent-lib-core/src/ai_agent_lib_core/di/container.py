@@ -18,12 +18,15 @@ from ai_agent_lib_core.adapters.telemetry import NullTelemetry, OpenTelemetryTel
 from ai_agent_lib_core.config import load_service_config
 from ai_agent_lib_core.contracts import (
     DEFAULT_MODEL_ALIAS,
+    AgentLibError,
     AuditSink,
     ChatModelProvider,
     CheckpointBackend,
+    CheckResult,
     Classification,
     Clock,
     ConfigurationError,
+    CredentialsExpiredError,
     DataSource,
     DeploymentEnv,
     GuardrailCheck,
@@ -44,6 +47,7 @@ from ai_agent_lib_core.contracts import (
     Telemetry,
     TokenAuthenticator,
     TokenExchanger,
+    TransientError,
 )
 from ai_agent_lib_core.di.providers import (
     DATA_PORT,
@@ -73,10 +77,24 @@ if TYPE_CHECKING:
     from ai_agent_lib_core.integrations.mcp import GovernedToolsMiddleware
     from ai_agent_lib_core.integrations.mcp.client import McpConnector
 
-__all__ = ["ServiceContainer"]
+__all__ = ["ServiceContainer", "fix_for"]
 
 _Key = tuple[str, str, str]
 """Identifies one built adapter: its port, its adapter name and its instance name."""
+
+
+def fix_for(problem: BaseException) -> str:
+    """Return what a person does about a failed check, by the kind of failure."""
+    if isinstance(problem, CredentialsExpiredError):
+        return "Sign in again, with the command the message names, and run the check again."
+    if isinstance(problem, TransientError):
+        return (
+            "Check that the service is running and can be reached from here "
+            "(network, proxy, VPN), then run the check again."
+        )
+    if isinstance(problem, ConfigurationError):
+        return "Correct the setting the message names, in the service's .env or its environment."
+    return ""
 
 
 class ServiceContainer:
@@ -189,6 +207,30 @@ class ServiceContainer:
                     problems.append(f"{self._label(key)}: {exc}")
         if problems:
             raise ConfigurationError("startup validation failed: " + "; ".join(problems))
+
+    async def check(self) -> tuple[CheckResult, ...]:
+        """Check every built adapter and report each one, usable or not.
+
+        ``validate`` stops a service that is not ready. This is for a person
+        finding out why: one result per adapter, with what to do about a failure.
+        """
+        self._require_started()
+        results: list[CheckResult] = []
+        for key in self._build_order:
+            service = self._services[key]
+            label = self._label(key)
+            if not isinstance(service, SupportsValidation):
+                results.append(CheckResult(label, ok=True, detail="built"))
+                continue
+            try:
+                await service.validate()
+            except AgentLibError as problem:
+                results.append(
+                    CheckResult(label, ok=False, detail=str(problem), fix=fix_for(problem))
+                )
+            else:
+                results.append(CheckResult(label, ok=True, detail="checked"))
+        return tuple(results)
 
     async def aclose(self) -> None:
         """Close adapters in reverse build order. Safe to call more than once.

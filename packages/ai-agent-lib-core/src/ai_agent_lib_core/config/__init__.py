@@ -26,7 +26,7 @@ from ai_agent_lib_core.config.reference import (
     render_reference,
     variable_for,
 )
-from ai_agent_lib_core.config.resolver import ConfigResolver, Resolution
+from ai_agent_lib_core.config.resolver import MASKED, ConfigResolver, Resolution
 from ai_agent_lib_core.config.sources import (
     DotenvConfigSource,
     EnvironConfigSource,
@@ -37,6 +37,7 @@ from ai_agent_lib_core.contracts import ConfigSource, ServiceConfig
 
 __all__ = [
     "DEFAULT_BINDINGS",
+    "MASKED",
     "PREFIX",
     "PROFILE_DEFAULTS",
     "Binding",
@@ -57,6 +58,7 @@ __all__ = [
     "render_env_file",
     "render_reference",
     "secret_key",
+    "service_resolver",
     "variable_for",
 ]
 
@@ -73,10 +75,19 @@ def load_service_config(dotenv_path: Path | None = Path(".env")) -> ServiceConfi
         dotenv_path: The ``.env`` file to read, or ``None`` to read only the
             process environment.
     """
+    return service_resolver(dotenv_path).resolve()
+
+
+def service_resolver(dotenv_path: Path | None = Path(".env")) -> ConfigResolver:
+    """Return the resolver a service's configuration comes from.
+
+    ``resolve()`` on it gives the configuration; ``explain()`` also says which
+    variable or default supplied each setting.
+    """
     layers: list[ConfigSource] = [EnvironConfigSource()]
     base_dir: Path | None = None
     if dotenv_path is not None:
         layers.append(DotenvConfigSource(dotenv_path))
         if dotenv_path.is_file():
             base_dir = dotenv_path.resolve().parent
-    return ConfigResolver(LayeredConfigSource(*layers), base_dir=base_dir).resolve()
+    return ConfigResolver(LayeredConfigSource(*layers), base_dir=base_dir)

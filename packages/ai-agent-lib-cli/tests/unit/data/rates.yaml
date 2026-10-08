@@ -1,0 +1,99 @@
+openapi: 3.0.3
+info: {title: Rates, version: "1.0"}
+servers:
+  - url: https://rates.example.test/api/v2
+security:
+  - bearer: []
+paths:
+  /currencies:
+    get:
+      operationId: listCurrencies
+      summary: Every currency the desk quotes.
+      parameters:
+        - {name: pageSize, in: query, schema: {type: integer, default: 50}}
+        - {name: cursor, in: query, schema: {type: string}}
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: "#/components/schemas/Currency"}
+                  nextCursor: {type: string}
+  /currencies/{currencyCode}:
+    parameters:
+      - {name: currencyCode, in: path, required: true, schema: {type: string, example: EUR}}
+    get:
+      summary: One currency.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Currency"}
+  /desks/{deskId}/traders:
+    get:
+      operationId: tradersOfDesk
+      description: |
+        The traders on one desk.
+        More text that is not the summary.
+      parameters:
+        - {name: deskId, in: path, required: true, schema: {type: integer}}
+        - {name: activeOnly, in: query, required: true, schema: {type: boolean}}
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  allOf:
+                    - {$ref: "#/components/schemas/Person"}
+                    - type: object
+                      properties:
+                        desk: {type: object, properties: {id: {type: integer}, name: {type: string}}}
+    post:
+      responses: {"201": {description: created}}
+  /reports/daily:
+    get:
+      responses:
+        "200":
+          description: a file
+          content: {application/pdf: {schema: {type: string, format: binary}}}
+  /quotes:
+    get:
+      parameters:
+        - {name: X-Desk, in: header, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: "#/components/schemas/Currency"}}
+components:
+  securitySchemes:
+    bearer: {type: http, scheme: bearer}
+  schemas:
+    Currency:
+      type: object
+      properties:
+        code: {type: string, example: EUR}
+        displayName: {type: string}
+        rate: {type: number}
+        asOf: {type: string, format: date-time}
+        tags: {type: array, items: {type: string}}
+    Person:
+      type: object
+      properties:
+        id: {type: integer}
+        fullName: {type: string}
+        workEmail: {type: string, format: email}
+        joined: {type: string, format: date}

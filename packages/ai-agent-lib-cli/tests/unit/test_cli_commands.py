@@ -7,11 +7,13 @@ from pathlib import Path
 import pytest
 import yaml
 
-from ai_agent_lib_cli import __version__, scaffold
+from ai_agent_lib_cli import __version__
 from ai_agent_lib_cli.__main__ import main
 from ai_agent_lib_cli.errors import CliError
 from ai_agent_lib_cli.scaffold import Scaffolder
 from ai_agent_lib_cli.shared import read_agents, read_servers
+from ai_agent_lib_cli.testing import as_written, toolbox_for_tests
+from ai_agent_lib_cli.toolbox import Toolbox
 from ai_agent_lib_cli.workspace import (
     AgentAnswers,
     LibrarySource,
@@ -24,8 +26,13 @@ from ai_agent_lib_core.adapters import FileRegistryOptions, FileRegistrySource
 RULES = Path("policies/agentlib/rules/data.yaml")
 
 
-def run(*arguments: str | Path) -> int:
-    return main([str(argument) for argument in arguments])
+# Generated code is left unformatted here: these tests are about which files are
+# written. Formatting has its own test, and the generated-workspace tests run it for real.
+TOOLS = toolbox_for_tests()
+
+
+def run(*arguments: str | Path, tools: Toolbox = TOOLS) -> int:
+    return main([str(argument) for argument in arguments], toolbox=tools)
 
 
 def tree(root: Path) -> dict[str, str]:
@@ -39,15 +46,6 @@ def tree(root: Path) -> dict[str, str]:
 def rule_ids(root: Path) -> list[str]:
     document = yaml.safe_load((root / RULES).read_text(encoding="utf-8"))
     return [rule["id"] for rule in document["rules"]]
-
-
-@pytest.fixture(autouse=True)
-def _unformatted(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Skip the formatter here: these tests are about which files are written.
-
-    Formatting has its own test, and the generated-workspace tests run it for real.
-    """
-    monkeypatch.setattr(scaffold, "format_python", lambda files, first_party: dict(files))
 
 
 @pytest.fixture
@@ -121,13 +119,16 @@ def test_init_creates_a_workspace_that_holds_nothing_yet(
     assert sorted(files) == [
         ".gitignore",
         "README.md",
+        "agentlib.lock",
         "agentlib.toml",
         "agents/.gitkeep",
         "mcp-servers/.gitkeep",
+        "policies/.manifest",
         "policies/agentlib/rules/data.yaml",
         "pyproject.toml",
         "registry/agents.yaml",
         "registry/mcp-tools.yaml",
+        "tests/policy-samples.yaml",
         "tests/test_workspace.py",
     ]
     answers = load_answers(workspace)
@@ -290,6 +291,27 @@ def test_link_lets_an_agent_call_a_server_and_is_safe_to_repeat(
     assert tree(workspace) == linked
 
 
+def test_link_brings_the_agents_readme_up_to_date_unless_the_developer_changed_it(
+    workspace: Path,
+) -> None:
+    for agent in ("hello-agent", "their-agent"):
+        assert run("new", "agent", agent, "--workspace", workspace) == 0
+    assert run("new", "mcp", "hello-mcp", "--no-pin", "--workspace", workspace) == 0
+    theirs = workspace / "agents/their-agent/README.md"
+    theirs.write_text("# Ours now\n", encoding="utf-8")
+
+    for agent in ("hello-agent", "their-agent"):
+        assert run("link", agent, "hello", "--workspace", workspace) == 0
+
+    readme = (workspace / "agents/hello-agent/README.md").read_text(encoding="utf-8")
+    assert "uv run hello-mcp" in readme
+    assert theirs.read_text(encoding="utf-8") == "# Ours now\n"
+    # The record follows, so a later update has nothing left to do for it.
+    before = tree(workspace)
+    assert run("update", "--workspace", workspace) == 0
+    assert tree(workspace) == before
+
+
 @pytest.mark.parametrize(
     ("arguments", "message"),
     [
@@ -374,7 +396,7 @@ def test_the_pin_command_writes_what_the_server_reports(workspace: Path) -> None
         asked.append((service.relative_to(workspace).as_posix(), package))
         return {"hello.greet": "ab" * 32, "hello.unknown": "cd" * 32}
 
-    report = Scaffolder(pin_reader=reader).pin(workspace, "hello")
+    report = Scaffolder(pin_reader=reader, formatter=as_written).pin(workspace, "hello")
     assert asked == [("mcp-servers/hello-mcp", "hello_mcp")]
     assert [path.name for path in report.updated] == ["mcp-tools.yaml"]
     greet, people = read_servers(workspace)[0].tools
@@ -396,10 +418,10 @@ def test_a_workspace_is_generated_again_from_its_answers_alone(tmp_path: Path) -
         mcp_servers=(McpAnswers("hello-mcp", "hello", "A directory.", 8100),),
     )
     first, second = tmp_path / "first", tmp_path / "second"
-    Scaffolder(pin_reader=reader).init(first, answers)
+    Scaffolder(pin_reader=reader, formatter=as_written).init(first, answers)
     assert load_answers(first) == answers
 
-    Scaffolder(pin_reader=reader).init(second, load_answers(first))
+    Scaffolder(pin_reader=reader, formatter=as_written).init(second, load_answers(first))
     assert tree(second) == tree(first)
     assert "tests/test_hello_agent_with_hello_mcp.py" in tree(first)
     assert "tests/test_other_agent_with_hello_mcp.py" not in tree(first)
@@ -428,39 +450,41 @@ def test_init_from_an_answers_file_on_the_command_line(
 # ------------------------------------------------------------- pins and prompts
 
 
+def pinned(pins: dict[str, str]) -> Toolbox:
+    """A toolbox whose servers report whatever ``pins`` holds when they are asked."""
+    return toolbox_for_tests(read_pins=lambda service, package: dict(pins))
+
+
 def test_new_mcp_pins_the_tools_and_registry_pin_does_it_again(
-    workspace: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    workspace: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     pins = {"hello.greet": "ab" * 32, "hello.people_by_team": "cd" * 32}
-    monkeypatch.setattr(scaffold, "read_pins", lambda service, package: pins)
-    assert run("new", "mcp", "hello-mcp", "--workspace", workspace) == 0
+    assert run("new", "mcp", "hello-mcp", "--workspace", workspace, tools=pinned(pins)) == 0
     assert "pinned   the input schema of each tool" in capsys.readouterr().out
     assert [tool.schema_sha256 for tool in read_servers(workspace)[0].tools] == list(pins.values())
 
     pins["hello.greet"] = "ef" * 32
-    assert run("registry", "pin", "hello", "--workspace", workspace) == 0
+    assert run("registry", "pin", "hello", "--workspace", workspace, tools=pinned(pins)) == 0
     assert "updated  registry/mcp-tools.yaml" in capsys.readouterr().out
     assert read_servers(workspace)[0].tools[0].schema_sha256 == "ef" * 32
 
 
 def test_a_server_that_cannot_be_pinned_yet_is_still_created(
-    workspace: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+    workspace: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     def failing(service: Path, package: str) -> dict[str, str]:
         raise CliError("the tools of hello_mcp could not be pinned: no module named mcp")
 
-    monkeypatch.setattr(scaffold, "read_pins", failing)
-    assert run("new", "mcp", "hello-mcp", "--workspace", workspace) == 0
+    tools = toolbox_for_tests(read_pins=failing)
+    assert run("new", "mcp", "hello-mcp", "--workspace", workspace, tools=tools) == 0
     captured = capsys.readouterr()
     assert "not pinned: the tools of hello_mcp could not be pinned" in captured.err
     assert "agentlib registry pin hello" in captured.err
     assert (workspace / "mcp-servers/hello-mcp/src/hello_mcp/server.py").is_file()
-    assert run("registry", "pin", "hello", "--workspace", workspace) == 1
+    assert run("registry", "pin", "hello", "--workspace", workspace, tools=tools) == 1
 
 
-def test_at_a_terminal_the_missing_answers_are_asked_for_one_at_a_time(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_at_a_terminal_the_missing_answers_are_asked_for_one_at_a_time(tmp_path: Path) -> None:
     asked: list[str] = []
     replies = {"Which team": "payments-team", "What does the agent": "Pays.", "Model": "bedrock"}
 
@@ -468,18 +492,13 @@ def test_at_a_terminal_the_missing_answers_are_asked_for_one_at_a_time(
         asked.append(question)
         return next(reply for start, reply in replies.items() if question.startswith(start))
 
-    class Terminal:
-        @staticmethod
-        def isatty() -> bool:
-            return True
-
-    monkeypatch.setattr("sys.stdin", Terminal())
-    monkeypatch.setattr("click.prompt", prompt)
-    assert run("init", "demo", "--dir", tmp_path) == 0
-    assert run("new", "agent", "pay-agent", "--workspace", tmp_path / "demo") == 0
+    at_a_terminal = toolbox_for_tests(prompt=prompt)
+    assert run("init", "demo", "--dir", tmp_path, tools=at_a_terminal) == 0
+    demo = tmp_path / "demo"
+    assert run("new", "agent", "pay-agent", "--workspace", demo, tools=at_a_terminal) == 0
     # An answer given on the command line is not asked for.
     assert run("new", "agent", "x-agent", "--description", "X.", "--model", "fake",
-               "--workspace", tmp_path / "demo") == 0  # fmt: skip
+               "--workspace", demo, tools=at_a_terminal) == 0  # fmt: skip
     assert [question.split()[0] for question in asked] == ["Which", "What", "Model"]
     answers = load_answers(tmp_path / "demo")
     assert answers.owner == "payments-team"

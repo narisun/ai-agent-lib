@@ -22,7 +22,7 @@ _DOT_MARK = "dot_"
 @functools.cache
 def _package_templates() -> jinja2.Environment:
     """Return the environment over this package's templates, compiled once a process."""
-    return jinja2.Environment(
+    environment = jinja2.Environment(
         loader=jinja2.PackageLoader("ai_agent_lib_cli", "templates"),
         undefined=jinja2.StrictUndefined,
         keep_trailing_newline=True,
@@ -30,6 +30,9 @@ def _package_templates() -> jinja2.Environment:
         lstrip_blocks=True,
         autoescape=False,  # noqa: S701 - the output is source code, not HTML
     )
+    # A value as Python source, for the code and the tests the templates write.
+    environment.filters["py"] = repr
+    return environment
 
 
 class TemplateRenderer:

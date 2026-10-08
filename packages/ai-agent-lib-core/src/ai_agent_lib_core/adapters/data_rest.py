@@ -8,7 +8,7 @@ query name::
     path: /v1/regions/{region}/accounts
     parameters:
       region: {type: string, in: path}
-      min_balance: {type: number, in: query, default: 0}
+      min_balance: {type: number, in: query, default: 0, name: minBalance}
     max_rows: 100
     classification: restricted
     rows: data.items
@@ -18,7 +18,8 @@ query name::
       balance: balance
     as_of: data.as_of
 
-A caller supplies only parameter values. The host, the path and the fields
+A parameter's ``name`` is what the API calls it, when that differs from the
+name a caller uses. A caller supplies only parameter values. The host, the path and the fields
 that are returned are fixed by the definition, so a model can neither reach
 another address nor read a field the definition does not list.
 """
@@ -113,6 +114,7 @@ class _ParameterSpec(OptionsModel):
     type: ParameterType
     location: Literal["path", "query", "body"] = Field(default="query", alias="in")
     default: Any = None
+    name: str | None = Field(default=None, min_length=1)
 
 
 class _EndpointSpec(OptionsModel):
@@ -134,6 +136,7 @@ class _Endpoint:
     method: str
     path: str
     locations: Mapping[str, str]
+    sent_as: Mapping[str, str]
     rows: tuple[str, ...]
     columns: Mapping[str, tuple[str, ...]]
     as_of: tuple[str, ...]
@@ -200,6 +203,10 @@ def _check_shape(name: str, spec: _EndpointSpec, parameters: Sequence[QueryParam
         )
     if any(not parameter.required for parameter in parameters if parameter.name in in_path):
         raise ConfigurationError(f"query {name!r}: a path parameter cannot have a default")
+    if any(d.name is not None and d.location == "path" for d in spec.parameters.values()):
+        raise ConfigurationError(
+            f"query {name!r}: a path parameter is named by its placeholder, not by 'name'"
+        )
     if spec.method == "GET" and any(d.location == "body" for d in spec.parameters.values()):
         raise ConfigurationError(f"query {name!r}: a GET request cannot have body parameters")
     for column in spec.columns:
@@ -235,6 +242,7 @@ def _load_endpoint(path: Path) -> _Endpoint:
         method=spec.method,
         path=spec.path,
         locations=MappingProxyType({key: d.location for key, d in spec.parameters.items()}),
+        sent_as=MappingProxyType({key: d.name or key for key, d in spec.parameters.items()}),
         rows=_field_path(spec.rows),
         columns=MappingProxyType({key: _field_path(value) for key, value in spec.columns.items()}),
         as_of=_field_path(spec.as_of),
@@ -440,9 +448,9 @@ class RestDataSource:
                     raise ValidationFailed(f"parameter {key!r} cannot be used in a path")
                 segments[key] = quote(text, safe="")
             elif location == "query":
-                query[key] = _text(value)
+                query[endpoint.sent_as[key]] = _text(value)
             else:
-                body[key] = _json_value(value)
+                body[endpoint.sent_as[key]] = _json_value(value)
         path = _PLACEHOLDER.sub(lambda match: segments[match.group(1)], endpoint.path)
         headers = {}
         if self._token is not None:

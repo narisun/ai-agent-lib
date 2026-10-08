@@ -17,7 +17,9 @@ uv sync --all-packages && uv run pytest
 ```
 
 That gives a working agent and MCP server with their tests, on the local
-adapters, with no account and no network. The rest of this page is what that
+adapters, with no account and no network. [`docs/getting-started.md`](docs/getting-started.md)
+goes on from there: changing them test first, and a server over your own CSV
+files, REST API or Redshift tables. The rest of this page is what that
 generated code is made of. The commands are described in
 [`packages/ai-agent-lib-cli`](packages/ai-agent-lib-cli/README.md).
 
@@ -133,6 +135,42 @@ await serve(app, lifecycle, host=host, port=port)
 
 The entry point answers with one JSON document. It does not stream.
 
+### Logs and telemetry
+
+```python
+from ai_agent_lib_core.observability import configure_logging, configure_telemetry
+
+configure_logging("accounts-agent")  # first line of the entry point
+shutdown = configure_telemetry("accounts-agent")  # optional; needs the otel extra
+```
+
+`configure_logging` writes one JSON object per line to standard output, which
+is what the Fargate log driver collects. These are operational logs: started,
+listening, ready, one `request` line per agent call with route, status,
+duration and request ID, one `tool_call` line per MCP tool call with the tool,
+how the call ended and its duration, draining, stopped, and failures of what
+the service depends on.
+They never hold what a caller asked or a model answered; that is not in the
+audit log either. Loggers outside the library are quiet below WARNING,
+anything shaped like a credential is replaced, and an error is logged by its
+type and the place it was raised, not by its message.
+
+`configure_telemetry` installs OpenTelemetry providers that send traces and
+metrics to a collector over OTLP. The OpenTelemetry SDK reads where the
+collector is from its own standard variables. Each agent request is one
+`agent.invoke` span and each MCP tool call one `mcp.tool_call` span; the
+library's own events and metrics join them when the
+audit option `tracing` is on. Call the function it returns when the service
+stops.
+
+### Is it configured correctly?
+
+`ServiceContainer.check()` builds every adapter the configuration selects,
+runs each one's startup check and returns one result per adapter, with what is
+wrong and how to fix it. `diagnose(config)` from `ai_agent_lib_core.di` does
+the same from a configuration that may not start at all. Neither calls a
+model. `agentlib doctor` prints the results for every service of a workspace.
+
 ## Layout
 
 | Path | What it is |
@@ -144,6 +182,7 @@ The entry point answers with one JSON document. It does not stream.
 | `examples/accounts-mcp` | The reference MCP server, with its queries, rules and registries |
 | `policies/bundle` | The platform's Rego bundle for OPA, and its tests |
 | `tests/architecture` | Rules that keep the module boundaries in place |
+| `docs/getting-started.md` | From nothing to a tested agent and MCP server over your own data |
 | `docs/variables.md` | Every configuration variable, generated from the binding table |
 | `docs/identity.md` | How a signed-in user and the agent acting for them reach an MCP server, with Microsoft Entra ID and without |
 | `docs/adr` | Recorded decisions |
@@ -162,6 +201,7 @@ Inside `ai_agent_lib_core`:
 | `integrations.langgraph` | Governed model, tools and checkpointer | The only place that imports `langgraph` |
 | `integrations.mcp` | The server middleware and the agent-side MCP tools | The only place that imports the MCP SDK |
 | `integrations.http` | An agent's HTTP entry point, health routes and the server loop | The only place that imports Starlette and uvicorn |
+| `observability` | JSON operational logs and OpenTelemetry export for a service's entry point | `contracts`, `pipeline` |
 | `testing` | Fakes and the contract test suites | Everything |
 
 ## Working on the library
@@ -213,17 +253,40 @@ state kept in a temporary folder.
 
 ```python
 from ai_agent_lib_core import ServiceContainer
-from ai_agent_lib_core.testing import audit_records, load_test_config, scripted_providers
+from ai_agent_lib_core.testing import (
+    audit_records,
+    last_shown_to_model,
+    load_test_config,
+    scripted_providers,
+)
 
-config = load_test_config(SERVICE / ".env.example", state_dir=tmp_path)
-async with ServiceContainer(config, scripted_providers("scripted answer")) as services:
+config = load_test_config(SERVICE / ".env.example", state_dir=tmp_path, roles=["analyst"])
+async with ServiceContainer(config, scripted_providers(asks_for_a_tool, "answer")) as services:
     ...
+    assert "masked" in last_shown_to_model(services)  # the tool result, as the model saw it
 assert audit_records(tmp_path)[0]["attributes"]["policy_reason_code"] == "agent-uses-its-models"
 ```
+
+`roles` says who the caller without a token is, on the development identity.
+`scripted_model(services)` gives the scripted model, with every prompt it was
+sent.
 
 `ai_agent_lib_core.testing.mcp` has `call_tool_as`, which calls a tool of an
 in-process MCP server for a caller with given roles, and
 `InProcessMcpConnector`, which lets an agent reach a server with no network.
+
+A service that reads a REST API is tested without the API.
+`rest_stub_providers` keeps the real `rest` data source, with its endpoint
+definitions, parameter checks, row cap and masks, and answers its requests
+from a table in the test:
+
+```python
+from ai_agent_lib_core.testing import rest_stub_providers
+
+responses = {"GET /v1/accounts/7": {"id": 7, "owner": {"name": "Ann"}}}
+async with ServiceContainer(config, rest_stub_providers(responses)) as services:
+    ...
+```
 
 A relative path in a `.env` file is relative to that file, so a service finds
 its files whatever folder it is started from.

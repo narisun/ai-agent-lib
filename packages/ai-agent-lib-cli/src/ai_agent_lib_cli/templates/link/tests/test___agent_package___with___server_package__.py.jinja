@@ -7,13 +7,25 @@ the caller the agent acted for.
 
 from __future__ import annotations
 
+{% if rest %}
+import json
+{% endif %}
 from pathlib import Path
 from typing import Any
 
 from ai_agent_lib_core import ServiceContainer
-from ai_agent_lib_core.adapters import FakeChatModelProvider
-from ai_agent_lib_core.contracts import MASK, ProviderSelection, Section
-from ai_agent_lib_core.testing import audit_records, load_test_config, scripted_providers
+{% if sample or (query.masked and query.returns_rows) %}
+from ai_agent_lib_core.contracts import MASK
+{% endif %}
+from ai_agent_lib_core.testing import (
+    audit_records,
+    last_shown_to_model,
+    load_test_config,
+{% if rest %}
+    rest_stub_providers,
+{% endif %}
+    scripted_providers,
+)
 from ai_agent_lib_core.testing.mcp import InProcessMcpConnector
 from langchain_core.messages import AIMessage
 
@@ -24,8 +36,15 @@ from {{ server_package }} import SERVER_ID, build_server
 ROOT = Path(__file__).resolve().parents[1]
 AGENT_ENV = ROOT / "agents" / "{{ agent }}" / ".env.example"
 SERVER_ENV = ROOT / "mcp-servers" / "{{ server }}" / ".env.example"
+{% if rest %}
+# What the server's API answers in these tests. Nothing here uses the network.
+API_RESPONSES = json.loads(
+    (ROOT / "mcp-servers" / "{{ server }}" / "{{ responses_file }}").read_text(encoding="utf-8")
+)
+{% endif %}
 
 
+{% if sample %}
 def asks_who_is_in(team: str) -> AIMessage:
     """What a model replies when it decides to call the server's tool.
 
@@ -34,19 +53,38 @@ def asks_who_is_in(team: str) -> AIMessage:
     """
     call = {"name": "{{ server_id }}_people_by_team", "args": {"team": team}, "id": "call-1"}
     return AIMessage(content="", tool_calls=[call])
+{% else %}
+QUESTION = "What does {{ server_id }} have?"
+
+
+def calls_the_tool() -> AIMessage:
+    """What a model replies when it decides to call the server's tool.
+
+    A model sees an MCP tool under the server's ID and the tool's name, joined
+    by an underscore.
+    """
+    call = {
+        "name": "{{ server_id }}_{{ query.name }}",
+        "args": {{ query.example_arguments }},
+        "id": "call-1",
+    }
+    return AIMessage(content="", tool_calls=[call])
+{% endif %}
 
 
 async def ask_as(roles: list[str], tmp_path: Path, question: str, *replies: Any) -> str:
     """Ask the agent as a local caller with ``roles``; return what the model was shown."""
     server_config = load_test_config(SERVER_ENV, state_dir=tmp_path / "server")
-    agent_config = load_test_config(AGENT_ENV, state_dir=tmp_path / "agent")
-    # The local caller's roles come from the agent's identity settings.
-    identity = agent_config.section(Section.IDENTITY)
-    agent_config = agent_config.with_section(
-        Section.IDENTITY,
-        ProviderSelection(identity.provider, {**identity.options, "roles": roles}),
-    )
+    # The caller is whoever uses the agent: on a developer's machine, the
+    # development identity, here with the roles the test gives it.
+    agent_config = load_test_config(AGENT_ENV, state_dir=tmp_path / "agent", roles=roles)
+{% if rest %}
+    async with ServiceContainer(
+        server_config, rest_stub_providers(API_RESPONSES)
+    ) as server_services:
+{% else %}
     async with ServiceContainer(server_config) as server_services:
+{% endif %}
         connector = InProcessMcpConnector({SERVER_ID: build_server(server_services)})
         async with ServiceContainer(
             agent_config, scripted_providers(*replies), mcp_connector=connector
@@ -55,11 +93,10 @@ async def ask_as(roles: list[str], tmp_path: Path, question: str, *replies: Any)
             # Only this server's tools, so the test needs no other server running.
             graph = build_graph(services, await services.mcp_tools(SERVER_ID))
             await answer(graph, services, context, question)
-            model = services.model_provider("fake")
-            assert isinstance(model, FakeChatModelProvider)
-            return str(model.models[-1].calls[1][-1].content)
+            return last_shown_to_model(services)
 
 
+{% if sample %}
 async def test_the_agent_answers_from_the_server_and_an_analyst_sees_no_email(
     tmp_path: Path,
 ) -> None:
@@ -97,3 +134,36 @@ async def test_a_caller_the_server_does_not_allow_gets_a_refusal_the_model_can_e
     )
     assert "The call was denied" in shown
     assert "Cleo Carr" not in shown
+{% else %}
+async def test_the_agent_answers_from_the_server_as_an_analyst(tmp_path: Path) -> None:
+    shown = await ask_as(["analyst"], tmp_path, QUESTION, calls_the_tool(), "Here it is.")
+    # The model was shown the table as data.
+    assert shown.startswith('<untrusted_tool_result tool="{{ server_id }}.{{ query.name }}">')
+{% if query.masked and query.returns_rows %}
+    # A column this caller may not see is masked before the model sees it.
+    assert MASK in shown
+{% endif %}
+
+    # Each side keeps its own audit log, for the same person and the same request.
+    agent_call = audit_records(tmp_path / "agent")[1]
+    assert agent_call["attributes"]["mcp_server"] == SERVER_ID
+    assert agent_call["attributes"]["policy_reason_code"] == "{{ agent }}-calls-{{ server_id }}"
+    for record in audit_records(tmp_path / "server"):
+        assert record["subject"] == agent_call["subject"] == "dev-user"
+        assert record["request_id"] == agent_call["request_id"]
+
+
+{% if query.masked and query.returns_rows %}
+async def test_a_manager_is_shown_every_column(tmp_path: Path) -> None:
+    shown = await ask_as(["manager"], tmp_path, QUESTION, calls_the_tool(), "Here it is.")
+    assert shown.startswith('<untrusted_tool_result tool="{{ server_id }}.{{ query.name }}">')
+    assert MASK not in shown
+
+
+{% endif %}
+async def test_a_caller_the_server_does_not_allow_gets_a_refusal_the_model_can_explain(
+    tmp_path: Path,
+) -> None:
+    shown = await ask_as(["intern"], tmp_path, QUESTION, calls_the_tool(), "I may not.")
+    assert "The call was denied" in shown
+{% endif %}

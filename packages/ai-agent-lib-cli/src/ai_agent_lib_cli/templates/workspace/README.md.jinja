@@ -20,9 +20,27 @@ uv sync --all-packages                   # install what was added
 uv run pytest
 ```
 
+For a server over your own data instead of the sample, give `new mcp` one of
+`--from-csv <folder>`, `--from-openapi <file>` or `--from-redshift <schema>`.
+Add `--propose` to see the tools it would write first.
+
 Each command writes working code with its tests, registers the service and
 adds the rules it needs. From there the code is yours: change a test first,
 watch it fail, then change the code.
+
+## Check and run
+
+```bash
+uv run agentlib doctor                    # is everything each service needs usable?
+uv run agentlib config explain <service>  # every setting and where its value came from
+uv run agentlib run <service>             # start an agent's HTTP entry point or an MCP server
+uv run agentlib graph <agent>             # the agent's graph, as a Mermaid diagram
+uv run agentlib policy test               # do the rules decide the samples as expected?
+uv run agentlib update                    # take template changes from a newer agentlib
+```
+
+`doctor` names what is wrong and how to fix it. Run it first when a service
+does not start.
 
 ## What is here
 
@@ -34,7 +52,9 @@ watch it fail, then change the code.
 | `registry/mcp-tools.yaml` | Which MCP servers and tools exist, with a pin of each tool's input schema |
 | `policies/agentlib/rules/data.yaml` | What every service allows. A request no rule matches is denied |
 | `tests/` | Tests of the workspace as a whole, and of agents together with servers |
+| `tests/policy-samples.yaml` | Requests the rules must allow or deny. Add one before you add a rule |
 | `agentlib.toml` | The answers this workspace was generated from |
+| `agentlib.lock` | What each generated file held when it was written. Commit it: `agentlib update` uses it to leave your changes alone |
 
 Every service reads the same registry and rules files, so an agent and the
 servers it calls agree on who may do what.

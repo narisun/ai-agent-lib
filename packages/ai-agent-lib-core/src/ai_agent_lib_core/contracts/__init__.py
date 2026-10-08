@@ -5,6 +5,7 @@ cloud SDK. Everything else depends on it.
 """
 
 from ai_agent_lib_core.contracts.audit import AUDIT_SCHEMA, AuditOutcome, AuditRecord, AuditValue
+from ai_agent_lib_core.contracts.checks import CheckResult
 from ai_agent_lib_core.contracts.data import (
     MASK,
     DataSource,
@@ -110,6 +111,7 @@ __all__ = [
     "AuditValue",
     "BudgetExceeded",
     "ChatModelProvider",
+    "CheckResult",
     "CheckpointBackend",
     "Classification",
     "Clock",

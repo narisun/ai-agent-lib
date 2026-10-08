@@ -29,7 +29,6 @@ from accounts_mcp import build_server
 from ai_agent_lib_core import Classification, RequestContext, ServiceContainer
 from ai_agent_lib_core.adapters import (
     ExchangingJwtIdentity,
-    FakeChatModelProvider,
     JwtIdentityOptions,
     JwtIdentityVerifier,
     OAuthTokenExchanger,
@@ -41,6 +40,7 @@ from ai_agent_lib_core.contracts import MASK, SecretsProvider, Section, ServiceC
 from ai_agent_lib_core.di import BuildContext, ServiceProviders
 from ai_agent_lib_core.integrations.http import ServiceLifecycle, add_health_routes, serve
 from ai_agent_lib_core.integrations.mcp import verify_registration
+from ai_agent_lib_core.testing import last_shown_to_model
 from ai_agent_lib_core.testing.oauth import FakeIdentityProvider
 
 pytestmark = [pytest.mark.integration, pytest.mark.enable_socket]
@@ -141,9 +141,7 @@ async def ask_over_http(tmp_path: Path, port: int, roles: list[str]) -> tuple[st
             classification_ceiling=Classification.RESTRICTED,
         )
         answer = await ask(services, context, "Which accounts are in the west?")
-        model = services.model_provider("fake")
-        assert isinstance(model, FakeChatModelProvider)
-        return answer, str(model.models[-1].calls[1][-1].content)
+        return answer, last_shown_to_model(services)
 
 
 async def test_opa_allows_an_analyst_and_masks_the_holder(served: int, tmp_path: Path) -> None:
@@ -301,9 +299,7 @@ async def test_a_signed_in_user_reaches_the_tool_through_token_exchange_and_opa_
                         sign_in, application=AGENT, thread_id=f"th-{subject}", request_id="r-entra"
                     )
                     await ask(agent_services, context, "Which accounts are in the west?")
-                    model = agent_services.model_provider("fake")
-                    assert isinstance(model, FakeChatModelProvider)
-                    return str(model.models[-1].calls[1][-1].content)
+                    return last_shown_to_model(agent_services)
 
             analyst = await ask_as("oid-analyst", ["analyst"])
             manager = await ask_as("oid-manager", ["manager"])

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import math
 import signal
 import socket
@@ -25,6 +26,7 @@ from ai_agent_lib_core.integrations.http.lifecycle import ServiceLifecycle
 __all__ = ["serve"]
 
 _POLL_SECONDS = 0.01
+_LOG = logging.getLogger(__name__)
 
 
 class _Server(uvicorn.Server):
@@ -183,9 +185,15 @@ async def serve(
     try:
         with _signals(stopping):
             await _listening(server, serving)
+            _LOG.info("listening", extra={"address": uds or f"{host}:{port}"})
             await lifecycle.start()
+            _LOG.info("ready")
             await _either(stopping.requested, serving=serving)
             lifecycle.begin_drain()
+            _LOG.info(
+                "draining",
+                extra={"drain_seconds": drain_seconds, "grace_seconds": grace_seconds},
+            )
             if drain_seconds > 0 and not stopping.at_once.is_set() and not serving.done():
                 with contextlib.suppress(TimeoutError):
                     async with asyncio.timeout(drain_seconds):
@@ -199,3 +207,4 @@ async def serve(
             listener.close()
             if uds is not None:
                 Path(uds).unlink(missing_ok=True)
+            _LOG.info("stopped")

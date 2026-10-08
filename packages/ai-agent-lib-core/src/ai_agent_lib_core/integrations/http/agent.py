@@ -10,10 +10,14 @@ would anywhere else.
 from __future__ import annotations
 
 import json
+import logging
 import re
+import time
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import Any, Protocol
 
+from opentelemetry import trace
 from starlette.applications import Starlette
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import JSONResponse, Response
@@ -30,6 +34,7 @@ from ai_agent_lib_core.contracts import (
     ValidationFailed,
 )
 from ai_agent_lib_core.integrations.http.lifecycle import ServiceLifecycle
+from ai_agent_lib_core.pipeline.context import bind_request_context
 
 __all__ = [
     "HEALTH_PATH",
@@ -51,6 +56,9 @@ REQUEST_ID_HEADER = "x-request-id"
 _SAFE_ID = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 _BEARER = re.compile(r"^[Bb]earer +(?P<token>[^\s]+)$")
 _RETRY_AFTER_SECONDS = "1"
+_SERVER_ERROR = 500
+_LOG = logging.getLogger(__name__)
+_INSTRUMENTATION = "ai_agent_lib_core"
 
 Run = Callable[[RequestContext, Any], Awaitable[Any]]
 """Runs the agent once.
@@ -178,6 +186,14 @@ def _failure(error: AgentLibError, request_id: str) -> JSONResponse:
     return response
 
 
+@dataclass(frozen=True, slots=True)
+class _Asked:
+    """What a request asks for: the input of the run, and the conversation it belongs to."""
+
+    given: object
+    thread_id: str
+
+
 class _Invoke:
     """The route that runs the agent for one request."""
 
@@ -196,9 +212,35 @@ class _Invoke:
         self._max_body_bytes = max_body_bytes
 
     async def handle(self, request: Request) -> Response:
-        """Run the agent for one request and describe the outcome."""
+        """Run the agent for one request, describe the outcome and log one line about it."""
+        started = time.perf_counter()
+        response = await self._respond(request)
+        _LOG.log(
+            logging.ERROR if response.status_code >= _SERVER_ERROR else logging.INFO,
+            "request",
+            extra={
+                "route": INVOKE_PATH,
+                "status": response.status_code,
+                "duration_ms": round((time.perf_counter() - started) * 1000),
+                "request_id": response.headers.get(REQUEST_ID_HEADER),
+            },
+        )
+        return response
+
+    async def _respond(self, request: Request) -> Response:
+        """Read the request, find out who is asking, then run the agent for them."""
         if not self._lifecycle.accepting:
             return _unavailable()
+        asked = await self._read(request)
+        if isinstance(asked, Response):
+            return asked
+        context = await self._caller(request, asked.thread_id)
+        if isinstance(context, Response):
+            return context
+        return await self._answer(context, asked.given)
+
+    async def _read(self, request: Request) -> _Asked | Response:
+        """Return what was asked, or the reply to a request that cannot be read."""
         try:
             payload = await _read_json(request, self._max_body_bytes)
         except _TooLargeError:
@@ -210,28 +252,48 @@ class _Invoke:
         thread_id = payload["thread_id"] if "thread_id" in payload else self._new_thread()
         if not isinstance(thread_id, str) or not _SAFE_ID.match(thread_id):
             return _error(400, "invalid", detail="'thread_id' is not a usable identifier")
+        return _Asked(payload["input"], thread_id)
 
+    async def _caller(self, request: Request, thread_id: str) -> RequestContext | Response:
+        """Return the request context of the caller, or the reply to one who is refused."""
         header = request.headers.get("authorization")
         bearer = _BEARER.match(header) if header is not None else None
         if header is not None and bearer is None:
             return self._unauthorized("malformed_authorization")
-        asked = request.headers.get(REQUEST_ID_HEADER, "")
+        sent = request.headers.get(REQUEST_ID_HEADER, "")
+        request_id = sent if _SAFE_ID.match(sent) else None
         try:
-            context = await self._services.authenticate(
+            return await self._services.authenticate(
                 bearer["token"] if bearer is not None else None,
                 application=self._application,
                 thread_id=thread_id,
-                request_id=asked if _SAFE_ID.match(asked) else None,
+                request_id=request_id,
             )
         except PolicyDenied as refusal:
             return self._unauthorized(refusal.reason_code)
         except AgentLibError as error:
-            return _failure(error, asked if _SAFE_ID.match(asked) else self._services.ids.new_id())
+            return _failure(error, request_id or self._services.ids.new_id())
 
+    async def _answer(self, context: RequestContext, given: object) -> Response:
+        """Run the agent for one caller and describe the outcome."""
+        tracer = trace.get_tracer(_INSTRUMENTATION)
+        attributes = {
+            "agentlib.application": self._application,
+            "agentlib.request_id": context.request_id,
+        }
         try:
-            output = await self._run(context, payload["input"])
+            # Inside the run every log line and every governed call belongs to this request.
+            with (
+                bind_request_context(context),
+                tracer.start_as_current_span("agent.invoke", attributes=attributes),
+            ):
+                output = await self._run(context, given)
         except AgentLibError as error:
             return _failure(error, context.request_id)
+        except Exception:  # noqa: BLE001 - a bug must become a reply and a log line
+            # Its type and where it was raised are logged, never its text.
+            _LOG.exception("the run failed unexpectedly", extra={"request_id": context.request_id})
+            return _error(_SERVER_ERROR, "internal", request_id=context.request_id)
         return JSONResponse(
             {"output": output, "thread_id": context.thread_id, "request_id": context.request_id},
             headers={REQUEST_ID_HEADER: context.request_id},

@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import Any
 
 from accounts_mcp import APPLICATION
-from ai_agent_lib_core.adapters import FakeChatModelProvider
 from ai_agent_lib_core.config import ConfigResolver, MappingConfigSource
 from ai_agent_lib_core.contracts import ServiceConfig
 from ai_agent_lib_core.di import MODEL_PORT, BuildContext, ServiceProviders
+from ai_agent_lib_core.testing import FakeChatModelProvider
 
 __all__ = ["HERE", "REGISTRY", "agent_config", "records", "scripted", "server_config"]
 

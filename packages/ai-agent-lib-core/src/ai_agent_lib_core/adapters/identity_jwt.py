@@ -13,6 +13,7 @@ PyJWT is an optional dependency; install the ``jwt`` extra of
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -54,6 +55,7 @@ ExchangeKind = Literal["on_behalf_of", "token_exchange"]
 
 _INSTALL_HINT = "install it with: pip install 'ai-agent-lib-core[jwt]'"
 _WHAT = "the jwt identity provider"
+_LOG = logging.getLogger(__name__)
 _GUID = re.compile(r"^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$")
 _MAX_TOKEN_CHARS = 16_384
 _MIN_REFRESH_SECONDS = 60.0
@@ -369,7 +371,12 @@ class _SigningKeys:
             if stale or (kid not in self._keys and may_retry):
                 try:
                     await self.refresh()
-                except ConfigurationError:
+                except ConfigurationError as problem:
+                    # Whoever runs the service has to hear of this before the keys rotate.
+                    _LOG.warning(
+                        "the signing keys could not be refreshed",
+                        extra={"keys_held": len(self._keys), "reason": str(problem)},
+                    )
                     if not self._keys:
                         raise _denied(
                             "the caller's token cannot be checked: the issuer's signing keys "

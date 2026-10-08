@@ -118,6 +118,17 @@ def test_with_section_returns_a_changed_copy() -> None:
     assert config.section(Section.AUDIT).provider == "fake"
 
 
+def test_with_data_source_returns_a_copy_with_one_source_added_or_replaced() -> None:
+    config = ServiceConfig.for_testing()
+    added = config.with_data_source("ledger", ProviderSelection("fake", {"rows": 1}))
+    replaced = added.with_data_source("ledger", ProviderSelection("duckdb_csv"))
+    assert dict(config.data_sources) == {}
+    assert added.data_sources["ledger"].options == {"rows": 1}
+    assert replaced.data_sources["ledger"].provider == "duckdb_csv"
+    with pytest.raises(ValueError, match="data source name"):
+        config.with_data_source(" ", ProviderSelection("fake"))
+
+
 def test_enum_fields_accept_their_string_values() -> None:
     config = ServiceConfig(profile="aws", deployment_env="prod")  # type: ignore[arg-type]
     assert config.profile is Profile.AWS

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+import re
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -11,6 +14,7 @@ from mcp.server.auth.settings import AuthSettings
 from mcp.server.context import CallNext, HandlerResult, ServerRequestContext
 from mcp.server.mcpserver import MCPServer
 from mcp_types import CallToolResult, TextContent
+from opentelemetry import trace
 from pydantic import SecretStr
 
 from ai_agent_lib_core.contracts import (
@@ -59,6 +63,21 @@ __all__ = [
 _TOOLS_CALL = "tools/call"
 _BEARER = "bearer "
 _MAX_ID_LENGTH = 128
+
+_LOG = logging.getLogger(__name__)
+_INSTRUMENTATION = "ai_agent_lib_core"
+# A tool is named by the caller. Only a name shaped like a registered one is
+# written to a log or a span; anything else could be content.
+_TOOL_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
+_UNNAMED = "unnamed"
+_SUCCESS, _TOOL_ERROR, _DENIED, _INVALID, _FAILED, _ERROR = (
+    "success",
+    "tool_error",
+    "denied",
+    "invalid",
+    "failed",
+    "error",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -212,6 +231,10 @@ class GovernedToolsMiddleware:
     A refusal is returned to the caller as a tool error that names the reason
     code and nothing else.
 
+    Each call is one ``mcp.tool_call`` span and one ``tool_call`` log line with
+    the tool's name, how the call ended and how long it took. Neither holds an
+    argument or a result.
+
     Args:
         server: The server's ID in the tool registry.
         application: The server's application name, as policy and audit see it.
@@ -264,14 +287,45 @@ class GovernedToolsMiddleware:
             payload=_Pending(ctx, call_next),
             evidence=evidence,
         )
+        return await self._observed(call)
+
+    async def _observed(self, call: ToolCall) -> HandlerResult:
+        """Run one call inside a span, and log one line about how it ended."""
+        tool = call.tool if _TOOL_NAME.match(call.tool) else _UNNAMED
+        request_id = call.context.request_id if call.context is not None else None
+        attributes = {"agentlib.application": self._application, "agentlib.tool": tool}
+        if request_id is not None:
+            attributes["agentlib.request_id"] = request_id
+        started = time.perf_counter()
+        outcome = _ERROR  # what stands if the tool raises something of its own
         try:
-            return await self._handler(call)
+            tracer = trace.get_tracer(_INSTRUMENTATION)
+            with tracer.start_as_current_span("mcp.tool_call", attributes=attributes):
+                result, outcome = await self._answer(call)
+                return result
+        finally:
+            _LOG.log(
+                logging.ERROR if outcome in (_FAILED, _ERROR) else logging.INFO,
+                "tool_call",
+                extra={
+                    "tool": tool,
+                    "outcome": outcome,
+                    "duration_ms": round((time.perf_counter() - started) * 1000),
+                    "request_id": request_id,
+                },
+            )
+
+    async def _answer(self, call: ToolCall) -> tuple[HandlerResult, str]:
+        """Run the pipeline; return what the caller is told and how the call ended."""
+        try:
+            result = await self._handler(call)
         except PolicyDenied as denied:
-            return _error(f"The call was denied (reason: {denied.reason_code}).")
+            return _error(f"The call was denied (reason: {denied.reason_code})."), _DENIED
         except ValidationFailed as invalid:
-            return _error(f"The call was refused: {invalid}.")
+            return _error(f"The call was refused: {invalid}."), _INVALID
         except AgentLibError as error:
-            return _error(f"The call failed ({type(error).__name__}).")
+            return _error(f"The call failed ({type(error).__name__})."), _FAILED
+        return result, _TOOL_ERROR if is_error_result(result) else _SUCCESS
 
     async def _request_context(
         self, request: ServerRequestContext[Any, Any], evidence: Evidence

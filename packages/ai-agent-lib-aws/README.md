@@ -68,6 +68,7 @@ EAP_TLS_CA_BUNDLE=/path/to/enterprise-ca.pem
 | `s3_file` | `s3:GetObject` on the two objects |
 | `postgres` | `rds-db:connect` for the database user |
 | `bedrock` guardrails | `bedrock:ApplyGuardrail` |
+| reading the catalogue (`agentlib new mcp --from-redshift`) | `redshift-data:ListTables`, `redshift-data:DescribeTable`, and the same credentials action as `redshift_data`. A developer needs these, not the deployed service |
 
 ## Notes on single adapters
 
@@ -76,6 +77,13 @@ data source runs over CSV files. One role per MCP server: the server's IAM
 role is the database user, granted only the tables its queries read. Row
 filters and the row cap run inside the database. Every parameter is sent as a
 bound value with an explicit type.
+
+**Reading the Redshift catalogue.** `ai_agent_lib_aws.catalog_redshift` lists
+the tables of a schema and describes their columns through the Data API. It
+runs no statement and reads no row. `agentlib new mcp --from-redshift` uses it
+to propose a server's queries. The queries name tables without a schema,
+because the local CSV engine has none: set the search path of the server's
+database user to the schema.
 
 **`s3_file`.** The documents are the same YAML or JSON files the local `file`
 provider reads. In a bucket with versioning, the object's version ID becomes

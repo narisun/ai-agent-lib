@@ -7,26 +7,59 @@ tool registry, policy, guardrails and audit) and every query the tools make.
 
 | Tool | What it does |
 | --- | --- |
+{% if sample %}
 | `{{ server_id }}.greet` | A plain tool: returns a greeting |
 | `{{ server_id }}.people_by_team` | Runs the named query `people_by_team` over `data/people.csv` |
+{% else %}
+{% for query in plan.queries %}
+| `{{ server_id }}.{{ query.name }}` | {{ query.description }} |
+{% endfor %}
+{% endif %}
 
+{% if plan.origin == "csv" %}
+The tools were proposed from the CSV files now in `data/`: one named query
+per tool, in `queries/`. They are a starting point. Keep the ones you want,
+change what they select, and delete the rest.
+
+{% endif %}
+{% if plan.origin == "redshift" %}
+The tools were proposed from the Redshift catalogue: one named query per
+tool, in `queries/`. They are a starting point. Keep the ones you want, change
+what they select, and delete the rest.
+
+{% endif %}
+{% if rest %}
+The tools were proposed from an OpenAPI document: one endpoint definition per
+tool, in `queries/`. A definition fixes the address, the parameters and the
+fields that are returned, so a model can neither reach another address nor
+read a field the definition does not list. They are a starting point. Keep the
+ones you want, change the columns they return, and delete the rest.
+
+{% endif %}
 ## Test it
 
 ```bash
 uv run pytest mcp-servers/{{ name }}
 ```
 
-The tests need no account and no network. They run the real rules file, so
+The tests need no account and no network. {{ "The API is not called: `" ~ responses_file ~ "` holds what it answers,\nby method and path. " if rest else "" }}They run the real rules file, so
 they show what each role is allowed to see:
 
 | Role | Tool call | Data |
 | --- | --- | --- |
 | `manager` | allowed | every column |
-| `analyst` | allowed | `email` is masked, at most 50 rows |
+{% if plan.masked %}
+| `analyst` | allowed | {% for column in plan.masked %}`{{ column }}`{{ ", " if not loop.last }}{% endfor %} {{ "is" if plan.masked | length == 1 else "are" }} masked, at most {{ analyst_rows }} rows |
+{% else %}
+| `analyst` | allowed | every column, at most {{ analyst_rows }} rows |
+{% endif %}
 | anything else | denied | none |
 
 Start a change with a test in `tests/test_{{ package }}.py`: pick the caller's
 roles, call the tool, and say what that caller should be shown.
+{% if not sample %}
+The generated tests check the columns each role sees. Add the rows you expect.
+{% endif %}
 
 ## Run it
 
@@ -36,16 +69,55 @@ uv run {{ name }}        # serves http://127.0.0.1:{{ port }}/mcp, with /healthz
 
 On this machine a caller without a token is the development identity in
 `{{ var.identity_options }}`. Local state is written under `.agentlib/`.
+{% if rest %}
+
+Running the server calls the real API at `{{ plan.options.base_url }}`. That
+address is the `base_url` of the data source in `.env`. If the API wants a
+token:
+
+1. Add `"auth_secret": "{{ plan.source }}_token"` to the data source's options
+   in `.env`. The token is sent as a bearer token; `auth_header` and
+   `auth_scheme` change that.
+2. Set `{{ var.secret_prefix }}{{ plan.source | upper }}_TOKEN` in `.env`, never in
+   `.env.example`. When deployed, the secret comes from the secrets provider.
+{% endif %}
 
 ## What to read
 
 | File | Shows |
 | --- | --- |
 | `src/{{ package }}/server.py` | The tools, and the two places the library appears |
+{% if sample %}
 | `queries/people_by_team.sql` | A named query: SQL with a declared interface |
 | `data/people.csv` | The sample data. Each CSV file is a table |
+{% else %}
+| `queries/` | The named queries: {{ "SQL" if plan.kind == "duckdb_csv" else "endpoint definitions" }} with a declared interface |
+{% if plan.kind == "duckdb_csv" %}
+| `data/` | The data. Each CSV file is a table |
+{% endif %}
+{% endif %}
 | `.env.example` | How the service is configured locally |
 
+{% if plan.notes or plan.deployed %}
+## Before it is deployed
+
+{% for note in plan.notes %}
+- {{ note }}
+{% endfor %}
+{% if plan.deployed %}
+- Deployed, the same query files run on the real database. Give the service
+  this value for `{{ var.data_sources }}` instead of the local one:
+
+  ```text
+  {{ plan.deployed_setting }}
+  ```
+
+  What the service's role must be allowed to do is in the README of
+  `ai-agent-lib-aws`.
+{% endif %}
+
+{% endif %}
+{% if plan.kind == "duckdb_csv" %}
 ## Adding a tool over your own data
 
 1. Put a CSV file in `data/` and a query in `queries/`. The query's header
@@ -60,3 +132,4 @@ On this machine a caller without a token is the development identity in
 
 The queries are written in the dialect of the production database and run
 unchanged over CSV files locally.
+{% endif %}

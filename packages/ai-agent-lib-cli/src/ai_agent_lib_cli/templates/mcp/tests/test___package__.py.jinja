@@ -1,22 +1,35 @@
 """The server with its own configuration, called in process with no network.
 
-Everything is real except the transport: the CSV data source, the rules file,
+Everything is real except the transport: the {{ "CSV data source" if plan.kind == "duckdb_csv" else "endpoint definitions" }}, the rules file,
 the registry and the audit log. A test picks the caller's roles, calls a tool
 the way an agent does, and checks what that caller was shown.
 """
 
 from __future__ import annotations
 
+{% if sample or rest %}
 import json
+{% endif %}
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
 import pytest
 from ai_agent_lib_core import ServiceContainer
+{% if sample or plan.masked %}
 from ai_agent_lib_core.contracts import MASK
+{% endif %}
 from ai_agent_lib_core.integrations.mcp import mcp_result_text, verify_registration
+{% if rest %}
+from ai_agent_lib_core.testing import (
+    TEST_AGENT,
+    audit_records,
+    load_test_config,
+    rest_stub_providers,
+)
+{% else %}
 from ai_agent_lib_core.testing import TEST_AGENT, audit_records, load_test_config
+{% endif %}
 from ai_agent_lib_core.testing.mcp import call_tool_as
 from mcp.server.mcpserver import MCPServer
 
@@ -24,6 +37,13 @@ from {{ package }} import APPLICATION, SERVER_ID, build_server
 
 SERVICE = Path(__file__).resolve().parents[1]
 Running = tuple[ServiceContainer, MCPServer[Any]]
+{% if rest %}
+
+# What the API answers in these tests, by method and path. Nothing here uses
+# the network. The file was written from the examples in the API's description:
+# put in answers that look like the real ones.
+API_RESPONSES = json.loads((SERVICE / "{{ responses_file }}").read_text(encoding="utf-8"))
+{% endif %}
 
 
 @pytest.fixture
@@ -36,7 +56,11 @@ async def running(tmp_path: Path) -> AsyncIterator[Running]:
     config = load_test_config(
         SERVICE / ".env.example", state_dir=tmp_path, test_agent=TEST_AGENT
     )
+{% if rest %}
+    async with ServiceContainer(config, rest_stub_providers(API_RESPONSES)) as services:
+{% else %}
     async with ServiceContainer(config) as services:
+{% endif %}
         await services.validate()
         yield services, build_server(services)
 
@@ -52,6 +76,7 @@ async def test_the_tools_are_the_ones_the_registry_lists(running: Running) -> No
     assert entry.audience == APPLICATION
 
 
+{% if sample %}
 async def test_greet_says_hello(running: Running) -> None:
     services, server = running
     result = await call_tool_as(
@@ -89,7 +114,7 @@ async def test_an_analyst_sees_people_but_not_their_email(
     # Both decisions are on the audit log, and the masked value is not.
     query, tool = audit_records(tmp_path)
     assert (query["event"], tool["event"]) == ("data.query", "tool.call")
-    assert query["attributes"]["policy_reason_code"] == "{{ server_id }}-analysts-see-no-email"
+    assert query["attributes"]["policy_reason_code"] == "{{ analyst_rule }}"
     assert tool["attributes"]["policy_reason_code"] == "{{ server_id }}-staff-call-the-tools"
     assert "eli.ember" not in json.dumps([query, tool])
 
@@ -114,3 +139,84 @@ async def test_a_team_nobody_is_in_is_an_empty_table_not_an_error(running: Runni
     )
     assert not result.is_error
     assert result.structured_content["rows"] == []
+{% else %}
+{% if rest %}
+# The tests below say which columns each role sees of what the API answers.
+# Add what the rows should be: that is where a change to a definition starts.
+{% else %}
+# The tests below were written from the data as it was when the server was
+# generated. They say which columns each role sees. Add what the rows should
+# be: that is where a change to a query starts.
+{% endif %}
+{% for query in plan.queries %}
+
+
+async def test_{{ query.name }}_shows_a_manager_every_column(running: Running) -> None:
+    services, server = running
+    result = await call_tool_as(
+        services,
+        server,
+        "{{ server_id }}.{{ query.name }}",
+        {{ query.example_arguments }},
+        roles=["manager"],
+    )
+    assert not result.is_error, mcp_result_text(result)
+    table = result.structured_content
+    assert table["columns"] == {{ query.columns | list | py }}
+    assert table["masked_columns"] == []
+    assert len(table["rows"]) <= {{ query.max_rows }}
+{% if query.returns_rows %}
+    assert table["rows"], "these arguments matched rows when the server was generated"
+{% endif %}
+
+
+{% if query.masked %}
+async def test_{{ query.name }}_masks_columns_for_an_analyst(
+    running: Running, tmp_path: Path
+) -> None:
+{% else %}
+async def test_{{ query.name }}_shows_an_analyst_every_column_of_fewer_rows(
+    running: Running, tmp_path: Path
+) -> None:
+{% endif %}
+    services, server = running
+    result = await call_tool_as(
+        services,
+        server,
+        "{{ server_id }}.{{ query.name }}",
+        {{ query.example_arguments }},
+        roles=["analyst"],
+    )
+    assert not result.is_error, mcp_result_text(result)
+    table = result.structured_content
+    assert table["masked_columns"] == {{ query.masked | sort | list | py }}
+    assert len(table["rows"]) <= {{ [query.max_rows, analyst_rows] | min }}
+{% if query.masked %}
+    masked = [table["columns"].index(name) for name in table["masked_columns"]]
+    assert all(row[index] == MASK for row in table["rows"] for index in masked)
+{% endif %}
+
+    # Both decisions are on the audit log, with the rule that made each.
+    query, tool = audit_records(tmp_path)
+    assert (query["event"], tool["event"]) == ("data.query", "tool.call")
+    assert query["attributes"]["policy_reason_code"] == "{{ analyst_rule }}"
+    assert tool["attributes"]["policy_reason_code"] == "{{ server_id }}-staff-call-the-tools"
+{% endfor %}
+
+
+async def test_any_other_role_is_denied_before_the_tool_runs(
+    running: Running, tmp_path: Path
+) -> None:
+    services, server = running
+    result = await call_tool_as(
+        services,
+        server,
+        "{{ server_id }}.{{ plan.queries[0].name }}",
+        {{ plan.queries[0].example_arguments }},
+        roles=["intern"],
+    )
+    assert result.is_error
+    assert mcp_result_text(result) == "The call was denied (reason: no_matching_rule)."
+    (record,) = audit_records(tmp_path)
+    assert (record["event"], record["outcome"]) == ("tool.call", "denied")
+{% endif %}

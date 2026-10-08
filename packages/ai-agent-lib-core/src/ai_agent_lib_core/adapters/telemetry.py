@@ -35,21 +35,15 @@ def _clean(attributes: Mapping[str, AuditValue]) -> dict[str, str | int | float 
 class OpenTelemetryTelemetry:
     """Emits metadata-only events and metrics through the OpenTelemetry API.
 
-    An event becomes a span event on the current span and an increment of the
-    ``agentlib.events`` counter. A duration is recorded in the
-    ``agentlib.duration`` histogram, in seconds.
+    An event becomes a span event on the current span, whichever tracer started
+    it, and an increment of the ``agentlib.events`` counter. A duration is
+    recorded in the ``agentlib.duration`` histogram, in seconds.
 
     Args:
-        tracer_provider: Optional. Defaults to the globally configured provider.
         meter_provider: Optional. Defaults to the globally configured provider.
     """
 
-    def __init__(
-        self,
-        tracer_provider: trace.TracerProvider | None = None,
-        meter_provider: metrics.MeterProvider | None = None,
-    ) -> None:
-        self._tracer = trace.get_tracer(_INSTRUMENTATION_NAME, tracer_provider=tracer_provider)
+    def __init__(self, meter_provider: metrics.MeterProvider | None = None) -> None:
         meter = metrics.get_meter(_INSTRUMENTATION_NAME, meter_provider=meter_provider)
         self._events = meter.create_counter(
             "agentlib.events", unit="1", description="Governed calls, by event and outcome."

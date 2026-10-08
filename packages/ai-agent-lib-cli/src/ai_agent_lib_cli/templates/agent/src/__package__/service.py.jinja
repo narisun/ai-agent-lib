@@ -10,6 +10,7 @@ from typing import Any
 
 from ai_agent_lib_core import AgentLibError, RequestContext, ServiceContainer, ValidationFailed
 from ai_agent_lib_core.integrations.http import ServiceLifecycle, agent_app, serve
+from ai_agent_lib_core.observability import configure_logging
 
 from {{ package }}.graph import APPLICATION, answer, build_graph, registered_mcp_tools
 from {{ package }}.settings import ENV_FILE
@@ -49,6 +50,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--host", default="127.0.0.1", help="address to listen on")
     parser.add_argument("--port", type=int, default={{ port }}, help="port to listen on")
     arguments = parser.parse_args(argv)
+    # One line of JSON per event on standard output, with no content in it.
+    configure_logging(APPLICATION)
     try:
         asyncio.run(_serve(arguments.host, arguments.port))
     except AgentLibError as error:

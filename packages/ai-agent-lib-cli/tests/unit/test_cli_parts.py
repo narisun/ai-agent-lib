@@ -31,6 +31,7 @@ from ai_agent_lib_cli.workspace import (
     find_workspace,
     load_answers,
 )
+from ai_agent_lib_cli.yaml_lists import yaml_flow, yaml_scalar
 from ai_agent_lib_core.adapters import (
     DuckDbCsvOptions,
     FileRegistryOptions,
@@ -287,7 +288,7 @@ def test_a_rules_file_that_cannot_be_extended_safely_is_left_alone() -> None:
     with pytest.raises(CliError, match="not a valid rules document"):
         rules_text("schema: agentlib.rules/v1\nrules: [", [RULE])
     reordered = "rules: []\nschema: agentlib.rules/v1\n"
-    with pytest.raises(CliError, match="add these rules by hand: hello-agent-uses-its-models"):
+    with pytest.raises(CliError, match="add these by hand: hello-agent-uses-its-models"):
         rules_text(reordered, [RULE])
 
 
@@ -339,10 +340,41 @@ def test_a_servers_settings_select_its_data_and_no_checkpoint_store(tmp_path: Pa
 
 def test_variable_names_for_the_readmes_come_from_the_binding_table(tmp_path: Path) -> None:
     names = variable_names()
+    # One of them is the start of a name: a secret's variable ends with the secret's name.
+    names["secret_prefix"] += "RATES_TOKEN"
     text = "\n".join(
-        f"{name}={json.dumps({}) if 'options' in key else 'fake'}"
+        f"{name}={json.dumps({}) if 'options' in key or key == 'data_sources' else 'fake'}"
         for key, name in names.items()
         if key != "deployment_env"
     )
     config = resolved(tmp_path, text).resolve()
     assert config.model.provider == "fake"
+
+
+# ------------------------------------------------------------- YAML a person keeps
+
+
+@pytest.mark.parametrize(
+    ("value", "written"),
+    [
+        ("analyst", "analyst"),
+        ("people by team", "people by team"),
+        ("hello-staff_1.v2", "hello-staff_1.v2"),
+        # What YAML would read as something other than this text is quoted.
+        ("on", '"on"'),
+        ("No", '"No"'),
+        ("50", '"50"'),
+        ("hello/*", '"hello/*"'),
+        ("trailing ", '"trailing "'),
+        ("", '""'),
+        ("über", '"über"'),
+        (50, "50"),
+        (True, "true"),
+    ],
+)
+def test_a_value_is_written_plainly_only_where_yaml_reads_it_back_unchanged(
+    value: object, written: str
+) -> None:
+    assert yaml_scalar(value) == written
+    assert yaml.safe_load(f"key: {written}")["key"] == value
+    assert yaml_flow([value, "x"]) == f"[{written}, x]"

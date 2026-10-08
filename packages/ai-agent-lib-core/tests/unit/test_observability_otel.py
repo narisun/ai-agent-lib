@@ -1,0 +1,185 @@
+"""Telemetry export: providers for a collector, and a span for each agent request."""
+
+from __future__ import annotations
+
+import sys
+from typing import Any
+
+import httpx
+import pytest
+from mcp import Client
+from mcp.server.mcpserver import MCPServer
+from opentelemetry import metrics, trace
+from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+from ai_agent_lib_core import Principal, RequestContext, ServiceContainer
+from ai_agent_lib_core.adapters import (
+    OpenTelemetryTelemetry,
+    StaticIdentityOptions,
+    StaticIdentityVerifier,
+)
+from ai_agent_lib_core.contracts import Classification, ConfigurationError, ServerEntry, ToolEntry
+from ai_agent_lib_core.integrations.http import ServiceLifecycle, agent_app
+from ai_agent_lib_core.integrations.mcp import META_REQUEST_ID
+from ai_agent_lib_core.observability import build_providers, configure_telemetry
+from ai_agent_lib_core.testing import FakeRegistry, Fakes, FrozenClock, SequentialIds
+
+
+def test_providers_carry_the_service_name_and_export_what_the_library_emits() -> None:
+    spans, reader = InMemorySpanExporter(), InMemoryMetricReader()
+    tracers, meters = build_providers("accounts-agent", span_exporter=spans, metric_reader=reader)
+    telemetry = OpenTelemetryTelemetry(meters)
+    with tracers.get_tracer("test").start_as_current_span("agent.invoke"):
+        telemetry.event("model.call", {"outcome": "success", "skipped": None})
+        telemetry.duration("model.call", 0.25, {"outcome": "success"})
+    tracers.force_flush()
+
+    (span,) = spans.get_finished_spans()
+    assert span.resource.attributes["service.name"] == "accounts-agent"
+    assert [(event.name, dict(event.attributes or {})) for event in span.events] == [
+        ("model.call", {"outcome": "success"})
+    ]
+    data = reader.get_metrics_data()
+    assert data is not None
+    names = {
+        metric.name
+        for resource in data.resource_metrics
+        for scope in resource.scope_metrics
+        for metric in scope.metrics
+    }
+    assert names == {"agentlib.events", "agentlib.duration"}
+    tracers.shutdown()
+    meters.shutdown()
+
+
+def test_the_default_exporters_send_to_a_collector() -> None:
+    tracers, meters = build_providers("accounts-agent")
+    processor: Any = tracers._active_span_processor._span_processors[0]
+    assert type(processor.span_exporter).__name__ == "OTLPSpanExporter"
+    tracers.shutdown()
+    meters.shutdown()
+
+
+def test_configuring_installs_the_providers_for_the_process(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    installed: dict[str, Any] = {}
+    monkeypatch.setattr(trace, "set_tracer_provider", lambda p: installed.setdefault("traces", p))
+    monkeypatch.setattr(metrics, "set_meter_provider", lambda p: installed.setdefault("metrics", p))
+    shutdown = configure_telemetry(
+        "accounts-agent", span_exporter=InMemorySpanExporter(), metric_reader=InMemoryMetricReader()
+    )
+    assert sorted(installed) == ["metrics", "traces"]
+    shutdown()
+    assert installed["traces"]._active_span_processor is not None
+
+
+def test_without_the_sdk_the_fix_is_named(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(sys.modules, "opentelemetry.sdk.trace", None)
+    with pytest.raises(ConfigurationError, match=r"ai-agent-lib-core\[otel\]"):
+        build_providers("accounts-agent")
+
+
+class Services:
+    ids = SequentialIds()
+
+    async def authenticate(
+        self, credential: str | None, *, application: str, thread_id: str,
+        request_id: str | None = None,
+    ) -> RequestContext:  # fmt: skip
+        return RequestContext(
+            principal=Principal(subject="ann", tenant="t-1"),
+            application=application,
+            request_id=request_id or "r-1",
+            thread_id=thread_id,
+        )
+
+
+async def _ready() -> None:
+    return None
+
+
+async def test_an_agent_request_is_one_span_that_holds_the_governed_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spans = InMemorySpanExporter()
+    tracers, meters = build_providers(
+        "accounts-agent", span_exporter=spans, metric_reader=InMemoryMetricReader()
+    )
+    tracers.add_span_processor(SimpleSpanProcessor(spans))
+    telemetry = OpenTelemetryTelemetry(meters)
+    monkeypatch.setattr(trace, "get_tracer", lambda name: tracers.get_tracer(name))
+
+    async def run(context: RequestContext, given: Any) -> Any:
+        telemetry.event("tool.call", {"outcome": "success"})
+        return {"ok": True}
+
+    lifecycle = ServiceLifecycle(_ready)
+    await lifecycle.start()
+    app = agent_app(Services(), run, application="accounts-agent", lifecycle=lifecycle)
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://agent.test") as http:
+        reply = await http.post(
+            "/invoke", json={"input": "a private question"}, headers={"x-request-id": "r-9"}
+        )
+    assert reply.status_code == 200
+    span = spans.get_finished_spans()[0]
+    assert span.name == "agent.invoke"
+    assert dict(span.attributes or {}) == {
+        "agentlib.application": "accounts-agent",
+        "agentlib.request_id": "r-9",
+    }
+    assert [event.name for event in span.events] == ["tool.call"]
+    assert "private" not in str(span.to_json())
+    tracers.shutdown()
+    meters.shutdown()
+
+
+async def test_a_tool_call_of_a_server_is_one_span_that_holds_its_governed_steps(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spans = InMemorySpanExporter()
+    tracers, meters = build_providers(
+        "notes-mcp", span_exporter=spans, metric_reader=InMemoryMetricReader()
+    )
+    tracers.add_span_processor(SimpleSpanProcessor(spans))
+    monkeypatch.setattr(trace, "get_tracer", lambda name: tracers.get_tracer(name))
+    tool = ToolEntry(name="notes.read", version="1", classification=Classification.INTERNAL)
+    entry = ServerEntry(
+        id="notes", owner="tests", url="http://127.0.0.1:1/mcp", audience="notes-mcp", tools=(tool,)
+    )
+    clock = FrozenClock()
+    fakes = Fakes(
+        clock=clock,
+        identity=StaticIdentityVerifier(StaticIdentityOptions(audience="notes-mcp"), clock),
+        registry=FakeRegistry(servers=[entry]),
+    )
+    container = ServiceContainer(
+        fakes.config(), fakes.providers(), clock=clock, telemetry=OpenTelemetryTelemetry(meters)
+    )
+    async with container as services:
+        server: MCPServer[Any] = MCPServer(
+            "notes-mcp", middleware=[services.mcp_middleware("notes", application="notes-mcp")]
+        )
+
+        @server.tool(name="notes.read")
+        async def read(title: str) -> str:
+            return f"the private note called {title}"
+
+        async with Client(server) as client:
+            meta: Any = {META_REQUEST_ID: "r-9"}
+            await client.call_tool("notes.read", {"title": "salary review"}, meta=meta)
+
+    (span,) = [s for s in spans.get_finished_spans() if s.name == "mcp.tool_call"]
+    assert dict(span.attributes or {}) == {
+        "agentlib.application": "notes-mcp",
+        "agentlib.tool": "notes.read",
+        "agentlib.request_id": "r-9",
+    }
+    assert "tool.call" in [event.name for event in span.events]
+    assert "salary" not in str(span.to_json())
+    assert "private" not in str(span.to_json())
+    tracers.shutdown()
+    meters.shutdown()

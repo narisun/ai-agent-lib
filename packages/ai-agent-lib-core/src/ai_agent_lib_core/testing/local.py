@@ -11,6 +11,7 @@ the model, and where local state is written.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -27,11 +28,10 @@ from ai_agent_lib_core.contracts import (
     Classification,
     ConfigurationError,
     ModelSection,
-    ProviderSelection,
     Section,
     ServiceConfig,
 )
-from ai_agent_lib_core.di import MODEL_PORT, BuildContext, ServiceProviders
+from ai_agent_lib_core.di import MODEL_PORT, BuildContext, ServiceContainer, ServiceProviders
 from ai_agent_lib_core.testing.harness import FAKE_PROVIDER
 
 __all__ = [
@@ -39,7 +39,9 @@ __all__ = [
     "CHECKPOINT_FILE",
     "TEST_AGENT",
     "audit_records",
+    "last_shown_to_model",
     "load_test_config",
+    "scripted_model",
     "scripted_providers",
 ]
 
@@ -53,6 +55,7 @@ _FILE = "file"
 
 _FAKE_MODEL_ID = "fake-model"
 _JSONL, _SQLITE = "jsonl", "sqlite"
+_STATIC = "static"
 
 
 def _with_test_agent(config: ServiceConfig, name: str, state_dir: Path) -> ServiceConfig:
@@ -79,10 +82,20 @@ def _with_test_agent(config: ServiceConfig, name: str, state_dir: Path) -> Servi
     path.write_text(json.dumps(agents_document([*others, agent])), encoding="utf-8")
     return config.with_section(
         Section.REGISTRY,
-        ProviderSelection(
-            _FILE,
-            {**selection.options, "agents_path": str(path), "tools_path": str(options.tools_path)},
-        ),
+        replace(selection, options={**selection.options, "agents_path": str(path)}),
+    )
+
+
+def _with_roles(config: ServiceConfig, roles: Sequence[str]) -> ServiceConfig:
+    """Give the caller who has no token these roles."""
+    selection = config.section(Section.IDENTITY)
+    if selection.provider != _STATIC:
+        raise ConfigurationError(
+            "roles can only be given to the development identity; this service selects the "
+            f"{selection.provider!r} identity provider"
+        )
+    return config.with_section(
+        Section.IDENTITY, replace(selection, options={**selection.options, "roles": list(roles)})
     )
 
 
@@ -92,6 +105,7 @@ def load_test_config(
     state_dir: Path,
     fake_model: bool = True,
     test_agent: str | None = None,
+    roles: Sequence[str] | None = None,
 ) -> ServiceConfig:
     """Resolve a service's own ``.env`` file for a test.
 
@@ -110,9 +124,13 @@ def load_test_config(
             of the agent registry that also holds an agent of this name,
             listed for every server, so the server can be tested on its own.
             The registry files themselves are not changed.
+        roles: The roles of the caller who has no token, in place of the ones
+            in the file. For a service on the development identity: it is how
+            a test says who is asking.
 
     Raises:
-        ConfigurationError: If the file is missing or invalid.
+        ConfigurationError: If the file is missing or invalid, or an argument
+            does not fit the adapters the file selects.
     """
     source = DotenvConfigSource(dotenv_path, required=True)
     config = ConfigResolver(source, base_dir=dotenv_path.resolve().parent).resolve()
@@ -123,27 +141,57 @@ def load_test_config(
         selection = config.section(section)
         if selection.provider == provider:
             options = {**selection.options, "path": str(state_dir / file_name)}
-            config = config.with_section(section, ProviderSelection(provider, options))
+            config = config.with_section(section, replace(selection, options=options))
     if fake_model:
         config = replace(
             config, model=ModelSection(provider=FAKE_PROVIDER, model_id=_FAKE_MODEL_ID)
         )
     if test_agent is not None:
         config = _with_test_agent(config, test_agent, state_dir)
+    if roles is not None:
+        config = _with_roles(config, roles)
     return config
 
 
 def scripted_providers(*replies: Any) -> ServiceProviders:
     """Return the local adapters, with a ``fake`` model that replays ``replies``.
 
-    After the run, ``services.model_provider("fake")`` is the provider, whose
-    ``models`` record every prompt they were sent.
+    After the run, :func:`scripted_model` gives the provider, whose ``models``
+    record every prompt they were sent, and :func:`last_shown_to_model` gives
+    the last thing the model saw.
     """
 
     def fake_model(context: BuildContext) -> FakeChatModelProvider:  # noqa: ARG001 - no options
         return FakeChatModelProvider(list(replies))
 
     return ServiceProviders.default().register(MODEL_PORT, FAKE_PROVIDER, fake_model, replace=True)
+
+
+def scripted_model(services: ServiceContainer) -> FakeChatModelProvider:
+    """Return the scripted model of a container, to see what it was sent.
+
+    Raises:
+        TypeError: If the container's ``fake`` model is not a scripted one.
+    """
+    provider = services.model_provider(FAKE_PROVIDER)
+    if not isinstance(provider, FakeChatModelProvider):
+        raise TypeError("this container has no scripted model; build it with scripted_providers()")
+    return provider
+
+
+def last_shown_to_model(services: ServiceContainer) -> str:
+    """Return the last message of the last prompt the scripted model was sent.
+
+    After a tool call that is the tool's result, exactly as the model saw it:
+    marked as data, and with anything the caller may not see already masked.
+
+    Raises:
+        LookupError: If the model was never called.
+    """
+    calls = [call for model in scripted_model(services).models for call in model.calls]
+    if not calls or not calls[-1]:
+        raise LookupError("the scripted model was never called")
+    return str(calls[-1][-1].content)
 
 
 def audit_records(state_dir: Path) -> list[dict[str, Any]]:

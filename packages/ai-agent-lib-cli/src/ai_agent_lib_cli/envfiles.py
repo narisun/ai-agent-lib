@@ -21,10 +21,7 @@ from ai_agent_lib_core.config import (
 )
 from ai_agent_lib_core.contracts import Section
 
-__all__ = ["DATA_SOURCE", "DEV_ROLE", "agent_env", "mcp_env", "variable_names"]
-
-DATA_SOURCE = "people"
-"""The name of the data source a generated MCP server reads."""
+__all__ = ["DEV_ROLE", "agent_env", "mcp_env", "variable_names"]
 
 DEV_ROLE = "analyst"
 """The role the local caller has until the developer changes it."""
@@ -37,6 +34,12 @@ _HEADER = (
     "and is not committed. The tests read this file, not .env.\n"
     "A relative path is relative to this file."
 )
+
+
+_DATA_COMMENTS = {
+    "duckdb_csv": "The data the tools read: CSV files in data/, queried through queries/.",
+    "rest": "The data the tools read: an HTTP API, called through the endpoints in queries/.",
+}
 
 
 def _shared() -> list[EnvSetting]:
@@ -104,11 +107,13 @@ def agent_env(agent: AgentAnswers) -> str:
 
 def mcp_env(server: McpAnswers) -> str:
     """Return the ``.env.example`` of a generated MCP server."""
+    plan = server.plan
+    where = {"data_dir": "data"} if plan.kind == "duckdb_csv" else {}
     settings = [
         EnvSetting(
             Key.DATA_SOURCES,
-            {DATA_SOURCE: {"kind": "duckdb_csv", "data_dir": "data", "queries_dir": "queries"}},
-            comment="The data the tools read: CSV files in data/, queried through queries/.",
+            {plan.source: {"kind": plan.kind, **where, "queries_dir": "queries", **plan.options}},
+            comment=_DATA_COMMENTS[plan.kind],
         ),
         EnvSetting(
             provider_key(Section.CHECKPOINT),
@@ -128,4 +133,6 @@ def variable_names() -> dict[str, str]:
         "model_id": variable_for(Key.MODEL_ID),
         "identity_options": variable_for(options_key(Section.IDENTITY)),
         "deployment_env": variable_for(Key.DEPLOYMENT_ENV),
+        "data_sources": variable_for(Key.DATA_SOURCES),
+        "secret_prefix": variable_for(secret_key("name")).removesuffix("NAME"),
     }

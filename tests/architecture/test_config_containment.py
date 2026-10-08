@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
 from architecture.containment import find_violations
+
+from ai_agent_lib_core.config import DEFAULT_BINDINGS
+from ai_agent_lib_core.config.bindings import PREFIX, SECRET_VARIABLE_PREFIX, secret_name
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PACKAGE = Path("packages/ai-agent-lib-core/src/ai_agent_lib_core/config")
@@ -64,3 +68,57 @@ def test_a_planted_violation_is_caught(planted: str, expected: str) -> None:
 )
 def test_ordinary_code_is_not_flagged(clean: str) -> None:
     assert find_violations(clean) == []
+
+
+# ---------------------------------------------------------- what is not Python
+#
+# Documents and templates are allowed to name variables: a person has to be
+# told what to set. What they may not do is name a variable that does not
+# exist, which is how a renamed variable lives on in a guide.
+
+_VARIABLE = re.compile(r"\b" + re.escape(PREFIX) + r"[A-Z0-9_]*[A-Z0-9]")
+
+
+def _documents() -> list[Path]:
+    patterns = (
+        "*.md",
+        ".env.example",
+        "docs/**/*.md",
+        "policies/**/*.md",
+        "packages/*/README.md",
+        "examples/**/README.md",
+        "examples/**/.env.example",
+    )
+    found = {path for pattern in patterns for path in REPO_ROOT.glob(pattern)}
+    return sorted(path for path in found if ".venv" not in path.parts)
+
+
+def _templates() -> list[Path]:
+    return sorted(REPO_ROOT.glob("packages/*/src/**/templates/**/*.jinja"))
+
+
+def test_every_variable_a_document_names_exists() -> None:
+    known = {name for binding in DEFAULT_BINDINGS for name in binding.all_names}
+    documents = _documents()
+    assert any(path.name == "getting-started.md" for path in documents)
+    unknown = sorted(
+        f"{path.relative_to(REPO_ROOT).as_posix()}: {name}"
+        for path in documents
+        for name in set(_VARIABLE.findall(path.read_text(encoding="utf-8")))
+        # "<prefix>SECRET_<NAME>" is how a document writes the pattern of a secret's variable.
+        if name not in known and secret_name(name) is None and name + "_" != SECRET_VARIABLE_PREFIX
+    )
+    assert not unknown, "these documents name variables that do not exist:\n" + "\n".join(unknown)
+
+
+def test_no_template_spells_out_a_variable_name() -> None:
+    # A template gets a name from the configuration package when it is rendered,
+    # so generated projects follow a rename without the templates being touched.
+    templates = _templates()
+    assert templates, "the scan found no templates"
+    spelled_out = sorted(
+        f"{path.relative_to(REPO_ROOT).as_posix()}: {name}"
+        for path in templates
+        for name in set(_VARIABLE.findall(path.read_text(encoding="utf-8")))
+    )
+    assert not spelled_out, "\n".join(spelled_out)

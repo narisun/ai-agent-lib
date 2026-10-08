@@ -7,17 +7,19 @@ again from the file alone.
 
 from __future__ import annotations
 
-import json
 import tomllib
-from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, Literal, Self
+from typing import Literal, Self
 
+from ai_agent_lib_cli.dataplan import DataPlan, sample_plan
 from ai_agent_lib_cli.errors import CliError
+from ai_agent_lib_cli.toml_text import string_of, toml_list, toml_text
 
 __all__ = [
+    "AGENTS_FOLDER",
     "MODEL_PROVIDERS",
+    "SERVERS_FOLDER",
     "WORKSPACE_FILE",
     "AgentAnswers",
     "LibrarySource",
@@ -28,21 +30,16 @@ __all__ = [
 ]
 
 WORKSPACE_FILE = "agentlib.toml"
+AGENTS_FOLDER = "agents"
+"""The folder of a workspace that holds one folder per agent."""
+SERVERS_FOLDER = "mcp-servers"
+"""The folder of a workspace that holds one folder per MCP server."""
 MODEL_PROVIDERS = ("fake", "anthropic", "bedrock")
 
 _HEADER = (
     "# Written by agentlib. It records the answers this workspace was generated from.\n"
     "# Generate the same workspace elsewhere with: agentlib init --answers agentlib.toml <folder>\n"
 )
-
-
-def _text(value: str) -> str:
-    """Return ``value`` as a TOML string."""
-    return json.dumps(value, ensure_ascii=False)
-
-
-def _list(values: tuple[str, ...]) -> str:
-    return "[" + ", ".join(_text(value) for value in values) + "]"
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,12 +81,27 @@ class AgentAnswers:
 
 @dataclass(frozen=True, slots=True)
 class McpAnswers:
-    """The answers one MCP server was generated from."""
+    """The answers one MCP server was generated from.
+
+    Attributes:
+        name: The service's name.
+        server_id: The server's ID in the tool registry.
+        description: One line on what the server offers.
+        port: The local HTTP port.
+        data: The queries the server offers, when a reader proposed them from
+            the developer's data. Without it the server is the hello-world sample.
+    """
 
     name: str
     server_id: str
     description: str
     port: int = 8100
+    data: DataPlan | None = None
+
+    @property
+    def plan(self) -> DataPlan:
+        """The plan the server is generated from."""
+        return self.data if self.data is not None else sample_plan()
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,38 +147,40 @@ class WorkspaceAnswers:
         """Return the workspace file."""
         library = self.library
         source = (
-            f"path = {_text(library.path or '')}"
+            f"path = {toml_text(library.path or '')}"
             if library.kind == "path"
-            else f"version = {_text(library.version or '')}"
+            else f"version = {toml_text(library.version or '')}"
         )
         lines = [
             _HEADER,
             "[workspace]",
-            f"name = {_text(self.name)}",
-            f"owner = {_text(self.owner)}",
+            f"name = {toml_text(self.name)}",
+            f"owner = {toml_text(self.owner)}",
             "",
             "[library]",
-            f"source = {_text(library.kind)}",
+            f"source = {toml_text(library.kind)}",
             source,
         ]
         for server in self.mcp_servers:
             lines += [
                 "",
                 "[[mcp_servers]]",
-                f"name = {_text(server.name)}",
-                f"server_id = {_text(server.server_id)}",
-                f"description = {_text(server.description)}",
+                f"name = {toml_text(server.name)}",
+                f"server_id = {toml_text(server.server_id)}",
+                f"description = {toml_text(server.description)}",
                 f"port = {server.port}",
             ]
+            if server.data is not None:
+                lines += server.data.to_toml("mcp_servers.data")
         for agent in self.agents:
             lines += [
                 "",
                 "[[agents]]",
-                f"name = {_text(agent.name)}",
-                f"description = {_text(agent.description)}",
-                f"model_provider = {_text(agent.model_provider)}",
+                f"name = {toml_text(agent.name)}",
+                f"description = {toml_text(agent.description)}",
+                f"model_provider = {toml_text(agent.model_provider)}",
                 f"port = {agent.port}",
-                f"mcp_servers = {_list(agent.mcp_servers)}",
+                f"mcp_servers = {toml_list(agent.mcp_servers)}",
             ]
         return "\n".join(lines) + "\n"
 
@@ -181,8 +195,8 @@ class WorkspaceAnswers:
             raw = tomllib.loads(text)
             workspace, library = raw["workspace"], raw["library"]
             return cls(
-                name=_string(workspace, "name"),
-                owner=_string(workspace, "owner"),
+                name=string_of(workspace, "name"),
+                owner=string_of(workspace, "owner"),
                 library=LibrarySource(
                     kind=library["source"],
                     path=library.get("path"),
@@ -190,9 +204,9 @@ class WorkspaceAnswers:
                 ),
                 agents=tuple(
                     AgentAnswers(
-                        name=_string(agent, "name"),
-                        description=_string(agent, "description"),
-                        model_provider=_string(agent, "model_provider"),
+                        name=string_of(agent, "name"),
+                        description=string_of(agent, "description"),
+                        model_provider=string_of(agent, "model_provider"),
                         port=int(agent["port"]),
                         mcp_servers=tuple(agent.get("mcp_servers", ())),
                     )
@@ -200,10 +214,11 @@ class WorkspaceAnswers:
                 ),
                 mcp_servers=tuple(
                     McpAnswers(
-                        name=_string(server, "name"),
-                        server_id=_string(server, "server_id"),
-                        description=_string(server, "description"),
+                        name=string_of(server, "name"),
+                        server_id=string_of(server, "server_id"),
+                        description=string_of(server, "description"),
                         port=int(server["port"]),
+                        data=DataPlan.from_toml(server["data"]) if "data" in server else None,
                     )
                     for server in raw.get("mcp_servers", ())
                 ),
@@ -212,13 +227,6 @@ class WorkspaceAnswers:
             raise CliError(
                 f"{what} is not a workspace file ({type(exc).__name__}: {exc})"
             ) from None
-
-
-def _string(table: Mapping[str, Any], key: str) -> str:
-    value = table[key]
-    if not isinstance(value, str):
-        raise TypeError(f"{key} must be text")
-    return value
 
 
 def find_workspace(start: Path) -> Path:

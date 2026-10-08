@@ -7,7 +7,10 @@ import re
 
 from ai_agent_lib_cli.errors import CliError
 
-__all__ = ["check_name", "package_name", "server_id_for"]
+__all__ = ["PLAIN_NAME", "check_name", "package_name", "server_id_for"]
+
+PLAIN_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
+"""What a query, a parameter and a column may be called: lower case, digits, underscores."""
 
 _NAME = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
 _MAX_LENGTH = 28  # two names and a few words must fit in a rule ID

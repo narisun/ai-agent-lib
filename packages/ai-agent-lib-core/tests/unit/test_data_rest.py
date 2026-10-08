@@ -134,6 +134,45 @@ async def test_the_request_is_built_only_from_the_definition_and_typed_values(
     await source.aclose()
 
 
+async def test_a_parameter_is_sent_under_the_name_the_api_uses(tmp_path: Path) -> None:
+    renamed = (
+        "description: Accounts of one customer.\n"
+        "method: POST\n"
+        "path: /v1/accounts/find\n"
+        "parameters:\n"
+        "  customer_id: {type: integer, in: query, name: customerId}\n"
+        "  min_balance: {type: number, in: body, name: minBalance}\n"
+        "  region: {type: string, in: body}\n"
+        "max_rows: 10\n"
+        "columns: {account_id: id}\n"
+    )
+    source, recording = await started(tmp_path, lambda request: ok([]), extra={"find": renamed})
+    await source.query("find", {"customer_id": 7, "min_balance": 5, "region": "emea"})
+    (request,) = recording.requests
+    # A caller uses the plain name; the API gets its own.
+    assert dict(request.url.params) == {"customerId": "7"}
+    assert json.loads(request.content) == {"minBalance": 5, "region": "emea"}
+    assert [p.name for p in source.describe()["find"].parameters] == [
+        "customer_id",
+        "min_balance",
+        "region",
+    ]
+    await source.aclose()
+
+
+async def test_a_path_parameter_cannot_be_renamed(tmp_path: Path) -> None:
+    renamed = (
+        "description: One account.\n"
+        "path: /v1/accounts/{account}\n"
+        "parameters:\n"
+        "  account: {type: string, in: path, name: accountId}\n"
+        "max_rows: 1\n"
+        "columns: {account_id: id}\n"
+    )
+    with pytest.raises(ConfigurationError, match="named by its placeholder"):
+        await started(tmp_path, lambda request: ok([]), extra={"renamed": renamed})
+
+
 @pytest.mark.parametrize("value", ["", ".", ".."])
 async def test_a_path_value_that_would_change_the_path_is_refused(
     tmp_path: Path, value: str
