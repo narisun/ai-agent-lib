@@ -1,4 +1,9 @@
-"""The service container: the composition root that owns lifecycle."""
+"""Assemble configured adapters and own their lifetime for one service.
+
+The public facade delegates dependency ordering, adapter lifetime, authentication,
+and MCP assembly to focused collaborators in this package. Framework bindings
+are loaded on demand; business rules belong in the pipeline and adapters.
+"""
 
 from __future__ import annotations
 
@@ -8,11 +13,8 @@ from collections.abc import Awaitable, Callable, Collection, Sequence
 from datetime import datetime
 from pathlib import Path
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, Any, Self, TypeVar, cast, overload
 
-from pydantic import SecretStr
-
-from ai_agent_lib_core.adapters.http_support import checked_base_url
 from ai_agent_lib_core.adapters.system import SystemClock, UuidGenerator
 from ai_agent_lib_core.adapters.telemetry import NullTelemetry, OpenTelemetryTelemetry
 from ai_agent_lib_core.config import (
@@ -40,45 +42,40 @@ from ai_agent_lib_core.contracts import (
     IdGenerator,
     ModelRef,
     PolicyDecisionPoint,
-    PolicyDenied,
     ProviderSelection,
     RegistrySource,
     RequestContext,
     SecretsProvider,
     Section,
-    ServerEntry,
     ServiceConfig,
     SupportsAsyncClose,
     SupportsValidation,
     Telemetry,
-    TokenAuthenticator,
-    TokenExchanger,
     generic_fix,
     shown_value,
 )
 from ai_agent_lib_core.di.access import selected_models
+from ai_agent_lib_core.di.dependencies import build_order
+from ai_agent_lib_core.di.lifetime import AdapterLifetime
 from ai_agent_lib_core.di.providers import (
     DATA_PORT,
     MODEL_PORT,
     BuildContext,
+    BuildResources,
     ProviderSpec,
+    ServicePort,
     ServiceProviders,
 )
 from ai_agent_lib_core.pipeline import (
-    AgentCheck,
     BudgetLedger,
     GovernedDataSource,
     Operations,
-    Pipeline,
-    ToolCall,
-    ToolStage,
-    build_tool_pipeline,
-    record_refused_sign_in,
 )
 
 if TYPE_CHECKING:
     from langchain_core.tools import BaseTool
 
+    from ai_agent_lib_core.di.mcp import McpBindings
     from ai_agent_lib_core.integrations.langgraph import (
         GovernedChatModel,
         LangGraphBindings,
@@ -91,6 +88,7 @@ __all__ = ["ServiceContainer", "fix_for"]
 
 _Key = tuple[str, str, str]
 """Identifies one built adapter: its port, its adapter name and its instance name."""
+_ServiceT = TypeVar("_ServiceT")
 
 
 def fix_for(problem: BaseException) -> str:
@@ -99,7 +97,11 @@ def fix_for(problem: BaseException) -> str:
 
 
 class ServiceContainer:
-    """Builds each adapter once, validates at startup and closes in reverse order.
+    """Build configured adapters once and close them in reverse dependency order.
+
+    Entering the context starts the container. Readiness checks are a separate,
+    explicit step: call ``validate`` before accepting application requests.
+    Use one container per service lifetime, not one per incoming request.
 
     Use it as an async context manager::
 
@@ -109,11 +111,13 @@ class ServiceContainer:
 
     Args:
         config: The resolved configuration.
-        providers: The adapter registry. Defaults to the local adapters.
+        providers: Factory definitions. Defaults to core adapters and installed
+            first-party provider packs; live instances belong to this container.
         clock: The clock port. Defaults to the system clock.
         ids: The identifier port. Defaults to random identifiers.
-        telemetry: The telemetry port. By default it follows the ``tracing``
-            option of the audit section: OpenTelemetry when on, a no-op when off.
+        telemetry: The telemetry port. By default, resolved telemetry settings
+            or the legacy audit ``tracing`` option enable OpenTelemetry;
+            otherwise a no-op implementation is used.
         mcp_connector: Opens connections to MCP servers. Defaults to
             Streamable HTTP; a test passes an in-process connector.
         sleep: Waits between retries. A test passes one that does not wait.
@@ -142,8 +146,16 @@ class ServiceContainer:
         self._building: list[_Key] = []
         self._started = False
         self._closed = False
+        self._closing: asyncio.Task[None] | None = None
+        self._owner: asyncio.Task[None] | None = None
+        self._background_failure = False
+        self._stop = asyncio.Event()
+        self._resources = BuildResources()
+        self._lifetimes: list[AdapterLifetime] = []
+        self._claimed_adapters: set[int] = set()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._langgraph: LangGraphBindings | None = None
+        self._mcp: McpBindings | None = None
         self._governed_sources: dict[str, GovernedDataSource] = {}
         self._mcp_connector = mcp_connector
         self._operations = Operations(
@@ -159,7 +171,10 @@ class ServiceContainer:
         dotenv_path: Path | None = Path(".env"),
         providers: ServiceProviders | None = None,
     ) -> Self:
-        """Build a container from the process environment and a ``.env`` file."""
+        """Resolve environment settings and return an unstarted container.
+
+        ``start`` or ``async with`` constructs the selected adapters.
+        """
         return cls(load_service_config(dotenv_path), providers)
 
     # ----------------------------------------------------------------- lifecycle
@@ -177,34 +192,82 @@ class ServiceContainer:
         await self.aclose()
 
     async def start(self) -> None:
-        """Check the selections, freeze the registry and build every section adapter.
+        """Validate selections and dependencies, then construct the selected adapters.
+
+        Options and dependency ordering are checked before any factory runs.
+        Each adapter is created and closed in its own lifetime task. If startup
+        fails or is cancelled, already-owned resources are cleaned up before
+        the failure reaches the caller. This does not run ``validate``.
 
         Raises:
             ConfigurationError: If a selected adapter is not registered, or a
-                local-only adapter is selected outside local development.
+                local-only adapter is selected outside local development, options
+                are invalid, or declared dependencies cannot be resolved.
             RuntimeError: If the container was already started or closed.
         """
-        if self._started or self._closed:
+        if self._started or self._closed or self._closing is not None:
             raise RuntimeError("a container can be started only once")
         selected = self._selected()
         for port, name, _ in selected:
             self._check_allowed(self._providers.lookup(port, name))
         self._check_options(selected)
+        selected = build_order(selected, self._providers)
         self._providers.freeze()
         self._loop = asyncio.get_running_loop()
         self._started = True
+        ready: asyncio.Future[None] = self._loop.create_future()
+        self._owner = asyncio.create_task(self._own_lifecycle(selected, ready))
+        try:
+            await asyncio.shield(ready)
+        except asyncio.CancelledError:
+            self._owner.cancel()
+            try:
+                await self.aclose()
+            finally:
+                if ready.done():
+                    ready.exception()  # retrieve a construction failure after caller cancellation
+            raise
+
+    async def _own_lifecycle(self, selected: Sequence[_Key], ready: asyncio.Future[None]) -> None:
+        """Order isolated adapter lifetimes and collect their failures."""
         try:
             for key in selected:
                 await self._build(key)
-        except BaseException:
-            await self.aclose()
-            raise
+        except BaseException as startup_error:  # noqa: BLE001 - delivered through startup future
+            try:
+                await self._close_all()
+            except BaseException as cleanup_error:  # noqa: BLE001 - preserve both failures
+                if self._background_failure and isinstance(startup_error, asyncio.CancelledError):
+                    startup_error = cleanup_error
+                else:
+                    startup_error = BaseExceptionGroup(
+                        "startup failed and cleanup also failed", [startup_error, cleanup_error]
+                    )
+            ready.set_exception(startup_error)
+            return
+        ready.set_result(None)
+        try:
+            await self._stop.wait()
+        finally:
+            await self._close_all()
+
+    def _adapter_failed(self) -> None:
+        """Interrupt pending construction when an already-built adapter fails."""
+        if not self._stop.is_set():
+            self._background_failure = True
+            self._stop.set()
+            if self._owner is not None:
+                self._owner.cancel()
 
     async def validate(self) -> None:
-        """Ask every built adapter that can check itself to do so.
+        """Run readiness checks on adapters that implement ``SupportsValidation``.
+
+        Call after ``start``. Checks may contact external services. Configuration
+        failures are collected; unexpected exceptions propagate immediately.
 
         Raises:
-            ConfigurationError: Listing every adapter that is not ready.
+            ConfigurationError: Summarizing the adapters that reported a
+                configuration failure.
         """
         self._require_started()
         problems: list[str] = []
@@ -224,10 +287,11 @@ class ServiceContainer:
             )
 
     async def check(self) -> tuple[CheckResult, ...]:
-        """Check every built adapter and report each one, usable or not.
+        """Return diagnostic results for the built adapters.
 
-        ``validate`` stops a service that is not ready. This is for a person
-        finding out why: one result per adapter, with what to do about a failure.
+        Unlike ``validate``, expected library errors become failed results with
+        suggested fixes. Unexpected exceptions still propagate. An adapter with
+        no readiness check is reported as built, not independently verified.
         """
         self._require_started()
         results: list[CheckResult] = []
@@ -248,28 +312,73 @@ class ServiceContainer:
     async def aclose(self) -> None:
         """Close adapters in reverse build order. Safe to call more than once.
 
-        Every adapter is closed even if an earlier close fails.
+        Cleanup is attempted for every owned adapter even if an earlier close
+        fails or is cancelled. Shared build resources are closed afterwards.
+        Concurrent callers await the same teardown. Cancelling a caller waits
+        for teardown before propagating cancellation.
 
         Raises:
-            ExceptionGroup: Holding each error raised while closing.
+            BaseExceptionGroup: Collected cleanup failures when no cancellation
+                takes precedence; ordinary errors form an ``ExceptionGroup``.
+            asyncio.CancelledError: After cleanup completes if the caller or an
+                adapter close was cancelled. Cleanup errors are chained to it.
         """
-        if self._closed:
+        if self._closed and (self._owner is None or self._closing is not None):
             return
-        self._closed = True
-        errors: list[Exception] = []
-        for key in reversed(self._build_order):
-            service = self._services[key]
+        if self._closing is None:
+            self._stop.set()
+            self._closing = (
+                self._owner if self._owner is not None else asyncio.create_task(self._close_all())
+            )
+        cancelled: asyncio.CancelledError | None = None
+        while not self._closing.done():
+            try:
+                await asyncio.shield(self._closing)
+            except asyncio.CancelledError as exc:
+                cancelled = exc
+            except BaseException:  # noqa: BLE001 - retrieved and raised below
+                break  # retrieve the error below, preserving a caller's cancellation
+        try:
+            self._closing.result()
+        except BaseException as error:
+            if cancelled is not None:
+                raise cancelled from error
+            raise
+        if cancelled is not None:
+            raise cancelled
+
+    async def _close_all(self) -> None:
+        self._stop.set()  # a later background failure must not interrupt teardown
+        errors: list[BaseException] = []
+        services: list[object] = list(reversed(self._lifetimes))
+        services.extend(
+            resource
+            for resource in self._resources.take()
+            if id(resource) not in self._claimed_adapters
+        )
+        closed: set[int] = set()
+        for service in services:
+            if id(service) in closed:
+                continue
+            closed.add(id(service))
             if isinstance(service, SupportsAsyncClose):
                 try:
                     await service.aclose()
-                except Exception as exc:  # noqa: BLE001 - every adapter must get its turn
+                except BaseException as exc:  # noqa: BLE001 - all resources must get their turn
                     errors.append(exc)
         self._services.clear()
         self._build_order.clear()
+        self._lifetimes.clear()
+        self._claimed_adapters.clear()
         self._langgraph = None
+        self._mcp = None
         self._governed_sources.clear()
+        self._closed = True
         if errors:
-            raise ExceptionGroup("errors while closing the service container", errors)
+            cancellation = next((e for e in errors if isinstance(e, asyncio.CancelledError)), None)
+            if cancellation is not None:
+                raise cancellation from BaseExceptionGroup("errors while closing", errors)
+            raise BaseExceptionGroup("errors while closing the service container", errors)
 
     # ------------------------------------------------------------------ accessors
 
@@ -328,14 +437,29 @@ class ServiceContainer:
         """The guardrail port."""
         return cast(GuardrailCheck, self.get(Section.GUARDRAILS))
 
-    def get(self, section: Section) -> object:
-        """Return the adapter that serves ``section``."""
+    @overload
+    def get(self, section: ServicePort[_ServiceT]) -> _ServiceT: ...
+
+    @overload
+    def get(self, section: Section) -> object: ...
+
+    def get(self, section: Section | ServicePort[Any]) -> object:
+        """Return a built singleton adapter, checking a typed port when supplied.
+
+        The container must be started. Use ``model_provider`` for model provider
+        names and ``data_source`` for named, governed data sources.
+        """
         self._require_started()
+        if isinstance(section, ServicePort):
+            return section.checked(self._resolve_built(section.name))
         selection = self._config.section(section)
         return self._services[(section.value, selection.provider, "")]
 
     def model_provider(self, name: str) -> ChatModelProvider:
         """Return the chat model provider called ``name``.
+
+        This is the configured provider name, such as ``anthropic``, not a model
+        alias. Use ``model(alias)`` for a governed LangGraph model.
 
         Raises:
             ConfigurationError: If no configured alias uses that provider.
@@ -420,16 +544,21 @@ class ServiceContainer:
 
         Args:
             tools: Tools, or functions with type hints and a docstring.
-            read_only: Names of tools that only read.
+            read_only: Names of tools that have no write effects and are safe
+                to retry. The resilience stage may repeat these calls.
         """
         return self._bindings().tools(tools, read_only=read_only)
 
     def compile_kwargs(self) -> dict[str, Any]:
-        """Return keyword arguments for ``StateGraph.compile``."""
+        """Return ``StateGraph.compile`` arguments with a scoped checkpointer."""
         return self._bindings().compile_kwargs()
 
     def invocation(self, context: RequestContext) -> dict[str, Any]:
-        """Return keyword arguments for ``ainvoke`` or ``astream`` for one request."""
+        """Return ``ainvoke`` or ``astream`` arguments for one authenticated request.
+
+        Scope the thread ID to the caller and application, and pass the request
+        as LangGraph runtime context rather than persisted graph state.
+        """
         return self._bindings().invocation(context)
 
     async def authenticate(
@@ -450,7 +579,9 @@ class ServiceContainer:
         server; it is never forwarded.
 
         Args:
-            credential: The token the caller presented, without the ``Bearer`` prefix.
+            credential: The token the caller presented, without the ``Bearer``
+                prefix. ``None`` is accepted only by a verifier that supports
+                tokenless access, such as the local development identity.
             application: This agent's name.
             thread_id: The conversation or workflow the request belongs to.
             request_id: Correlates logs. Defaults to a new identifier.
@@ -460,40 +591,26 @@ class ServiceContainer:
             deadline: When the request must be finished.
 
         Raises:
-            PolicyDenied: If the credential is missing, expired or not trusted.
+            PolicyDenied: If the configured identity verifier rejects the credential.
                 The refusal is written to the audit log before it is raised.
             IntegrityError: If that audit record could not be written.
         """
-        request_id = request_id if request_id is not None else self._ids.new_id()
-        try:
-            principal = await self.identity.verify(credential)
-        except PolicyDenied as refusal:
-            await record_refused_sign_in(
-                self.audit,
-                self._telemetry,
-                self._clock,
-                self._ids,
-                refusal=refusal,
-                application=application,
-                request_id=request_id,
-                thread_id=thread_id,
-            )
-            raise
-        if classification_ceiling is None:
-            entry = self.registry.agents.get(application)
-            classification_ceiling = (
-                entry.classification_ceiling if entry is not None else Classification.INTERNAL
-            )
-        return RequestContext(
-            principal=principal,
+        from ai_agent_lib_core.di.authentication import RequestAuthenticator
+
+        return await RequestAuthenticator(
+            identity=self.identity,
+            registry=self.registry,
+            audit=self.audit,
+            telemetry=self.telemetry,
+            clock=self.clock,
+            ids=self.ids,
+        ).authenticate(
+            credential,
             application=application,
-            request_id=request_id,
             thread_id=thread_id,
+            request_id=request_id,
             classification_ceiling=classification_ceiling,
             deadline=deadline,
-            credential=SecretStr(credential) if credential else None,
-            # Each request gets its own budget, whatever request ID it was sent.
-            invocation_id=self._ids.new_id(),
         )
 
     async def mcp_tools(self, server: str) -> list[BaseTool]:
@@ -504,38 +621,14 @@ class ServiceContainer:
         must be pinned.
 
         Raises:
-            ConfigurationError: If the server is not in the tool registry.
-            ConfigurationError: Also if, outside local development, the server
-                is registered with a plain ``http`` address on another host,
-                or the identity provider cannot issue tokens for the server.
-                A token is sent only over TLS, and a call with no token would
-                be refused by the server.
+            ConfigurationError: If the server is unregistered or its URL is
+                invalid. Outside local development, remote addresses require
+                TLS and the identity provider must support token exchange.
             IntegrityError: If a registered tool is missing or its schema does
                 not match its pin.
             TransientError: If the server cannot be reached.
         """
-        entry = self._registered_server(server)
-        local = self._config.deployment_env is DeploymentEnv.LOCAL
-        # The caller's token travels to this address. Plain http is for this machine only.
-        checked_base_url(
-            f"MCP server {server!r} in the tool registry",
-            entry.url,
-            allow_http=local,
-            hint="outside local development a caller's token is sent only over TLS",
-        )
-        exchanger = self.identity if isinstance(self.identity, TokenExchanger) else None
-        if exchanger is None and not local:
-            raise ConfigurationError(
-                f"MCP server {server!r} cannot be called: the identity provider "
-                f"{self._config.section(Section.IDENTITY).provider!r} is not set up to obtain "
-                "tokens for the services this one calls; configure its exchange options"
-            )
-        return await self._bindings().mcp_tools(
-            entry,
-            connector=self._mcp_connector,
-            exchanger=exchanger,
-            require_pins=not local,
-        )
+        return await self._mcp_bindings().mcp_tools(server)
 
     def mcp_middleware(
         self,
@@ -561,35 +654,8 @@ class ServiceContainer:
         Raises:
             ConfigurationError: If the server is not in the tool registry.
         """
-        # Imported here so that an agent which serves no MCP tools does not load the SDK.
-        from ai_agent_lib_core.integrations.mcp import GovernedToolsMiddleware, mcp_result_text
-
-        entry = self._registered_server(server)
-        pipeline: Pipeline[ToolStage, ToolCall, Any] = build_tool_pipeline(
-            audit=self.audit,
-            telemetry=self._telemetry,
-            clock=self._clock,
-            ids=self._ids,
-            registry=self.registry,
-            # The agent is somewhere else: it is whoever the caller's token names.
-            registry_agent_check=(
-                AgentCheck.CALLER
-                if self._config.deployment_env is DeploymentEnv.LOCAL
-                else AgentCheck.CALLER_REQUIRED
-            ),
-            policy=self.policy,
-            environment=self._config.deployment_env.value,
-            guardrails=self.guardrails,
-            response_text=mcp_result_text,
-            operations=self._operations,
-        )
-        return GovernedToolsMiddleware(
-            server=entry.id,
-            application=application if application is not None else entry.id,
-            identity=self.identity,
-            pipeline=pipeline,
-            ids=self._ids,
-            classification_ceiling=classification_ceiling,
+        return self._mcp_bindings().mcp_middleware(
+            server, application=application, classification_ceiling=classification_ceiling
         )
 
     def mcp_server_kwargs(
@@ -623,55 +689,31 @@ class ServiceContainer:
                 outside local development, the identity provider cannot check
                 tokens at the door.
         """
-        from ai_agent_lib_core.integrations.mcp import DoorTokenVerifier, resource_server_settings
-
-        entry = self._registered_server(server)
-        name = application if application is not None else entry.id
-        kwargs: dict[str, Any] = {
-            "middleware": [
-                self.mcp_middleware(
-                    server, application=name, classification_ceiling=classification_ceiling
-                )
-            ]
-        }
-        identity = self.identity
-        local = self._config.deployment_env is DeploymentEnv.LOCAL
-        if not isinstance(identity, TokenAuthenticator):
-            if not local:
-                raise ConfigurationError(
-                    f"MCP server {server!r} cannot check tokens at its door: the identity "
-                    f"provider {self._config.section(Section.IDENTITY).provider!r} does not "
-                    "verify tokens from an issuer"
-                )
-            return kwargs
-        kwargs["auth"] = resource_server_settings(identity.issuer, entry)
-        kwargs["token_verifier"] = DoorTokenVerifier(
-            identity=identity,
-            server=entry,
-            application=name,
-            agents=self.registry.agents,
-            require_agent=not local,
-            audit=self.audit,
-            telemetry=self._telemetry,
-            clock=self._clock,
-            ids=self._ids,
+        return self._mcp_bindings().mcp_server_kwargs(
+            server, application=application, classification_ceiling=classification_ceiling
         )
-        return kwargs
 
-    def _registered_server(self, server: str) -> ServerEntry:
-        entry = self.registry.tools.get(server)
-        if entry is None:
-            known = ", ".join(e.id for e in self.registry.tools.entries()) or "none"
-            raise ConfigurationError(
-                f"MCP server {server!r} is not in the tool registry",
-                expected=f"{server!r} among the registered servers",
-                actual=f"registered servers: {known}",
-                fix=(
-                    f"register it (agentlib new mcp does this), or check "
-                    f"{variable_for(options_key(Section.REGISTRY))} points at the right registry"
-                ),
+    def _mcp_bindings(self) -> McpBindings:
+        from ai_agent_lib_core.di.mcp import McpBindings
+
+        self._require_started()
+        if self._mcp is None:
+            self._mcp = McpBindings(
+                audit=self.audit,
+                telemetry=self.telemetry,
+                clock=self.clock,
+                ids=self.ids,
+                identity=self.identity,
+                registry=self.registry,
+                policy=self.policy,
+                guardrails=self.guardrails,
+                environment=self.config.deployment_env,
+                identity_provider=self.config.section(Section.IDENTITY).provider,
+                operations=self._operations,
+                connector=self._mcp_connector,
+                bindings=self._bindings,
             )
-        return entry
+        return self._mcp
 
     def _bindings(self) -> LangGraphBindings:
         self._require_started()
@@ -727,7 +769,7 @@ class ServiceContainer:
         return framing
 
     def _require_started(self) -> None:
-        if self._closed:
+        if self._closed or self._closing is not None:
             raise RuntimeError("the container is closed")
         if not self._started:
             raise RuntimeError(
@@ -736,7 +778,7 @@ class ServiceContainer:
             )
 
     def _selected(self) -> list[_Key]:
-        """Return every adapter the configuration selects, in build order."""
+        """Return selected adapters in legacy order, before dependency ordering."""
         selected: list[_Key] = [
             (section.value, self._config.section(section).provider, "") for section in Section
         ]
@@ -783,6 +825,14 @@ class ServiceContainer:
             cycle = " -> ".join(self._label(k) for k in [*self._building, key])
             raise ConfigurationError(f"adapters depend on each other in a cycle: {cycle}")
         spec = self._providers.lookup(port, name)
+
+        def resolve(dependency: str) -> object:
+            if spec.dependencies is not None and dependency not in spec.dependencies:
+                raise ConfigurationError(
+                    f"{port} ({name}) requested undeclared dependency {dependency!r}"
+                )
+            return self._resolve_built(dependency)
+
         context = BuildContext(
             port=port,
             selection=self._selection_for(key),
@@ -792,14 +842,20 @@ class ServiceContainer:
             clock=self._clock,
             ids=self._ids,
             secret_values=self._config.secrets if port == Section.SECRETS.value else {},
-            resolver=self._resolve_built,
+            resolver=resolve,
             instance=instance,
+            resources=self._resources,
         )
         self._building.append(key)
+
+        async def create() -> object:
+            value = spec.factory(context)
+            return await value if inspect.isawaitable(value) else value
+
+        lifetime = AdapterLifetime(create, self._claimed_adapters, self._adapter_failed)
+        self._lifetimes.append(lifetime)
         try:
-            service = spec.factory(context)
-            if inspect.isawaitable(service):
-                service = await service
+            service = await lifetime.start()
         except AgentLibError as error:
             error.add_note(self._where_configured(key))
             raise
@@ -807,6 +863,8 @@ class ServiceContainer:
             self._building.pop()
         self._services[key] = service
         self._build_order.append(key)
+        if spec.contract is not None:
+            spec.contract.checked(service)
         return service
 
     def _check_options(self, selected: Sequence[_Key]) -> None:
@@ -856,10 +914,10 @@ class ServiceContainer:
 
     def _resolve_built(self, port: str) -> object:
         """Give a factory a dependency that was built before it."""
-        section = Section(port)
-        key = (section.value, self._config.section(section).provider, "")
-        if key not in self._services:
+        matches = [value for key, value in self._services.items() if key[0] == port and not key[2]]
+        if len(matches) != 1:
             raise ConfigurationError(
-                f"{port} is not built yet; an adapter may depend only on sections built before it"
+                f"{port} is not built yet or is ambiguous; declare a singleton dependency "
+                "when registering the adapter"
             )
-        return self._services[key]
+        return matches[0]

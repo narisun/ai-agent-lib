@@ -114,7 +114,7 @@ def test_init_creates_a_workspace_that_holds_nothing_yet(
     workspace = tmp_path / "demo"
     out = capsys.readouterr().out
     assert "created  pyproject.toml" in out
-    assert "uv run agentlib new mcp hello-mcp" in out
+    assert "python -m ai_agent_lib_cli new mcp hello-mcp" in out
     files = tree(workspace)
     assert sorted(files) == [
         ".github/workflows/check.yml",
@@ -172,7 +172,7 @@ def test_new_mcp_adds_a_server_registers_it_and_adds_its_rules(
     assert run("new", "mcp", "hello-mcp", "--no-pin", "--workspace", workspace) == 0
     out = capsys.readouterr().out
     assert "MCP server hello-mcp (registry ID hello)" in out
-    assert "uv run pytest mcp-servers/hello-mcp" in out
+    assert "python -m pytest mcp-servers/hello-mcp" in out
     files = tree(workspace)
     service = "mcp-servers/hello-mcp/"
     assert {name.removeprefix(service) for name in files if name.startswith(service)} == {
@@ -307,7 +307,7 @@ def test_link_brings_the_agents_readme_up_to_date_unless_the_developer_changed_i
         assert run("link", agent, "hello", "--workspace", workspace) == 0
 
     readme = (workspace / "agents/hello-agent/README.md").read_text(encoding="utf-8")
-    assert "uv run hello-mcp" in readme
+    assert "hello-mcp" in readme
     assert theirs.read_text(encoding="utf-8") == "# Ours now\n"
     # The record follows, so a later update has nothing left to do for it.
     before = tree(workspace)

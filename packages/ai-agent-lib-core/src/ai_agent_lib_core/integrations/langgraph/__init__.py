@@ -15,6 +15,7 @@ from ai_agent_lib_core.integrations.langgraph.model import (
     GovernedChatModel,
     describe_model_response,
 )
+from ai_agent_lib_core.integrations.langgraph.providers import LangGraphModelProvider
 from ai_agent_lib_core.integrations.langgraph.tools import GovernedTool, govern_tools
 
 __all__ = [
@@ -23,6 +24,7 @@ __all__ = [
     "GovernedTool",
     "InMemoryCheckpointBackend",
     "LangGraphBindings",
+    "LangGraphModelProvider",
     "LoopBridge",
     "ScopedCheckpointer",
     "SqliteCheckpointBackend",

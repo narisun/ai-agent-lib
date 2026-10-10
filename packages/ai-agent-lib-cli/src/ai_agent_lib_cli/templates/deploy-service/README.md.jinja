@@ -7,7 +7,7 @@ settings {{ name }} runs with in AWS. Nothing here holds a secret.
 | --- | --- |
 | `settings.tf` | agentlib's: the task's environment, from `deploy.env` |
 | `permissions.tf` | agentlib's: what each adapter said it needs from AWS, and why |
-| `main.tf`, `variables.tf`, `Dockerfile` | yours: written once, never overwritten |
+| `main.tf`, `variables.tf`, `Dockerfile`, `Dockerfile.dockerignore` | yours: written once, never overwritten |
 
 Change `deploy.env`, never `settings.tf` or `permissions.tf`, and run the command again.
 
@@ -16,7 +16,18 @@ Change `deploy.env`, never `settings.tf` or `permissions.tf`, and run the comman
 1. Review the plan: `agentlib deploy {{ name }} --plan`. It lists every adapter, every
    permission and the reason for it, the sidecars, and anything to check by hand.
 2. Write the files: `agentlib deploy {{ name }}`.
-3. Build and push the images, from the workspace folder:
+3. Lock the service's runtime dependencies with hashes in a release environment
+   matching the image's Python and operating system. This needs only pip-installed
+   Python tools; Docker is needed only on the machine that builds the image:
+
+   ```
+   python -m pip install pip-tools
+   python -m piptools compile --generate-hashes --output-file=deploy/{{ name }}/requirements.lock {{ folder }}/pyproject.toml
+   ```
+
+   Commit and review the lock file. Regenerate it when dependencies change. Use
+   your package index for the library; editable local checkouts are not release inputs.
+   Build and push the images, from the workspace folder:
 
    ```
    docker build -f deploy/{{ name }}/Dockerfile -t {{ name }} .
@@ -25,6 +36,12 @@ Change `deploy.env`, never `settings.tf` or `permissions.tf`, and run the comman
 
 4. Copy `terraform.tfvars.example` to `terraform.tfvars` and fill it in.
 5. `terraform init`, `terraform plan`, read it, `terraform apply`.
+
+The Dockerfile-specific ignore file excludes other services, `.env` files, local
+state and private keys from the build context. The selected service's `src/` and
+`queries/`, plus the shared `registry/` and `policies/`, are its runtime assets.
+Review and explicitly admit any additional assets your service needs; never copy
+the whole workspace. Configure credentials at runtime through the secrets provider.
 
 In `permissions.tf`, a line starting `# check:` marks a resource agentlib could not
 narrow from the settings alone, such as an ID AWS assigns. Narrow it before production.

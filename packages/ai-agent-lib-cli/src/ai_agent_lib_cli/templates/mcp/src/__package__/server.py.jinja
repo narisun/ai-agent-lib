@@ -49,7 +49,7 @@ def build_server(services: ServiceContainer) -> MCPServer[Any]:
 
     @server.tool(name="{{ server_id }}.{{ query.name }}")
     async def {{ query.name }}({{ query.signature }}) -> dict[str, Any]:
-        """{{ query.description }}"""
+        {{ query.description | py }}
 {% if loop.first %}
         # A named query, never {{ "SQL" if plan.kind == "duckdb_csv" else "an address" }} from a caller. Policy decides the rows and
         # columns this caller sees before anything is returned.

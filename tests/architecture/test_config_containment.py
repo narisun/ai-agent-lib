@@ -90,7 +90,13 @@ def _documents() -> list[Path]:
         "examples/**/.env.example",
     )
     found = {path for pattern in patterns for path in REPO_ROOT.glob(pattern)}
-    return sorted(path for path in found if ".venv" not in path.parts)
+    # The target specification includes proposed variables; current release docs
+    # and templates must use the implemented vocabulary. See docs/release-scope.md.
+    return sorted(
+        path
+        for path in found
+        if ".venv" not in path.parts and path != REPO_ROOT / "docs/Specification.md"
+    )
 
 
 def _templates() -> list[Path]:

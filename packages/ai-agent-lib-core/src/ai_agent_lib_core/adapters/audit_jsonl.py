@@ -1,4 +1,4 @@
-"""A local audit sink: one JSON object per line, flushed to disk on every write."""
+"""Local JSON-lines audit storage with per-record fsync enabled by default."""
 
 from __future__ import annotations
 
@@ -32,9 +32,10 @@ class JsonlAuditOptions(AuditOptions):
 class JsonlAuditSink:
     """Appends audit records to a file, one JSON object per line.
 
-    Each record is written with a single ``write`` call on a descriptor opened
-    in append mode, so lines from concurrent writers do not interleave. With
-    ``fsync`` on, ``write`` returns only after the record has reached the disk.
+    Each record uses one ``os.write`` on an append-mode descriptor; a short
+    write is treated as a failure. With ``fsync`` on, ``write`` also waits for
+    the operating system to flush the record before returning. Disabling it
+    trades crash durability for speed.
 
     This is the reference adapter for local development. It has no delivery
     guarantee beyond the local disk.
@@ -59,7 +60,7 @@ class JsonlAuditSink:
             raise ConfigurationError(f"the audit file cannot be opened: {self._path}") from exc
 
     async def write(self, record: AuditRecord) -> None:
-        """Append ``record`` and flush it, or raise ``IntegrityError``."""
+        """Append ``record``, fsync if configured, or raise ``IntegrityError``."""
         line = json.dumps(record.to_dict(), separators=(",", ":"), ensure_ascii=False) + "\n"
         async with self._lock:
             try:

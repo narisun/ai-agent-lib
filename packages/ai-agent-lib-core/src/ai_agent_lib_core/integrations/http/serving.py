@@ -3,7 +3,7 @@
 On Fargate a task is stopped with SIGTERM and killed some seconds later. In
 between, a service has to leave the load balancer, finish the requests it has
 and release what it holds. :func:`serve` does the first two and then returns,
-so the caller's ``async with ServiceContainer`` block does the third.
+so the caller must close its container in ``finally`` or an async context manager.
 """
 
 from __future__ import annotations
@@ -104,9 +104,12 @@ def _bind(host: str, port: int, uds: str | None) -> socket.socket:
     """Open the listening socket here, so a failure is an error and not an exit."""
     try:
         if uds is not None:
+            unix_family = getattr(socket, "AF_UNIX", None)
+            if unix_family is None:
+                raise ConfigurationError("Unix sockets are unavailable; use a TCP host and port")
             if Path(uds).is_socket():
                 Path(uds).unlink()  # left behind by a process that was killed
-            return _open(socket.AF_UNIX, socket.SOCK_STREAM, 0, uds, reuse=False)
+            return _open(unix_family, socket.SOCK_STREAM, 0, uds, reuse=False)
         family, kind, protocol, _, address = socket.getaddrinfo(
             host, port, type=socket.SOCK_STREAM, flags=socket.AI_PASSIVE
         )[0]
@@ -139,32 +142,31 @@ async def _either(*events: asyncio.Event, serving: asyncio.Future[None]) -> None
 async def _started(
     lifecycle: ServiceLifecycle, stopping: _Stop, serving: asyncio.Future[None]
 ) -> bool:
-    """Run the startup check until it ends, unless a stop or the server's end comes first.
+    """Await startup and preparation, or cancel them if shutdown wins the race.
 
-    A check that hangs, say on a dependency that does not answer, must not
-    keep a stop request waiting: the check is cancelled and the service stops.
+    Cancellation is awaited so startup does not leave orphaned tasks. Callbacks
+    must cooperate with cancellation and release partially acquired resources.
 
     Returns:
-        Whether the check passed. ``False`` when it was cancelled.
-
-    Raises:
-        ConfigurationError: If the check failed.
+        ``True`` when startup finishes successfully; ``False`` when shutdown
+        wins first. Startup exceptions propagate unchanged.
     """
     starting: asyncio.Future[Any] = asyncio.ensure_future(lifecycle.start())
     stopped: asyncio.Future[Any] = asyncio.ensure_future(stopping.requested.wait())
     racing: list[asyncio.Future[Any]] = [starting, stopped, serving]
     try:
         await asyncio.wait(racing, return_when=asyncio.FIRST_COMPLETED)
+        if starting.done():
+            starting.result()  # raises what the check raised
+            return True
+        _LOG.info("stopped before the startup check finished")
+        return False
     finally:
+        starting.cancel()
         stopped.cancel()
-    if starting.done():
-        starting.result()  # raises what the check raised
-        return True
-    starting.cancel()
-    with contextlib.suppress(asyncio.CancelledError):
-        await starting
-    _LOG.info("stopped before the startup check finished")
-    return False
+        # Also runs when the serve caller is cancelled. Startup may own a
+        # container still constructing adapters; do not orphan that work.
+        await asyncio.gather(starting, stopped, return_exceptions=True)
 
 
 async def serve(
@@ -180,12 +182,15 @@ async def serve(
 ) -> None:
     """Serve ``app`` until the service is asked to stop, then stop it in order.
 
-    The service listens first and runs its startup check second, so the
-    liveness route answers while readiness still says no. On SIGTERM it
+    The service listens before running startup and preparation callbacks, so
+    liveness can answer while readiness still says no. On SIGTERM it
     reports not ready for ``drain_seconds`` while it still takes requests,
     then stops listening and gives the requests it has ``grace_seconds`` to
-    finish. SIGINT skips the wait. Keep the two times together below the time
+    finish. SIGINT skips the drain wait. Keep the two times together below the time
     the platform allows a task to stop.
+
+    Callback exceptions propagate after server cleanup. The caller still owns
+    container cleanup; this function does not close adapters.
 
     Args:
         app: An ASGI application, for example from :func:`agent_app` or an MCP

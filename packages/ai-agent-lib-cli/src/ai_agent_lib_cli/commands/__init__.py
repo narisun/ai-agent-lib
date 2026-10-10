@@ -9,6 +9,7 @@ command line itself, which puts them together, is :mod:`ai_agent_lib_cli.app`.
 from ai_agent_lib_cli.commands.check import check, evals
 from ai_agent_lib_cli.commands.create import init, link, new, registry, update
 from ai_agent_lib_cli.commands.deploy import deploy
+from ai_agent_lib_cli.commands.install import install
 from ai_agent_lib_cli.commands.look import config, doctor, graph, run
 from ai_agent_lib_cli.commands.rules import policy
 
@@ -20,6 +21,7 @@ __all__ = [
     "evals",
     "graph",
     "init",
+    "install",
     "link",
     "new",
     "policy",

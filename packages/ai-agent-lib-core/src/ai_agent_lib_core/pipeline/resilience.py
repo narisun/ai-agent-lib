@@ -45,8 +45,10 @@ class ResilienceInterceptor(Generic[CallT, ResponseT]):
 
     A failure is tried again only when its error says it may be
     (``retryable``), only while attempts remain and the request's deadline has
-    not passed, and only when ``may_retry`` allows it for the call: a tool that
-    changes something is never called twice.
+    not passed, and only when ``may_retry`` allows it for the call. The standard
+    tool pipeline supplies a predicate that permits only declared read-only
+    tools. Direct users of this interceptor must supply their own retry-safety
+    rule for operations with side effects; there is no idempotency guarantee.
 
     Args:
         limits: The time limit, the number of retries and the backoff.

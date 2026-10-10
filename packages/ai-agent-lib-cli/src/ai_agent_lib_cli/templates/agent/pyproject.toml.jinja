@@ -1,11 +1,14 @@
 [project]
 name = "{{ name }}"
 version = "0.1.0"
-description = "{{ description }}"
+description = {{ description | toml }}
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "ai-agent-lib-core[{{ extras }}]{{ library.version or "" }}",
+{% if model_provider == "bedrock" %}
+    "ai-agent-lib-aws[bedrock]{{ library.version or "" }}",
+{% endif %}
 ]
 
 [project.scripts]

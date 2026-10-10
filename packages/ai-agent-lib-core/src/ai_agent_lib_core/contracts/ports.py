@@ -1,8 +1,10 @@
-"""The ports: interfaces every adapter implements and every component depends on.
+"""Framework-neutral ports that describe the capabilities components depend on.
 
-A component names the ports it needs in its constructor and never imports an
-adapter. Ports are structural (:class:`typing.Protocol`), so an adapter does
-not have to inherit from anything.
+Business components receive the ports they need through constructors; the
+composition layer selects concrete adapters. Each adapter implements the ports
+for its role. Ports are structural (:class:`typing.Protocol`), so adapters need
+not inherit from them. Framework-specific behavior is checked in integrations
+and reusable contract tests, not by adding SDK types to this module.
 """
 
 from __future__ import annotations
@@ -94,7 +96,12 @@ class SpanNotes(Protocol):
 
 
 class Telemetry(Protocol):
-    """Metadata-only operational signals. Never carries content."""
+    """Operational signals whose callers must supply metadata only.
+
+    Attribute types cannot distinguish a safe identifier from sensitive text.
+    Implementations and callers must exclude prompts, tool results, credentials,
+    and raw error messages rather than relying on this protocol to redact them.
+    """
 
     def span(
         self, name: str, attributes: Mapping[str, AuditValue]
@@ -129,8 +136,12 @@ class IdentityVerifier(Protocol):
     async def verify(self, credential: str | None) -> Principal:
         """Return the principal for ``credential``.
 
+        Local development verifiers may accept ``None`` as a configured test
+        identity. Production verifiers must validate credentials before creating
+        a principal; constructing a ``Principal`` is not authentication.
+
         Raises:
-            PolicyDenied: If the credential is missing, expired or not trusted.
+            PolicyDenied: If the verifier rejects the credential under its rules.
         """
         ...
 
@@ -212,6 +223,8 @@ class ChatModelProvider(Protocol):
 
     The model object is the framework's own chat model type. This port does not
     name that type, so the contracts stay free of any framework.
+    The consuming integration must check the returned type and test the
+    capabilities the provider advertises.
     """
 
     @property
@@ -248,7 +261,11 @@ class CheckpointBackend(Protocol):
 
 @runtime_checkable
 class SupportsValidation(Protocol):
-    """Optional: an adapter that can check its own readiness at startup."""
+    """Optional readiness checks, run by ``ServiceContainer.validate`` or ``check``.
+
+    Construction alone does not invoke this protocol. Checks may perform I/O;
+    report known readiness problems as ``ConfigurationError``.
+    """
 
     async def validate(self) -> None:
         """Raise ``ConfigurationError`` if the adapter cannot do its job."""

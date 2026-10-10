@@ -3,7 +3,7 @@
 # matches its pin.
 #
 # To print the pins of the server as it is now:
-#   uv run python -m accounts_mcp.pins
+#   python -m accounts_mcp.pins
 schema: agentlib.registry/v1
 servers:
   - id: accounts

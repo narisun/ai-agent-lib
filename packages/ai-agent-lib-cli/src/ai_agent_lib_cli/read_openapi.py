@@ -29,7 +29,7 @@ from ai_agent_lib_cli.dataplan import (
     PlannedQuery,
 )
 from ai_agent_lib_cli.errors import CliError
-from ai_agent_lib_cli.names import PLAIN_NAME
+from ai_agent_lib_cli.names import PLAIN_NAME, python_name
 from ai_agent_lib_cli.proposals import is_sensitive, stand_in
 from ai_agent_lib_core.contracts import ParameterType, describe
 
@@ -212,7 +212,7 @@ class _Operation:
     def name(self) -> str:
         given = self._operation.get("operationId")
         if isinstance(given, str) and PLAIN_NAME.match(snake(given)):
-            return snake(given)
+            return python_name(snake(given))
         fixed = [
             snake(segment)
             for segment in self._path.split("/")
@@ -222,7 +222,7 @@ class _Operation:
             and not _VERSION.match(segment.lower())
         ]
         keys = [snake(name) for name in _PLACEHOLDER.findall(self._path)]
-        return "_".join([*fixed, *(f"by_{key}" for key in keys)]) or "root"
+        return python_name("_".join([*fixed, *(f"by_{key}" for key in keys)]) or "root")
 
     def description(self) -> str:
         for key in ("summary", "description"):
@@ -268,7 +268,7 @@ class _Operation:
                 )
             found.append(
                 _Parameter(
-                    name=snake(sent_as),
+                    name=python_name(snake(sent_as)),
                     sent_as=sent_as,
                     location=location,
                     kind=kind,
@@ -279,7 +279,7 @@ class _Operation:
         names = [parameter.name for parameter in found]
         if len(names) != len(set(names)):
             raise _LeftOutError("two of its parameters would get the same name")
-        in_path = {snake(name) for name in _PLACEHOLDER.findall(self._path)}
+        in_path = {python_name(snake(name)) for name in _PLACEHOLDER.findall(self._path)}
         if in_path != {p.name for p in found if p.location == "path"}:
             raise _LeftOutError("its path placeholders and its path parameters do not match")
         return found, left_out
@@ -416,7 +416,7 @@ def _read_operation(
     columns = reader.columns(record)
     masked = tuple(column.name for column in columns if is_sensitive(column.name))
     classification = "confidential" if masked else "internal"
-    ours = _PLACEHOLDER.sub(lambda match: "{" + snake(match.group(1)) + "}", path)
+    ours = _PLACEHOLDER.sub(lambda match: "{" + python_name(snake(match.group(1))) + "}", path)
     description = reader.description()
     examples = {p.name: p.example for p in parameters}
     called = _PLACEHOLDER.sub(lambda match: _in_a_path(examples[match.group(1)]), ours)

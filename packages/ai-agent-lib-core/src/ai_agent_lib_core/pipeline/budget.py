@@ -14,6 +14,7 @@ from collections import OrderedDict
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Generic, Protocol, TypeVar
+from weakref import ReferenceType, ref
 
 from ai_agent_lib_core.contracts import AuditValue, BudgetExceeded, BudgetLimits, RequestContext
 from ai_agent_lib_core.pipeline.calls import Evidence
@@ -32,23 +33,62 @@ class _Spent:
 
 
 class BudgetLedger:
-    """What each recent request has used. Bounded: the oldest requests are forgotten.
+    """Request accounting retained for as long as a request context is alive.
+
+    Only inactive entries may be evicted. Active contexts pin their accounting,
+    including between calls, so traffic cannot reset a running graph's budget.
 
     Args:
-        max_requests: How many requests are remembered at once.
+        max_requests: Target cache size; live requests may exceed this limit.
     """
 
     def __init__(self, max_requests: int = _MAX_REQUESTS) -> None:
         self._spent: OrderedDict[str, _Spent] = OrderedDict()
+        self._contexts: dict[int, ReferenceType[RequestContext]] = {}
+        self._active: dict[str, set[int]] = {}
+        if max_requests < 1:
+            raise ValueError("max_requests must be positive")
         self._max = max_requests
 
+    def for_request(self, context: RequestContext) -> _Spent:
+        """Return accounting pinned until this context is released by its owner."""
+        identity = id(context)
+        key = context.budget_key
+        if identity not in self._contexts:
+            owner = ref(self)
+
+            def release(_reference: ReferenceType[RequestContext]) -> None:
+                ledger = owner()
+                if ledger is not None:
+                    ledger._contexts.pop(identity, None)
+                    ledger._active[key].discard(identity)
+                    if not ledger._active[key]:
+                        del ledger._active[key]
+                    ledger._trim()
+
+            self._contexts[identity] = ref(context, release)
+            self._active.setdefault(key, set()).add(identity)
+        return self.spent(key)
+
+    def _trim(self) -> None:
+        if len(self._spent) <= self._max:
+            return
+        for key in tuple(self._spent):
+            if len(self._spent) <= self._max:
+                break
+            if key not in self._active:
+                del self._spent[key]
+
     def spent(self, key: str) -> _Spent:
-        """Return what the request counted under ``key`` has used, remembering it as recent."""
+        """Return mutable accounting for ``key`` and mark it recently used.
+
+        This lookup alone does not pin the entry against eviction. Pipeline
+        stages use ``for_request`` to retain spending while a context is alive.
+        """
         spent = self._spent.get(key)
         if spent is None:
             spent = self._spent[key] = _Spent()
-            while len(self._spent) > self._max:
-                self._spent.popitem(last=False)
+            self._trim()
         else:
             self._spent.move_to_end(key)
         return spent
@@ -67,7 +107,13 @@ ResponseT = TypeVar("ResponseT")
 
 
 class BudgetInterceptor(Generic[CallT, ResponseT]):
-    """Stops a call that would take its request over budget.
+    """Reject calls once a request has reached its call or reported-token limit.
+
+    Admitted calls count before execution, including calls that later fail.
+    Token usage is added after a response or recorded provider usage becomes
+    available. A model call can therefore cross the token limit; subsequent
+    model calls are refused. Missing usage counts as zero, not an estimate.
+    This is per-process accounting, not a distributed quota or token reservation.
 
     Args:
         limits: The budget per request.
@@ -97,7 +143,7 @@ class BudgetInterceptor(Generic[CallT, ResponseT]):
         context = request.context
         if context is None:
             return await call_next(request)
-        spent = self._ledger.spent(context.budget_key)
+        spent = self._ledger.for_request(context)
         self._check(spent)
         if self._kind == "model":
             spent.model_calls += 1

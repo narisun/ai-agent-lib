@@ -11,7 +11,7 @@ No account or key is needed. The `fake` model echoes the question.
 
 ```bash
 cd examples/accounts-agent
-EAP_MODEL_PROVIDER=fake EAP_MODEL_ID=fake-model uv run accounts-agent "What is the balance of account 4411?"
+EAP_MODEL_PROVIDER=fake EAP_MODEL_ID=fake-model accounts-agent "What is the balance of account 4411?"
 ```
 
 Local state is written under `.agentlib/`: the audit log as JSON lines and the
@@ -20,14 +20,14 @@ conversation checkpoints in SQLite.
 ## Run it on the Anthropic API
 
 ```bash
-uv sync --all-packages --extra anthropic
-ANTHROPIC_API_KEY=... EAP_MODEL_ID=<model id> uv run accounts-agent "What is the balance of account 4411?"
+python -m pip install -e "../../packages/ai-agent-lib-core[anthropic]"
+ANTHROPIC_API_KEY=... EAP_MODEL_ID=<model id> accounts-agent "What is the balance of account 4411?"
 ```
 
 ## Serve it over HTTP
 
 ```bash
-EAP_MODEL_PROVIDER=fake EAP_MODEL_ID=fake-model uv run accounts-agent-serve --port 8000
+EAP_MODEL_PROVIDER=fake EAP_MODEL_ID=fake-model accounts-agent-serve --port 8000
 curl -s localhost:8000/readyz
 curl -s localhost:8000/invoke -H 'content-type: application/json' \
   -d '{"input": {"question": "What is the balance of account 4411?"}, "thread_id": "demo"}'

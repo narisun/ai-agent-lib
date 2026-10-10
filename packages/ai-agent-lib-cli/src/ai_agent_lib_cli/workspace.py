@@ -70,7 +70,13 @@ class LibrarySource:
 
 @dataclass(frozen=True, slots=True)
 class AgentAnswers:
-    """The answers one agent was generated from."""
+    """Generation inputs for one agent, separate from its runtime configuration.
+
+    ``name`` is the service/distribution name; its Python package name is derived
+    by replacing hyphens with underscores. ``mcp_servers`` accepts service names
+    or registry IDs; the scaffolder stores them as registry IDs. The generated
+    environment file owns runtime settings.
+    """
 
     name: str
     description: str
@@ -106,7 +112,12 @@ class McpAnswers:
 
 @dataclass(frozen=True, slots=True)
 class WorkspaceAnswers:
-    """Every answer a workspace was generated from."""
+    """Generation inputs serialized in ``agentlib.toml``.
+
+    Copy-returning helpers update service definitions without mutating existing
+    answers. This model describes what to generate; it does not open adapters,
+    resolve runtime secrets, or represent a running service container.
+    """
 
     name: str
     owner: str

@@ -2,7 +2,7 @@
 
 They need the ``opa`` binary on ``PATH``::
 
-    uv run pytest -m integration packages/ai-agent-lib-core/tests/integration/test_opa_live.py
+    python -m pytest -m integration packages/ai-agent-lib-core/tests/integration/test_opa_live.py
 """
 
 from __future__ import annotations

@@ -79,6 +79,7 @@ max-complexity = 12
 # Contract suites are tests shipped inside the package: asserts are the point.
 "**/testing/contracts.py" = ["D102", "S101"]
 "**/testing/langgraph_contracts.py" = ["D102", "S101"]
+"**/testing/langgraph_model_contracts.py" = ["D102", "S101", "ARG001"]
 
 # --------------------------------------------------------------------------- mypy
 [[tool.mypy.overrides]]
@@ -121,6 +122,7 @@ files = [
     "examples/accounts-mcp/tests",
     "tests",
     "docs/guide",
+    "tools",
 ]
 
 # ------------------------------------------------------------------------- pytest
@@ -134,7 +136,7 @@ addopts = [
     "--strict-markers",
     "--strict-config",
     "-ra",
-    "--disable-socket",
+    "--allow-hosts=127.0.0.1,::1",
     "--allow-unix-socket",
     # Tests that need something outside the process are opt-in: -m integration
     "-m", "not integration and not container",

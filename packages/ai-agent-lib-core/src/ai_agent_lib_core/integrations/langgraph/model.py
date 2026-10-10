@@ -25,6 +25,7 @@ from ai_agent_lib_core.contracts import (
 )
 from ai_agent_lib_core.integrations.langgraph.bridge import LoopBridge
 from ai_agent_lib_core.integrations.langgraph.context import current_request_context
+from ai_agent_lib_core.integrations.langgraph.providers import create_chat_model
 from ai_agent_lib_core.pipeline import Handler, ModelCall, ModelStage, Pipeline
 
 __all__ = [
@@ -204,13 +205,7 @@ class GovernedChatModel(BaseChatModel):
             TypeError: If the provider does not return a LangChain chat model.
         """
         if inner is None:
-            created = provider.create(ref.model_id)
-            if not isinstance(created, BaseChatModel):
-                raise TypeError(
-                    f"model provider {ref.provider!r} returned {type(created).__name__}, "
-                    "not a LangChain chat model"
-                )
-            inner = created
+            inner = create_chat_model(provider, ref.model_id)
         # The provider's model would consult a process-wide LangChain cache too, and
         # share one caller's answer with another across tenants. Caching, if it is
         # wanted, belongs to a governed stage that scopes and audits it.
@@ -247,6 +242,10 @@ class GovernedChatModel(BaseChatModel):
                 tool by name and a ``ToolNode`` keeps one tool per name, so the
                 second would silently take the first one's calls.
         """
+        if not self._provider.capabilities.tool_calling:
+            raise ConfigurationError(
+                f"model provider {self.provider_name!r} does not support tools"
+            )
         _require_distinct_names(tools)
         if tool_choice is not None:
             kwargs["tool_choice"] = tool_choice
@@ -284,6 +283,12 @@ class GovernedChatModel(BaseChatModel):
             A runnable that gives the validated value: an instance of the
             Pydantic model when one was given, otherwise a dictionary.
         """
+        capabilities = self._provider.capabilities
+        if not capabilities.structured_output or not capabilities.tool_calling:
+            raise ConfigurationError(
+                f"model provider {self.provider_name!r} does not support structured output "
+                "through tool calling"
+            )
         output = schema if isinstance(schema, StructuredOutput) else StructuredOutput(schema)
         kwargs.setdefault("tool_choice", "any")
         bound = self._inner.bind_tools([output.tool_definition()], **kwargs)

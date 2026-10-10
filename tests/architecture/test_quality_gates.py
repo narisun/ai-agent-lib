@@ -7,12 +7,15 @@ import socket
 from pathlib import Path
 
 import pytest
-from pytest_socket import SocketBlockedError
+from pytest_socket import SocketConnectBlockedError
 
 
 def test_network_sockets_are_blocked_in_tests() -> None:
-    with pytest.raises(SocketBlockedError):
-        socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    with (
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM) as connection,
+        pytest.raises(SocketConnectBlockedError),
+    ):
+        connection.connect(("192.0.2.1", 443))
 
 
 def test_all_three_packages_import() -> None:

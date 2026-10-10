@@ -6,18 +6,18 @@ A local development workspace for agents and MCP servers built on
 ## Start
 
 ```bash
-uv sync --all-packages     # one environment for every service in the workspace
-uv run pytest              # every test, with no network and no accounts
+python -m ai_agent_lib_cli install     # one environment for every service in the workspace
+python -m pytest              # every test, with no network and no accounts
 ```
 
 ## Add services
 
 ```bash
-uv run agentlib new mcp hello-mcp        # an MCP server with a sample data source
-uv run agentlib new agent hello-agent    # a LangGraph agent
-uv run agentlib link hello-agent hello   # let the agent call the server's tools
-uv sync --all-packages                   # install what was added
-uv run pytest
+python -m ai_agent_lib_cli new mcp hello-mcp        # an MCP server with a sample data source
+python -m ai_agent_lib_cli new agent hello-agent    # a LangGraph agent
+python -m ai_agent_lib_cli link hello-agent hello   # let the agent call the server's tools
+python -m ai_agent_lib_cli install                   # install what was added
+python -m pytest
 ```
 
 For a server over your own data instead of the sample, give `new mcp` one of
@@ -31,15 +31,15 @@ watch it fail, then change the code.
 ## Check and run
 
 ```bash
-uv run agentlib doctor                    # is everything each service needs usable?
-uv run agentlib config explain <service>  # every setting and where its value came from
-uv run agentlib run <service>             # start an agent's HTTP entry point or an MCP server
-uv run agentlib graph <agent>             # the agent's graph, as a Mermaid diagram
-uv run agentlib policy test               # do the rules decide the samples as expected?
-uv run agentlib update                    # take template changes from a newer agentlib
-uv run agentlib check                     # what CI runs: lint, format, types, tests, rules
-uv run agentlib eval [<service>]          # the evals, with the real model in each .env
-uv run agentlib deploy <service> --plan   # what running it on AWS takes, and why
+python -m ai_agent_lib_cli doctor                    # is everything each service needs usable?
+python -m ai_agent_lib_cli config explain <service>  # every setting and where its value came from
+python -m ai_agent_lib_cli run <service>             # start an agent's HTTP entry point or an MCP server
+python -m ai_agent_lib_cli graph <agent>             # the agent's graph, as a Mermaid diagram
+python -m ai_agent_lib_cli policy test               # do the rules decide the samples as expected?
+python -m ai_agent_lib_cli update                    # take template changes from a newer agentlib
+python -m ai_agent_lib_cli check                     # what CI runs: lint, format, types, tests, rules
+python -m ai_agent_lib_cli eval [<service>]          # the evals, with the real model in each .env
+python -m ai_agent_lib_cli deploy <service> --plan   # what running it on AWS takes, and why
 ```
 
 `doctor` names what is wrong and how to fix it. Run it first when a service

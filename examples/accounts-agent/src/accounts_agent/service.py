@@ -26,15 +26,23 @@ __all__ = ["build_app", "main"]
 async def build_app(services: ServiceContainer, lifecycle: ServiceLifecycle) -> Any:
     """Build the agent's HTTP application.
 
-    The graph is built once, here, and reused for every request. Each request
-    brings its own caller: the entry point turns the bearer token into a
+    The graph is prepared once after the listener starts and before readiness.
+    Each request brings its own caller: the entry point turns the bearer token into a
     request context before the graph runs.
 
     Args:
-        services: A started service container.
-        lifecycle: The service's lifecycle.
+        services: The container used by request handlers. The lifecycle startup
+            callback must start and validate it before graph preparation runs.
+        lifecycle: Receives deferred preparation before serving starts.
     """
-    graph = build_graph(services, await registered_mcp_tools(services))
+    graph: Any = None
+
+    async def prepare() -> None:
+        # Admission stays closed until discovery and graph compilation succeed.
+        nonlocal graph
+        graph = build_graph(services, await registered_mcp_tools(services))
+
+    lifecycle.prepare(prepare)
 
     async def run(context: RequestContext, given: Any) -> dict[str, str]:
         result = await graph.ainvoke(
@@ -73,11 +81,18 @@ def _question(given: Any) -> str:
 
 
 async def _serve(config: ServiceConfig, host: str, port: int) -> None:
-    async with ServiceContainer(config) as services:
-        # serve() runs services.validate() once it is listening, so the health
-        # route answers while the readiness route still says no.
-        lifecycle = ServiceLifecycle(services.validate)
+    services = ServiceContainer(config)
+
+    async def start() -> None:
+        await services.start()
+        await services.validate()
+
+    lifecycle = ServiceLifecycle(start)
+    try:
+        # The listener is available during adapter startup and graph preparation.
         await serve(await build_app(services, lifecycle), lifecycle, host=host, port=port)
+    finally:
+        await services.aclose()
 
 
 def main(argv: Sequence[str] | None = None) -> int:

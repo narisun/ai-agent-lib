@@ -68,7 +68,7 @@ def test_a_file_written_from_logical_keys_resolves_to_what_was_asked(tmp_path: P
     assert rules.path == base / "../shared/rules.yaml"
     assert registry.agents_path == base / "registry/agents.yaml"
     assert registry.tools_path == base / "registry/mcp-tools.yaml"  # a default is rebased too
-    assert audit.path == Path("/var/log/audit.jsonl")  # an absolute path stays as it is
+    assert audit.path == Path("/var/log/audit.jsonl").absolute()  # an absolute path stays as it is
     assert (people.data_dir, people.queries_dir) == (base / "data", base / "queries")
     assert config.tls_ca_bundle == base / "certs/ca.pem"
 

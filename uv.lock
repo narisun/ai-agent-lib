@@ -86,8 +86,8 @@ postgres = [
 requires-dist = [
     { name = "ai-agent-lib-core", editable = "packages/ai-agent-lib-core" },
     { name = "boto3", specifier = ">=1.35" },
-    { name = "langchain-aws", marker = "extra == 'bedrock'", specifier = ">=1.0" },
-    { name = "langgraph-checkpoint-postgres", marker = "extra == 'postgres'", specifier = ">=3.0" },
+    { name = "langchain-aws", marker = "extra == 'bedrock'", specifier = ">=1.0,<2" },
+    { name = "langgraph-checkpoint-postgres", marker = "extra == 'postgres'", specifier = ">=3.1,<4" },
     { name = "psycopg", extras = ["binary", "pool"], marker = "extra == 'postgres'", specifier = ">=3.2" },
     { name = "psycopg-pool", marker = "extra == 'postgres'", specifier = ">=3.3" },
     { name = "sqlglot", specifier = ">=25.0" },
@@ -174,11 +174,11 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "httpx2", marker = "extra == 'mcp'", specifier = ">=2.0" },
     { name = "jsonschema", specifier = ">=4.21" },
-    { name = "langchain-anthropic", marker = "extra == 'anthropic'", specifier = ">=1.0" },
-    { name = "langchain-core", specifier = ">=1.0" },
-    { name = "langgraph", specifier = ">=1.2" },
-    { name = "langgraph-checkpoint-sqlite", specifier = ">=3.0" },
-    { name = "mcp", marker = "extra == 'mcp'", specifier = ">=2.3" },
+    { name = "langchain-anthropic", marker = "extra == 'anthropic'", specifier = ">=1.0,<2" },
+    { name = "langchain-core", specifier = ">=1.4,<2" },
+    { name = "langgraph", specifier = ">=1.2,<2" },
+    { name = "langgraph-checkpoint-sqlite", specifier = ">=3.1,<4" },
+    { name = "mcp", marker = "extra == 'mcp'", specifier = ">=2.3,<3" },
     { name = "opentelemetry-api", specifier = ">=1.28" },
     { name = "opentelemetry-exporter-otlp-proto-http", marker = "extra == 'otel'", specifier = ">=1.28" },
     { name = "opentelemetry-sdk", marker = "extra == 'otel'", specifier = ">=1.28" },
@@ -1011,8 +1011,8 @@ name = "httpcore2"
 version = "2.13.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "h11" },
-    { name = "truststore" },
+    { name = "h11", marker = "python_full_version < '3.12' or python_full_version >= '3.15' or sys_platform != 'emscripten'" },
+    { name = "truststore", marker = "python_full_version < '3.12' or python_full_version >= '3.15' or sys_platform != 'emscripten'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/cb/f3/1db7aa2bc2524062192bb0e0323969492d1883152a232fe36eea65f4e35c/httpcore2-2.13.1.tar.gz", hash = "sha256:e0aa977abe17e69a3b820a24542a6fa88702676d83880b8d194dcd18408e5103", size = 68071, upload-time = "2026-09-23T07:47:22.372Z" }
 wheels = [

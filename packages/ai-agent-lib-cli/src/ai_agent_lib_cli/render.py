@@ -2,17 +2,22 @@
 
 from __future__ import annotations
 
+import ast
 import functools
+import json
 import re
+import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 import jinja2
+import yaml
 
 from ai_agent_lib_cli.errors import CliError
+from ai_agent_lib_cli.toml_text import toml_text
 
-__all__ = ["Report", "TemplateRenderer", "write_files"]
+__all__ = ["Report", "TemplateRenderer", "validate_files", "write_files"]
 
 _SUFFIX = ".jinja"
 _PATH_MARK = re.compile(r"__([a-z]+(?:_[a-z]+)*)__")
@@ -32,6 +37,7 @@ def _package_templates() -> jinja2.Environment:
     )
     # A value as Python source, for the code and the tests the templates write.
     environment.filters["py"] = repr
+    environment.filters["toml"] = toml_text
     return environment
 
 
@@ -76,6 +82,29 @@ class TemplateRenderer:
         return files
 
 
+def validate_files(files: Mapping[PurePosixPath, str]) -> None:
+    """Parse generated Python, TOML, YAML, and JSON before writing any files.
+
+    This catches syntax errors, not runtime behavior, import failures, schema
+    violations, or filesystem errors. Generated-consumer tests cover behavior.
+    """
+    for path, text in files.items():
+        try:
+            if path.suffix == ".py":
+                ast.parse(text, filename=path.as_posix())
+            elif path.suffix == ".toml":
+                tomllib.loads(text)
+            elif path.suffix in {".yaml", ".yml"}:
+                yaml.safe_load(text)
+            elif path.suffix == ".json" or path.name == "agentlib.lock":
+                json.loads(text)
+        except (SyntaxError, ValueError, yaml.YAMLError) as error:
+            raise CliError(
+                f"generated {path} is not valid {path.suffix[1:]}",
+                fix="correct the generation inputs or template; nothing was written",
+            ) from error
+
+
 @dataclass(frozen=True, slots=True)
 class Report:
     """What a command did to the files of a workspace.
@@ -106,15 +135,21 @@ def write_files(
     replace: frozenset[PurePosixPath] = frozenset(),
     force: bool = False,
 ) -> Report:
-    """Write ``files`` under ``root``, or write nothing at all.
+    """Validate generated files and check all conflicts before writing under ``root``.
 
     A file that exists with other content is the developer's work. Unless the
     file is one the tool maintains (``replace``) or ``force`` is set, the
     command stops before anything is written.
 
+    Paths must be trusted, target-relative template paths. Writes are sequential,
+    not transactional: a filesystem failure can leave earlier writes in place.
+
     Raises:
-        CliError: If a file would be overwritten.
+        CliError: If supported source cannot be parsed or an existing file
+            conflicts with the requested content.
+        OSError: If reading or writing the filesystem fails.
     """
+    validate_files(files)
     created: list[Path] = []
     updated: list[Path] = []
     unchanged: list[Path] = []

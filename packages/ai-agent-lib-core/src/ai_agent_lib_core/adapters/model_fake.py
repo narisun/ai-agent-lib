@@ -126,7 +126,7 @@ class FakeChatModelProvider:
     @property
     def capabilities(self) -> ModelCapabilities:
         """The fake supports tool calling and nothing vendor-specific."""
-        return ModelCapabilities(tool_calling=True)
+        return ModelCapabilities(tool_calling=True, structured_output=True)
 
     def create(self, model_id: str) -> FakeChatModel:
         """Return a fake model that replays this provider's script."""

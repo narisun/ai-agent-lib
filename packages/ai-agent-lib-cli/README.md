@@ -13,25 +13,26 @@ through all of it, test first.
 
 ## Five minutes
 
-From a checkout of the library, with [uv](https://docs.astral.sh/uv/) installed:
+From a checkout of the library, using Python and pip in a virtual environment:
 
 ```bash
-uv run --project <path-to-ai-agent-lib> --package ai-agent-lib-cli agentlib init my-platform
+python -m pip install -e <lib>/packages/ai-agent-lib-core -e <lib>/packages/ai-agent-lib-cli
+python -m ai_agent_lib_cli init my-platform --lib-path <lib>
 cd my-platform
-uv sync --all-packages                             # the workspace gets its own environment
-uv run agentlib new mcp hello-mcp                  # an MCP server over sample data
-uv run agentlib new agent hello-agent --mcp hello  # an agent that may call it
-uv sync --all-packages                             # install the two new services
-uv run pytest                                      # every test, all offline
+python -m ai_agent_lib_cli install                             # install workspace development tools
+python -m ai_agent_lib_cli new mcp hello-mcp                  # an MCP server over sample data
+python -m ai_agent_lib_cli new agent hello-agent --mcp hello  # an agent that may call it
+python -m ai_agent_lib_cli install                             # install the two new services
+python -m pytest                                      # every test, all offline
 ```
 
 Then check the workspace and run the two services:
 
 ```bash
-uv run agentlib doctor                   # is everything each service needs usable?
-uv run agentlib run hello-mcp            # terminal 1: http://127.0.0.1:8100/mcp
-uv run hello-agent "Say hello to Ada."   # terminal 2: one question
-uv run agentlib run hello-agent          # or serve the agent: POST /invoke on port 8000
+python -m ai_agent_lib_cli doctor                   # is everything each service needs usable?
+python -m ai_agent_lib_cli run hello-mcp            # terminal 1: http://127.0.0.1:8100/mcp
+hello-agent "Say hello to Ada."   # terminal 2: one question
+python -m ai_agent_lib_cli run hello-agent          # or serve the agent: POST /invoke on port 8000
 ```
 
 The agent starts on the `fake` model, which echoes the question. Select a real
@@ -41,7 +42,8 @@ model in `agents/hello-agent/.env` when you want one.
 
 | Command | What it does |
 | --- | --- |
-| `agentlib init NAME` | Creates the workspace folder: a uv workspace with shared registry and rules files |
+| `agentlib init NAME` | Creates the workspace folder with shared registry and rules files |
+| `agentlib install [--no-dev]` | Installs all workspace services and their dependencies using the current Python's pip |
 | `agentlib new mcp NAME` | Adds an MCP server: one plain tool, one governed query over a sample CSV file, tests |
 | `agentlib new mcp NAME --from-csv DIR` | Adds an MCP server over your own CSV files, with tools proposed from what is in them |
 | `agentlib new mcp NAME --from-openapi FILE` | Adds an MCP server over a REST API, with one tool for each GET operation that answers with records |
@@ -73,7 +75,7 @@ what went wrong, then what was expected, what was found and the fix.
 
 ```text
 my-platform/
-  pyproject.toml              the uv workspace, test and lint settings
+  pyproject.toml              dependencies, optional uv workspace, test and lint settings
   agentlib.toml               the answers this workspace was generated from
   registry/agents.yaml        which agents exist, and which servers each may call
   registry/mcp-tools.yaml     which servers and tools exist, with schema pins
@@ -125,7 +127,7 @@ More options: `--per-table N` (how many per table, default 3), `--query NAME`
 server), and for Redshift `--database`, `--workgroup` or `--cluster`,
 `--db-user`, `--secret-arn`, `--table`, `--aws-profile`, `--aws-region`.
 `--from-redshift` needs `ai-agent-lib-aws` installed beside the command:
-`uv add --dev ai-agent-lib-aws`.
+`python -m pip install ai-agent-lib-aws`.
 
 What to know about the proposals:
 
@@ -177,8 +179,8 @@ The commands add samples for what they generate. Add one for every rule you
 write, before you write the rule.
 
 ```bash
-uv run agentlib policy test          # decided by the rules engine the services use locally
-uv run agentlib policy test --opa    # also by OPA with the platform's Rego bundle; both must agree
+python -m ai_agent_lib_cli policy test          # decided by the rules engine the services use locally
+python -m ai_agent_lib_cli policy test --opa    # also by OPA with the platform's Rego bundle; both must agree
 ```
 
 `--opa` needs the `opa` program on the path. It is the check that the rules
@@ -232,6 +234,15 @@ assert main(["new", "mcp", "hello-mcp"], toolbox=toolbox_for_tests(pins={})) == 
 ## Where a workspace gets the library
 
 From the checkout the command runs from, by path, until the library is on a
-package index. Then: `agentlib init NAME --lib-version ">=0.1"`, or delete the
-`[tool.uv.sources]` table in the workspace's `pyproject.toml`.
+package index. Then create a workspace with
+`agentlib init NAME --lib-version ">=0.1"`. The recorded library source in
+`agentlib.toml` controls `agentlib install`; optional `[tool.uv.sources]`
+metadata is only used by uv.
 
+
+## Install a generated workspace with pip
+
+Use `python -m ai_agent_lib_cli install` after adding services or changing their
+dependencies. It resolves all members and the development tools together in the
+current Python environment. `--no-dev` omits the development group. Use a virtual
+environment; Docker and uv are optional deployment/development tools.

@@ -77,6 +77,54 @@ def test_the_proxy_is_used_unless_the_host_is_listed_as_direct() -> None:
     assert partly.client("s3").meta.config.proxies
 
 
+async def test_proxy_discovery_and_cached_clients_are_all_closed_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sessions = factory(proxy="http://proxy.corp:8080")
+    built: list[Any] = []
+    closed: list[Any] = []
+    original = sessions._create
+
+    def create(service: str, attempts: int, *, proxied: bool) -> Any:
+        client = original(service, attempts, proxied=proxied)
+        close = client.close
+
+        def record_close() -> None:
+            closed.append(client)
+            close()
+
+        monkeypatch.setattr(client, "close", record_close)
+        built.append(client)
+        return client
+
+    monkeypatch.setattr(sessions, "_create", create)
+    sessions.client("bedrock-runtime")
+    sessions.client("s3")
+    assert closed == built[::2]  # only the temporary endpoint-discovery clients
+    await sessions.aclose()
+    await sessions.aclose()
+    assert len(closed) == len(built) == 4
+    assert {id(client) for client in closed} == {id(client) for client in built}
+
+
+async def test_a_client_close_failure_does_not_leak_remaining_clients(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sessions = factory()
+    first, second = sessions.client("s3"), sessions.client("secretsmanager")
+    closed: list[bool] = []
+
+    def fail() -> None:
+        raise RuntimeError("close failed")
+
+    monkeypatch.setattr(first, "close", fail)
+    monkeypatch.setattr(second, "close", lambda: closed.append(True))
+    with pytest.raises(ExceptionGroup, match="closing AWS clients"):
+        await sessions.aclose()
+    await sessions.aclose()
+    assert closed == [True]
+
+
 def test_timeouts_and_bounded_retries_are_set_on_every_client() -> None:
     config = factory(connect_timeout=2, read_timeout=9, max_attempts=1).client("s3").meta.config
     assert (config.connect_timeout, config.read_timeout) == (2, 9)
@@ -91,20 +139,32 @@ def test_the_shared_settings_supply_everything() -> None:
         external, tls_ca_bundle=Path("/etc/corp.pem"), session_factory=offline_session
     )
     assert sessions.region == "us-east-2"
-    assert sessions.client("bedrock-runtime")._endpoint.http_session._verify == "/etc/corp.pem"
-    assert sessions.client("s3")._endpoint.http_session._verify == "/etc/aws.pem"
+    assert sessions.client("bedrock-runtime")._endpoint.http_session._verify == str(
+        Path("/etc/corp.pem")
+    )
+    assert sessions.client("s3")._endpoint.http_session._verify == str(Path("/etc/aws.pem"))
     assert sessions.sign_in is None
     assert "http://p:1" not in repr(sessions)
 
 
-def test_a_profile_that_does_not_exist_or_a_missing_region_stops_startup() -> None:
+def test_a_profile_that_does_not_exist_or_a_missing_region_stops_startup(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("AWS_DEFAULT_REGION", raising=False)
+    monkeypatch.delenv("AWS_REGION", raising=False)
+    config = tmp_path / "aws-config"
+    config.write_text("")
+    monkeypatch.setenv("AWS_CONFIG_FILE", str(config))
     with pytest.raises(ConfigurationError, match="profile or region is not valid"):
         AwsSessionFactory(profile="no-such-profile", region="eu-west-1")
 
     def no_region(**arguments: Any) -> Any:
         import boto3
 
-        return boto3.Session(aws_access_key_id="a", aws_secret_access_key="b")
+        session = boto3.Session(aws_access_key_id="a", aws_secret_access_key="b")
+        session._session.set_config_variable("region", None)
+        return session
 
     with pytest.raises(ConfigurationError, match="profile or region is not valid"):
         AwsSessionFactory(session_factory=no_region).client("secretsmanager")

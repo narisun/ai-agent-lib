@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
+import anyio
 import pytest
 from pydantic import SecretStr
 
@@ -21,6 +23,7 @@ from ai_agent_lib_core.di import (
     MODEL_PORT,
     BuildContext,
     ServiceContainer,
+    ServicePort,
     ServiceProviders,
 )
 
@@ -43,6 +46,261 @@ class Recorder:
         self.log.append(f"close {self.context.port}")
         if "close_error" in self.behaviour:
             raise RuntimeError(self.behaviour["close_error"])
+
+
+async def test_declared_dependencies_reorder_construction_and_teardown() -> None:
+    log: list[str] = []
+    providers = fake_registry(log)
+
+    def secrets(context: BuildContext) -> Recorder:
+        assert isinstance(context.get("guardrails"), Recorder)
+        return Recorder(context, log)
+
+    providers.register("secrets", "fake", secrets, dependencies=("guardrails",), replace=True)
+    async with ServiceContainer(ServiceConfig.for_testing(), providers):
+        assert log[:2] == ["build guardrails", "build secrets"]
+    assert log[-2:] == ["close secrets", "close guardrails"]
+
+
+@pytest.mark.parametrize("dependency", ["missing", "secrets"])
+async def test_bad_dependency_graph_fails_before_any_factory(dependency: str) -> None:
+    log: list[str] = []
+    providers = fake_registry(log)
+    providers.register(
+        "secrets",
+        "fake",
+        lambda context: Recorder(context, log),
+        dependencies=(dependency,),
+        replace=True,
+    )
+    with pytest.raises(ConfigurationError):
+        await ServiceContainer(ServiceConfig.for_testing(), providers).start()
+    assert log == []
+
+
+async def test_undeclared_dependency_fails_and_closes_built_resources() -> None:
+    log: list[str] = []
+    providers = fake_registry(log)
+    providers.register(
+        "audit", "fake", lambda context: context.get("secrets"), dependencies=(), replace=True
+    )
+    with pytest.raises(ConfigurationError, match="undeclared dependency"):
+        await ServiceContainer(ServiceConfig.for_testing(), providers).start()
+    assert log == ["build secrets", "close secrets"]
+
+
+async def test_typed_port_rejects_incompatible_adapter_and_still_closes_it() -> None:
+    log: list[str] = []
+    providers = fake_registry(log)
+    port = ServicePort[Recorder]("audit", ("write",))
+    providers.register(port, "fake", lambda context: Recorder(context, log), replace=True)
+    with pytest.raises(ConfigurationError, match="missing required members: write"):
+        await ServiceContainer(ServiceConfig.for_testing(), providers).start()
+    assert log[-2:] == ["close audit", "close secrets"]
+
+
+async def test_construction_and_teardown_share_one_owner_task() -> None:
+    log: list[str] = []
+    providers = fake_registry(log)
+    task: asyncio.Task[Any] | None = None
+
+    class AffineAdapter:
+        async def aclose(self) -> None:
+            assert asyncio.current_task() is task
+
+    def build(context: BuildContext) -> AffineAdapter:
+        nonlocal task
+        task = asyncio.current_task()
+        return AffineAdapter()
+
+    providers.register("audit", "fake", build, replace=True)
+    async with ServiceContainer(ServiceConfig.for_testing(), providers):
+        assert task is not None
+
+
+async def test_background_failure_does_not_cancel_other_adapters_cleanup() -> None:
+    trigger = asyncio.Event()
+    log: list[str] = []
+    providers = fake_registry(log)
+
+    class YieldingRecorder(Recorder):
+        async def aclose(self) -> None:
+            await asyncio.sleep(0)
+            await super().aclose()
+
+    for port in [*(section.value for section in Section), MODEL_PORT]:
+        providers.register(
+            port, "fake", lambda context: YieldingRecorder(context, log), replace=True
+        )
+
+    async def child() -> None:
+        await trigger.wait()
+        raise ValueError("background failure")
+
+    async def build(context: BuildContext) -> object:
+        group = anyio.create_task_group()
+        await group.__aenter__()
+        group.start_soon(child)
+
+        class AffineAdapter:
+            async def aclose(self) -> None:
+                log.append("close audit")
+                await group.__aexit__(None, None, None)
+
+        return AffineAdapter()
+
+    providers.register("audit", "fake", build, replace=True)
+    services = ServiceContainer(ServiceConfig.for_testing(), providers)
+    await services.start()
+    log.clear()
+    trigger.set()
+    async with asyncio.timeout(2):
+        while not services._closed:
+            await asyncio.sleep(0)
+    with pytest.raises(ExceptionGroup) as caught:
+        await services.aclose()
+    assert "background failure" in repr(caught.value)
+    assert sorted(log) == sorted(f"close {port}" for port in [*Section, MODEL_PORT])
+    await services.aclose()  # failure is reported by the first public close
+
+
+async def test_an_adapter_shared_by_two_factories_is_closed_once() -> None:
+    log: list[str] = []
+    providers = fake_registry(log)
+    providers.register("audit", "fake", lambda context: context.get("secrets"), replace=True)
+    async with ServiceContainer(ServiceConfig.for_testing(), providers):
+        pass
+    assert log.count("close secrets") == 1
+
+
+@pytest.mark.parametrize("immediate", [False, True])
+async def test_background_failure_during_startup_interrupts_a_pending_factory(
+    immediate: bool,
+) -> None:
+    trigger, entered, released = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    providers = fake_registry([])
+
+    async def child() -> None:
+        if not immediate:
+            await trigger.wait()
+        raise ValueError("failed during startup")
+
+    async def audit(context: BuildContext) -> object:
+        group = anyio.create_task_group()
+        await group.__aenter__()
+        group.start_soon(child)
+
+        class Adapter:
+            async def aclose(self) -> None:
+                await group.__aexit__(None, None, None)
+
+        return Adapter()
+
+    async def identity(context: BuildContext) -> object:
+        entered.set()
+        if immediate:
+
+            class ReadyAdapter:
+                async def aclose(self) -> None:
+                    await asyncio.sleep(0)
+                    released.set()
+
+            return ReadyAdapter()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            released.set()
+        return object()
+
+    providers.register("audit", "fake", audit, replace=True)
+    providers.register("identity", "fake", identity, replace=True)
+    services = ServiceContainer(ServiceConfig.for_testing(), providers)
+    starting = asyncio.create_task(services.start())
+    async with asyncio.timeout(2):
+        if not immediate:
+            await entered.wait()
+            trigger.set()
+        with pytest.raises(ExceptionGroup) as caught:
+            await starting
+    assert "failed during startup" in repr(caught.value)
+    assert released.is_set() == entered.is_set()
+    await services.aclose()
+
+
+async def test_secondary_background_failure_cannot_interrupt_startup_cleanup() -> None:
+    trigger, failed, release, closed = (
+        asyncio.Event(),
+        asyncio.Event(),
+        asyncio.Event(),
+        asyncio.Event(),
+    )
+    providers = fake_registry([])
+
+    async def child() -> None:
+        await trigger.wait()
+        raise ValueError("secondary failure")
+
+    async def secrets(context: BuildContext) -> object:
+        group = anyio.create_task_group()
+        await group.__aenter__()
+        group.start_soon(child)
+
+        class Adapter:
+            async def aclose(self) -> None:
+                try:
+                    await group.__aexit__(None, None, None)
+                finally:
+                    failed.set()
+
+        return Adapter()
+
+    class SlowAudit:
+        async def aclose(self) -> None:
+            trigger.set()
+            await release.wait()
+            closed.set()
+
+    def identity(context: BuildContext) -> object:
+        raise ValueError("startup failure")
+
+    providers.register("secrets", "fake", secrets, replace=True)
+    providers.register("audit", "fake", lambda _: SlowAudit(), replace=True)
+    providers.register("identity", "fake", identity, replace=True)
+    services = ServiceContainer(ServiceConfig.for_testing(), providers)
+    starting = asyncio.create_task(services.start())
+    async with asyncio.timeout(2):
+        await failed.wait()
+        await asyncio.sleep(0)
+        try:
+            assert not starting.done()
+            assert not services._closed
+        finally:
+            release.set()
+        with pytest.raises(ExceptionGroup) as caught:
+            await starting
+    assert "startup failure" in repr(caught.value)
+    assert "secondary failure" in repr(caught.value)
+    assert closed.is_set()
+
+
+async def test_cancellation_during_construction_closes_earlier_adapters() -> None:
+    log: list[str] = []
+    entered = asyncio.Event()
+    providers = fake_registry(log)
+
+    async def build(context: BuildContext) -> object:
+        entered.set()
+        await asyncio.Event().wait()
+        return object()
+
+    providers.register("audit", "fake", build, replace=True)
+    services = ServiceContainer(ServiceConfig.for_testing(), providers)
+    starting = asyncio.create_task(services.start())
+    await entered.wait()
+    starting.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await starting
+    assert log == ["build secrets", "close secrets"]
 
 
 def fake_registry(log: list[str], **behaviour: dict[str, Any]) -> ServiceProviders:
@@ -119,6 +377,66 @@ async def test_close_is_idempotent() -> None:
     await services.aclose()
     await services.aclose()
     assert log.count("close audit") == 1
+
+
+async def test_a_cancelled_closer_does_not_skip_other_adapters() -> None:
+    log: list[str] = []
+    providers = fake_registry(log)
+
+    class CancelledAdapter:
+        async def aclose(self) -> None:
+            log.append("cancelled guardrails")
+            raise asyncio.CancelledError
+
+    providers.register(Section.GUARDRAILS, "fake", lambda _: CancelledAdapter(), replace=True)
+    services = ServiceContainer(ServiceConfig.for_testing(), providers)
+    await services.start()
+    with pytest.raises(asyncio.CancelledError):
+        await services.aclose()
+    await services.aclose()
+    assert log[-1] == "close secrets"
+    assert log.count("close audit") == 1
+
+
+async def test_cancelling_a_close_caller_waits_for_shared_cleanup() -> None:
+    log: list[str] = []
+    entered, release = asyncio.Event(), asyncio.Event()
+    providers = fake_registry(log)
+
+    class SlowAdapter:
+        async def aclose(self) -> None:
+            entered.set()
+            await release.wait()
+            log.append("close slow adapter")
+
+    providers.register(Section.GUARDRAILS, "fake", lambda _: SlowAdapter(), replace=True)
+    services = ServiceContainer(ServiceConfig.for_testing(), providers)
+    await services.start()
+    first = asyncio.create_task(services.aclose())
+    await entered.wait()
+    second = asyncio.create_task(services.aclose())
+    first.cancel()
+    await asyncio.sleep(0)
+    assert not first.done()
+    release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await first
+    await second
+    assert log[-1] == "close secrets"
+    assert log.count("close slow adapter") == 1
+
+
+async def test_startup_preserves_the_original_error_when_cleanup_also_fails() -> None:
+    providers = fake_registry([], audit={"close_error": "close failed"})
+
+    def broken(_: BuildContext) -> object:
+        raise ConfigurationError("startup failed")
+
+    providers.register(Section.IDENTITY, "fake", broken, replace=True)
+    with pytest.raises(BaseExceptionGroup) as caught:
+        await ServiceContainer(ServiceConfig.for_testing(), providers).start()
+    assert isinstance(caught.value.exceptions[0], ConfigurationError)
+    assert "startup failed" in str(caught.value.exceptions[0])
 
 
 async def test_a_failed_startup_closes_what_was_already_built() -> None:

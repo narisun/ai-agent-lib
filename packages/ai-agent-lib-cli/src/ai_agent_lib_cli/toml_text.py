@@ -11,7 +11,7 @@ __all__ = ["string_of", "toml_list", "toml_text"]
 
 def toml_text(value: str) -> str:
     """Return ``value`` as a TOML string."""
-    return json.dumps(value, ensure_ascii=False)
+    return json.dumps(value, ensure_ascii=False).replace("\x7f", "\\u007f")
 
 
 def toml_list(values: Sequence[str]) -> str:

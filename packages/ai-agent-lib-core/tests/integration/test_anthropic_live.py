@@ -2,7 +2,7 @@
 
 Run it with a real key and model ID in the environment::
 
-    uv run pytest -m integration packages/ai-agent-lib-core/tests/integration
+    python -m pytest -m integration packages/ai-agent-lib-core/tests/integration
 """
 
 from __future__ import annotations

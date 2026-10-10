@@ -79,7 +79,7 @@ def evals(tools: Toolbox, service: str | None, workspace: Path | None) -> None:
     """
     root = workspace_root(workspace)
     target = service_folder(root, load_answers(root), service) if service else root
-    arguments = ("-m", "eval", "-q", "-rs", str(target.relative_to(root)) if service else ".")
+    arguments = ("-m", "eval", "-q", "-rs", target.relative_to(root).as_posix() if service else ".")
     click.echo(f"== evals: python -m pytest {' '.join(arguments)}")
     code = tools.run_tool("pytest", arguments, root)
     # pytest says 5 when no test was collected: a service with no evals yet.

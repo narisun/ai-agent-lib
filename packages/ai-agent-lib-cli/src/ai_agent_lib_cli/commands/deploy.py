@@ -77,7 +77,7 @@ def deploy(service: str, plan_only: bool, bundle: Path | None, workspace: Path |
             extras = "[bedrock,postgres]" if target.kind == "agent" else ""
             click.echo(
                 f'  add "{AWS_DISTRIBUTION}{extras}" to the dependencies in {pyproject}, '
-                "then run 'uv sync --all-packages'"
+                "then run 'python -m ai_agent_lib_cli install'"
             )
         click.echo(f"  fill in {target.settings}: its values are examples")
         click.echo(f"  run 'agentlib deploy {service} --plan'")

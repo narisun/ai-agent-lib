@@ -17,17 +17,54 @@ from typing import Any
 
 import httpx
 import pytest
+from langchain_core.tools import BaseTool
 
 from accounts_agent import APPLICATION
+from accounts_agent import service as entrypoint
 from accounts_agent.graph import build_graph
 from accounts_agent.service import build_app
-from ai_agent_lib_core import Principal, RequestContext
+from ai_agent_lib_core import Principal, RequestContext, ServiceContainer
 from ai_agent_lib_core.integrations.http import ServiceLifecycle, ServiceState, serve
 from ai_agent_lib_core.pipeline import bind_request_context
 from ai_agent_lib_core.testing import FakeChatModelProvider, FakeIdentityVerifier, Fakes, calls_tool
 
 ANN = {"authorization": "Bearer ann-token"}
 BO = {"authorization": "Bearer bo-token"}
+
+
+@pytest.mark.parametrize("fails", [False, True])
+async def test_health_remains_available_during_graph_preparation(
+    monkeypatch: pytest.MonkeyPatch,
+    fails: bool,
+) -> None:
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def discover(services: ServiceContainer) -> list[BaseTool]:
+        entered.set()
+        await release.wait()
+        if fails:
+            raise ValueError("discovery failed")
+        return []
+
+    monkeypatch.setattr(entrypoint, "registered_mcp_tools", discover)
+    async with Fakes().container() as services:
+        lifecycle = ServiceLifecycle(services.validate)
+        app = await build_app(services, lifecycle)
+        starting = asyncio.create_task(lifecycle.start())
+        await entered.wait()
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://agent.test"
+        ) as http:
+            assert (await http.get("/healthz")).status_code == 200
+            assert (await http.get("/readyz")).status_code == 503
+            release.set()
+            if fails:
+                with pytest.raises(ValueError, match="discovery failed"):
+                    await starting
+                assert (await http.get("/readyz")).status_code == 503
+            else:
+                await starting
+                assert (await http.get("/readyz")).status_code == 200
 
 
 def fakes(*replies: Any) -> Fakes:

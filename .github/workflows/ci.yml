@@ -20,23 +20,23 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - run: uv sync --all-packages --locked
-      - run: uv run ruff check .
-      - run: uv run ruff format --check .
-      - run: uv run mypy
-      - run: uv run lint-imports
-      - run: uv run pytest -q
+      - run: python tools/install_dev.py
+      - run: python -m ruff check .
+      - run: python -m ruff format --check .
+      - run: python -m mypy
+      - run: lint-imports
+      - run: python -m pytest -q
       - name: The developer guide matches the code
-        run: uv run python docs/guide/build_guide.py --check
+        run: python docs/guide/build_guide.py --check
 
   integration:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       # The version the deployed OPA sidecar runs (templates/deploy-opa/Dockerfile.jinja).
@@ -48,5 +48,32 @@ jobs:
         with:
           terraform_version: "1.9.8"
           terraform_wrapper: false
-      - run: uv sync --all-packages --locked
-      - run: uv run pytest -q -m integration
+      - run: python tools/install_dev.py
+      - run: python -m pytest -q -m integration
+
+  consumer:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [core, aws, cli, generated-fake, generated-anthropic, generated-bedrock]
+        versions: [minimum, latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - if: matrix.versions == 'minimum'
+        run: python tools/check_consumer.py --profile ${{ matrix.profile }} --constraints tools/framework-minimum.txt
+      - if: matrix.versions == 'latest'
+        run: python tools/check_consumer.py --profile ${{ matrix.profile }}
+
+  container-context:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python tools/install_dev.py
+      - run: python -m pytest packages/ai-agent-lib-cli/tests/unit/test_cli_deploy.py -q -m container

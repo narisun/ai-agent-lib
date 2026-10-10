@@ -5,7 +5,10 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
+import tarfile
 import types
+import uuid
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -124,8 +127,97 @@ def test_deploy_writes_the_module_and_the_files_derived_from_the_settings(
     assert "  uses_opa  = true\n" in settings
     assert '    EAP_AUDIT_OPTIONS      = "{\\"stream\\": \\"eap-audit\\"}"\n' in settings
     dockerfile = (ready / "deploy/helper/Dockerfile").read_text(encoding="utf-8")
-    assert "uv sync --frozen --no-dev --package helper" in dockerfile
+    assert "python -m pip install --no-cache-dir --require-hashes" in dockerfile
+    assert "COPY agents/helper agents/helper" in dockerfile
+    assert "COPY agents agents" not in dockerfile
     assert 'CMD ["helper-serve", "--host", "0.0.0.0", "--port", "8000"]' in dockerfile
+    rules = (ready / "deploy/helper/Dockerfile.dockerignore").read_text()
+    assert rules.splitlines()[1] == "**"
+    assert "!agents/helper/src/**" in rules
+    assert "!agents/**" not in rules
+    assert rules.index("**/.env") > rules.index("!agents/helper/src/**")
+    assert "**/*.sqlite*" in rules
+    assert "**/*.jsonl" in rules
+
+
+@pytest.mark.container
+def test_no_secret_sentinel_reaches_any_image_layer(ready: Path) -> None:
+    assert run("deploy", "helper", "--workspace", ready) == 0
+    sentinel = "MUST-NOT-ENTER-IMAGE-" + uuid.uuid4().hex
+    excluded = (
+        ".env",
+        "agents/helper/.env",
+        "agents/helper/src/helper/.env",
+        "agents/helper/src/helper/cache.sqlite",
+        "agents/helper/src/helper/audit.jsonl",
+        "mcp-servers/people/.env",
+        "agents/another/src/another/secret.txt",
+    )
+    for relative in excluded:
+        path = ready / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(sentinel)
+    # A minimal installable service isolates the context test from package indexes.
+    (ready / "agents/helper/src/helper/__init__.py").write_text('RUNTIME_MARKER = "included"\n')
+    (ready / "agents/helper/pyproject.toml").write_text(
+        '[project]\nname="helper"\nversion="0.1.0"\n'
+        '[build-system]\nrequires=["setuptools"]\nbuild-backend="setuptools.build_meta"\n'
+    )
+    (ready / "deploy/helper/requirements.lock").write_text("")
+    # Inspect the actual filtered build context as well as the saved image.
+    # An excluded sibling can otherwise be uploaded without a COPY using it.
+    dockerfile = ready / "deploy/helper/Dockerfile"
+    probe = (
+        "from pathlib import Path; root = Path('/context'); "
+        f"assert not any((root / name).exists() for name in {excluded!r})"
+    )
+    dockerfile.write_text(
+        dockerfile.read_text().replace(
+            "WORKDIR /app\n",
+            f'WORKDIR /app\nRUN --mount=type=bind,target=/context python -c "{probe}"\n',
+            1,
+        )
+    )
+    docker = shutil.which("docker")
+    assert docker is not None, "run this opt-in gate on a host with Docker"
+    tag = "agentlib-context-test:" + uuid.uuid4().hex
+
+    def command(*arguments: str) -> None:
+        subprocess.run([docker, *arguments], cwd=ready, check=True, capture_output=True)  # noqa: S603
+
+    try:
+        command("build", "-f", "deploy/helper/Dockerfile", "-t", tag, ".")
+        command(
+            "run",
+            "--rm",
+            tag,
+            "python",
+            "-c",
+            "import helper; assert helper.RUNTIME_MARKER == 'included'",
+        )
+        image = ready / "image.tar"
+        command("save", "-o", str(image), tag)
+        with tarfile.open(image) as archive:
+            layers = [member for member in archive if member.isfile()]
+            assert layers
+            for member in layers:
+                content = archive.extractfile(member)
+                assert content is not None
+                data = content.read()
+                assert sentinel.encode() not in data
+                # Docker archives can contain compressed OCI layers; inspect
+                # every archived layer, including files deleted by later layers.
+                try:
+                    with tarfile.open(fileobj=BytesIO(data), mode="r:*") as layer:
+                        for entry in layer:
+                            if entry.isfile():
+                                payload = layer.extractfile(entry)
+                                assert payload is not None
+                                assert sentinel.encode() not in payload.read()
+                except tarfile.ReadError:
+                    continue  # image metadata, not a layer
+    finally:
+        subprocess.run([docker, "image", "rm", "--force", tag], check=False, capture_output=True)  # noqa: S603
 
 
 def test_running_again_rewrites_what_is_derived_and_keeps_what_is_yours(

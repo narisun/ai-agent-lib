@@ -5,6 +5,10 @@ from __future__ import annotations
 import json
 import textwrap
 from collections.abc import Sequence
+from pathlib import Path
+from typing import Any
+
+from pydantic.json_schema import GenerateJsonSchema
 
 from ai_agent_lib_cli.errors import CliError
 from ai_agent_lib_core.config import Key, options_key, variable_for
@@ -120,4 +124,15 @@ def options_schema(providers: ServiceProviders, port: str, name: str) -> str:
     spec = providers.lookup(_known_port(port), name)
     if spec.options is None:
         raise CliError(f"{port} {name} does not declare its options, so there is no schema")
-    return json.dumps(spec.options.model_json_schema(), indent=2, sort_keys=True)
+    return json.dumps(
+        spec.options.model_json_schema(schema_generator=_OptionsSchema), indent=2, sort_keys=True
+    )
+
+
+class _OptionsSchema(GenerateJsonSchema):
+    """Serialize concrete OS path defaults identically on Windows and Unix."""
+
+    def encode_default(self, dft: Any) -> Any:
+        if isinstance(dft, Path):
+            return dft.as_posix()
+        return super().encode_default(dft)

@@ -12,6 +12,7 @@ from ai_agent_lib_core.adapters import FakeChatModelProvider
 from ai_agent_lib_core.contracts import (
     AgentLibError,
     AuditOutcome,
+    ConfigurationError,
     IntegrityError,
     ModelCapabilities,
     ModelRef,
@@ -33,6 +34,25 @@ CONTEXT = RequestContext(
     thread_id="th-1",
 )
 QUESTION = [HumanMessage("a confidential question")]
+
+
+@pytest.mark.parametrize("structured", [True, False])
+async def test_unsupported_capabilities_fail_before_binding(structured: bool) -> None:
+    class PlainProvider(FakeChatModelProvider):
+        @property
+        def capabilities(self) -> ModelCapabilities:
+            return ModelCapabilities()
+
+    provider = PlainProvider()
+    async with Fakes(model=provider).container() as services:
+        model = services.model()
+        if structured:
+            with pytest.raises(ConfigurationError, match="does not support"):
+                model.with_structured_output({"type": "object", "properties": {}})
+        else:
+            with pytest.raises(ConfigurationError, match="does not support"):
+                model.bind_tools([])
+        assert provider.models[0].bound_tools == []
 
 
 async def test_the_governed_model_is_a_native_chat_model() -> None:

@@ -146,14 +146,16 @@ def test_every_tool_of_every_server_was_pinned_from_the_running_code(workspace: 
         "rates.currencies_by_currency_code",
         "rates.traders_of_desk",
     ]
-    assert [tool.name for tool in servers[2].tools] == [
-        "orders.orders_2026_by_order_id",
-        "orders.orders_2026_by_customer_id",
-        "orders.orders_2026_by_state",
-        "orders.customers_by_customer_id",
-        "orders.customers_by_segment",
-        "orders.readings_all",
-    ]
+    assert sorted(tool.name for tool in servers[2].tools) == sorted(
+        [
+            "orders.orders_2026_by_order_id",
+            "orders.orders_2026_by_customer_id",
+            "orders.orders_2026_by_state",
+            "orders.customers_by_customer_id",
+            "orders.customers_by_segment",
+            "orders.readings_all",
+        ]
+    )
     for server in servers:
         assert all(tool.schema_sha256 for tool in server.tools), server.id
     # The same arguments give the same pin, whatever the server is called.

@@ -9,7 +9,7 @@ the governed tools, the scoped checkpointer and the per-request run arguments.
 ## Test it
 
 ```bash
-uv run pytest agents/{{ name }}
+python -m pytest agents/{{ name }}
 ```
 
 The tests need no account and no network. Start a change with a test:
@@ -25,8 +25,8 @@ The tests need no account and no network. Start a change with a test:
 ## Run it
 
 ```bash
-uv run {{ name }} "Say hello to Ada."
-uv run {{ name }}-serve --port {{ port }}
+{{ name }} "Say hello to Ada."
+{{ name }}-serve --port {{ port }}
 curl -s localhost:{{ port }}/invoke -H 'content-type: application/json' \
   -d '{"input": {"question": "Say hello to Ada."}, "thread_id": "demo"}'
 curl -sN localhost:{{ port }}/invoke/stream -H 'content-type: application/json' \
@@ -49,7 +49,7 @@ or the agent stops with "could not be reached":
 
 ```bash
 {% for server in servers %}
-uv run {{ server }}
+{{ server }}
 {% endfor %}
 ```
 
@@ -79,11 +79,11 @@ audit log as JSON lines and the conversation checkpoints in SQLite.
 ## When something fails
 
 The error says what was expected, what came instead, how to fix it, and the
-line of this agent's code that led there. Run `uv run agentlib doctor {{ name }}`
+line of this agent's code that led there. Run `python -m ai_agent_lib_cli doctor {{ name }}`
 when the agent does not start.
 
 ## Deploying
 
-`uv run agentlib deploy {{ name }}` writes `deploy.env` here, for the settings
+`python -m ai_agent_lib_cli deploy {{ name }}` writes `deploy.env` here, for the settings
 the agent runs with in AWS. Fill it in, then `agentlib deploy {{ name }} --plan`
 shows every permission the agent's adapters need and why.

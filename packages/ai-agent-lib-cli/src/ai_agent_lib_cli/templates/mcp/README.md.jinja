@@ -39,7 +39,7 @@ ones you want, change the columns they return, and delete the rest.
 ## Test it
 
 ```bash
-uv run pytest mcp-servers/{{ name }}
+python -m pytest mcp-servers/{{ name }}
 ```
 
 The tests need no account and no network. {{ "The API is not called: `" ~ responses_file ~ "` holds what it answers,\nby method and path. " if rest else "" }}They run the real rules file, so
@@ -64,7 +64,7 @@ The generated tests check the columns each role sees. Add the rows you expect.
 ## Run it
 
 ```bash
-uv run {{ name }}        # serves http://127.0.0.1:{{ port }}/mcp, with /healthz and /readyz
+{{ name }}        # serves http://127.0.0.1:{{ port }}/mcp, with /healthz and /readyz
 ```
 
 On this machine a caller without a token is the development identity in
@@ -106,7 +106,7 @@ token:
 {% endfor %}
 {% if plan.deployed %}
 - Deployed, the same query files run on the real database. In the
-  `deploy.env` that `uv run agentlib deploy {{ name }}` writes, give
+  `deploy.env` that `python -m ai_agent_lib_cli deploy {{ name }}` writes, give
   `{{ var.data_sources }}` this value instead of the local one:
 
   ```text
@@ -127,7 +127,7 @@ token:
    role should see.
 3. Add the tool in `server.py` and list it under `{{ server_id }}` in
    `registry/mcp-tools.yaml`.
-4. Run `uv run agentlib registry pin {{ server_id }}` to pin its arguments.
+4. Run `python -m ai_agent_lib_cli registry pin {{ server_id }}` to pin its arguments.
 5. If a new role or a new column to mask is involved, add or change a rule in
    `policies/agentlib/rules/data.yaml`.
 
@@ -137,6 +137,6 @@ unchanged over CSV files locally.
 
 ## Deploying
 
-`uv run agentlib deploy {{ name }}` writes `deploy.env` here, for the settings
+`python -m ai_agent_lib_cli deploy {{ name }}` writes `deploy.env` here, for the settings
 the server runs with in AWS. Fill it in, then `agentlib deploy {{ name }} --plan`
 shows every permission its adapters need and why.

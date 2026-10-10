@@ -1,4 +1,4 @@
-"""Testing a service as it is configured, with nothing outside the process.
+"""Test a service's local configuration while controlling models and state paths.
 
 The fakes in :mod:`ai_agent_lib_core.testing.harness` replace every adapter,
 which is the fastest way to test graph and tool logic. The helpers here are
@@ -6,6 +6,10 @@ for the other question: does the service work with its own configuration? They
 read the service's ``.env.example``, keep the real local adapters (the rules
 file, the registry files, CSV data) and replace only what a test must control:
 the model, and where local state is written.
+
+These helpers do not turn every adapter into a fake or block network access.
+Use local adapter selections, inject transports where needed, and enforce
+network restrictions in the test runner.
 """
 
 from __future__ import annotations
@@ -124,7 +128,7 @@ def load_eval_config(dotenv_path: Path, *, state_dir: Path) -> ServiceConfig:
 
     Unlike :func:`load_test_config`, this reads the process environment and
     then the file, the way the service itself starts, so a model and its key
-    can come from either. It never selects the fake model; check
+    can come from either. It preserves the configured model selection; check
     ``config.model.provider`` and skip the eval when no real model is set.
 
     Args:
@@ -146,8 +150,9 @@ def load_test_config(
 ) -> ServiceConfig:
     """Resolve a service's own ``.env`` file for a test.
 
-    Nothing is read from the process environment, so the result is the same on
-    every machine. Relative paths in the file are relative to its folder. The
+    Configuration resolution ignores the process environment. Adapters may
+    still depend on files, SDK credential sources, or external services.
+    Relative paths in the file are relative to its folder. The
     audit log and the checkpoint database, when they are local files, are
     written under ``state_dir`` instead of the service's own state folder.
 

@@ -38,7 +38,7 @@ _NUMBERS = frozenset(
 _TIMESTAMPS = frozenset({"timestamp", "timestamptz"})
 _INSTALL = (
     "reading the Redshift catalogue needs the AWS package; install ai-agent-lib-aws where "
-    "agentlib runs, in a workspace with: uv add --dev ai-agent-lib-aws"
+    "agentlib runs, in a workspace with: python -m pip install ai-agent-lib-aws"
 )
 
 

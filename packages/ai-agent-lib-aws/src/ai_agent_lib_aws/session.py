@@ -1,8 +1,8 @@
-"""One AWS session for a service, and the rules every AWS client follows.
+"""Share AWS clients within a container and translate SDK failures.
 
-Nothing here reads the process environment. The profile, the region, the CA
-files and the proxy all come from resolved configuration, so a value written
-in a ``.env`` file works exactly like one that was exported.
+Library settings such as profile, region, CA files, and proxy arrive as resolved
+configuration. Credential discovery remains the AWS SDK's responsibility and
+may use its normal environment, profile, or workload-identity sources.
 """
 
 from __future__ import annotations
@@ -135,9 +135,11 @@ def _bypasses_proxy(host: str, no_proxy: str | None) -> bool:
 class AwsSessionFactory:
     """Builds the AWS clients of one service from resolved configuration.
 
-    One client is kept per AWS service; clients are safe to share between
-    threads. A call is made with :meth:`invoke`, which keeps it off the event
-    loop and maps what the SDK raises to the library's errors.
+    Clients are cached by AWS service and retry-attempt setting. Creation is
+    protected by a lock; :meth:`invoke` runs synchronous SDK calls off the event
+    loop and translates recognized SDK failures into library errors.
+    The provider pack creates one factory per container unless a caller injects
+    a factory and retains responsibility for closing it.
 
     Args:
         profile: The named profile to use, for example one signed in through SSO.
@@ -254,6 +256,7 @@ class AwsSessionFactory:
             client = self._create(service, attempts, proxied=False)
             host = str(client.meta.endpoint_url).split("://", 1)[-1].split("/", 1)[0].lower()
             if self._proxy is not None and not _bypasses_proxy(host.split(":")[0], self._no_proxy):
+                client.close()
                 client = self._create(service, attempts, proxied=True)
         except (aws.BotoCoreError, aws.ClientError, ValueError) as exc:
             mapped = classify_aws_error(exc, what=what, sign_in=self.sign_in)
@@ -273,6 +276,11 @@ class AwsSessionFactory:
 
     async def invoke(self, what: str, operation: Callable[..., T], /, **arguments: Any) -> T:
         """Call an SDK operation off the event loop and translate what it raises.
+
+        Cancelling the await does not stop the synchronous SDK call already
+        running in a worker thread. SDK timeouts still apply; a timeout or
+        cancellation does not prove that a remote write had no effect.
+        SDK errors without a library translation propagate unchanged.
 
         Args:
             what: Names the adapter and the operation, for an error message.
@@ -295,3 +303,20 @@ class AwsSessionFactory:
     def classify(self, error: BaseException, *, what: str) -> AgentLibError | None:
         """Map an SDK error to the taxonomy, naming this session's sign-in command."""
         return classify_aws_error(error, what=what, sign_in=self.sign_in)
+
+    async def aclose(self) -> None:
+        """Close cached clients and collect failures while attempting each close.
+
+        The owner should finish using adapters before closing their shared
+        clients. This clears the cache; it does not permanently disable ``client``.
+        """
+        with self._lock:
+            clients, self._clients = tuple(self._clients.values()), {}
+        errors: list[Exception] = []
+        for client in clients:
+            try:
+                await asyncio.to_thread(client.close)
+            except Exception as error:  # noqa: BLE001 - release all clients
+                errors.append(error)
+        if errors:
+            raise ExceptionGroup("errors while closing AWS clients", errors)

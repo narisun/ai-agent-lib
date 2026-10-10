@@ -286,7 +286,9 @@ async def test_an_mcp_server_gets_the_same_health_routes() -> None:
 async def test_a_socket_left_by_a_killed_process_is_replaced(socket_path: str) -> None:
     import socket
 
-    stale = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    unix_family = getattr(socket, "AF_UNIX", None)
+    assert unix_family is not None
+    stale = socket.socket(unix_family, socket.SOCK_STREAM)
     stale.bind(socket_path)
     stale.close()
     service = Running(socket_path)

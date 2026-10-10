@@ -127,6 +127,6 @@ against the SDK's own service models with `botocore.stub.Stubber`. The
 PostgreSQL store also runs against a real PostgreSQL server:
 
 ```bash
-uv run pytest packages/ai-agent-lib-aws                  # offline
-uv run pytest -m integration packages/ai-agent-lib-aws   # real PostgreSQL; Bedrock if configured
+python -m pytest packages/ai-agent-lib-aws                  # offline
+python -m pytest -m integration packages/ai-agent-lib-aws   # real PostgreSQL; Bedrock if configured
 ```

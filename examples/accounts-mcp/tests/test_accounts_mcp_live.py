@@ -2,7 +2,7 @@
 
 It needs the ``opa`` binary on ``PATH``::
 
-    uv run pytest -m integration examples/accounts-mcp/tests/test_accounts_mcp_live.py
+    python -m pytest -m integration examples/accounts-mcp/tests/test_accounts_mcp_live.py
 """
 
 from __future__ import annotations

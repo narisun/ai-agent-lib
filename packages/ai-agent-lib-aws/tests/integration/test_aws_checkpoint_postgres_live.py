@@ -4,7 +4,7 @@ The server comes from the ``pgserver`` package, which carries its own
 PostgreSQL and runs it from a temporary directory over a local socket. Nothing
 has to be installed or started first::
 
-    uv run pytest -m integration packages/ai-agent-lib-aws/tests/integration
+    python -m pytest -m integration packages/ai-agent-lib-aws/tests/integration
 
 The server trusts local connections, so these tests replace the IAM token and
 turn TLS off, which only code can do. Signing in to Amazon RDS with IAM is not

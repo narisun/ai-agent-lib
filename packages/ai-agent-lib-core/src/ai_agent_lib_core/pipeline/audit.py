@@ -1,4 +1,4 @@
-"""The audit stage: evidence for every call, whatever its outcome."""
+"""Record governed call outcomes, including failures and attempted cancellation evidence."""
 
 from __future__ import annotations
 
@@ -83,11 +83,14 @@ def _ended(
 
 
 class AuditInterceptor(Generic[CallT, ResponseT]):
-    """Writes one audit record per call and emits telemetry.
+    """Record each call's outcome and emit metadata-only telemetry.
 
     This is the outermost stage, so it sees denials and failures raised by any
     stage inside it. It fails closed: if the record cannot be written, the call
     fails with :class:`IntegrityError`, even if the call itself succeeded.
+    This does not roll back an operation that already took effect. During
+    cancellation, recording is best effort so an audit failure does not replace
+    the caller's cancellation.
 
     Args:
         sink: Where records are stored.

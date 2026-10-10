@@ -4,7 +4,7 @@
 [project]
 name = "{{ name }}"
 version = "0.1.0"
-description = "Agents and MCP servers of {{ owner }}, built on ai-agent-lib."
+description = {{ ("Agents and MCP servers of " ~ owner ~ ", built on ai-agent-lib.") | toml }}
 requires-python = ">=3.11"
 
 [tool.uv]
@@ -14,12 +14,12 @@ package = false
 members = ["agents/*", "mcp-servers/*"]
 {% if library.kind == "path" %}
 
-# The library comes from a local checkout. Once it is on your package index,
-# delete this table and give a version in each member's dependencies.
+# Optional uv support for the local checkout. The pip-based agentlib install
+# command uses the library source recorded in agentlib.toml instead.
 [tool.uv.sources]
-ai-agent-lib-core = { path = "{{ library.path }}/packages/ai-agent-lib-core", editable = true }
-ai-agent-lib-aws = { path = "{{ library.path }}/packages/ai-agent-lib-aws", editable = true }
-ai-agent-lib-cli = { path = "{{ library.path }}/packages/ai-agent-lib-cli", editable = true }
+ai-agent-lib-core = { path = {{ (library.path ~ "/packages/ai-agent-lib-core") | toml }}, editable = true }
+ai-agent-lib-aws = { path = {{ (library.path ~ "/packages/ai-agent-lib-aws") | toml }}, editable = true }
+ai-agent-lib-cli = { path = {{ (library.path ~ "/packages/ai-agent-lib-cli") | toml }}, editable = true }
 {% endif %}
 
 [dependency-groups]

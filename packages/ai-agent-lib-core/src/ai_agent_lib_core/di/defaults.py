@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from ai_agent_lib_core.adapters import (
     AnthropicChatModelProvider,
@@ -41,15 +41,34 @@ from ai_agent_lib_core.contracts import (
     ConfigurationError,
     NoOptions,
     PolicyDecisionPoint,
-    SecretsProvider,
-    Section,
     no_access,
 )
-from ai_agent_lib_core.di.providers import DATA_PORT, MODEL_PORT
+from ai_agent_lib_core.di.ports import (
+    AUDIT,
+    CHECKPOINT,
+    DATA,
+    GUARDRAILS,
+    IDENTITY,
+    MODEL,
+    POLICY,
+    REGISTRY,
+    SECRETS,
+)
 
 if TYPE_CHECKING:
     from ai_agent_lib_core.contracts import CheckpointBackend
-    from ai_agent_lib_core.di.providers import BuildContext, ServiceProviders
+    from ai_agent_lib_core.di.ports import (
+        AUDIT,
+        CHECKPOINT,
+        DATA,
+        GUARDRAILS,
+        IDENTITY,
+        MODEL,
+        POLICY,
+        REGISTRY,
+        SECRETS,
+    )
+from ai_agent_lib_core.di.providers import BuildContext, ServiceProviders
 
 __all__ = ["register_local_adapters"]
 
@@ -82,7 +101,7 @@ async def _jwt_identity(context: BuildContext) -> JwtIdentityVerifier:
     exchange = options.exchange
     if exchange is None or settings.exchange_kind is None or settings.token_url is None:
         return JwtIdentityVerifier(settings, context.clock, proxy=proxy)
-    secrets = cast(SecretsProvider, context.get(Section.SECRETS))
+    secrets = context.get(SECRETS)
     exchanger = OAuthTokenExchanger(
         kind=settings.exchange_kind,
         token_url=settings.token_url,
@@ -102,7 +121,7 @@ def _fake_model(context: BuildContext) -> FakeChatModelProvider:  # noqa: ARG001
 
 
 async def _anthropic_model(context: BuildContext) -> AnthropicChatModelProvider:
-    secrets = cast(SecretsProvider, context.get(Section.SECRETS))
+    secrets = context.get(SECRETS)
     api_key = await secrets.get_secret("anthropic_api_key")
     # The model pipeline's resilience stage owns retries, so the vendor client makes
     # one attempt each: otherwise two pipeline retries become nine HTTP calls.
@@ -141,7 +160,7 @@ async def _opa_policy(context: BuildContext) -> PolicyDecisionPoint:
     options = context.selection.parse_options(OpaPolicyOptions)
     token = None
     if options.auth_secret is not None:
-        secrets = cast(SecretsProvider, context.get(Section.SECRETS))
+        secrets = context.get(SECRETS)
         token = await secrets.get_secret(options.auth_secret)
     return _cached(OpaPolicyDecisionPoint(options, context.ids, token=token), options, context)
 
@@ -166,7 +185,7 @@ async def _rest(context: BuildContext) -> RestDataSource:
     options = context.selection.parse_options(RestOptions)
     token = None
     if options.auth_secret is not None:
-        secrets = cast(SecretsProvider, context.get(Section.SECRETS))
+        secrets = context.get(SECRETS)
         token = await secrets.get_secret(options.auth_secret)
     source = RestDataSource(
         context.instance,
@@ -184,26 +203,38 @@ def register_local_adapters(providers: ServiceProviders) -> None:
 
     None of them needs anything from a cloud account, so each says so.
     """
-    register = functools.partial(providers.register, access=no_access)
-    register(MODEL_PORT, "fake", _fake_model, local_only=True, options=NoOptions)
-    register(MODEL_PORT, "anthropic", _anthropic_model, options=NoOptions, extra="anthropic")
-    register(Section.SECRETS, "env", _env_secrets, options=NoOptions)
-    register(Section.AUDIT, "jsonl", _jsonl_audit, local_only=True, options=JsonlAuditOptions)
+    register = functools.partial(providers.register, access=no_access, dependencies=())
+    register(MODEL, "fake", _fake_model, local_only=True, options=NoOptions)
     register(
-        Section.IDENTITY, "static", _static_identity, local_only=True, options=StaticIdentityOptions
+        MODEL,
+        "anthropic",
+        _anthropic_model,
+        dependencies=(SECRETS,),
+        options=NoOptions,
+        extra="anthropic",
     )
-    register(Section.IDENTITY, "jwt", _jwt_identity, options=JwtIdentityOptions, extra="jwt")
+    register(SECRETS, "env", _env_secrets, options=NoOptions)
+    register(AUDIT, "jsonl", _jsonl_audit, local_only=True, options=JsonlAuditOptions)
+    register(IDENTITY, "static", _static_identity, local_only=True, options=StaticIdentityOptions)
     register(
-        Section.CHECKPOINT,
+        IDENTITY,
+        "jwt",
+        _jwt_identity,
+        dependencies=(SECRETS,),
+        options=JwtIdentityOptions,
+        extra="jwt",
+    )
+    register(
+        CHECKPOINT,
         "sqlite",
         _sqlite_checkpoint,
         local_only=True,
         options=SqliteCheckpointOptions,
     )
-    register(Section.CHECKPOINT, "none", _no_checkpoint, options=NoOptions)
-    register(Section.REGISTRY, "file", _file_registry, options=FileRegistryOptions)
-    register(Section.POLICY, "rules", _rules_policy, local_only=True, options=RulesPolicyOptions)
-    register(Section.POLICY, "opa", _opa_policy, options=OpaPolicyOptions)
-    register(Section.GUARDRAILS, "patterns", _pattern_guardrails, options=PatternGuardrailsOptions)
-    register(DATA_PORT, "duckdb_csv", _duckdb_csv, local_only=True, options=DuckDbCsvOptions)
-    register(DATA_PORT, "rest", _rest, options=RestOptions)
+    register(CHECKPOINT, "none", _no_checkpoint, options=NoOptions)
+    register(REGISTRY, "file", _file_registry, options=FileRegistryOptions)
+    register(POLICY, "rules", _rules_policy, local_only=True, options=RulesPolicyOptions)
+    register(POLICY, "opa", _opa_policy, dependencies=(SECRETS,), options=OpaPolicyOptions)
+    register(GUARDRAILS, "patterns", _pattern_guardrails, options=PatternGuardrailsOptions)
+    register(DATA, "duckdb_csv", _duckdb_csv, local_only=True, options=DuckDbCsvOptions)
+    register(DATA, "rest", _rest, dependencies=(SECRETS,), options=RestOptions)

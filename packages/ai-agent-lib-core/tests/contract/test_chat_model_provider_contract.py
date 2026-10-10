@@ -13,7 +13,7 @@ from ai_agent_lib_core.contracts import (
     ConfigurationError,
     TransientError,
 )
-from ai_agent_lib_core.testing.contracts import ChatModelProviderContract
+from ai_agent_lib_core.testing.langgraph_model_contracts import LangGraphModelProviderContract
 
 
 def _status(code: int) -> anthropic.APIStatusError:
@@ -23,7 +23,7 @@ def _status(code: int) -> anthropic.APIStatusError:
     )
 
 
-class TestAnthropicChatModelProvider(ChatModelProviderContract):
+class TestAnthropicChatModelProvider(LangGraphModelProviderContract):
     def make_provider(self) -> ChatModelProvider:
         return AnthropicChatModelProvider(SecretStr("sk-test-key"))
 
@@ -35,6 +35,6 @@ class TestAnthropicChatModelProvider(ChatModelProviderContract):
         ]
 
 
-class TestFakeChatModelProvider(ChatModelProviderContract):
+class TestFakeChatModelProvider(LangGraphModelProviderContract):
     def make_provider(self) -> ChatModelProvider:
         return FakeChatModelProvider()

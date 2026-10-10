@@ -31,8 +31,7 @@ def test_generated_document_is_current(path: str, expected: str, command: str) -
 def test_the_developer_guide_is_current() -> None:
     actual = (REPO_ROOT / "docs" / "developer-guide.html").read_text(encoding="utf-8")
     assert actual == build_guide.guide_html(), (
-        "docs/developer-guide.html is stale; regenerate it with: "
-        "uv run python docs/guide/build_guide.py"
+        "docs/developer-guide.html is stale; regenerate it with: python docs/guide/build_guide.py"
     )
 
 

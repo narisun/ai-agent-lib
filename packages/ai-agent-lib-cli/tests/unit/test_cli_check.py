@@ -89,7 +89,7 @@ def test_a_new_workspace_has_a_ci_workflow_and_blocks_the_network_in_tests() -> 
     workflow = by_name[".github/workflows/check.yml"]
     assert "runs-on: ${{ matrix.os }}" in workflow
     assert "os: [ubuntu-latest, windows-latest]" in workflow
-    assert "uv run agentlib check" in workflow
+    assert "python -m ai_agent_lib_cli check" in workflow
     pyproject = by_name["pyproject.toml"]
     assert '"pytest-socket>=0.7"' in pyproject
     assert '"--allow-hosts=127.0.0.1,::1"' in pyproject

@@ -12,6 +12,7 @@ from ai_agent_lib_aws.access import (
     secrets_manager_access,
 )
 from ai_agent_lib_aws.audit_firehose import FirehoseAuditOptions, FirehoseAuditSink
+from ai_agent_lib_aws.checkpoint_options import PostgresCheckpointOptions
 from ai_agent_lib_aws.data_redshift import RedshiftDataOptions, RedshiftDataSource
 from ai_agent_lib_aws.guardrails_bedrock import (
     DRAFT_VERSION,
@@ -27,35 +28,41 @@ from ai_agent_lib_core.contracts import (
     ConfigurationError,
     DeploymentEnv,
     NoOptions,
-    OptionsModel,
-    Section,
 )
-from ai_agent_lib_core.kit import DATA_PORT, MODEL_PORT, BuildContext, ServiceProviders
+from ai_agent_lib_core.kit import (
+    AUDIT,
+    CHECKPOINT,
+    DATA,
+    GUARDRAILS,
+    MODEL,
+    REGISTRY,
+    SECRETS,
+    BuildContext,
+    ServiceProviders,
+)
 
 __all__ = ["register_aws_adapters"]
 
 
-def _postgres_options() -> type[OptionsModel] | None:
-    """The postgres store's options model, when its database driver is installed."""
-    try:
-        from ai_agent_lib_aws.checkpoint_postgres import PostgresCheckpointOptions
-    except ImportError:
-        return None
-    return PostgresCheckpointOptions
-
-
 class _Sessions:
-    """Hands every adapter of one service the same AWS session factory."""
+    """Resolve a container-owned session factory or borrow a caller-owned one.
+
+    The registry may outlive several containers, so default sessions are cached
+    in ``BuildContext.resources``, never on this registry-held helper.
+    """
 
     def __init__(self, sessions: AwsSessionFactory | None) -> None:
         self._sessions = sessions
 
     def get(self, context: BuildContext) -> AwsSessionFactory:
-        if self._sessions is None:
-            self._sessions = AwsSessionFactory.from_settings(
+        if self._sessions is not None:
+            return self._sessions  # explicitly injected: the caller owns it
+        return context.resources.shared(
+            self,
+            lambda: AwsSessionFactory.from_settings(
                 context.external, tls_ca_bundle=context.tls_ca_bundle
-            )
-        return self._sessions
+            ),
+        )
 
 
 def register_aws_adapters(
@@ -68,8 +75,9 @@ def register_aws_adapters(
 
     Args:
         providers: The registry to add to.
-        sessions: The session factory every adapter uses. By default one is
-            built from the resolved configuration when the first adapter needs it.
+        sessions: Optional shared session factory owned and closed by the caller.
+            By default each container builds its own on first use and closes it
+            after its adapters, even when containers reuse the same registry.
         replace: Allow overwriting adapters that are already registered. A
             test uses this to register the adapters again over stubbed clients.
     """
@@ -128,61 +136,68 @@ def register_aws_adapters(
         return backend
 
     providers.register(
-        MODEL_PORT,
+        MODEL,
         "bedrock",
         bedrock_model,
         options=NoOptions,
         access=bedrock_model_access,
         extra="bedrock",
         replace=replace,
+        dependencies=(),
     )
     providers.register(
-        Section.CHECKPOINT,
+        CHECKPOINT,
         "postgres",
         postgres_checkpoint,
-        options=_postgres_options(),
+        options=PostgresCheckpointOptions,
         access=postgres_checkpoint_access,
         extra="postgres",
         replace=replace,
+        dependencies=(),
     )
     providers.register(
-        Section.GUARDRAILS,
+        GUARDRAILS,
         "bedrock",
         bedrock_guardrails,
         options=BedrockGuardrailsOptions,
         access=bedrock_guardrails_access,
         replace=replace,
+        dependencies=(),
     )
     providers.register(
-        DATA_PORT,
+        DATA,
         "redshift_data",
         redshift_data,
         options=RedshiftDataOptions,
         access=redshift_data_access,
         replace=replace,
+        dependencies=(),
     )
     providers.register(
-        Section.AUDIT,
+        AUDIT,
         "firehose",
         firehose_audit,
         options=FirehoseAuditOptions,
         access=firehose_audit_access,
         replace=replace,
+        dependencies=(),
     )
     providers.register(
-        Section.REGISTRY,
+        REGISTRY,
         "s3_file",
         s3_registry,
         options=S3RegistryOptions,
         access=s3_registry_access,
         replace=replace,
+        dependencies=(),
     )
     providers.register(
-        Section.SECRETS,
+        SECRETS,
         "secrets_manager",
         secrets_manager,
         options=SecretsManagerOptions,
         access=secrets_manager_access,
         replace=replace,
+        dependencies=(),
     )
     return providers

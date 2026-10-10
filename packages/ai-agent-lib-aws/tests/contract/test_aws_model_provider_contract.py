@@ -13,7 +13,7 @@ from ai_agent_lib_core.contracts import (
     CredentialsExpiredError,
     TransientError,
 )
-from ai_agent_lib_core.testing.contracts import ChatModelProviderContract
+from ai_agent_lib_core.testing.langgraph_model_contracts import LangGraphModelProviderContract
 
 
 def _client_error(code: str, status: int) -> aws.ClientError:
@@ -23,7 +23,9 @@ def _client_error(code: str, status: int) -> aws.ClientError:
     )
 
 
-class TestBedrockChatModelProvider(ChatModelProviderContract):
+class TestBedrockChatModelProvider(LangGraphModelProviderContract):
+    model_id = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+
     def make_provider(self) -> ChatModelProvider:
         return BedrockChatModelProvider(offline_sessions())
 

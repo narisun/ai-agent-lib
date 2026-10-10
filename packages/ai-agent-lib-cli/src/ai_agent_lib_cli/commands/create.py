@@ -102,10 +102,10 @@ def init(
     click.echo(
         "\nNext:\n"
         f"  cd {root}\n"
-        "  uv sync --all-packages\n"
-        "  uv run agentlib new mcp hello-mcp\n"
-        "  uv run agentlib new agent hello-agent --mcp hello\n"
-        "  uv sync --all-packages && uv run pytest"
+        "  python -m ai_agent_lib_cli install\n"
+        "  python -m ai_agent_lib_cli new mcp hello-mcp\n"
+        "  python -m ai_agent_lib_cli new agent hello-agent --mcp hello\n"
+        "  python -m ai_agent_lib_cli install && python -m pytest"
     )
 
 
@@ -160,15 +160,15 @@ def new_agent(
     print_report(report, root)
     linked = [load_answers(root).mcp_server(name) for name in mcp_servers]
     start = "".join(
-        f"  uv run {server.name}        # in another terminal: the agent calls it\n"
+        f"  {server.name}        # in another terminal: the agent calls it\n"
         for server in linked
         if server is not None
     )
     click.echo(
         "\nNext:\n"
-        "  uv sync --all-packages\n"
-        f"  uv run pytest {AGENTS_FOLDER}/{agent.name}\n"
-        f'{start}  uv run {agent.name} "Say hello to Ada."'
+        "  python -m ai_agent_lib_cli install\n"
+        f"  python -m pytest {AGENTS_FOLDER}/{agent.name}\n"
+        f'{start}  {agent.name} "Say hello to Ada."'
     )
 
 
@@ -296,9 +296,9 @@ def new_mcp(
             )
     click.echo(
         "\nNext:\n"
-        "  uv sync --all-packages\n"
-        f"  uv run pytest {SERVERS_FOLDER}/{server.name}\n"
-        f"  uv run {server.name}"
+        "  python -m ai_agent_lib_cli install\n"
+        f"  python -m pytest {SERVERS_FOLDER}/{server.name}\n"
+        f"  {server.name}"
     )
 
 
@@ -316,8 +316,8 @@ def link(tools: Toolbox, agent: str, server: str, workspace: Path | None) -> Non
     linked = load_answers(root).mcp_server(server)
     if linked is not None:
         click.echo(
-            f"\nFrom now on {agent} needs {linked.name} running: uv run {linked.name}\n"
-            "The tests need nothing running: uv run pytest tests"
+            f"\nFrom now on {agent} needs {linked.name} running: {linked.name}\n"
+            "The tests need nothing running: python -m pytest tests"
         )
 
 

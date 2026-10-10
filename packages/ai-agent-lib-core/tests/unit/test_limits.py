@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import gc
 import time
 from datetime import timedelta
 from typing import Any
@@ -213,6 +214,35 @@ def test_the_ledger_forgets_the_oldest_requests() -> None:
     ledger.spent("b")
     ledger.spent("c")
     assert ledger.spent("a").model_calls == 0
+
+
+def test_active_budgets_survive_traffic_and_are_reclaimed_when_contexts_die() -> None:
+    ledger = BudgetLedger(max_requests=1)
+    first = context("first")
+    ledger.for_request(first).model_calls = 7
+    other = context("other")
+    ledger.for_request(other).model_calls = 9
+    assert ledger.for_request(first).model_calls == 7
+    for number in range(100):
+        ledger.for_request(context(f"noise-{number}"))
+    assert ledger.for_request(first).model_calls == 7
+    assert ledger.for_request(other).model_calls == 9
+    first_key = first.budget_key
+    del first
+    gc.collect()
+    assert ledger.spent(first_key).model_calls == 0
+    assert ledger.for_request(other).model_calls == 9
+
+
+def test_equal_context_values_from_different_invocations_have_distinct_budgets() -> None:
+    from dataclasses import replace
+
+    ledger = BudgetLedger(max_requests=1)
+    first = replace(context(), invocation_id="first")
+    second = replace(context(), invocation_id="second")
+    ledger.for_request(first).model_calls = 1
+    assert ledger.for_request(second).model_calls == 0
+    assert ledger.for_request(first).model_calls == 1
 
 
 async def test_a_looping_graph_is_stopped_by_the_budget_and_audited_as_denied() -> None:

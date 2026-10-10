@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 import yaml
@@ -188,7 +188,7 @@ def test_a_workspace_file_with_a_broken_plan_is_not_a_workspace_file() -> None:
 def test_the_sample_plan_is_the_query_file_the_sample_ships() -> None:
     files = TemplateRenderer().render("mcp-sample", {})
     (query,) = sample_plan().queries
-    assert files[Path("queries/people_by_team.sql")] == query.definition  # type: ignore[index]
+    assert files[PurePosixPath("queries/people_by_team.sql")] == query.definition
     assert f"-- description: {query.description}\n" in query.definition
 
 

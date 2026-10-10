@@ -56,12 +56,34 @@ def _serve(service: object) -> Factory:
 class Fakes:
     """One fake per port, kept together so a test can inspect them afterwards.
 
+    Policy and guardrails allow calls by default. Use these fakes for isolated
+    behavior tests; use ``load_test_config`` to exercise a service's local rules
+    and registry files. Create a new ``Fakes`` per test to avoid shared histories
+    and resource state.
+
     Example::
 
-        fakes = Fakes(model=FakeChatModelProvider(["hello"]))
-        async with fakes.container() as services:
-            ...
-        assert fakes.audit.records[0].event == "model.call"
+        import asyncio
+
+        from ai_agent_lib_core import Principal, RequestContext
+        from ai_agent_lib_core.pipeline import bind_request_context
+        from ai_agent_lib_core.testing import FakeChatModelProvider, Fakes
+
+        async def example():
+            fakes = Fakes(model=FakeChatModelProvider(["hello"]))
+            context = RequestContext(
+                principal=Principal(subject="user-1", tenant="tenant-1"),
+                application="example",
+                request_id="request-1",
+                thread_id="conversation-1",
+            )
+            async with fakes.container() as services:
+                with bind_request_context(context):
+                    reply = await services.model().ainvoke("Say hello")
+            assert reply.content == "hello"
+            assert fakes.audit.records[0].event == "model.call"
+
+        asyncio.run(example())
 
     Attributes:
         data_sources: Fake data sources by name. Each is served under that name
@@ -85,7 +107,7 @@ class Fakes:
     data_sources: dict[str, DataSource] = field(default_factory=dict)
 
     def providers(self) -> ServiceProviders:
-        """Return a registry that serves these fakes under the name ``fake``."""
+        """Return new factory definitions that serve these existing fake instances."""
         return (
             ServiceProviders()
             .register(Section.SECRETS, FAKE_PROVIDER, _serve(self.secrets))
@@ -116,7 +138,11 @@ class Fakes:
         )
 
     def container(self, config: ServiceConfig | None = None) -> ServiceContainer:
-        """Return a container wired to these fakes. Use it with ``async with``."""
+        """Return an unstarted container with these fakes and no retry delays.
+
+        Use it with ``async with``. The frozen clock advances only when the test
+        asks it to, so tests control deadlines without waiting for wall time.
+        """
         return ServiceContainer(
             config if config is not None else self.config(),
             self.providers(),

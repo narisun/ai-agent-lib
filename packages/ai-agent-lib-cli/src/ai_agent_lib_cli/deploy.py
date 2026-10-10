@@ -302,7 +302,7 @@ def _missing_dependencies(
         problems.append(
             f"{', '.join(labels)} need {what}, which {target.name} does not install; "
             f'list "{requirement}" in the dependencies in {target.folder}/pyproject.toml '
-            "and run 'uv sync --all-packages'"
+            "and run 'python -m ai_agent_lib_cli install'"
         )
     return problems
 

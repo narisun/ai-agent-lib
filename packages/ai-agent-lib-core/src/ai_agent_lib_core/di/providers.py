@@ -7,12 +7,14 @@ path or load code of its own.
 
 from __future__ import annotations
 
+import inspect
 import re
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from importlib import metadata
 from pathlib import Path
 from types import MappingProxyType
+from typing import Any, Generic, TypeVar, cast, overload
 
 from pydantic import SecretStr
 
@@ -34,8 +36,10 @@ __all__ = [
     "FIRST_PARTY_PACKS",
     "MODEL_PORT",
     "BuildContext",
+    "BuildResources",
     "Factory",
     "ProviderSpec",
+    "ServicePort",
     "ServiceProviders",
 ]
 
@@ -74,6 +78,76 @@ def _no_dependencies(port: str) -> object:
     raise ConfigurationError(f"{port} is not available to this factory")
 
 
+ResourceT = TypeVar("ResourceT")
+
+
+@dataclass(frozen=True, slots=True)
+class ServicePort(Generic[ResourceT]):
+    """A typed port with the member names required at its runtime boundary.
+
+    Registering and resolving the same descriptor preserves the adapter type
+    for static checkers. Runtime checks reject missing members before any
+    dependent factory runs. Framework-specific behavior belongs in contract tests.
+
+    Attributes:
+        name: Configuration-facing port name, such as ``"audit"``.
+        members: Attributes that an adapter must expose.
+        methods: Members that must also be callable. Signatures and behavior
+            remain the responsibility of static checking and contract tests.
+    """
+
+    name: str
+    members: tuple[str, ...]
+    methods: tuple[str, ...] = ()
+
+    def checked(self, value: object) -> ResourceT:
+        """Reject an adapter that does not expose this port's members."""
+        absent = object()
+        missing = [
+            name for name in self.members if inspect.getattr_static(value, name, absent) is absent
+        ]
+        if missing:
+            raise ConfigurationError(
+                f"adapter for {self.name} is missing required members: {', '.join(missing)}"
+            )
+        invalid = [
+            name for name in self.methods if not callable(inspect.getattr_static(value, name, None))
+        ]
+        if invalid:
+            raise ConfigurationError(
+                f"adapter for {self.name} has non-callable methods: {', '.join(invalid)}"
+            )
+        return cast(ResourceT, value)
+
+
+class BuildResources:
+    """Shared resources owned by one container, never by a provider registry.
+
+    Factories use a stable key to share a resource within their container.
+    The container closes owned resources after closing the adapters that use them.
+    """
+
+    def __init__(self) -> None:
+        self._values: dict[object, object] = {}
+
+    def shared(self, key: object, create: Callable[[], ResourceT]) -> ResourceT:
+        """Return the resource for ``key``, creating it on first use.
+
+        A key must always refer to the same resource type. Creation is synchronous
+        during sequential adapter startup; this is not a thread-safe cache.
+        A failing creator must clean up resources it has not returned.
+        """
+        if key not in self._values:
+            self._values[key] = create()
+        return cast(ResourceT, self._values[key])
+
+    def take(self) -> tuple[object, ...]:
+        """Transfer resources to the container's teardown, in reverse creation order."""
+        values = tuple(reversed(tuple(self._values.values())))
+        self._values.clear()
+        return values
+
+
 @dataclass(frozen=True, slots=True)
 class BuildContext:
     """What a factory is given to build its adapter.
@@ -90,8 +164,12 @@ class BuildContext:
         clock: The clock port.
         ids: The identifier port.
         secret_values: Named secret values. Populated only for the secrets port.
+        resolver: Resolves already-built singleton dependencies. Factories
+            normally call ``get`` rather than accessing this callback directly.
         instance: The name of the thing being built, for ports that can have
             several adapters at once, such as data sources. Empty otherwise.
+        resources: Resources shared and owned within this container, such as
+            an AWS session factory. They close after the adapters that use them.
     """
 
     port: str
@@ -104,19 +182,39 @@ class BuildContext:
     secret_values: Mapping[str, SecretStr] = field(default_factory=dict, repr=False)
     resolver: Callable[[str], object] = field(default=_no_dependencies, repr=False)
     instance: str = ""
+    resources: BuildResources = field(default_factory=BuildResources, repr=False)
 
-    def get(self, port: str) -> object:
-        """Return the service behind another port this adapter depends on."""
+    @overload
+    def get(self, port: ServicePort[ResourceT]) -> ResourceT: ...
+
+    @overload
+    def get(self, port: str) -> object: ...
+
+    def get(self, port: str | ServicePort[Any]) -> object:
+        """Return an already-built singleton dependency.
+
+        Declared dependencies restrict which ports are accessible. A typed
+        descriptor also checks the returned adapter's required members.
+        This method never constructs an adapter on demand.
+        """
+        if isinstance(port, ServicePort):
+            return port.checked(self.resolver(port.name))
         return self.resolver(port)
 
 
 Factory = Callable[[BuildContext], object | Awaitable[object]]
-"""Builds an adapter. May be a plain function or a coroutine function."""
+"""Build an adapter synchronously or asynchronously from a ``BuildContext``.
+
+The container takes ownership of the returned adapter and calls ``aclose`` if
+supported. Construction and close run in the same lifetime task, allowing
+task-bound async context managers. A factory that fails before returning must
+clean up its own partially constructed adapter.
+"""
 
 
 @dataclass(frozen=True, slots=True)
 class ProviderSpec:
-    """One registered adapter.
+    """The definition of an adapter, not a live instance.
 
     Attributes:
         port: The port it implements.
@@ -133,6 +231,10 @@ class ProviderSpec:
             needs nothing; ``None`` when the adapter does not say.
         extra: The optional extra of its distribution that it needs installed,
             such as ``"bedrock"`` for ``ai-agent-lib-aws[bedrock]``.
+        dependencies: Singleton ports to build first and allow through ``get``.
+            ``()`` declares none; ``None`` preserves legacy ordering and access
+            to any already-built singleton.
+        contract: Optional typed descriptor used to check a factory's result.
     """
 
     port: str
@@ -142,6 +244,8 @@ class ProviderSpec:
     options: type[OptionsModel] | None = None
     access: AccessRule | None = None
     extra: str | None = None
+    dependencies: tuple[str, ...] | None = None
+    contract: ServicePort[Any] | None = None
 
 
 def _normalize(distribution: str) -> str:
@@ -152,7 +256,8 @@ class ServiceProviders:
     """A registry from ``(port, name)`` to an adapter factory.
 
     The registry can be changed until a container starts with it. From then on
-    it is frozen, so the set of adapters a process can use is fixed at startup.
+    it is frozen. A registry can be reused by multiple containers: it holds
+    definitions, while each container owns the resources its factories create.
     """
 
     def __init__(self) -> None:
@@ -175,13 +280,29 @@ class ServiceProviders:
 
     @property
     def frozen(self) -> bool:
-        """Whether a container has started with this registry."""
+        """Whether registrations are frozen, explicitly or by container startup."""
         return self._frozen
 
     def freeze(self) -> None:
         """Stop further changes. Called by the container when it starts."""
         self._frozen = True
 
+    @overload
+    def register(
+        self,
+        port: ServicePort[ResourceT],
+        name: str,
+        factory: Callable[[BuildContext], ResourceT | Awaitable[ResourceT]],
+        *,
+        local_only: bool = False,
+        options: type[OptionsModel] | None = None,
+        access: AccessRule | None = None,
+        extra: str | None = None,
+        replace: bool = False,
+        dependencies: Iterable[str | ServicePort[Any]] | None = None,
+    ) -> ServiceProviders: ...
+
+    @overload
     def register(
         self,
         port: str,
@@ -193,6 +314,21 @@ class ServiceProviders:
         access: AccessRule | None = None,
         extra: str | None = None,
         replace: bool = False,
+        dependencies: Iterable[str | ServicePort[Any]] | None = None,
+    ) -> ServiceProviders: ...
+
+    def register(
+        self,
+        port: str | ServicePort[Any],
+        name: str,
+        factory: Factory,
+        *,
+        local_only: bool = False,
+        options: type[OptionsModel] | None = None,
+        access: AccessRule | None = None,
+        extra: str | None = None,
+        replace: bool = False,
+        dependencies: Iterable[str | ServicePort[Any]] | None = None,
     ) -> ServiceProviders:
         """Add an adapter and return the registry, so calls can be chained.
 
@@ -207,6 +343,10 @@ class ServiceProviders:
                 ``no_access`` for nothing.
             extra: The optional extra of its distribution that it needs.
             replace: Allow overwriting an existing registration.
+            dependencies: Singleton ports needed by this factory, built first.
+                ``None`` preserves legacy section ordering and access to any
+                already-built singleton.
+                An explicit empty iterable declares no dependencies.
 
         Raises:
             RuntimeError: If the registry is frozen.
@@ -216,22 +356,30 @@ class ServiceProviders:
             raise RuntimeError(
                 "the provider registry is frozen; register before the container starts"
             )
-        key = (str(port), name)
+        contract = port if isinstance(port, ServicePort) else None
+        port_name = contract.name if contract is not None else str(port)
+        key = (port_name, name)
         if key in self._specs and not replace:
             raise ValueError(f"provider {name!r} is already registered for {port}")
         self._specs[key] = ProviderSpec(
-            port=str(port),
+            port=port_name,
             name=name,
             factory=factory,
             local_only=local_only,
             options=options,
             access=access,
             extra=extra,
+            dependencies=(
+                tuple(p.name if isinstance(p, ServicePort) else str(p) for p in dependencies)
+                if dependencies is not None
+                else None
+            ),
+            contract=contract,
         )
         return self
 
     def lookup(self, port: str, name: str) -> ProviderSpec:
-        """Return the registered adapter, or explain how to get it.
+        """Return an adapter definition without constructing an instance.
 
         Raises:
             ConfigurationError: If no such adapter is registered.

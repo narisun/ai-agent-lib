@@ -1,13 +1,20 @@
-"""The names of generated things, and the names derived from them."""
+"""Translate service and external names into generated Python identifiers.
+
+A service name such as ``claims-mcp`` names its directory and distribution;
+``package_name`` produces ``claims_mcp`` and ``server_id_for`` produces the
+default registry ID ``claims``. Schema readers normalize external identifiers
+before ``python_name`` escapes reserved Python symbols.
+"""
 
 from __future__ import annotations
 
+import builtins
 import keyword
 import re
 
 from ai_agent_lib_cli.errors import CliError
 
-__all__ = ["PLAIN_NAME", "check_name", "package_name", "server_id_for"]
+__all__ = ["PLAIN_NAME", "check_name", "package_name", "python_name", "server_id_for"]
 
 PLAIN_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 """What a query, a parameter and a column may be called: lower case, digits, underscores."""
@@ -19,12 +26,26 @@ _MCP_SUFFIX = "-mcp"
 _RESERVED = frozenset({"test", "tests", "src", "site", "agentlib", "mcp", "langgraph"})
 
 
+def python_name(name: str) -> str:
+    """Escape a normalized identifier when it would shadow a reserved symbol.
+
+    The caller must first validate the identifier and afterwards check for
+    collisions: both ``class`` and ``class_`` become ``class_``. This function
+    does not normalize punctuation or guarantee uniqueness.
+    """
+    reserved = {"source", "server", "result", "build_server", "greet"}
+    if keyword.iskeyword(name) or hasattr(builtins, name) or name in reserved:
+        return name + "_"
+    return name
+
+
 def check_name(kind: str, value: str) -> str:
     """Return ``value`` if it can name a workspace or a service.
 
     A name is lower-case words joined by hyphens, such as ``claims-agent``. It
-    becomes a folder, a distribution, a Python package and an identifier in
-    the registry and in policy, so it has to be valid as all of them.
+    names a folder and distribution, and may appear in registry and policy
+    entries. ``package_name`` converts hyphens to underscores for Python;
+    reserved package names are rejected here.
 
     Raises:
         CliError: If it cannot.

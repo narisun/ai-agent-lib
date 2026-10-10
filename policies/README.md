@@ -72,7 +72,7 @@ name every sensitive column in the rule.
 opa fmt --fail policies/bundle
 opa check --strict policies/bundle
 opa test policies/bundle
-uv run pytest -m integration packages/ai-agent-lib-core/tests/integration/test_opa_live.py
+python -m pytest -m integration packages/ai-agent-lib-core/tests/integration/test_opa_live.py
 ```
 
 The last command needs the `opa` binary on `PATH`. It starts a local OPA server

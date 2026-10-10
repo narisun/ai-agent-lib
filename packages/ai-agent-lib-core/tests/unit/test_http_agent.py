@@ -279,7 +279,16 @@ async def test_health_needs_no_token_and_readiness_follows_the_lifecycle() -> No
     service.lifecycle.stop()
     stopped = await service.invoke()
     assert (stopped.status_code, stopped.headers["retry-after"]) == (503, "1")
-    assert (await service.client.get("/readyz")).json() == {"status": "stopping"}
+
+
+async def test_drain_before_startup_never_accepts_requests() -> None:
+    service = Service()
+    service.lifecycle.begin_drain()
+    assert not service.lifecycle.accepting
+    assert (await service.invoke()).status_code == 503
+    await service.lifecycle.start()
+    assert not service.lifecycle.accepting
+    assert (await service.client.get("/readyz")).json() == {"status": "draining"}
     assert (await service.client.get("/healthz")).status_code == 200
 
 

@@ -111,6 +111,11 @@ def _under(folder: str, name: str, files: Mapping[PurePosixPath, str]) -> dict[P
 class Scaffolder:
     """Creates workspaces and adds services to them.
 
+    Coordinates answer models, pure rendering, schema pin discovery, formatting,
+    and file writes. Templates and maintained-file lists define what can be
+    regenerated; edited application files belong to the developer. These steps
+    are not a filesystem transaction, so an I/O failure may leave partial output.
+
     Args:
         renderer: Renders the templates.
         pin_reader: Asks a generated MCP server for the pins of its tools.
@@ -413,7 +418,11 @@ class Scaffolder:
             "model_provider": agent.model_provider,
             "servers": [server.name for server in servers],
             "port": agent.port,
-            "extras": _AGENT_EXTRAS,
+            "extras": (
+                _AGENT_EXTRAS + ",anthropic"
+                if agent.model_provider == "anthropic"
+                else _AGENT_EXTRAS
+            ),
             "library": answers.library,
             "var": variable_names(),
         }

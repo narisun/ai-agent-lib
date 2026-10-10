@@ -1,8 +1,8 @@
 """Authenticated identity and the per-request context.
 
-Authority in the library comes only from these immutable values, which are
-created at the boundary by an identity verifier. Nothing in a prompt, a tool
-result or graph state can add a role or change a tenant.
+Entry points create these immutable values from verified identity, not from
+prompts, tool results, or graph state. The dataclasses validate shape, not
+credentials: application code must use an identity verifier at the boundary.
 """
 
 from __future__ import annotations
@@ -42,7 +42,9 @@ class PrincipalKind(enum.StrEnum):
 class Principal:
     """A verified caller.
 
-    Instances are meant to be built only by an ``IdentityVerifier``.
+    Production entry points obtain this value from an ``IdentityVerifier``.
+    Tests may construct principals directly to exercise a particular role or
+    tenant. Constructing the dataclass does not authenticate its contents.
 
     Attributes:
         subject: The authenticated person or service.
@@ -85,12 +87,12 @@ class Principal:
         return role in self.roles
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, weakref_slot=True)
 class RequestContext:
     """Everything the library needs to know about one request.
 
-    The context travels beside the graph, never inside graph state, because
-    state is checkpointed and visible to the model.
+    The context travels as runtime context, outside graph state. This keeps
+    authority and credentials out of checkpoints and model-visible messages.
 
     Attributes:
         principal: The verified caller.
@@ -101,10 +103,13 @@ class RequestContext:
         deadline: When the request must be finished, as an aware datetime.
         credential: The credential the caller presented. It is kept only so
             that it can be exchanged for a token bound to another service. It
-            is never forwarded, logged, shown or compared.
+            is excluded from this dataclass's repr and equality. Library
+            integrations exchange it rather than forwarding it; application
+            code must also keep it out of logs and serialized state.
         invocation_id: Identifies this one invocation inside the process, so
             its budget is its own. ``services.authenticate`` makes a new one
-            for each request. Unlike ``request_id``, a caller never chooses it.
+            for each request, independently of caller-supplied correlation IDs.
+            Contexts built without one use ``request_id`` for budget accounting.
     """
 
     principal: Principal

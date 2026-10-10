@@ -13,7 +13,7 @@ __all__ = ["AUDIT_SCHEMA", "AuditOutcome", "AuditRecord", "AuditValue"]
 AUDIT_SCHEMA = "agentlib.audit/v1"
 
 AuditValue = str | int | float | bool | None
-"""The only value types an audit attribute may hold: scalars, never content."""
+"""Scalar types for audit metadata; callers must exclude content and credentials."""
 
 
 class AuditOutcome(enum.StrEnum):
@@ -28,9 +28,9 @@ class AuditOutcome(enum.StrEnum):
 class AuditRecord:
     """One audited event.
 
-    Attributes hold metadata such as names, counts and durations. They are
-    restricted to scalars so that prompts, tool results and other content
-    cannot be recorded by accident.
+    Attributes hold metadata such as names, counts and durations. Scalar
+    validation rejects nested payloads but cannot recognize sensitive strings.
+    Callers must keep prompts, tool results, and credentials out of attributes.
 
     Attributes:
         record_id: Unique identifier of this record.

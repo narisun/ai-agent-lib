@@ -8,9 +8,9 @@ stale.
 
 Usage::
 
-    uv run python docs/guide/build_guide.py            # write docs/developer-guide.html
-    uv run python docs/guide/build_guide.py --check    # exit 1 if it is stale
-    uv run python docs/guide/build_guide.py --fragment out.html  # body only, for hosting
+    python docs/guide/build_guide.py            # write docs/developer-guide.html
+    python docs/guide/build_guide.py --check    # exit 1 if it is stale
+    python docs/guide/build_guide.py --fragment out.html  # body only, for hosting
 """
 
 from __future__ import annotations
@@ -586,9 +586,7 @@ def main(argv: list[str] | None = None) -> int:
     if arguments.check:
         actual = TARGET.read_text(encoding="utf-8") if TARGET.exists() else ""
         if actual != expected:
-            sys.stderr.write(
-                f"{TARGET.name} is stale; run: uv run python docs/guide/build_guide.py\n"
-            )
+            sys.stderr.write(f"{TARGET.name} is stale; run: python docs/guide/build_guide.py\n")
             return 1
         return 0
     TARGET.write_text(expected, encoding="utf-8", newline="\n")
