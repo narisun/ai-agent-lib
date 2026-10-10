@@ -1,7 +1,11 @@
 """The budget stage: what one request may use, so a looping graph stops.
 
-The ledger counts per request ID, in this process. An MCP server keeps its own
-count for the requests it serves, under the same request ID the agent sends.
+The ledger counts per request, in this process, under the request's
+``budget_key``: the caller's tenant and subject, the application, and the
+invocation. An agent's entry point starts a new invocation for each request,
+so a correlation ID a caller sends never carries spending from one request to
+another, or from one caller to another. An MCP server keeps its own count for
+the requests it serves, per caller and the request ID the agent sends.
 """
 
 from __future__ import annotations
@@ -38,15 +42,15 @@ class BudgetLedger:
         self._spent: OrderedDict[str, _Spent] = OrderedDict()
         self._max = max_requests
 
-    def spent(self, request_id: str) -> _Spent:
-        """Return what ``request_id`` has used so far, remembering it as recent."""
-        spent = self._spent.get(request_id)
+    def spent(self, key: str) -> _Spent:
+        """Return what the request counted under ``key`` has used, remembering it as recent."""
+        spent = self._spent.get(key)
         if spent is None:
-            spent = self._spent[request_id] = _Spent()
+            spent = self._spent[key] = _Spent()
             while len(self._spent) > self._max:
                 self._spent.popitem(last=False)
         else:
-            self._spent.move_to_end(request_id)
+            self._spent.move_to_end(key)
         return spent
 
 
@@ -93,7 +97,7 @@ class BudgetInterceptor(Generic[CallT, ResponseT]):
         context = request.context
         if context is None:
             return await call_next(request)
-        spent = self._ledger.spent(context.request_id)
+        spent = self._ledger.spent(context.budget_key)
         self._check(spent)
         if self._kind == "model":
             spent.model_calls += 1

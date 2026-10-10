@@ -27,6 +27,7 @@ from ai_agent_lib_core.contracts import (
 from ai_agent_lib_core.pipeline.audit import AuditInterceptor
 from ai_agent_lib_core.pipeline.budget import BudgetInterceptor, BudgetLedger
 from ai_agent_lib_core.pipeline.calls import ModelCall, ToolCall
+from ai_agent_lib_core.pipeline.deadline import DeadlineInterceptor
 from ai_agent_lib_core.pipeline.guardrails import (
     FramingInterceptor,
     InputGuardrailInterceptor,
@@ -98,9 +99,13 @@ def build_model_pipeline(
         audit, telemetry, clock, ids, describe_response
     )
     identity_stage: IdentityInterceptor[ModelCall, ResponseT] = IdentityInterceptor(clock)
+    model_deadline: DeadlineInterceptor[ModelCall, ResponseT] = DeadlineInterceptor(
+        clock, "model call"
+    )
     pipeline = (
         Pipeline[ModelStage, ModelCall, ResponseT]()
         .with_stage(ModelStage.AUDIT, audit_stage)
+        .with_stage(ModelStage.DEADLINE, model_deadline)
         .with_stage(ModelStage.IDENTITY, identity_stage)
     )
     if policy is not None:
@@ -190,7 +195,14 @@ def build_tool_pipeline(
     audit_stage: AuditInterceptor[ToolCall, ResponseT] = AuditInterceptor(
         audit, telemetry, clock, ids
     )
-    pipeline = Pipeline[ToolStage, ToolCall, ResponseT]().with_stage(ToolStage.AUDIT, audit_stage)
+    tool_deadline: DeadlineInterceptor[ToolCall, ResponseT] = DeadlineInterceptor(
+        clock, "tool call"
+    )
+    pipeline = (
+        Pipeline[ToolStage, ToolCall, ResponseT]()
+        .with_stage(ToolStage.AUDIT, audit_stage)
+        .with_stage(ToolStage.DEADLINE, tool_deadline)
+    )
     if policy is not None:
         policy_stage: ToolPolicyInterceptor[ResponseT] = ToolPolicyInterceptor(
             policy, clock, environment

@@ -14,10 +14,13 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from importlib import metadata
 from pathlib import Path, PurePosixPath
+from typing import Any
 from urllib.parse import urlsplit
 
 from ai_agent_lib_cli.errors import CliError
@@ -32,6 +35,7 @@ from ai_agent_lib_core.config import (
     provider_key,
     render_env_file,
     secret_key,
+    telemetry_enabled,
     variable_for,
 )
 from ai_agent_lib_core.contracts import (
@@ -40,7 +44,6 @@ from ai_agent_lib_core.contracts import (
     DeploymentEnv,
     Section,
     ServiceConfig,
-    TelemetryMode,
 )
 from ai_agent_lib_core.contracts.access import ACCOUNT, REGION
 from ai_agent_lib_core.di import AccessPlan, ServiceProviders, access_plan
@@ -221,13 +224,37 @@ def _normalized(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
-def installed_extras(root: Path, target: Target) -> dict[str, set[str]]:
-    """The service's own dependencies: each distribution, with the extras it asks for."""
+def _project(root: Path, target: Target) -> dict[str, Any]:
     path = root.joinpath(*target.folder.parts, "pyproject.toml")
     try:
         project = tomllib.loads(path.read_text(encoding="utf-8")).get("project", {})
     except (OSError, tomllib.TOMLDecodeError):
         return {}
+    return project if isinstance(project, dict) else {}
+
+
+def _owning_distribution(module: str, root: Path, target: Target) -> str | None:
+    """The distribution that ships ``module``, or ``None`` when it is the service's own code.
+
+    An import name and a distribution name are different things, so the
+    installed distributions' metadata decides; the import name is the last resort.
+    """
+    top = module.split(".", 1)[0]
+    loaded = sys.modules.get(top)
+    location = getattr(loaded, "__file__", None)
+    service = root.joinpath(*target.folder.parts).resolve()
+    if location is not None and Path(location).resolve().is_relative_to(service):
+        return None
+    own = _normalized(str(_project(root, target).get("name", target.name)))
+    shipped_by = {_normalized(name) for name in metadata.packages_distributions().get(top, [])}
+    if own in shipped_by or (not shipped_by and _normalized(top) == own):
+        return None
+    return min(shipped_by) if shipped_by else _normalized(top)
+
+
+def installed_extras(root: Path, target: Target) -> dict[str, set[str]]:
+    """The service's own dependencies: each distribution, with the extras it asks for."""
+    project = _project(root, target)
     found: dict[str, set[str]] = {}
     for requirement in project.get("dependencies", []):
         match = _REQUIREMENT.match(str(requirement))
@@ -251,7 +278,9 @@ def _missing_dependencies(
     needed: dict[str, dict[str, list[str]]] = {}
     for adapter in access.adapters:
         spec = registry.lookup(adapter.port, adapter.name)
-        distribution = _normalized(spec.factory.__module__.split(".", 1)[0])
+        distribution = _owning_distribution(spec.factory.__module__, root, target)
+        if distribution is None:
+            continue  # the service's own adapter is in its own image
         extras = needed.setdefault(distribution, {})
         key = spec.extra or ""
         extras.setdefault(key, []).append(adapter.label)
@@ -305,7 +334,7 @@ def plan_deployment(
         for adapter in access.undeclared
     ]
     problems += _missing_dependencies(root, target, access, registry)
-    collector = config.telemetry is TelemetryMode.OPENTELEMETRY
+    collector = telemetry_enabled(config)
     core = installed_extras(root, target).get("ai-agent-lib-core", set())
     if collector and "otel" not in core:
         problems.append(

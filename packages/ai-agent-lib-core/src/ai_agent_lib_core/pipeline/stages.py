@@ -27,6 +27,7 @@ class ModelStage(enum.IntEnum):
     """Stages of a model call, outermost first."""
 
     AUDIT = 0
+    DEADLINE = 5  # the whole call within the caller's deadline; a late answer is refused
     BUDGET = 10  # execution pause check, reservation before and settlement after
     IDENTITY = 20
     POLICY = 30
@@ -41,6 +42,7 @@ class ToolStage(enum.IntEnum):
     """Stages of a tool call, outermost first."""
 
     AUDIT = 0
+    DEADLINE = 5  # the whole call within the caller's deadline; a late result is refused
     BUDGET = 10  # execution pause check and reservation
     REGISTRY = 20
     POLICY = 30
@@ -57,6 +59,7 @@ class DataStage(enum.IntEnum):
     """Stages of a governed data query, outermost first."""
 
     AUDIT = 0
+    DEADLINE = 5  # the whole query within the caller's deadline
     POLICY = 30  # the decision, and the obligations the data layer must apply
     RESILIENCE = 100
 

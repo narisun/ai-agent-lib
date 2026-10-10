@@ -20,6 +20,7 @@ from ai_agent_lib_core.config import (
     load_service_config,
     options_key,
     provider_key,
+    telemetry_enabled,
     variable_for,
 )
 from ai_agent_lib_core.contracts import (
@@ -50,7 +51,6 @@ from ai_agent_lib_core.contracts import (
     SupportsAsyncClose,
     SupportsValidation,
     Telemetry,
-    TelemetryMode,
     TokenAuthenticator,
     TokenExchanger,
     generic_fix,
@@ -492,6 +492,8 @@ class ServiceContainer:
             classification_ceiling=classification_ceiling,
             deadline=deadline,
             credential=SecretStr(credential) if credential else None,
+            # Each request gets its own budget, whatever request ID it was sent.
+            invocation_id=self._ids.new_id(),
         )
 
     async def mcp_tools(self, server: str) -> list[BaseTool]:
@@ -708,20 +710,7 @@ class ServiceContainer:
 
     @staticmethod
     def _default_telemetry(config: ServiceConfig) -> Telemetry:
-        tracing = config.section(Section.AUDIT).options.get("tracing", False)
-        if not isinstance(tracing, bool):
-            raise ConfigurationError(
-                "the audit option 'tracing' is not true or false",
-                expected="true or false",
-                actual=shown_value(tracing),
-                fix=(
-                    'write "tracing": true or "tracing": false in '
-                    f"{variable_for(options_key(Section.AUDIT))}, or set "
-                    f"{variable_for(Key.TELEMETRY)}=opentelemetry instead"
-                ),
-            )
-        wanted = tracing or config.telemetry is TelemetryMode.OPENTELEMETRY
-        return OpenTelemetryTelemetry() if wanted else NullTelemetry()
+        return OpenTelemetryTelemetry() if telemetry_enabled(config) else NullTelemetry()
 
     def _frame_tool_results(self) -> bool:
         framing = self._config.section(Section.GUARDRAILS).options.get("frame_tool_results", True)

@@ -33,6 +33,7 @@ from ai_agent_lib_core.config.sources import (
     LayeredConfigSource,
     MappingConfigSource,
 )
+from ai_agent_lib_core.config.telemetry import telemetry_enabled
 from ai_agent_lib_core.contracts import ConfigSource, ServiceConfig
 
 __all__ = [
@@ -59,6 +60,7 @@ __all__ = [
     "render_reference",
     "secret_key",
     "service_resolver",
+    "telemetry_enabled",
     "variable_for",
 ]
 

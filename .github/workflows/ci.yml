@@ -39,9 +39,10 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.11"
+      # The version the deployed OPA sidecar runs (templates/deploy-opa/Dockerfile.jinja).
       - uses: open-policy-agent/setup-opa@v2
         with:
-          version: latest
+          version: "1.0.0"
       # For the deployment module: fmt, validate and its mocked-provider tests.
       - uses: hashicorp/setup-terraform@v3
         with:

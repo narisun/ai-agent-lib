@@ -50,6 +50,7 @@ async def _run(stage_type: type[enum.IntEnum], seed: int) -> list[str]:
 # The golden orders. Changing either list is a change to the specification.
 MODEL_ORDER = [
     "AUDIT before",
+    "DEADLINE before",  # the whole call within the caller's deadline
     "BUDGET before",  # 1. execution pause check and budget reservation
     "IDENTITY before",  # 2. identity present and scope resolved
     "POLICY before",  # 3. policy decision on the model route
@@ -67,11 +68,13 @@ MODEL_ORDER = [
     "POLICY after",
     "IDENTITY after",
     "BUDGET after",  # 10. budget settlement
+    "DEADLINE after",  # a late answer is refused, not released
     "AUDIT after",
 ]
 
 TOOL_ORDER = [
     "AUDIT before",
+    "DEADLINE before",  # the whole call within the caller's deadline
     "BUDGET before",  # 1. execution pause check and budget reservation
     "REGISTRY before",  # 2. registry check
     "POLICY before",  # 3. policy decision
@@ -93,6 +96,7 @@ TOOL_ORDER = [
     "POLICY after",
     "REGISTRY after",
     "BUDGET after",
+    "DEADLINE after",  # a late answer is refused, not released
     "AUDIT after",
 ]
 

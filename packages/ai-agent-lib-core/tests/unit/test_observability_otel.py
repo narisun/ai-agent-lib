@@ -305,3 +305,32 @@ def test_r21_telemetry_starts_only_when_the_settings_turn_it_on(
     stop = start_telemetry("accounts-agent", on)
     stop()
     assert started == ["accounts-agent", "flushed"]
+
+
+@pytest.mark.parametrize(
+    ("mode", "tracing", "on"),
+    [("off", False, False), ("off", True, True), ("opentelemetry", False, True)],
+)
+def test_f7_the_adapter_and_the_sdk_agree_on_whether_telemetry_is_on(
+    monkeypatch: pytest.MonkeyPatch, mode: str, tracing: bool, on: bool
+) -> None:
+    from ai_agent_lib_core.adapters import NullTelemetry, OpenTelemetryTelemetry
+    from ai_agent_lib_core.config import telemetry_enabled
+    from ai_agent_lib_core.contracts import ProviderSelection, Section, ServiceConfig, TelemetryMode
+    from ai_agent_lib_core.di import ServiceContainer
+    from ai_agent_lib_core.observability import otel, start_telemetry
+
+    config = ServiceConfig.for_testing(
+        telemetry=TelemetryMode(mode),
+        sections={Section.AUDIT: ProviderSelection("jsonl", {"tracing": tracing})},
+    )
+    started: list[str] = []
+    monkeypatch.setattr(
+        otel, "configure_telemetry", lambda service, **_: lambda: started.append("flushed")
+    )
+    adapter = ServiceContainer._default_telemetry(config)
+
+    start_telemetry("accounts-agent", config)()
+    assert telemetry_enabled(config) is on
+    assert isinstance(adapter, OpenTelemetryTelemetry if on else NullTelemetry)
+    assert started == (["flushed"] if on else [])

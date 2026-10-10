@@ -210,7 +210,7 @@ which issuers do differently:
 | --- | --- | --- |
 | `kind_claim` | carries a value of `service_kinds` (default `["app"]`) in the `kind` claim; a token without the claim is refused | the issuer marks the kind of token in a claim |
 | `without_scopes` | carries no delegated scope claim | user tokens always carry `scope` and application tokens never do |
-| `actor_is_subject` | has the same `actor` (`azp`) and subject | the issuer sets `sub` to the client ID for client credentials |
+| `actor_is_subject` | has the same `actor` (`azp`) and subject; a token without both, as text, is refused | the issuer sets `sub` to the client ID for client credentials |
 
 A wrong rule would let an application act as a user, so there is no default.
 The Entra preset brings its own rule.

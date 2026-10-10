@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
+import types
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -268,3 +271,89 @@ def test_r21_telemetry_on_needs_the_opentelemetry_sdk_in_the_image(
 
     assert run("deploy", "helper", "--plan", "--workspace", ready) == 1
     assert "does not install the OpenTelemetry SDK" in capsys.readouterr().out
+
+
+# ------------- F6: an adapter is checked against the distribution that ships it
+
+
+def _plan_with(root: Path, factory: Any, *, extra: str | None = None) -> Any:
+    from ai_agent_lib_cli.deploy import plan_deployment, target_of
+    from ai_agent_lib_cli.workspace import load_answers
+    from ai_agent_lib_core.di import ServiceProviders
+
+    with _settings(root).open("a", encoding="utf-8") as file:
+        file.write("EAP_AUDIT_PROVIDER=own_audit\nEAP_AUDIT_OPTIONS={}\n")
+    registry = ServiceProviders.default().register("audit", "own_audit", factory, extra=extra)
+    answers = load_answers(root)
+    return plan_deployment(root, answers, target_of(answers, "helper"), providers=registry)
+
+
+def _factory_in(module_name: str) -> Any:
+    def factory(context: Any) -> Any:
+        return None
+
+    factory.__module__ = module_name
+    return factory
+
+
+def test_f6_the_services_own_adapter_needs_no_dependency_on_itself(
+    ready: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    package = types.ModuleType("helper")
+    package.__file__ = str(ready / "agents/helper/src/helper/__init__.py")
+    monkeypatch.setitem(sys.modules, "helper", package)
+
+    plan = _plan_with(ready, _factory_in("helper.providers"))
+    assert plan.problems == ()
+
+
+def test_f6_a_pack_is_checked_by_its_distribution_not_its_import_name(
+    ready: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from importlib import metadata
+
+    shipped = metadata.packages_distributions()
+    monkeypatch.setattr(
+        metadata,
+        "packages_distributions",
+        lambda: {**shipped, "review_adapters": ["review-provider-pack"]},
+    )
+    factory = _factory_in("review_adapters.audit")
+
+    (problem,) = _plan_with(ready, factory, extra="fast").problems
+    assert "need review-provider-pack, which helper does not install" in problem
+    assert 'list "review-provider-pack[fast]"' in problem
+    assert "review-adapters" not in problem
+
+    _depend_on_aws(ready, "agents/helper", "review-provider-pack[fast]")
+    assert _plan_with(ready, factory, extra="fast").problems == ()
+
+
+@pytest.mark.parametrize(
+    ("telemetry", "tracing", "on"),
+    [
+        ("off", False, False),
+        ("off", True, True),  # the older audit option still turns telemetry on
+        ("opentelemetry", False, True),
+        ("opentelemetry", True, True),
+    ],
+)
+def test_f7_the_collector_and_the_sdk_follow_the_same_switch_as_the_service(
+    ready: Path, capsys: pytest.CaptureFixture[str], telemetry: str, tracing: bool, on: bool
+) -> None:
+    settings = _settings(ready)
+    text = settings.read_text(encoding="utf-8")
+    text = text.replace("EAP_TELEMETRY=opentelemetry", f"EAP_TELEMETRY={telemetry}")
+    text = text.replace(
+        'EAP_AUDIT_OPTIONS={"stream": "eap-audit"}',
+        f'EAP_AUDIT_OPTIONS={{"stream": "eap-audit", "tracing": {str(tracing).lower()}}}',
+    )
+    settings.write_text(text, encoding="utf-8")
+    pyproject = ready / "agents/helper/pyproject.toml"
+    pyproject.write_text(pyproject.read_text(encoding="utf-8").replace(",otel", ""), "utf-8")
+
+    code = run("deploy", "helper", "--plan", "--workspace", ready)
+    out = capsys.readouterr().out
+    assert ("collector:" in out) is on
+    assert ("does not install the OpenTelemetry SDK" in out) is on
+    assert code == (1 if on else 0)

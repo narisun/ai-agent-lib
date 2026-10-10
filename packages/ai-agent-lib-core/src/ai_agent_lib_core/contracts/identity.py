@@ -102,6 +102,9 @@ class RequestContext:
         credential: The credential the caller presented. It is kept only so
             that it can be exchanged for a token bound to another service. It
             is never forwarded, logged, shown or compared.
+        invocation_id: Identifies this one invocation inside the process, so
+            its budget is its own. ``services.authenticate`` makes a new one
+            for each request. Unlike ``request_id``, a caller never chooses it.
     """
 
     principal: Principal
@@ -111,6 +114,7 @@ class RequestContext:
     classification_ceiling: Classification = Classification.INTERNAL
     deadline: datetime | None = None
     credential: SecretStr | None = field(default=None, repr=False, compare=False)
+    invocation_id: str | None = field(default=None, compare=False)
 
     def __post_init__(self) -> None:
         if self.credential is not None and not isinstance(self.credential, SecretStr):
@@ -120,11 +124,25 @@ class RequestContext:
         require_identifier("application", self.application)
         require_identifier("request_id", self.request_id)
         require_identifier("thread_id", self.thread_id)
+        if self.invocation_id is not None:
+            require_identifier("invocation_id", self.invocation_id)
         object.__setattr__(
             self, "classification_ceiling", Classification(self.classification_ceiling)
         )
         if self.deadline is not None and self.deadline.tzinfo is None:
             raise ValueError("deadline must be timezone-aware")
+
+    @property
+    def budget_key(self) -> str:
+        """What the budget of this request is counted under.
+
+        The caller's tenant and subject and this application come first, so a
+        request ID one caller chose can never spend another caller's budget.
+        Then the invocation, when there is one, else the request ID.
+        """
+        principal = self.principal
+        invocation = self.invocation_id or self.request_id
+        return "\x1f".join((principal.tenant, principal.subject, self.application, invocation))
 
     @property
     def scope(self) -> Scope:

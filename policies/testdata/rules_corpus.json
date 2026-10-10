@@ -1,0 +1,262 @@
+{
+  "description": "Rules that both engines must judge the same way. Each change is applied to a rule placed beside a valid grant, first and last, matching the request and not. An invalid change must make the local parser refuse the document and OPA deny with invalid_rules; a valid change must leave the grant in force.",
+  "grant": {
+    "id": "allow-analyst",
+    "actions": [
+      "data.query"
+    ],
+    "roles": [
+      "analyst"
+    ]
+  },
+  "matching": {
+    "id": "probe",
+    "actions": [
+      "data.query"
+    ],
+    "roles": [
+      "analyst"
+    ]
+  },
+  "not_matching": {
+    "id": "probe",
+    "actions": [
+      "tool.call"
+    ],
+    "roles": [
+      "nobody"
+    ]
+  },
+  "request": {
+    "schema": "agentlib.decision/v1",
+    "principal": {
+      "subject": "u-1",
+      "tenant": "t-9",
+      "roles": [
+        "analyst"
+      ]
+    },
+    "action": "data.query",
+    "resource": {
+      "kind": "query",
+      "name": "accounts.by_region",
+      "classification": "internal"
+    },
+    "context": {
+      "application": "accounts-mcp",
+      "environment": "local"
+    }
+  },
+  "invalid": {
+    "misspelt key": {
+      "role": [
+        "analyst"
+      ]
+    },
+    "unknown action": {
+      "actions": [
+        "data.querry"
+      ]
+    },
+    "no actions": {
+      "actions": []
+    },
+    "roles not a list": {
+      "roles": "analyst"
+    },
+    "empty role name": {
+      "roles": [
+        ""
+      ]
+    },
+    "overlong application name": {
+      "applications": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ]
+    },
+    "overlong agent name": {
+      "agents": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ]
+    },
+    "unknown kind": {
+      "kinds": [
+        "robot"
+      ]
+    },
+    "no resources": {
+      "resources": []
+    },
+    "resource with a bracket": {
+      "resources": [
+        "accounts.(x)"
+      ]
+    },
+    "unknown classification": {
+      "max_classification": "secret"
+    },
+    "id with spaces": {
+      "id": "Has Spaces"
+    },
+    "unknown obligation": {
+      "obligations": {
+        "mask_column": [
+          "holder"
+        ]
+      }
+    },
+    "mask_columns null": {
+      "obligations": {
+        "mask_columns": null
+      }
+    },
+    "mask_columns empty name": {
+      "obligations": {
+        "mask_columns": [
+          ""
+        ]
+      }
+    },
+    "max_rows negative": {
+      "obligations": {
+        "max_rows": -1
+      }
+    },
+    "max_rows text": {
+      "obligations": {
+        "max_rows": "50"
+      }
+    },
+    "max_rows true": {
+      "obligations": {
+        "max_rows": true
+      }
+    },
+    "max_rows fraction": {
+      "obligations": {
+        "max_rows": 2.5
+      }
+    },
+    "row_filter not an object": {
+      "obligations": {
+        "row_filter": [
+          "region"
+        ]
+      }
+    },
+    "row_filter values not a list": {
+      "obligations": {
+        "row_filter": {
+          "region": "east"
+        }
+      }
+    },
+    "row_filter object value": {
+      "obligations": {
+        "row_filter": {
+          "region": [
+            {
+              "a": 1
+            }
+          ]
+        }
+      }
+    },
+    "row_filter null value": {
+      "obligations": {
+        "row_filter": {
+          "region": [
+            null
+          ]
+        }
+      }
+    },
+    "row_filter list value": {
+      "obligations": {
+        "row_filter": {
+          "region": [
+            [
+              "east"
+            ]
+          ]
+        }
+      }
+    },
+    "row_filter empty column": {
+      "obligations": {
+        "row_filter": {
+          "": [
+            "east"
+          ]
+        }
+      }
+    },
+    "row_filter padded column": {
+      "obligations": {
+        "row_filter": {
+          " region": [
+            "east"
+          ]
+        }
+      }
+    },
+    "row_filter control character": {
+      "obligations": {
+        "row_filter": {
+          "reg\tion": [
+            "east"
+          ]
+        }
+      }
+    },
+    "require_approval text": {
+      "obligations": {
+        "require_approval": "yes"
+      }
+    }
+  },
+  "valid": {
+    "plain": {},
+    "names at the limit": {
+      "applications": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "agents": [
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ]
+    },
+    "null lists": {
+      "roles": null,
+      "agents": null,
+      "kinds": null,
+      "applications": null
+    },
+    "every obligation": {
+      "obligations": {
+        "row_filter": {
+          "region": [
+            "east",
+            1,
+            2.5,
+            true
+          ],
+          "branch code": []
+        },
+        "mask_columns": [
+          "holder"
+        ],
+        "max_rows": 0,
+        "require_approval": false
+      }
+    },
+    "kinds": {
+      "kinds": [
+        "user",
+        "service"
+      ]
+    },
+    "classification": {
+      "max_classification": "restricted"
+    }
+  }
+}

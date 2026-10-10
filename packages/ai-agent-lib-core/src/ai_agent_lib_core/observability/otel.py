@@ -14,7 +14,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from ai_agent_lib_core.contracts import ConfigurationError, ServiceConfig, TelemetryMode
+from ai_agent_lib_core.config import telemetry_enabled
+from ai_agent_lib_core.contracts import ConfigurationError, ServiceConfig
 
 if TYPE_CHECKING:
     from opentelemetry.sdk.metrics import MeterProvider
@@ -112,10 +113,10 @@ def start_telemetry(service: str, config: ServiceConfig | None) -> Callable[[], 
     Raises:
         ConfigurationError: If telemetry is on and the ``otel`` extra is missing.
     """
-    if config is None or config.telemetry is not TelemetryMode.OPENTELEMETRY:
+    if config is None or not telemetry_enabled(config):
         return _nothing_to_flush
     try:
         return configure_telemetry(service)
     except ConfigurationError as error:
-        error.add_note("telemetry is set to opentelemetry in the service's settings")
+        error.add_note("telemetry is turned on in the service's settings")
         raise

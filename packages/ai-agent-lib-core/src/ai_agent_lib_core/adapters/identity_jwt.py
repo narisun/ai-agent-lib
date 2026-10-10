@@ -283,6 +283,12 @@ def _service_token_rule(
             expected='claims.scopes, such as {"scopes": "scope"}',
             actual="no scopes claim",
         )
+    if rule == "actor_is_subject" and not claims.get("actor"):
+        raise ConfigurationError(
+            f"{_WHAT}: the actor_is_subject rule needs the claim that names the client",
+            expected='claims.actor, such as {"actor": "azp"}',
+            actual="no actor claim",
+        )
     return rule
 
 
@@ -648,19 +654,21 @@ class JwtIdentityVerifier:
         kind_value = claim("kind")
         if rule == "entra":
             if kind_value is not None:
+                if not isinstance(kind_value, str):
+                    raise _unclassifiable()
                 return kind_value in settings.service_kinds
             return settings.claims.get("scopes") not in claims
         if rule == "kind_claim":
             if not isinstance(kind_value, str):
-                raise _denied(
-                    "the token does not say whether it is a user's or an application's",
-                    "credential_invalid",
-                )
+                raise _unclassifiable()
             return kind_value in settings.service_kinds
         if rule == "without_scopes":
             return settings.claims.get("scopes") not in claims
-        actor = claim("actor")
-        return isinstance(actor, str) and actor == claim("subject")
+        # actor_is_subject: only a token naming both, as text, can be classified.
+        actor, subject = claim("actor"), claim("subject")
+        if not (isinstance(actor, str) and actor and isinstance(subject, str) and subject):
+            raise _unclassifiable()
+        return actor == subject
 
     async def validate(self) -> None:
         """Check that the issuer's signing keys can be read.
@@ -673,6 +681,13 @@ class JwtIdentityVerifier:
     async def aclose(self) -> None:
         """Close the HTTP client."""
         await self._client.aclose()
+
+
+def _unclassifiable() -> PolicyDenied:
+    return _denied(
+        "the token does not say whether it is a user's or an application's",
+        "credential_invalid",
+    )
 
 
 class ExchangingJwtIdentity(JwtIdentityVerifier):

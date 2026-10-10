@@ -18,6 +18,7 @@ from ai_agent_lib_core.pipeline.data import (
     GovernedDataSource,
     describe_query_result,
 )
+from ai_agent_lib_core.pipeline.deadline import DeadlineInterceptor
 from ai_agent_lib_core.pipeline.guardrails import (
     FramingInterceptor,
     InputGuardrailInterceptor,
@@ -52,6 +53,7 @@ __all__ = [
     "DataCall",
     "DataPolicyInterceptor",
     "DataStage",
+    "DeadlineInterceptor",
     "Evidence",
     "FramingInterceptor",
     "GovernedDataSource",

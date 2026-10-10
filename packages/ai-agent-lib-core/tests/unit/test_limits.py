@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import timedelta
 from typing import Any
 
@@ -10,10 +11,12 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from ai_agent_lib_core import Principal, RequestContext, ServiceConfig, bind_request_context
+from ai_agent_lib_core.adapters import SystemClock
 from ai_agent_lib_core.contracts import (
     BudgetExceeded,
     BudgetLimits,
     CallLimits,
+    GuardrailPoint,
     Limits,
     PolicyDenied,
     TransientError,
@@ -21,11 +24,12 @@ from ai_agent_lib_core.contracts import (
 from ai_agent_lib_core.pipeline import (
     BudgetInterceptor,
     BudgetLedger,
+    DeadlineInterceptor,
     ModelCall,
     ResilienceInterceptor,
     ToolCall,
 )
-from ai_agent_lib_core.testing import FakeChatModelProvider, Fakes, FrozenClock
+from ai_agent_lib_core.testing import FakeChatModelProvider, FakeGuardrails, Fakes, FrozenClock
 
 
 def context(request_id: str = "r-1", deadline: Any = None) -> RequestContext:
@@ -225,3 +229,142 @@ async def test_a_looping_graph_is_stopped_by_the_budget_and_audited_as_denied() 
     outcomes = [record.outcome.value for record in fakes.audit.records]
     assert outcomes == ["success", "success", "success", "denied"]
     assert fakes.audit.records[-1].error_type == "BudgetExceeded"
+
+
+# ------------------------------- F3: nothing is released after the deadline
+
+
+class SlowOutputCheck(FakeGuardrails):
+    """Takes longer over the reply than the request has left."""
+
+    async def check(self, point: GuardrailPoint, text: str, context: Any) -> Any:
+        if point is GuardrailPoint.MODEL_OUTPUT:
+            await asyncio.sleep(0.12)
+        return await super().check(point, text, context)
+
+
+async def test_f3_a_slow_output_check_cannot_release_a_late_answer() -> None:
+    clock = SystemClock()
+    fakes = Fakes(
+        model=FakeChatModelProvider(["late answer"]),
+        guardrails=SlowOutputCheck(),
+        clock=clock,  # type: ignore[arg-type]  # the real clock, on purpose
+    )
+    async with fakes.container() as services:
+        model = services.model()
+        caller = context(deadline=clock.now() + timedelta(milliseconds=60))
+        with bind_request_context(caller), pytest.raises(PolicyDenied) as caught:
+            await model.ainvoke([HumanMessage("hello")])
+    assert caught.value.reason_code == "deadline_exceeded"
+    assert not caught.value.retryable
+    (record,) = fakes.audit.records
+    assert (record.outcome.value, record.error_type) == ("denied", "PolicyDenied")
+
+
+async def test_f3_an_attempt_that_blocks_the_loop_past_the_deadline_is_not_a_success() -> None:
+    clock = SystemClock()
+    stage: ResilienceInterceptor[Any, Any] = ResilienceInterceptor(
+        CallLimits(timeout_seconds=5, retries=2), clock, what="model call", sleep=no_wait
+    )
+
+    async def blocking(call: object) -> str:
+        time.sleep(0.08)  # never yields, so no cancellation can reach it
+        return "late"
+
+    with pytest.raises(PolicyDenied) as caught:
+        await stage(
+            model_call(context(deadline=clock.now() + timedelta(milliseconds=30))), blocking
+        )
+    assert caught.value.reason_code == "deadline_exceeded"
+
+
+async def test_f3_an_answer_that_arrives_after_the_deadline_on_the_injected_clock_is_refused() -> (
+    None
+):
+    clock = FrozenClock()
+    stage: DeadlineInterceptor[Any, Any] = DeadlineInterceptor(clock, "model call")
+
+    async def answers_late(call: object) -> str:
+        clock.advance(2)
+        return "late"
+
+    async def answers_in_time(call: object) -> str:
+        clock.advance(0.5)
+        return "in time"
+
+    with pytest.raises(PolicyDenied) as caught:
+        await stage(model_call(context(deadline=clock.now() + timedelta(seconds=1))), answers_late)
+    assert caught.value.reason_code == "deadline_exceeded"
+    in_time = model_call(context(deadline=clock.now() + timedelta(seconds=1)))
+    assert await stage(in_time, answers_in_time) == "in time"
+    assert await stage(model_call(context()), answers_late) == "late"  # no deadline, no limit
+
+
+# --------------------- F5: a request ID a caller sends never shares a budget
+
+
+async def test_f5_the_same_request_id_never_shares_a_budget_across_callers_or_requests() -> None:
+    import httpx
+
+    from ai_agent_lib_core.integrations.http import ServiceLifecycle, agent_app
+    from ai_agent_lib_core.testing import FakeIdentityVerifier
+
+    config = ServiceConfig.for_testing(limits=Limits(budget=BudgetLimits(model_calls=2)))
+    fakes = Fakes(
+        model=FakeChatModelProvider([AIMessage("ok") for _ in range(10)]),
+        identity=FakeIdentityVerifier(
+            {
+                "alice-token": Principal(subject="alice", tenant="tenant-a"),
+                "bob-token": Principal(subject="bob", tenant="tenant-b"),
+            }
+        ),
+    )
+    async with fakes.container(config) as services:
+        model = services.model()
+
+        async def run(caller: RequestContext, given: Any) -> Any:
+            with bind_request_context(caller):
+                for _ in range(int(given)):  # the steps of one invocation share its budget
+                    await model.ainvoke([HumanMessage("go on")])
+            return "done"
+
+        lifecycle = ServiceLifecycle(services.validate)
+        await lifecycle.start()
+        app = agent_app(services, run, application="accounts-agent", lifecycle=lifecycle)
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://agent.test") as http:
+
+            async def invoke(token: str, steps: int) -> int:
+                reply = await http.post(
+                    "/invoke",
+                    json={"input": steps},
+                    headers={"authorization": f"Bearer {token}", "x-request-id": "chosen-id"},
+                )
+                return reply.status_code
+
+            assert await invoke("alice-token", 2) == 200  # Alice spends her whole allowance
+            assert await invoke("bob-token", 2) == 200  # Bob, same ID: his own allowance
+            assert await invoke("alice-token", 2) == 200  # Alice again: a new request, fresh
+            assert await invoke("alice-token", 3) == 429  # but one request cannot exceed it
+
+
+def test_f5_the_budget_is_counted_per_caller_and_invocation() -> None:
+    def caller(subject: str, tenant: str, invocation: str | None = None) -> RequestContext:
+        return RequestContext(
+            principal=Principal(subject=subject, tenant=tenant),
+            application="accounts-mcp",
+            request_id="same-id",
+            thread_id="th-1",
+            invocation_id=invocation,
+        )
+
+    keys = {
+        caller("alice", "a").budget_key,
+        caller("bob", "b").budget_key,
+        caller("alice", "b").budget_key,
+        caller("alice", "a", "inv-1").budget_key,
+        caller("alice", "a", "inv-2").budget_key,
+    }
+    assert len(keys) == 5
+    # An MCP server counts per caller and the request ID the agent sends.
+    assert caller("alice", "a").budget_key == caller("alice", "a").budget_key

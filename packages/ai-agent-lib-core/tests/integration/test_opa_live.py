@@ -17,6 +17,7 @@ from pathlib import Path
 
 import httpx
 import pytest
+from policy_corpus import documents, load_corpus
 
 from ai_agent_lib_core.adapters import OpaPolicyDecisionPoint, OpaPolicyOptions
 from ai_agent_lib_core.contracts import PolicyDecisionPoint
@@ -135,3 +136,38 @@ def test_the_bundle_is_formatted_and_passes_strict_checks() -> None:
     assert run_opa("fmt", "--fail", "--list").returncode == 0
     checked = run_opa("check", "--strict")
     assert checked.returncode == 0, checked.stderr
+
+
+def test_opa_refuses_exactly_the_documents_the_local_engine_refuses(tmp_path: Path) -> None:
+    """The shared corpus (see test_policy_parity), every document in one evaluation."""
+    corpus = load_corpus()
+    cases = [
+        (group, label, document)
+        for group in ("invalid", "valid")
+        for label, document in documents(corpus, group)
+    ]
+    question = tmp_path / "input.json"
+    question.write_text(
+        json.dumps({"request": corpus["request"], "documents": [case[2] for case in cases]}),
+        encoding="utf-8",
+    )
+    query = (
+        "[decision | some document in input.documents; request := input.request; "
+        "decision := data.agentlib.authz.decision "
+        "with data.agentlib.rules as document with input as request]"
+    )
+    result = subprocess.run(  # noqa: S603 - a fixed command line, no shell
+        [opa_binary(), "eval", "--format", "json", "-d", str(BUNDLE), "-i", str(question), query],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    decisions = json.loads(result.stdout)["result"][0]["expressions"][0]["value"]
+    wrong = [
+        f"{label}: {decision}"
+        for (group, label, _), decision in zip(cases, decisions, strict=True)
+        if (group == "invalid" and decision.get("reason_code") != "invalid_rules")
+        or (group == "valid" and decision.get("allow") is not True)
+    ]
+    assert not wrong, "\n".join(wrong)

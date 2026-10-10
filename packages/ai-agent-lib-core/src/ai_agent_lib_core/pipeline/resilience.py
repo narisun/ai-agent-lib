@@ -113,7 +113,7 @@ class ResilienceInterceptor(Generic[CallT, ResponseT]):
             raise self._deadline_passed(request)
         try:
             async with asyncio.timeout(seconds):
-                return await call_next(request)
+                response = await call_next(request)
         except TimeoutError:
             if by_deadline:
                 raise self._deadline_passed(request) from None
@@ -124,6 +124,12 @@ class ResilienceInterceptor(Generic[CallT, ResponseT]):
                 actual=f"none after {seconds:g} seconds",
                 fix=f"raise timeout_seconds in {self._variable}, or find what is slow",
             ) from None
+        # An attempt that blocked the loop can return after its deadline without
+        # ever seeing the cancellation; its answer is late, not a success.
+        after = self._remaining(request)
+        if after is not None and after <= 0:
+            raise self._deadline_passed(request)
+        return response
 
     def _deadline_passed(self, request: CallT) -> AgentLibError:
         # The caller gave up: trying again cannot help, so this is not retryable.

@@ -32,6 +32,7 @@ from ai_agent_lib_core.contracts import (
 from ai_agent_lib_core.pipeline.audit import AuditInterceptor
 from ai_agent_lib_core.pipeline.calls import DataCall
 from ai_agent_lib_core.pipeline.context import bound_request_context
+from ai_agent_lib_core.pipeline.deadline import DeadlineInterceptor
 from ai_agent_lib_core.pipeline.identity import require_identified
 from ai_agent_lib_core.pipeline.interceptor import Handler, compose
 from ai_agent_lib_core.pipeline.policy import enforce_decision
@@ -142,6 +143,7 @@ class GovernedDataSource:
         pipeline = (
             Pipeline[DataStage, DataCall, QueryResult]()
             .with_stage(DataStage.AUDIT, audit_stage)
+            .with_stage(DataStage.DEADLINE, DeadlineInterceptor(clock, "data query"))
             .with_stage(DataStage.POLICY, policy_stage)
         )
         self._handler = pipeline.bind(self._run)

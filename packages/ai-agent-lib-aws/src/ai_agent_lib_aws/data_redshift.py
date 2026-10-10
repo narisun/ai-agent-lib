@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import threading
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -220,6 +221,36 @@ def _error_code(error: BaseException) -> str:
 
 
 _CLEANUP_SECONDS = 10.0
+
+
+class _LateStatement:
+    """Decides who cancels a statement whose submission outlived its request.
+
+    The worker thread that submits cannot be stopped. If the request gives up
+    before the thread returns, the thread cancels the statement itself, so the
+    cancellation does not depend on the event loop still running. If the thread
+    has already returned, the event loop cancels it once the result arrives.
+    Either way it is cancelled once.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._abandoned = False
+        self._returned = False
+
+    def abandon(self) -> bool:
+        """Mark the request as gone; true when the event loop must do the cancelling."""
+        with self._lock:
+            self._abandoned = True
+            return self._returned
+
+    def returned(self) -> bool:
+        """Mark the submission as answered; true when the worker must do the cancelling."""
+        with self._lock:
+            self._returned = True
+            return self._abandoned
+
+
 """How long closing waits for statements submitted late to be cancelled."""
 
 
@@ -337,8 +368,12 @@ class RedshiftDataSource:
         with contextlib.suppress(TimeoutError):
             async with asyncio.timeout(_CLEANUP_SECONDS):
                 # A submission that ends schedules its cancellation: wait for both.
+                # Shielded: giving up the wait must not cancel the only task that
+                # learns a late statement's ID. A worker still running after the
+                # wait cancels its statement itself.
                 while self._cleanups:
-                    await asyncio.gather(*list(self._cleanups), return_exceptions=True)
+                    pending = [asyncio.shield(task) for task in self._cleanups]
+                    await asyncio.gather(*pending, return_exceptions=True)
                     await asyncio.sleep(0)
 
     def _started(self) -> QueryCatalog:
@@ -354,26 +389,29 @@ class RedshiftDataSource:
         # task, so a statement the database accepts after the deadline is still
         # known, and cancelled, instead of running on with no one to stop it.
         submission: asyncio.Future[str] | None = None
+        late = _LateStatement()
         try:
             async with asyncio.timeout(self._options.timeout_seconds):
-                submission = asyncio.ensure_future(self._submit(label, request))
+                submission = asyncio.ensure_future(self._submit(label, request, late))
                 statement_id = await asyncio.shield(submission)
                 submitted.append(statement_id)
                 await self._wait(label, statement_id)
                 return await self._fetch(label, statement_id, limit)
         except TimeoutError:
-            self._cancel_late(submission, submitted)
+            self._cancel_late(submission, submitted, late)
             await self._cancel(submitted)
             raise TransientError(
                 f"query {label!r} on data source {self._name!r} took longer than "
                 f"{self._options.timeout_seconds:g} seconds"
             ) from None
         except asyncio.CancelledError:
-            self._cancel_late(submission, submitted)
+            self._cancel_late(submission, submitted, late)
             await self._cancel(submitted)
             raise
 
-    def _cancel_late(self, submission: asyncio.Future[str] | None, submitted: list[str]) -> None:
+    def _cancel_late(
+        self, submission: asyncio.Future[str] | None, submitted: list[str], late: _LateStatement
+    ) -> None:
         """Cancel the statement of a submission that has not answered yet, once it does."""
         if submission is None:
             return
@@ -383,19 +421,21 @@ class RedshiftDataSource:
                 if statement_id not in submitted:
                     submitted.append(statement_id)
             return
+        if late.abandon():
+            # The worker already returned: its result is on the way to the loop.
+            def cancel_when_known(finished: asyncio.Future[str]) -> None:
+                if finished.cancelled() or finished.exception() is not None:
+                    return
+                cleanup = asyncio.ensure_future(self._cancel([finished.result()]))
+                self._cleanups.add(cleanup)
+                cleanup.add_done_callback(self._cleanups.discard)
 
-        def cancel_when_known(finished: asyncio.Future[str]) -> None:
-            if finished.cancelled() or finished.exception() is not None:
-                return
-            cleanup = asyncio.ensure_future(self._cancel([finished.result()]))
-            self._cleanups.add(cleanup)
-            cleanup.add_done_callback(self._cleanups.discard)
-
-        submission.add_done_callback(cancel_when_known)
+            submission.add_done_callback(cancel_when_known)
+        # Otherwise the worker cancels the statement itself when it returns.
         self._cleanups.add(submission)
         submission.add_done_callback(self._cleanups.discard)
 
-    async def _submit(self, label: str, request: _Request) -> str:
+    async def _submit(self, label: str, request: _Request, late: _LateStatement) -> str:
         arguments: dict[str, Any] = {
             **self._target.arguments(),
             "Sql": request.sql,
@@ -403,7 +443,19 @@ class RedshiftDataSource:
         }
         if request.parameters:
             arguments["Parameters"] = [dict(parameter) for parameter in request.parameters]
-        reply = await self._call(label, self._client.execute_statement, **arguments)
+        client = self._client
+
+        def execute(**sdk_arguments: Any) -> Any:
+            reply = client.execute_statement(**sdk_arguments)
+            if late.returned():
+                statement_id = reply.get("Id") if isinstance(reply, Mapping) else None
+                if isinstance(statement_id, str) and statement_id:
+                    # Best effort, in this thread: no one is waiting for the answer.
+                    with contextlib.suppress(Exception):
+                        client.cancel_statement(Id=statement_id)
+            return reply
+
+        reply = await self._call(label, execute, **arguments)
         statement_id = reply.get("Id")
         if not isinstance(statement_id, str) or not statement_id:
             raise AgentLibError(

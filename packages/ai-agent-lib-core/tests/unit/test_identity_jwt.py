@@ -573,3 +573,52 @@ async def test_r3_a_user_token_still_passes_the_explicit_rule(idp: FakeIdentityP
     claims.update({"sub": "ann", "azp": "chat-ui", "scope": "accounts.read"})
     principal = await generic(idp, service_tokens_are="without_scopes").verify(idp.sign(claims))
     assert (principal.subject, principal.kind) == ("ann", PrincipalKind.USER)
+
+
+# ------------------------------- F1: actor_is_subject never guesses a user
+
+
+def test_f1_actor_is_subject_needs_an_actor_claim() -> None:
+    with pytest.raises(ConfigurationError) as caught:
+        resolve_jwt_options(
+            JwtIdentityOptions(
+                issuer="https://idp.test",
+                jwks_url="https://idp.test/keys",
+                audience=API,
+                tenant="t",
+                service_tokens_are="actor_is_subject",
+                claims={"actor": None},
+            )
+        )
+    assert "needs the claim that names the client" in str(caught.value)
+
+
+@pytest.mark.parametrize(
+    "actor",
+    [pytest.param(None, id="missing"), "", ["reports-job"], 7, {"id": "x"}],
+)
+async def test_f1_a_token_whose_actor_cannot_be_read_is_refused_not_taken_for_a_user(
+    idp: FakeIdentityProvider, actor: object
+) -> None:
+    claims = idp.claims(audience=API, subject="unused")
+    claims.update({"sub": "reports-job", "roles": ["admin"]})
+    claims.pop("azp", None)
+    if actor is not None:
+        claims["azp"] = actor
+    by_actor = generic(idp, service_tokens_are="actor_is_subject")
+    assert await refusal(by_actor, idp.sign(claims)) == "credential_invalid"
+
+
+async def test_f1_matching_actor_and_subject_is_an_application_and_distinct_is_a_user(
+    idp: FakeIdentityProvider,
+) -> None:
+    by_actor = generic(idp, service_tokens_are="actor_is_subject")
+    claims = idp.claims(audience=API, subject="unused")
+    claims.update({"sub": "reports-job", "azp": "reports-job"})
+    assert await refusal(by_actor, idp.sign(claims)) == "service_token_refused"
+    accepting = generic(idp, service_tokens_are="actor_is_subject", accept_service_tokens=True)
+    assert (await accepting.verify(idp.sign(claims))).kind is PrincipalKind.SERVICE
+
+    claims.update({"sub": "ann", "azp": "chat-ui"})
+    principal = await by_actor.verify(idp.sign(claims))
+    assert (principal.subject, principal.kind) == ("ann", PrincipalKind.USER)

@@ -163,6 +163,7 @@ names_or_null(value) if {
 	every name in value {
 		is_string(name)
 		count(name) > 0
+		count(name) <= 200
 	}
 }
 
@@ -185,17 +186,42 @@ valid_obligations(obligations) if {
 	row_filter := object.get(obligations, "row_filter", {})
 	is_object(row_filter)
 	every column, values in row_filter {
-		is_string(column)
+		identifier(column)
 		is_array(values)
+		every value in values {
+			scalar(value)
+		}
 	}
-	names_or_null(object.get(obligations, "mask_columns", []))
+	mask_columns := object.get(obligations, "mask_columns", [])
+	is_array(mask_columns)
+	every column in mask_columns {
+		is_string(column)
+		count(column) > 0
+	}
 	whole_or_null(object.get(obligations, "max_rows", null))
 	is_boolean(object.get(obligations, "require_approval", false))
 }
+
+# The same rule as the library's identifiers: text, not empty, not padded,
+# with no control or separator characters other than the space.
+identifier(value) if {
+	is_string(value)
+	count(value) > 0
+	trim_space(value) == value
+	not regex.match(`[\p{C}\p{Zl}\p{Zp}]`, value)
+	not regex.match(`\p{Zs}`, replace(value, " ", ""))
+}
+
+scalar(value) if is_string(value)
+
+scalar(value) if is_number(value)
+
+scalar(value) if is_boolean(value)
 
 whole_or_null(value) if value == null
 
 whole_or_null(value) if {
 	is_number(value)
 	value == floor(value)
+	value >= 0
 }

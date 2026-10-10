@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import threading
+import time
+from collections.abc import Callable
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -12,6 +15,7 @@ import pytest
 from botocore import exceptions as aws
 from botocore.stub import Stubber
 
+from ai_agent_lib_aws import data_redshift
 from ai_agent_lib_aws.data_redshift import RedshiftDataOptions, RedshiftDataSource
 from ai_agent_lib_aws.pack import register_aws_adapters
 from ai_agent_lib_aws.testing import FakeRedshiftData, client_error, offline_sessions
@@ -360,8 +364,6 @@ async def test_a_statement_that_runs_too_long_is_cancelled(tmp_path: Path) -> No
 async def test_r12_a_statement_accepted_after_the_deadline_is_still_cancelled(
     tmp_path: Path,
 ) -> None:
-    import time
-
     source, database, _ = await started(tmp_path, timeout_seconds=0.05)
     database.end_as = "STARTED"
     accept = database.execute_statement
@@ -508,3 +510,65 @@ async def test_a_service_gets_the_source_from_configuration(tmp_path: Path) -> N
     async with ServiceContainer(config, providers, clock=fakes.clock) as services:
         source = services.data_source("accounts")
         assert sorted(source.describe()) == ["accounts_by_region", "all_accounts"]
+
+
+# ------------------- F4: a late statement is cancelled even after close gives up
+
+
+async def held_submission(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[Any, Any, threading.Event]:
+    """A source whose next submission waits until the test releases it."""
+    monkeypatch.setattr(data_redshift, "_CLEANUP_SECONDS", 0.05)
+    source, database, _ = await started(tmp_path, timeout_seconds=0.05)
+    database.end_as = "STARTED"
+    accept = database.execute_statement
+    release = threading.Event()
+
+    def held_accept(**request: Any) -> dict[str, Any]:
+        release.wait(5)
+        return accept(**request)
+
+    database.execute_statement = held_accept  # type: ignore[method-assign]
+    with pytest.raises(TransientError):
+        await source.query("all_accounts")
+    return source, database, release
+
+
+async def until(condition: Callable[[], bool]) -> None:
+    for _ in range(200):
+        if condition():
+            return
+        await asyncio.sleep(0.01)
+
+
+async def test_f4_a_statement_accepted_after_close_gave_up_is_still_cancelled_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source, database, release = await held_submission(tmp_path, monkeypatch)
+    started_at = time.monotonic()
+    await source.aclose()  # the close wait ends while the worker still holds the statement
+    assert time.monotonic() - started_at < 1
+    assert database.cancelled == []
+
+    release.set()
+    await until(lambda: bool(database.cancelled))
+    await asyncio.sleep(0.05)
+    assert database.cancelled == ["statement-1"]
+
+
+async def test_f4_cancelling_close_itself_does_not_lose_the_statement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source, database, release = await held_submission(tmp_path, monkeypatch)
+    monkeypatch.setattr(data_redshift, "_CLEANUP_SECONDS", 5.0)
+    closing = asyncio.ensure_future(source.aclose())
+    await asyncio.sleep(0.02)
+    closing.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await closing
+
+    release.set()
+    await until(lambda: bool(database.cancelled))
+    await asyncio.sleep(0.05)
+    assert database.cancelled == ["statement-1"]

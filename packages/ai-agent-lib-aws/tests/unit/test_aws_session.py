@@ -44,7 +44,13 @@ def test_a_client_is_built_once_for_the_configured_region() -> None:
     assert sessions.region == "eu-west-1"
 
 
-def test_the_enterprise_ca_file_reaches_the_bedrock_clients_and_no_other(tmp_path: Path) -> None:
+def test_the_enterprise_ca_file_reaches_the_bedrock_clients_and_no_other(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The host's own trust settings would otherwise decide what "default" means.
+    for variable in ("AWS_CA_BUNDLE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"):
+        monkeypatch.delenv(variable, raising=False)
+    monkeypatch.setenv("AWS_CONFIG_FILE", str(tmp_path / "no-config"))  # no ca_bundle there
     enterprise, aws_wide = tmp_path / "enterprise.pem", tmp_path / "aws.pem"
     only_enterprise = factory(bedrock_ca_bundle=enterprise)
     assert only_enterprise.client("bedrock-runtime")._endpoint.http_session._verify == str(
