@@ -1,0 +1,19 @@
+{
+  "output": {
+    "answer": "The synthetic preparation memo is ready.",
+    "artifacts": [{
+      "schema": "agentlib.artifact/v1",
+      "id": "memo-version-1",
+      "document_id": "meeting-memo",
+      "version": 1,
+      "title": "Client meeting preparation",
+      "media_type": "text/markdown",
+      "created_at": "2026-08-03T10:00:00Z",
+      "request_id": "request-1",
+      "thread_id": "thread-1",
+      "content": "# Preparation memo\n\nSynthetic example for contract checks."
+    }]
+  },
+  "thread_id": "thread-1",
+  "request_id": "request-1"
+}

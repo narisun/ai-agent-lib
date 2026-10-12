@@ -1,0 +1,8 @@
+{
+  "schema": "agentlib.registry/v1",
+  "agents": [
+    {"id": "rmprep-demo", "owner": "examples", "version": "phase0", "description": "Scripted memo and same-thread follow-up. Synthetic data.", "url": "http://127.0.0.1:8765/fixture/rmprep-demo", "status": "active"},
+    {"id": "help-demo", "owner": "examples", "version": "phase0", "description": "Second scripted agent for selection checks.", "url": "http://127.0.0.1:8765/fixture/help-demo", "status": "active"}
+  ]
+}
+

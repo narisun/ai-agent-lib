@@ -11,6 +11,28 @@ permissions:
   contents: read
 
 jobs:
+  ui:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.11", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -e packages/ai-agent-lib-core -e "packages/ai-agent-lib-ui[chat,dev]"
+      - run: python -m pytest
+        working-directory: packages/ai-agent-lib-ui
+      - run: python -m mypy
+        working-directory: packages/ai-agent-lib-ui
+      - run: python -m pip check
+      - run: python -m pip wheel --no-deps --wheel-dir dist packages/ai-agent-lib-ui
+      - name: Installed UI wheel chat and restart checks
+        run: python tools/check_consumer.py --profile ui-chat
+
   gate:
     strategy:
       fail-fast: false
@@ -29,6 +51,8 @@ jobs:
       - run: python -m mypy
       - run: lint-imports
       - run: python -m pytest -q
+      - name: Relationship manager example policy samples
+        run: python -m ai_agent_lib_cli policy test --workspace examples/rmprep
       - name: The developer guide matches the code
         run: python docs/guide/build_guide.py --check
 
@@ -56,7 +80,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        profile: [core, aws, cli, generated-fake, generated-anthropic, generated-bedrock]
+        profile: [core, aws, cli, ui, generated-fake, generated-anthropic, generated-bedrock]
         versions: [minimum, latest]
     steps:
       - uses: actions/checkout@v4

@@ -1,0 +1,120 @@
+uen,first_name,last_name,title,email,phone,is_primary,role,department
+ALLO-0001,Janice,Myers,,yballard@duffy-brown.info,2229166088,true,User,Finance
+ALLO-0001,Jeffery,Harris,Treasurer,,+1-806-833-6632x881,false,Decision-maker,Finance
+BARG-0002,Richard,Stevens,Owner,ncochran@oliver.com,(970)602-0153,true,Economic buyer,Treasury
+BARG-0002,Angela,Anthony,CFO,hansenalexis@curtis.com,(649)863-2282x7222,false,User,Operations
+BARG-0002,Amanda,Allen,CFO,lhenderson@young.info,676-323-2658x901,false,Decision-maker,Treasury
+BENC-0003,David,Lopez,VP Finance,mcdanielandrew@luna.com,454.597.1638,true,Influencer,Operations
+BENC-0003,Sherry,Vaughn,CFO,hernandezvalerie@underwood.info,(364)368-8197x294,false,Economic buyer,Finance
+BENC-0003,Diane,Miller,Controller,hbarnes@thomas.com,(848)789-9317,false,User,Executive
+BETT-0004,Donna,Flores,VP Finance,nicholsonjennifer@mckenzie-ortiz.com,643-562-5770x9661,true,User,Operations
+BETT-0004,Jeffrey,Johnson,,aaron19@martinez.com,600.396.6598,false,Decision-maker,Operations
+BETT-0004,Curtis,Bradley,Treasurer,cathy86@ryan-anderson.com,668-762-4362,false,User,Operations
+BLOU-0005,Eric,Franklin,VP Finance,olove@baker.org,817.758.4470,true,Decision-maker,Treasury
+BLOU-0005,Jesus,Villarreal,VP Finance,,+1-975-234-1395x1821,false,Economic buyer,Finance
+BOBS-0006,Gina,Huber,,,563-982-2167x3290,true,User,Operations
+BOBS-0006,Ronald,Santos,Controller,clinemike@galvan-black.com,867.884.0639x2890,false,User,Treasury
+BOST-0007,John,Coleman,CFO,,001-358-512-3413x1875,true,Decision-maker,Treasury
+BOST-0007,Amy,Shaw,Controller,zmurphy@thompson-abbott.com,810.228.1900x51507,false,User,Executive
+BUCK-0008,Daniel,Hammond,Treasurer,aadams@brown.com,(485)826-6687x959,true,Decision-maker,Executive
+BUCK-0008,David,Sullivan,CFO,jacksonmary@mason.com,,false,Decision-maker,Executive
+BUSH-0009,Matthew,Garcia,Controller,jayblair@smith.org,(402)477-1779x1921,true,Economic buyer,Treasury
+BUSH-0009,Alexis,Downs,Owner,alee@cook.net,(674)362-0398x527,false,Influencer,Treasury
+BUSH-0009,Brett,Sanchez,Owner,gonzalesangie@hammond.com,(433)797-2291,false,Decision-maker,Finance
+CANA-0010,David,Hall,CFO,,+1-569-855-7882x1916,true,Economic buyer,Operations
+CANA-0010,Jessica,Kirk,Owner,,001-246-969-1418x497,false,Decision-maker,Operations
+CANA-0010,Theresa,George,Treasurer,walkermegan@edwards.info,771.847.5014x45096,false,Economic buyer,Finance
+CHAN-0011,David,Edwards,Owner,,+1-900-632-6222x504,true,Influencer,Executive
+DGYU-0012,Jennifer,Williams,Treasurer,,(583)435-8174,true,Decision-maker,Executive
+DGYU-0012,Colin,Morris,Controller,emilyrussell@mann.biz,(293)251-9368x61436,false,User,Operations
+DGYU-0012,Amanda,Mckinney,CFO,kyleflowers@moore.com,+1-926-569-8096x4482,false,Economic buyer,Treasury
+ADUD-0013,Frederick,Cuevas,,jason51@gutierrez.net,405.811.7925x01767,true,Decision-maker,Executive
+ADUD-0013,Teresa,Castro,Controller,monique01@hanson-munoz.com,+1-766-843-5464x2761,false,Economic buyer,Executive
+DULU-0014,Juan,Ford,Treasurer,carl11@davis-petersen.com,(690)903-4956,true,Decision-maker,Operations
+ESTW-0015,Andrew,Porter,Treasurer,,001-927-686-6105,true,Economic buyer,Finance
+FARI-0016,Jessica,Khan,Treasurer,clayton71@johnston.net,(624)451-5017x8332,true,Economic buyer,Operations
+FARI-0016,Larry,Stevens,VP Finance,gina49@wyatt-lee.com,740-244-8795x046,false,Influencer,Operations
+FARI-0016,Andrew,Jacobs,Owner,tanya75@rodriguez.com,+1-302-641-0872x3448,false,Influencer,Finance
+FILS-0017,Brandon,West,,pmejia@parker.com,(945)896-6344x0672,true,User,Executive
+FRES-0018,Trevor,Meyers,,vmoore@baldwin.com,586.552.5054x4610,true,Decision-maker,Executive
+FRES-0018,Rebecca,Bauer,VP Finance,jesseanderson@carter-guerrero.info,(731)491-9552x6255,false,Decision-maker,Treasury
+FRES-0018,Tim,Perry,,catherinezimmerman@larson.com,001-281-351-8910x32031,false,Decision-maker,Executive
+GREA-0019,Michael,Thompson,CFO,kcallahan@phillips-myers.biz,,true,Influencer,Operations
+GREA-0019,Heather,Jones,Owner,arussell@freeman.net,(843)503-6321x3726,false,Influencer,Executive
+GREA-0019,Albert,Ruiz,,scottgates@roberts.info,+1-276-513-0061x0834,false,Decision-maker,Finance
+GUID-0020,Sean,Ray,,pricejoshua@cervantes-hayes.biz,295-230-4177,true,Economic buyer,Executive
+IGLO-0021,Gregory,Moore,,priscillayoung@thomas.com,001-861-496-8167x53612,true,User,Finance
+IGLO-0021,George,King,VP Finance,markmoore@simmons.biz,7034609766,false,Economic buyer,Executive
+IGLO-0021,Nicholas,Richard,Treasurer,jack50@burch-golden.com,(747)586-6469,false,Decision-maker,Treasury
+JONE-0022,Connie,Pineda,VP Finance,erika96@green.com,(995)291-6595,true,Decision-maker,Operations
+JONE-0022,Aaron,Henry,CFO,michelle40@lopez.com,953.844.3251x90485,false,Economic buyer,Finance
+JONE-0022,Brett,Fuller,CFO,frankpeters@watts.com,+1-782-367-9132,false,User,Executive
+KING-0023,Vanessa,Cisneros,VP Finance,amyturner@reyes-patterson.com,815.939.4398x143,true,Influencer,Finance
+KING-0023,Donna,Schroeder,,wilsondouglas@wong-lewis.org,,false,Economic buyer,Finance
+KLEI-0024,Andrew,Morris,CFO,earmstrong@tran.com,903-945-5314,true,Influencer,Operations
+KLEI-0024,Patrick,Cooke,Controller,ahanson@perry-smith.com,001-640-429-9066x230,false,Influencer,Finance
+LIFE-0025,Jeffrey,Marshall,,jessesaunders@holmes.com,(614)275-7746x64998,true,User,Executive
+LIFE-0025,Theodore,Church,VP Finance,ethompson@payne.biz,646.245.6213x10852,false,Influencer,Executive
+LIFE-0025,Dustin,Cooper,Controller,craig02@pittman-mccoy.com,495-209-1387x2061,false,Decision-maker,Executive
+LIPM-0026,Tammy,Miller,Owner,farrelljamie@fisher.com,408.490.8892,true,User,Finance
+LIPM-0026,Sean,Diaz,,eric81@cantu-frost.com,001-898-448-2074x878,false,Decision-maker,Executive
+MALO-0027,Judy,Patton,Controller,ucobb@diaz-griffin.com,001-280-671-4654x49352,true,Decision-maker,Operations
+MALO-0027,George,Arnold,VP Finance,,001-551-392-2649x241,false,Influencer,Executive
+MALO-0027,Sarah,Cordova,Controller,brittany41@melton-page.com,710-797-6660,false,User,Operations
+MALO-0027,Dylan,Wall,Controller,amy81@mckay.com,(553)684-6776,true,Economic buyer,Executive
+MALO-0027,Connie,Hinton,Owner,,336-318-5559x671,true,User,Operations
+MALO-0027,Cathy,Foster,Controller,james99@martin.com,+1-519-536-1498x9320,false,Decision-maker,Treasury
+MALO-0027,Jessica,Gomez,Treasurer,wlopez@esparza.com,,false,User,Executive
+MAPL-0028,Sara,Gallegos,Controller,,(607)516-3785,true,Decision-maker,Finance
+MAST-0029,Jason,Reyes,Controller,samantha06@porter.com,(639)696-2879,true,Decision-maker,Treasury
+MAST-0029,Alex,Smith,Treasurer,frank32@smith-terry.com,886.857.4701x9773,false,Economic buyer,Finance
+MAST-0029,Timothy,Williams,VP Finance,hwilliams@sampson.com,+1-962-494-6692x781,false,Influencer,Operations
+MCCO-0030,Jason,Bass,CFO,wowens@anderson.net,,true,Influencer,Executive
+NEWM-0031,Wendy,Foley,,cpatel@miles-smith.com,417-596-7339x769,true,User,Operations
+OLSS-0032,Scott,Young,Owner,kwalker@klein.info,947-656-5542x7891,true,Decision-maker,Finance
+OLSS-0032,Robert,Elliott,VP Finance,ramirezandrew@burton.biz,001-594-917-0386x492,false,Decision-maker,Executive
+PEND-0033,David,Hansen,Owner,,001-964-597-5201x13321,true,User,Treasury
+PRAI-0034,Alicia,Davidson,Controller,ywebster@jones-rice.com,001-422-654-2309,true,Influencer,Operations
+PRAI-0034,Russell,Smith,VP Finance,xsilva@garcia.net,496.281.5147x06962,false,Economic buyer,Finance
+PREM-0035,Nathan,Soto,Owner,stephanie16@brown.net,+1-654-600-4002x95472,true,Economic buyer,Operations
+PREM-0035,Jessica,Ali,Controller,amoreno@stephens-soto.com,001-759-790-8875x09358,false,Decision-maker,Finance
+REMB-0036,Christina,Vargas,Controller,jonathanfowler@brown.com,736-646-1576x548,true,Influencer,Operations
+REMB-0036,Laura,Johnson,VP Finance,gibsondominique@wright.org,,true,Influencer,Finance
+REMB-0036,Cassandra,Gardner,VP Finance,kevin22@davis.org,,false,Decision-maker,Treasury
+REMB-0036,Thomas,Lam,Treasurer,krodriguez@griffin-bray.com,(475)357-3384,false,Decision-maker,Operations
+REMB-0036,Sandra,Hodge,Controller,david58@higgins.net,,true,User,Finance
+REMB-0036,Jason,Williams,Treasurer,kellyhorn@avery.com,001-250-580-3404x98465,false,Influencer,Executive
+REMB-0036,John,Green,CFO,richard28@cortez-flores.com,(514)521-2676x453,false,Influencer,Operations
+SEBA-0037,Alexandria,Johnson,Treasurer,joshua63@parks.net,496.530.8269x545,true,User,Operations
+SEBA-0037,Seth,Miller,Controller,heather80@butler.com,(678)581-9558x63497,false,Influencer,Finance
+SHAM-0038,Matthew,Smith,CFO,josephwise@johnston.biz,892.382.8476,true,User,Treasury
+SHIN-0039,Melinda,Brown,Controller,anthonyrobinson@ward-macias.org,876-506-1070x2877,true,Influencer,Executive
+SHIN-0039,Richard,Walton,Owner,robinsonmaria@moore.net,+1-307-493-9185x772,false,User,Treasury
+SIMM-0040,Christian,Brown,VP Finance,,630.946.1075x5602,true,User,Treasury
+SIMM-0040,Kimberly,Taylor,Controller,kjackson@massey.com,(593)725-6532x151,false,Decision-maker,Finance
+SLEE-0041,Carl,Graham,Controller,john00@mitchell.biz,(891)356-3658x01816,true,Economic buyer,Operations
+SLEE-0041,Crystal,Harrell,VP Finance,tranjennifer@perez-evans.com,367-889-2265x707,false,Influencer,Executive
+STHU-0042,Vincent,Ford,,john33@morales-greene.com,001-951-770-8236,true,Economic buyer,Treasury
+SUNM-0043,Emma,Scott,CFO,collinsashlee@white.biz,+1-885-880-2331x02705,true,Decision-maker,Executive
+SUNM-0043,Todd,Davis,VP Finance,william92@young-freeman.com,844-726-0125,false,Decision-maker,Operations
+SUNM-0043,Christine,Glover,Controller,bhernandez@herrera-saunders.com,750-310-1122,false,Decision-maker,Finance
+THEV-0044,Alicia,Smith,,christopherjones@myers-parks.com,001-275-952-8029,true,Influencer,Finance
+THEV-0044,William,Powell,,brookebennett@thomas.org,+1-358-866-3737x61960,false,Decision-maker,Treasury
+THEV-0044,Victoria,Curtis,CFO,dknapp@love-robinson.com,001-217-420-2752x4240,false,Economic buyer,Finance
+VERM-0045,Michelle,Miller,VP Finance,,209-684-2827x3933,true,Influencer,Operations
+VERM-0045,Steven,Mcdonald,VP Finance,robertsonemily@harris.com,806.314.6727x1984,false,Influencer,Executive
+VERM-0045,Jacob,Wells,Owner,sandra11@warren.com,+1-983-471-1320x936,false,Influencer,Operations
+WAWO-0046,Regina,Fuller,CFO,,+1-400-553-5322x138,true,User,Finance
+WAWO-0046,Sheila,Wilson,Controller,heidi38@hicks.com,+1-979-568-3538,false,Decision-maker,Finance
+WAWO-0046,David,Washington,,michaelosborne@erickson.net,+1-325-381-9981x96609,false,Economic buyer,Treasury
+CHAN-0011,Anita,Mbeki,Treasurer,anita.mbeki@channellocki.example.com,(541) 448-1832,false,Economic buyer,Treasury
+DULU-0014,Mark,Torrence,Treasurer,mark.torrence@duluthpack.example.com,(537) 880-6542,false,Economic buyer,Treasury
+ESTW-0015,Scott,Mbeki,Treasurer,scott.mbeki@estwingmanuf.example.com,(745) 773-5673,false,Economic buyer,Treasury
+FILS-0017,Brent,Ellery,Treasurer,brent.ellery@filsonholdin.example.com,(201) 542-7891,false,Economic buyer,Treasury
+GUID-0020,Neil,Lindqvist,Treasurer,neil.lindqvist@guideoneinsu.example.com,(906) 508-6489,false,Economic buyer,Treasury
+MAPL-0028,Paul,Gallo,Treasurer,paul.gallo@maplelodgefr.example.com,(493) 364-1345,false,Economic buyer,Treasury
+MCCO-0030,Meera,Whitfield,Treasurer,meera.whitfield@mccowngordon.example.com,(679) 516-1412,false,Economic buyer,Treasury
+NEWM-0031,Neil,Cavanaugh,Treasurer,neil.cavanaugh@newmansownin.example.com,(206) 555-9867,false,Economic buyer,Treasury
+PEND-0033,Rosa,Cavanaugh,Treasurer,rosa.cavanaugh@pendletonwoo.example.com,(633) 690-4771,false,Economic buyer,Treasury
+SHAM-0038,Wade,Gallo,Treasurer,wade.gallo@shamrockfarm.example.com,(959) 893-8138,false,Economic buyer,Treasury
+STHU-0042,Ivy,Reinhart,Treasurer,ivy.reinhart@sthubertgrou.example.com,(866) 366-4849,false,Economic buyer,Treasury

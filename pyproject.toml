@@ -1,9 +1,10 @@
 # Workspace root for the ai-agent-lib repository.
-# The root is not a distribution: it only wires the three packages together
+# The root is not a distribution: it wires the agent packages together
 # and holds the shared tool configuration.
 
 [tool.uv.workspace]
 members = ["packages/*", "examples/*"]
+exclude = ["examples/rmprep", "packages/ai-agent-lib-ui"] # Separately managed environments.
 
 [dependency-groups]
 dev = [
@@ -106,6 +107,8 @@ mypy_path = [
     "$MYPY_CONFIG_FILE_DIR/examples/accounts-agent/tests",
     "$MYPY_CONFIG_FILE_DIR/examples/accounts-mcp/src",
     "$MYPY_CONFIG_FILE_DIR/examples/accounts-mcp/tests",
+    "$MYPY_CONFIG_FILE_DIR/examples/rmprep/agents/rmprep/src",
+    "$MYPY_CONFIG_FILE_DIR/examples/rmprep/mcp-servers/rmprep-data/src",
     "$MYPY_CONFIG_FILE_DIR/tests",
     "$MYPY_CONFIG_FILE_DIR/docs/guide",
 ]
@@ -120,6 +123,9 @@ files = [
     "examples/accounts-agent/tests",
     "examples/accounts-mcp/src",
     "examples/accounts-mcp/tests",
+    "examples/rmprep/agents",
+    "examples/rmprep/mcp-servers",
+    "examples/rmprep/tests",
     "tests",
     "docs/guide",
     "tools",
@@ -132,6 +138,7 @@ testpaths = ["packages", "examples", "tests"]
 # Lets the repository-level tests import their shared helpers.
 pythonpath = ["tests", "examples/accounts-mcp/tests", "docs/guide"]
 addopts = [
+    "--ignore=packages/ai-agent-lib-ui/tests",
     "--import-mode=importlib",
     "--strict-markers",
     "--strict-config",

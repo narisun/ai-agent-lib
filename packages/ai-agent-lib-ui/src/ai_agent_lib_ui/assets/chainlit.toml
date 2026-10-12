@@ -1,0 +1,37 @@
+[project]
+allow_origins = ["__ORIGIN__"]
+session_timeout = 60
+user_session_timeout = 3600
+persist_user_env = false
+
+[features]
+unsafe_allow_html = false
+edit_message = false
+allow_thread_sharing = false
+favorites = false
+latex = false
+[features.spontaneous_file_upload]
+enabled = false
+[features.audio]
+enabled = false
+[features.mcp]
+enabled = false
+
+[UI]
+name = "Agent workspace"
+description = "Local conversations with registered agents"
+layout = "wide"
+default_sidebar_state = "open"
+default_theme = "light"
+cot = "hidden"
+confirm_new_chat = false
+custom_css = "/public/chat.css"
+[[UI.header_links]]
+name = "Conversations"
+display_name = "Conversations"
+icon_url = "/chat/public/conversations.svg"
+url = "/conversations"
+target = "_self"
+
+[meta]
+generated_by = "2.12.0"

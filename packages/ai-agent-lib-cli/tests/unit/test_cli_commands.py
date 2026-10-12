@@ -107,7 +107,7 @@ def test_a_command_that_cannot_be_done_exits_with_one_and_one_line(
 # -------------------------------------------------------------------- workspace
 
 
-def test_init_creates_a_workspace_that_holds_nothing_yet(
+def test_init_creates_workspace_docs_and_samples_without_services(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert run("init", "demo", "--dir", tmp_path, "--owner", "demo-team") == 0
@@ -123,6 +123,10 @@ def test_init_creates_a_workspace_that_holds_nothing_yet(
         "agentlib.lock",
         "agentlib.toml",
         "agents/.gitkeep",
+        "docs/samples/verified-anthropic/checkpoint-history.json",
+        "docs/samples/verified-anthropic/model-trace.jsonl",
+        "docs/verified-anthropic-run.md",
+        "examples/read_trace.py",
         "mcp-servers/.gitkeep",
         "policies/.manifest",
         "policies/agentlib/rules/data.yaml",
@@ -227,10 +231,14 @@ def test_new_agent_adds_an_agent_linked_to_the_servers_it_names(
         ".env",
         ".env.example",
         "README.md",
+        "docs/anthropic-example.md",
         "evals/cases.jsonl",
         "pyproject.toml",
         "src/hello_agent/__init__.py",
         "src/hello_agent/__main__.py",
+        "src/hello_agent/examples/__init__.py",
+        "src/hello_agent/examples/trace_anthropic.py",
+        "src/hello_agent/examples/trace_react.py",
         "src/hello_agent/graph.py",
         "src/hello_agent/py.typed",
         "src/hello_agent/service.py",
@@ -240,6 +248,7 @@ def test_new_agent_adds_an_agent_linked_to_the_servers_it_names(
         "tests/test_hello_agent_as_configured.py",
         "tests/test_hello_agent_eval.py",
         "tests/test_hello_agent_service.py",
+        "tests/test_hello_agent_tracing.py",
     }
     assert "tests/test_hello_agent_with_hello_mcp.py" in files
     assert 'description = "Says hello."' in files[service + "pyproject.toml"]

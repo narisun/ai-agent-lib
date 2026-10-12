@@ -433,6 +433,8 @@ class ServiceConfig:
         data_sources: The adapter selected for each named data source. A service
             can have any number of them, so they are named instead of being one
             section.
+        model_trace_path: Optional JSONL destination for diagnostic model messages.
+            Unset by default. Contains conversation content; use with test data.
     """
 
     profile: Profile = Profile.LOCAL
@@ -447,6 +449,7 @@ class ServiceConfig:
     secrets: Mapping[str, SecretStr] = field(default_factory=dict)
     external: ExternalSettings = field(default_factory=ExternalSettings)
     data_sources: Mapping[str, ProviderSelection] = field(default_factory=dict)
+    model_trace_path: Path | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "profile", Profile(self.profile))

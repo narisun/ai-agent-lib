@@ -338,17 +338,23 @@ def test_a_servers_settings_select_its_data_and_no_checkpoint_store(tmp_path: Pa
     assert identity.audience == "hello-mcp"
 
 
-def test_variable_names_for_the_readmes_come_from_the_binding_table(tmp_path: Path) -> None:
+def test_variable_names_for_generated_docs_come_from_the_binding_table(tmp_path: Path) -> None:
     names = variable_names()
     # One of them is the start of a name: a secret's variable ends with the secret's name.
     names["secret_prefix"] += "RATES_TOKEN"
+    json_values = {
+        "identity_options": {},
+        "data_sources": {},
+        "model_aliases": {"fast": {"model_id": "fake-fast"}},
+    }
     text = "\n".join(
-        f"{name}={json.dumps({}) if 'options' in key or key == 'data_sources' else 'fake'}"
+        f"{name}={json.dumps(json_values[key]) if key in json_values else 'fake'}"
         for key, name in names.items()
         if key != "deployment_env"
     )
     config = resolved(tmp_path, text).resolve()
     assert config.model.provider == "fake"
+    assert config.model.resolve("fast").model_id == "fake-fast"
 
 
 # ------------------------------------------------------------- YAML a person keeps

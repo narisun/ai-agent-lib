@@ -1,0 +1,84 @@
+uen,request,product,close_date,status,category,priority,opened_date
+KLEI-0024,Dispute on service charge,Commercial Demand Deposit Account,2024-12-10,Closed,Fees,3 - Moderate,2024-11-07
+LIFE-0025,Update authorized signers,Commercial Demand Deposit Account,,In Progress,Account Maintenance,1 - Critical,2024-08-25
+LIFE-0025,Dispute on service charge,Commercial Demand Deposit Account,2026-06-01,Closed,Fees,1 - Critical,2026-05-28
+LIPM-0026,Payment trace request,Wire Transfer,,In Progress,Payments,3 - Moderate,2024-11-06
+LIPM-0026,Update authorized signers,Commercial Demand Deposit Account,2025-03-30,Closed,Account Maintenance,2 - High,2025-03-17
+LIPM-0026,Add signing authority,Commercial Demand Deposit Account,2026-02-08,Closed,Access,4 - Low,2026-02-03
+LIPM-0026,Dispute on service charge,Commercial Demand Deposit Account,,In Progress,Fees,2 - High,2026-03-03
+LIPM-0026,Address / KYC information update,Commercial Demand Deposit Account,2026-01-17,Closed,Account Maintenance,4 - Low,2025-12-10
+LIPM-0026,OLBB login issue,Online Banking for Business,2025-08-17,Closed,Online Banking,1 - Critical,2025-07-23
+LIPM-0026,ACH batch rejected,ACH Origination,,In Progress,Payments,4 - Low,2025-01-22
+MALO-0027,Add user entitlement,Online Banking for Business,,New,Access,4 - Low,2025-01-26
+MALO-0027,OLBB alert configuration,Online Banking for Business,2026-02-28,Closed,Online Banking,2 - High,2026-01-16
+MALO-0027,Update authorized signers,Commercial Demand Deposit Account,,In Progress,Account Maintenance,3 - Moderate,2024-09-07
+MALO-0027,Add signing authority,Commercial Demand Deposit Account,,New,Access,1 - Critical,2025-07-22
+MALO-0027,Unable to initiate wire,Wire Transfer,,New,Payments,1 - Critical,2026-01-09
+MALO-0027,Wire fee inquiry,Wire Transfer,2025-07-19,Closed,Fees,3 - Moderate,2025-07-18
+MALO-0027,Dispute on service charge,Commercial Demand Deposit Account,2026-01-13,Closed,Fees,2 - High,2026-01-11
+MALO-0027,Payment trace request,Wire Transfer,2026-04-16,Closed,Payments,3 - Moderate,2026-04-13
+MAPL-0028,Reset security token,Online Banking for Business,2025-08-15,Closed,Access,4 - Low,2025-08-08
+MAPL-0028,Dispute on service charge,Commercial Demand Deposit Account,2024-10-27,Closed,Fees,1 - Critical,2024-10-13
+MAPL-0028,Add user entitlement,Online Banking for Business,,In Progress,Access,3 - Moderate,2026-03-01
+MAST-0029,OLBB alert configuration,Online Banking for Business,,New,Online Banking,3 - Moderate,2026-06-09
+MAST-0029,Address / KYC information update,Commercial Demand Deposit Account,2026-04-17,Closed,Account Maintenance,3 - Moderate,2026-04-05
+MAST-0029,Add signing authority,Commercial Demand Deposit Account,2026-02-20,Closed,Access,4 - Low,2026-01-26
+MCCO-0030,Dispute on service charge,Commercial Demand Deposit Account,,New,Fees,2 - High,2025-02-19
+MCCO-0030,Payment trace request,Wire Transfer,2024-09-14,Closed,Payments,3 - Moderate,2024-08-10
+MCCO-0030,e-Statement delivery setup,Online Banking for Business,,In Progress,Online Banking,1 - Critical,2024-09-18
+MCCO-0030,Update authorized signers,Commercial Demand Deposit Account,2025-10-31,Closed,Account Maintenance,4 - Low,2025-10-22
+MCCO-0030,Address / KYC information update,Commercial Demand Deposit Account,2025-07-24,Closed,Account Maintenance,4 - Low,2025-06-22
+MCCO-0030,OLBB login issue,Online Banking for Business,,New,Online Banking,3 - Moderate,2024-08-04
+NEWM-0031,OLBB alert configuration,Online Banking for Business,,New,Online Banking,1 - Critical,2026-05-02
+NEWM-0031,Update authorized signers,Commercial Demand Deposit Account,,In Progress,Account Maintenance,2 - High,2024-12-24
+NEWM-0031,Account analysis statement question,Analyzed Operating DDA,,New,Account Maintenance,2 - High,2024-12-05
+NEWM-0031,Unable to initiate wire,Wire Transfer,,New,Payments,2 - High,2025-07-29
+NEWM-0031,Address / KYC information update,Commercial Demand Deposit Account,,New,Account Maintenance,4 - Low,2025-06-13
+PEND-0033,OLBB alert configuration,Online Banking for Business,2025-07-09,Closed,Online Banking,2 - High,2025-06-29
+PEND-0033,e-Statement delivery setup,Online Banking for Business,,New,Online Banking,4 - Low,2025-03-16
+PEND-0033,Wire fee inquiry,Wire Transfer,,In Progress,Fees,4 - Low,2024-08-25
+PRAI-0034,Dispute on service charge,Commercial Demand Deposit Account,,New,Fees,2 - High,2025-03-02
+PRAI-0034,Unable to initiate wire,Wire Transfer,,In Progress,Payments,2 - High,2026-01-19
+PRAI-0034,Update authorized signers,Commercial Demand Deposit Account,,In Progress,Account Maintenance,1 - Critical,2026-05-02
+PREM-0035,Payment trace request,Wire Transfer,,New,Payments,1 - Critical,2026-04-22
+REMB-0036,Add signing authority,Commercial Demand Deposit Account,,In Progress,Access,3 - Moderate,2026-03-24
+REMB-0036,Update authorized signers,Commercial Demand Deposit Account,2024-10-05,Closed,Account Maintenance,4 - Low,2024-09-27
+REMB-0036,ACH batch rejected,ACH Origination,2024-11-23,Closed,Payments,3 - Moderate,2024-10-28
+REMB-0036,Wire fee inquiry,Wire Transfer,,New,Fees,3 - Moderate,2024-08-22
+SEBA-0037,e-Statement delivery setup,Online Banking for Business,2025-09-25,Closed,Online Banking,4 - Low,2025-09-11
+SEBA-0037,Update authorized signers,Commercial Demand Deposit Account,,In Progress,Account Maintenance,4 - Low,2024-08-20
+SHAM-0038,Unable to initiate wire,Wire Transfer,2025-05-19,Closed,Payments,1 - Critical,2025-04-11
+SHAM-0038,e-Statement delivery setup,Online Banking for Business,,In Progress,Online Banking,1 - Critical,2025-02-05
+SHAM-0038,Update authorized signers,Commercial Demand Deposit Account,,In Progress,Account Maintenance,1 - Critical,2024-12-19
+SHIN-0039,OLBB alert configuration,Online Banking for Business,2026-01-12,Closed,Online Banking,4 - Low,2026-01-09
+SHIN-0039,ACH batch rejected,ACH Origination,,In Progress,Payments,2 - High,2025-01-06
+SHIN-0039,Address / KYC information update,Commercial Demand Deposit Account,,In Progress,Account Maintenance,3 - Moderate,2025-10-04
+SIMM-0040,Update authorized signers,Commercial Demand Deposit Account,2025-12-31,Closed,Account Maintenance,1 - Critical,2025-11-29
+SIMM-0040,Account analysis statement question,Analyzed Operating DDA,2025-12-08,Closed,Account Maintenance,3 - Moderate,2025-11-07
+SIMM-0040,Address / KYC information update,Commercial Demand Deposit Account,2024-11-15,Closed,Account Maintenance,4 - Low,2024-11-02
+SIMM-0040,OLBB alert configuration,Online Banking for Business,,New,Online Banking,4 - Low,2024-08-28
+SIMM-0040,Analysis fee review request,Analyzed Operating DDA,,In Progress,Fees,4 - Low,2025-09-05
+SLEE-0041,e-Statement delivery setup,Online Banking for Business,2024-09-11,Closed,Online Banking,4 - Low,2024-08-27
+STHU-0042,Add signing authority,Commercial Demand Deposit Account,,In Progress,Access,4 - Low,2025-05-15
+STHU-0042,e-Statement delivery setup,Online Banking for Business,,In Progress,Online Banking,2 - High,2025-04-24
+STHU-0042,Address / KYC information update,Commercial Demand Deposit Account,2025-08-24,Closed,Account Maintenance,3 - Moderate,2025-07-12
+STHU-0042,OLBB alert configuration,Online Banking for Business,2025-07-13,Closed,Online Banking,3 - Moderate,2025-06-18
+SUNM-0043,e-Statement delivery setup,Online Banking for Business,2026-01-20,Closed,Online Banking,3 - Moderate,2025-12-15
+SUNM-0043,ACH batch rejected,ACH Origination,2025-01-06,Closed,Payments,1 - Critical,2024-12-09
+THEV-0044,e-Statement delivery setup,Online Banking for Business,,New,Online Banking,2 - High,2025-02-18
+THEV-0044,Update authorized signers,Commercial Demand Deposit Account,,New,Account Maintenance,3 - Moderate,2026-03-30
+THEV-0044,Reset security token,Online Banking for Business,2024-09-29,Closed,Access,3 - Moderate,2024-09-05
+THEV-0044,Add user entitlement,Online Banking for Business,,New,Access,1 - Critical,2025-08-25
+VERM-0045,ACH batch rejected,ACH Origination,2025-02-07,Closed,Payments,4 - Low,2025-01-12
+VERM-0045,Dispute on service charge,Commercial Demand Deposit Account,2025-10-19,Closed,Fees,4 - Low,2025-10-09
+VERM-0045,OLBB login issue,Online Banking for Business,2026-01-04,Closed,Online Banking,4 - Low,2025-11-28
+WAWO-0046,Reset security token,Online Banking for Business,2025-09-06,Closed,Access,1 - Critical,2025-08-29
+WAWO-0046,Payment trace request,Wire Transfer,,New,Payments,2 - High,2024-08-09
+BUSH-0009,Sweep Account implementation & onboarding,Sweep Account,2026-06-10,Closed,Account Maintenance,3 - Moderate,2026-05-23
+BUSH-0009,Lockbox implementation & onboarding,Lockbox,2026-08-01,Closed,Account Maintenance,3 - Moderate,2026-07-14
+CHAN-0011,Positive Pay implementation & onboarding,Positive Pay,2026-03-08,Closed,Account Maintenance,3 - Moderate,2026-02-18
+FARI-0016,Sweep Account implementation & onboarding,Sweep Account,2026-05-24,Closed,Account Maintenance,3 - Moderate,2026-05-06
+IGLO-0021,Sweep Account implementation & onboarding,Sweep Account,2026-05-24,Closed,Account Maintenance,3 - Moderate,2026-05-06
+JONE-0022,Lockbox implementation & onboarding,Lockbox,2026-05-12,Closed,Account Maintenance,3 - Moderate,2026-04-24
+MALO-0027,Sweep Account implementation & onboarding,Sweep Account,2026-06-06,Closed,Account Maintenance,3 - Moderate,2026-05-19
+MAPL-0028,Sweep Account implementation & onboarding,Sweep Account,2026-05-10,Closed,Account Maintenance,3 - Moderate,2026-04-22

@@ -1,0 +1,20 @@
+[project]
+name = "rmprep"
+version = "0.1.0"
+description = "Prepare relationship manager client meeting memos and answer follow-up questions"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "ai-agent-lib-core[jwt,mcp,otel,serve]",
+]
+
+[project.scripts]
+rmprep = "rmprep.__main__:main"
+rmprep-serve = "rmprep.service:main"
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rmprep"]

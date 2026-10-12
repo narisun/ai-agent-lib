@@ -19,6 +19,7 @@ from ai_agent_lib_core.contracts import (
     GuardrailCheck,
     IdGenerator,
     ModelRef,
+    ModelTraceSink,
     PolicyDecisionPoint,
     RegistrySource,
     RequestContext,
@@ -37,7 +38,9 @@ from ai_agent_lib_core.integrations.langgraph.model import (
     message_text,
     structured_payload,
 )
+from ai_agent_lib_core.integrations.langgraph.model_trace import ModelTrace
 from ai_agent_lib_core.integrations.langgraph.tools import govern_tools
+from ai_agent_lib_core.observability.diagnostics import Diagnostics
 from ai_agent_lib_core.pipeline import (
     ModelCall,
     ModelStage,
@@ -72,6 +75,8 @@ class LangGraphBindings:
         frame_tool_results: Whether tool results are framed as untrusted data.
         bridge: Gives the bridge used by synchronous calls.
         operations: Timeouts, retries and budgets of model and tool calls.
+        model_trace: Optional sink for diagnostic model exchanges, separate from audit.
+        diagnostics: Optional content-free usage and operation recorder.
     """
 
     def __init__(
@@ -90,10 +95,14 @@ class LangGraphBindings:
         frame_tool_results: bool,
         bridge: Callable[[], LoopBridge],
         operations: Operations | None = None,
+        model_trace: ModelTraceSink | None = None,
+        diagnostics: Diagnostics | None = None,
     ) -> None:
         self._resolve_model = resolve_model
         self._checkpoint_backend = checkpoint_backend
         self._bridge = bridge
+        self._diagnostics = diagnostics
+        self._model_trace = ModelTrace(model_trace, clock, ids) if model_trace is not None else None
         self._model_pipeline: Pipeline[ModelStage, ModelCall, AIMessage] = build_model_pipeline(
             audit=audit,
             telemetry=telemetry,
@@ -129,6 +138,8 @@ class LangGraphBindings:
             provider=provider,
             pipeline=self._model_pipeline,
             bridge=self._bridge,
+            trace=self._model_trace,
+            diagnostics=self._diagnostics,
         )
 
     def tools(

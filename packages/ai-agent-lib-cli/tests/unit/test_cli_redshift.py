@@ -206,8 +206,8 @@ def test_new_mcp_from_redshift_writes_a_server_that_runs_locally_on_stand_ins(
     # Locally it is a CSV server like any other.
     assert '"sales": {"kind": "duckdb_csv"' in (service / ".env.example").read_text()
     readme = (service / "README.md").read_text(encoding="utf-8")
-    assert "proposed from the Redshift catalogue" in readme
-    assert "## Before it is deployed" in readme
+    assert "generated from the Redshift" in readme
+    assert "## Review data settings for deployment" in readme
     assert "search path of the server's database user to `sales`" in readme
     assert '{"sales": {"kind": "redshift_data", "database": "dev", "workgroup": "eap"' in readme
     assert "EAP_DATA_SOURCES" in readme

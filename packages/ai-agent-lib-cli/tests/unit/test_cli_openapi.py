@@ -518,10 +518,10 @@ def test_new_mcp_from_openapi_writes_a_server_whose_tests_answer_for_the_api(
     assert "ai-agent-lib-core[jwt,mcp,otel,serve]" in (service / "pyproject.toml").read_text()
 
     readme = (service / "README.md").read_text(encoding="utf-8")
-    assert "proposed from an OpenAPI document" in readme
+    assert "endpoint definition in `queries/`, generated from the OpenAPI" in readme
     assert '"auth_secret": "rates_token"' in readme
     assert "EAP_SECRET_RATES_TOKEN" in readme
-    assert "Adding a tool over your own data" not in readme
+    assert "## Add a tool over your own data" not in readme
 
     (entry,) = read_servers(workspace)
     assert [tool.name for tool in entry.tools] == [

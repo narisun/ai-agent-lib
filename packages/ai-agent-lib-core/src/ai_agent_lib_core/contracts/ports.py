@@ -30,6 +30,7 @@ __all__ = [
     "IdGenerator",
     "IdentityVerifier",
     "ModelCapabilities",
+    "ModelTraceSink",
     "SecretsProvider",
     "SpanNotes",
     "SupportsAsyncClose",
@@ -82,6 +83,20 @@ class AuditSink(Protocol):
 
     async def write(self, record: AuditRecord) -> None:
         """Store ``record`` durably or raise ``IntegrityError``."""
+        ...
+
+
+class ModelTraceSink(Protocol):
+    """An opt-in destination for diagnostic model exchanges.
+
+    Records contain model-visible content and JSON-compatible values. The caller
+    owns injected sinks and their resources. Implementations must support concurrent
+    writes. Diagnostic failures are reported separately from the model operation;
+    this port does not provide the durability guarantees of :class:`AuditSink`.
+    """
+
+    async def write(self, record: Mapping[str, object]) -> None:
+        """Write one diagnostic event, or raise if the destination is unavailable."""
         ...
 
 

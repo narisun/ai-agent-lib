@@ -101,7 +101,16 @@ def agent_env(agent: AgentAnswers) -> str:
             ),
             EnvSetting(Key.AWS_REGION, "<region>", enabled=False),
         ]
-    settings += [*_shared(), _identity({})]
+    settings += [
+        EnvSetting(
+            Key.MODEL_TRACE_PATH,
+            ".agentlib/model-trace.jsonl",
+            comment="Optional model diagnostics: captures conversation content. Use test data.",
+            enabled=False,
+        ),
+        *_shared(),
+        _identity({}),
+    ]
     return render_env_file(settings, header=_HEADER.format(name=agent.name))
 
 
@@ -127,10 +136,12 @@ def mcp_env(server: McpAnswers) -> str:
 
 
 def variable_names() -> dict[str, str]:
-    """Return the variable names a generated README mentions, by a short label."""
+    """Return the variable names used by generated docs and examples, by a short label."""
     return {
         "model_provider": variable_for(Key.MODEL_PROVIDER),
         "model_id": variable_for(Key.MODEL_ID),
+        "model_aliases": variable_for(Key.MODEL_ALIASES),
+        "model_trace_path": variable_for(Key.MODEL_TRACE_PATH),
         "identity_options": variable_for(options_key(Section.IDENTITY)),
         "deployment_env": variable_for(Key.DEPLOYMENT_ENV),
         "data_sources": variable_for(Key.DATA_SOURCES),

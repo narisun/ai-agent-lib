@@ -1,0 +1,35 @@
+# The MCP tool registry: which servers and tools exist. An agent can only use a tool
+# that is listed here, and only if the tool's live input schema still matches its pin.
+# After changing a tool's arguments, pin it again: agentlib registry pin <server>
+# agentlib rewrites this file when it adds, links or pins a service; comments are not kept.
+schema: agentlib.registry/v1
+servers:
+- id: rmprep-data
+  owner: commercial-banking
+  url: http://127.0.0.1:8100/mcp
+  audience: rmprep-data
+  tools:
+  - name: rmprep-data.find_clients
+    version: 0.1.0
+    schema_sha256: 3ffc2f464cdc40f33447273bf9f38dd4f76e65a3b5f6631736c174007ee1cb56
+    classification: confidential
+    read_only: true
+    description: Resolve client names or UENs and clarify ambiguous matches.
+  - name: rmprep-data.get_memo_evidence
+    version: 0.1.0
+    schema_sha256: 2288419c141e0a5dfcffbba15eff874a8f933dc37d11045ee4ca72a849ff7752
+    classification: confidential
+    read_only: true
+    description: Collect client evidence, sourced review findings and data gaps for a meeting.
+  - name: rmprep-data.get_client_records
+    version: 0.1.0
+    schema_sha256: 30ace48db86605e4699fb5bf135df021c44e24a88906b221bb5e513f652264c3
+    classification: confidential
+    read_only: true
+    description: Retrieve a page of client details within an explicit date window.
+  - name: rmprep-data.get_reference_data
+    version: 0.1.0
+    schema_sha256: d0148955d1d1313f4f166e8313b6c56a2c1fba99268b70e9a68230d86cc7c06e
+    classification: internal
+    read_only: true
+    description: Read product, market and data dictionary reference snapshots.

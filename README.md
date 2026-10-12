@@ -9,15 +9,17 @@ An **agent** uses a language model to answer questions and choose tools. A
 (Model Context Protocol) lets a separate server expose tools to several agents.
 
 Start with the [getting-started tutorial](docs/getting-started.md). The
-[developer guide](docs/developer-guide.html) explains the concepts, architecture,
-troubleshooting, and configuration reference in more detail.
+[developer guide](docs/developer-guide.html) starts with
+[the design principles](docs/developer-guide.html#principles): interfaces,
+dependency injection, and how providers keep cross-cutting concerns separate
+from the LangGraph workflow. It also covers troubleshooting and configuration.
 
 ## Run your first agent
 
 You need Python 3.11 or newer with pip, a copy of this repository, and access
 to your approved package index or a folder of pre-downloaded Python wheels.
-Local development needs no Docker, uv, cloud account, or administrator rights.
-After installation, the default example and tests run without external services.
+The tutorial uses a fake model that runs in the Python process and local
+providers for configuration, permissions, audit records, and conversation state.
 
 Open a terminal in the repository's top-level `ai-agent-lib/` folder. Choose
 the commands for your terminal below. They create a virtual environment in
@@ -25,27 +27,30 @@ the library checkout and a separate application workspace named `tutorial/`
 beside it. Use a different workspace name if that folder already exists.
 
 A **virtual environment** keeps project packages separate from system Python.
-These commands use its Python executable directly, so script activation is
-unnecessary. If you already created this tutorial using the developer guide,
+These commands use its Python executable directly. If you already created
+this tutorial using the developer guide,
 continue with [the next steps](docs/getting-started.md#2-understand-your-project).
 
-### Windows PowerShell
+### Windows Command Prompt (cmd.exe)
 
-```powershell
-$Library = (Get-Location).Path
+In **Command Prompt**, run the commands one line at a time from the library
+root. `set "PYTHON=..."` stores the executable's full path; `"%PYTHON%"` runs
+it. Keep the quotes so paths containing spaces work.
+
+```bat
+set "LIBRARY=%CD%"
 python -m venv .venv
-$Python = Join-Path $Library ".venv\Scripts\python.exe"
-& $Python -m pip install -e ./packages/ai-agent-lib-core -e ./packages/ai-agent-lib-cli
-& $Python -m ai_agent_lib_cli init tutorial --dir .. --lib-path $Library --owner learning
-Set-Location ../tutorial
-& $Python -m ai_agent_lib_cli new agent helper --description "A practice assistant" --model fake
-& $Python -m ai_agent_lib_cli install
-& $Python -m pytest
-& $Python -m helper "Say hello to Ada."
+set "PYTHON=%LIBRARY%\.venv\Scripts\python.exe"
+"%PYTHON%" -m pip install -e ./packages/ai-agent-lib-core -e ./packages/ai-agent-lib-cli
+"%PYTHON%" -m ai_agent_lib_cli init tutorial --dir .. --lib-path "%LIBRARY%" --owner learning
+cd /d ..\tutorial
+"%PYTHON%" -m ai_agent_lib_cli new agent helper --description "A practice assistant" --model fake
+"%PYTHON%" -m ai_agent_lib_cli install
+"%PYTHON%" -m pytest
+"%PYTHON%" -m helper "Say hello to Ada."
 ```
 
-`$Python` holds the executable's full path; PowerShell's `&` runs it. If your
-Python installation uses `py -3.11`, use `py -3.11 -m venv .venv` for the
+If your Python installation uses `py -3.11`, use `py -3.11 -m venv .venv` for the
 environment creation step.
 
 ### macOS or Linux, using bash or zsh
@@ -69,9 +74,8 @@ cd ../tutorial
 fake: Say hello to Ada.
 ```
 
-The fake model repeats your question. It does not decide to call tools.
-The tutorial adds a scripted test that tells the model which tool to call,
-then shows how to configure a real model when you are ready.
+The fake model echoes your question. The tutorial uses scripted model replies
+to test tool calls, then shows how to configure a real model.
 
 `--lib-path` connects the workspace to this library checkout. `install` uses
 the current Python's pip to install the workspace services and development
@@ -95,22 +99,22 @@ Your generated application lives in `tutorial/`. The library lives in
 | Share tools through MCP | [Add an MCP server](docs/getting-started.md#5-add-a-shared-tool-server) |
 | Change shared library behavior | The packages in this repository; see [contributing](#working-on-the-library) below |
 
-An **adapter** implements a service, such as a model or a data source.
-Application code receives services through `ServiceContainer`, rather than
-creating cloud clients inside business functions. This is dependency
-injection: tests can supply fakes through the same interfaces.
+An **adapter** implements an interface for a service, such as a model or a
+data source. `ServiceContainer` builds the configured adapters and supplies
+them to application code. This is dependency injection: the graph depends on
+interfaces, so tests can supply fakes and deployments can select other providers.
 
 ## Run and check the application
 
-From `tutorial/`, in the same PowerShell terminal:
+From `tutorial/`, in the same Command Prompt window:
 
-```powershell
-& $Python -m ai_agent_lib_cli doctor helper
-& $Python -m ai_agent_lib_cli check
-& $Python -m ai_agent_lib_cli run helper
+```bat
+"%PYTHON%" -m ai_agent_lib_cli doctor helper
+"%PYTHON%" -m ai_agent_lib_cli check
+"%PYTHON%" -m ai_agent_lib_cli run helper
 ```
 
-On macOS/Linux, replace `& $Python` with `"$PYTHON"`. In a new terminal,
+On macOS/Linux, replace `"%PYTHON%"` with `"$PYTHON"`. In a new terminal,
 [restore the interpreter variable](docs/getting-started.md#using-a-new-terminal)
 before running commands.
 
@@ -119,13 +123,55 @@ before running commands.
 - `check` runs lint, formatting, type checks, tests, and policy samples.
 - `run helper` starts an HTTP service. It keeps running until you press Ctrl+C.
   To ask one question from the command line instead, use
-  `& $Python -m helper "Say hello to Ada."`.
+  `"%PYTHON%" -m helper "Say hello to Ada."`.
 
 The [HTTP example](docs/getting-started.md#6-optional-call-the-agent-over-http)
 uses Python's standard library to send a request. The service exposes
 `/healthz` for liveness and `/readyz` for readiness. Readiness waits for
 service validation and graph/MCP preparation. Streaming sends graph-step
 updates, not individual model tokens.
+
+## Inspect model input, output, and conversation history
+
+To inspect an agent's model calls, add this to its `.env` and restart:
+
+```dotenv
+EAP_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl
+```
+
+The file is written under that service's `.agentlib/` folder. It records the
+messages sent to the provider, tool definitions, responses, and retry attempts.
+Capture is opt-in and retains conversation content; use test data and keep the
+file private. Recognizable credentials are masked.
+
+The [debugging Q&A](docs/developer-guide.html#faq) explains how to read the trace,
+continue a conversation, and inspect checkpoint state. Its
+[runnable ReAct example](docs/developer-guide.html#react-context) follows a tool
+call and a second question through the generated graph using scripted replies.
+
+Every new workspace also includes the [verified Anthropic walkthrough](docs/verified-anthropic-run.md),
+selected-field trace samples, and a JSONL reader. The real run made three model
+calls with **2, 4, and 6 input messages**; its checkpoints grew from **4 to 6
+messages**. The annotations show how a tool result and the saved first turn
+reach the model on the next call.
+
+From your generated workspace, run the scripted example:
+
+```bat
+"%PYTHON%" -m helper.examples.trace_react
+"%PYTHON%" examples\read_trace.py agents/helper/.agentlib/react-demo.jsonl --last 6
+```
+
+For a live run, follow [Anthropic setup](docs/anthropic-example.md) to add its
+dependency extra and configure your model ID and API key. Then run:
+
+```bat
+"%PYTHON%" -m helper.examples.trace_anthropic
+```
+
+It sends two questions on the same thread, prints the model trace and checkpoint
+snapshots, and accepts `--thread` to continue a saved conversation. Other agents
+have these examples under their own package names; their READMEs give exact commands.
 
 ## Explore the repository
 
@@ -136,29 +182,29 @@ updates, not individual model tokens.
 | [CLI package](packages/ai-agent-lib-cli/README.md) | The `agentlib` command, also available as `python -m ai_agent_lib_cli` |
 | [Reference agent](examples/accounts-agent/README.md) | A working LangGraph agent |
 | [Reference MCP server](examples/accounts-mcp/README.md) | Shared tools, named queries, and sample CSV data |
+| [Relationship manager preparation](examples/rmprep/README.md) | Router, memo and Q&A nodes over 33 supplied CSVs, with governed MCP evidence, source references and checkpoints |
 | [Policies](policies/README.md) | Rules and the OPA policy bundle |
 | [Architecture tests](tests/architecture) | Checks that enforce package boundaries and keep documentation current |
 | [Configuration reference](docs/variables.md) | Supported environment variables |
 | [Identity guide](docs/identity.md) | User identity and delegated service calls |
 
-The repository root holds shared development settings; it is not an
-installable distribution. The packages under `packages/` are installed
-individually or through the pip-based helpers.
+The repository root holds shared development settings. Install the packages
+under `packages/` using pip or the development helper below.
 
 ## Working on the library
 
 Use this workflow when changing the library itself. Open a terminal at the
 library root. If you followed the quickstart, return there with
-`Set-Location $Library` in PowerShell or `cd "$LIBRARY"` in bash/zsh.
+`cd /d "%LIBRARY%"` in Command Prompt or `cd "$LIBRARY"` in bash/zsh.
 
 Create the virtual environment if it does not already exist, and select its
 interpreter:
 
-```powershell
-# Windows PowerShell, from ai-agent-lib/
+```bat
+rem Windows Command Prompt, from ai-agent-lib/
 python -m venv .venv
-$Python = Join-Path (Get-Location).Path ".venv\Scripts\python.exe"
-& $Python tools/install_dev.py
+set "PYTHON=%CD%\.venv\Scripts\python.exe"
+"%PYTHON%" tools/install_dev.py
 ```
 
 ```bash
@@ -170,25 +216,24 @@ PYTHON="$PWD/.venv/bin/python"
 
 `tools/install_dev.py` uses pip to install the local packages, examples,
 optional dependencies, and development tools. Then run these checks from
-the library root, replacing `& $Python` with `"$PYTHON"` on macOS/Linux:
+the library root, replacing `"%PYTHON%"` with `"$PYTHON"` on macOS/Linux:
 
-```powershell
-& $Python -m ruff check .
-& $Python -m ruff format --check .
-& $Python -m mypy
-& $Python -c "from importlinter.cli import lint_imports; lint_imports()"
-& $Python -m pytest
-& $Python docs/guide/build_guide.py --check
+```bat
+"%PYTHON%" -m ruff check .
+"%PYTHON%" -m ruff format --check .
+"%PYTHON%" -m mypy
+"%PYTHON%" -c "from importlinter.cli import lint_imports; lint_imports()"
+"%PYTHON%" -m pytest
+"%PYTHON%" docs/guide/build_guide.py --check
 ```
 
-Lint catches suspicious code patterns; mypy checks types. Import-linter
-checks package dependency boundaries. Its Python entry point above runs the
-same check as the `lint-imports` shortcut without relying on that shortcut
-being on `PATH`.
+Ruff checks code style and formatting, mypy checks types, and import-linter
+checks package dependency boundaries. Pytest runs the tests; the final command
+checks that the generated developer guide matches its source.
 
 Follow the [code and documentation conventions](docs/developer-guide.html#code-conventions)
 when contributing. They explain where code belongs, how to name components, and
-how to document ownership, failures, and examples without changing public APIs.
+how to document ownership, failures, and examples.
 
 The default tests block connections to external hosts while allowing
 loopback for local tests and Python's event loop. Tests that need OPA,
@@ -199,24 +244,45 @@ checks for suitable machines. See [CI](.github/workflows/ci.yml) and the
 When editing the developer guide, change `docs/guide/guide.src.html`, then
 regenerate the HTML and run its tests:
 
-```powershell
-& $Python docs/guide/build_guide.py
-& $Python -m pytest tests/architecture/test_generated_docs.py
+```bat
+"%PYTHON%" docs/guide/build_guide.py
+"%PYTHON%" -m pytest tests/architecture/test_generated_docs.py
 ```
 
-Keep the generated HTML with the source change. Configuration reference
+Keep the generated HTML and companion Markdown/sample files with the source change.
+The walkthroughs and trace reader come from the CLI templates, so the library
+docs and newly generated tutorials stay in sync. Configuration reference
 tables come from the binding definitions in
 `packages/ai-agent-lib-core/src/ai_agent_lib_core/config/bindings.py`.
 
 ## Deployment and release scope
 
 The [deployment walkthrough](docs/getting-started.md#10-optional-prepare-a-deployment)
-generates AWS Fargate deployment files for review. Applying infrastructure
-and building images belongs on a machine or CI runner with the required
-tools and permissions; the desktop tutorial remains Python/pip-based.
+uses the Python CLI to generate AWS Fargate deployment files for review.
+To build images and apply infrastructure, use a build machine or CI runner
+with a container engine, Terraform, and the required registry and AWS permissions.
 
 The [specification](docs/Specification.md) describes the target design.
-The [release scope](docs/release-scope.md) records what is implemented,
-and the [architecture decisions](docs/adr/README.md) explain why. Check these
-before depending on features such as human approvals, idempotency, long-term
-memory, or distributed spending limits, which remain future work.
+The [release scope](docs/release-scope.md) records supported behavior and
+operational limits. The [architecture decisions](docs/adr/README.md) explain
+the design choices.
+
+The proposed [default frontend specification](docs/frontend-specification.md)
+and [implementation plan](docs/frontend-implementation-plan.md) cover a separate
+Python package for agent chat, documents, response metrics, and authorized
+checkpoint, model trace, and log inspection. The frontend package is not released yet.
+
+Phase 2 adds [local agent chat](packages/ai-agent-lib-ui/README.md) with registry-based
+selection and SQLite history. Create, rename, search, archive, restore and resume
+threads using Command Prompt, Python and pip in the separate UI environment.
+Read the [contract guide](docs/frontend-contracts.md)
+for presentation manifests, scoped conversations, artifact references and optional
+agent diagnostic metadata. Local `init`, `check`, and `serve` commands are available;
+the agent HTTP API remains unchanged. Document panels, metrics and the inspector
+follow in later phases.
+
+Try the [Phase 0 chat experiment](experiments/chainlit-phase0/README.md) with
+Command Prompt, Python and pip. It demonstrates saved conversations, memos,
+response metrics and an inspector using synthetic data. The
+[validation report](docs/frontend-phase0-review.md) records passing checks and
+the remaining enterprise readiness decisions.

@@ -1,0 +1,232 @@
+"""Map Chainlit history onto admitted turns; never persist a second transcript."""
+
+from typing import Any
+from uuid import NAMESPACE_URL, uuid5
+
+from chainlit.data.base import BaseDataLayer
+from chainlit.element import Element, ElementDict
+from chainlit.step import StepDict
+from chainlit.types import (
+    Feedback,
+    PageInfo,
+    PaginatedResponse,
+    Pagination,
+    ThreadDict,
+    ThreadFilter,
+)
+from chainlit.user import PersistedUser, User
+from fastapi import HTTPException
+
+from ai_agent_lib_ui.adapters.sqlite import now
+from ai_agent_lib_ui.application.chat import view_for
+from ai_agent_lib_ui.contracts.conversations import RunRecord
+from ai_agent_lib_ui.contracts.queries import ContractError, ErrorCode, PageRequest
+from ai_agent_lib_ui.integrations.runtime import runtime
+from ai_agent_lib_ui.integrations.security import current_principal
+
+
+def answer_id(run: RunRecord) -> str:
+    """Keep the accepted message ID stable across sends, refreshes and restarts."""
+    return str(uuid5(NAMESPACE_URL, "agentlib:answer:" + run.run_id))
+
+
+def outcome_text(run: RunRecord) -> str:
+    """Explain incomplete outcomes without presenting a draft as an accepted answer."""
+    if run.state == "completed":
+        return run.answer or ""
+    if run.state == "failed":
+        return (
+            "This request failed. Check the agent and UI configuration "
+            "before sending a new question."
+        )
+    if run.state == "unknown":
+        return (
+            "The request outcome is unknown. It may have reached the agent. "
+            "This thread is held to prevent duplicate work. Check the agent logs; "
+            "start a new thread when you are ready. Reopening this thread does not resend it."
+        )
+    return "The request is still running. Reopen this thread to see its saved outcome."
+
+
+class DataLayer(BaseDataLayer):
+    """Authorize framework endpoints and derive their messages from the UI store."""
+
+    async def get_user(self, identifier: str) -> PersistedUser | None:
+        """Return only the user authenticated by the parent session."""
+        current_principal()
+        if identifier != runtime().identity:
+            raise HTTPException(404, "User not found")
+        return PersistedUser(
+            id=identifier,
+            identifier=identifier,
+            createdAt=now().isoformat(),
+            display_name=runtime().settings.identity.subject,
+            metadata={"provider": "header"},
+        )
+
+    async def create_user(self, user: User) -> PersistedUser | None:
+        """Reuse the configured identity; the browser cannot create identities."""
+        return await self.get_user(user.identifier)
+
+    async def get_thread_author(self, thread_id: str) -> str:
+        """Check ownership before exposing the framework author identifier."""
+        await runtime().store.get(current_principal(), thread_id)
+        return runtime().identity
+
+    async def get_thread(self, thread_id: str) -> ThreadDict | None:
+        """Restore messages exclusively from durable admitted turns."""
+        principal = current_principal()
+        conversation = await runtime().store.get(principal, thread_id)
+        thread = conversation.thread
+        view = view_for(principal, thread.scope.application)
+        steps: list[StepDict] = []
+        for stored in await runtime().store.history(view, thread_id):
+            run = stored.run
+            steps.append(
+                {
+                    "id": run.idempotency_key,
+                    "threadId": thread_id,
+                    "name": "You",
+                    "type": "user_message",
+                    "output": stored.question,
+                    "createdAt": run.accepted_at.isoformat(),
+                    "parentId": None,
+                }
+            )
+            steps.append(
+                {
+                    "id": answer_id(run),
+                    "threadId": thread_id,
+                    "name": thread.scope.application,
+                    "type": "assistant_message" if run.state == "completed" else "system_message",
+                    "output": outcome_text(run),
+                    "createdAt": run.updated_at.isoformat(),
+                    "parentId": None,
+                    "metadata": {"run_id": run.run_id, "state": run.state},
+                }
+            )
+        return {
+            "id": thread_id,
+            "createdAt": thread.created_at.isoformat(),
+            "name": thread.title,
+            "userId": runtime().identity,
+            "userIdentifier": runtime().identity,
+            "tags": [],
+            "metadata": {"chat_profile": thread.scope.application},
+            "steps": steps,
+            "elements": [],
+        }
+
+    async def list_threads(
+        self, pagination: Pagination, filters: ThreadFilter
+    ) -> PaginatedResponse[ThreadDict]:
+        """Return bounded, owner-filtered summaries with a signed cursor."""
+        principal = current_principal()
+        if filters.userId and filters.userId != runtime().identity:
+            raise HTTPException(404, "User not found")
+        page = await runtime().store.list_owned(
+            principal,
+            PageRequest(limit=min(max(pagination.first, 1), 100), cursor=pagination.cursor),
+            search=filters.search or "",
+        )
+        threads: list[ThreadDict] = [
+            {
+                "id": thread.thread_id,
+                "createdAt": thread.created_at.isoformat(),
+                "name": thread.title,
+                "userId": runtime().identity,
+                "userIdentifier": runtime().identity,
+                "tags": [],
+                "metadata": {"chat_profile": thread.scope.application},
+                "steps": [],
+                "elements": [],
+            }
+            for thread in page.items
+        ]
+        return PaginatedResponse(PageInfo(bool(page.next_cursor), None, page.next_cursor), threads)
+
+    async def update_thread(
+        self,
+        thread_id: str,
+        name: str | None = None,
+        user_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        tags: list[str] | None = None,
+    ) -> None:
+        """Accept title changes; framework metadata cannot change ownership or agent."""
+        principal = current_principal()
+        if user_id is not None and user_id != runtime().identity:
+            raise HTTPException(404, "User not found")
+        try:
+            conversation = await runtime().store.get(principal, thread_id)
+        except ContractError as error:
+            # Chainlit writes lifecycle metadata before on_chat_start. Only the
+            # application create operation may establish agent binding/ownership.
+            if error.code == ErrorCode.NOT_FOUND and name is None:
+                return
+            raise
+        if name is not None:
+            await runtime().store.change(
+                view_for(principal, conversation.thread.scope.application), thread_id, title=name
+            )
+        # Framework session metadata and tags cannot change a stored agent binding.
+
+    async def create_step(self, step_dict: StepDict) -> None:
+        """Authenticate lifecycle callbacks without persisting framework drafts."""
+        current_principal()
+        # Chainlit emits drafts and lifecycle steps. Admission/completion, not this
+        # callback, owns the transcript transaction in SqliteThreads.
+
+    async def update_step(self, step_dict: StepDict) -> None:
+        """Ignore draft changes in the framework-owned message cache."""
+        await self.create_step(step_dict)
+
+    async def delete_thread(self, thread_id: str) -> None:
+        """Keep destructive framework deletion disabled; provide explicit archiving."""
+        await runtime().store.get(current_principal(), thread_id)
+        raise HTTPException(409, "Use Conversations to archive this thread")
+
+    async def delete_step(self, step_id: str) -> None:
+        """Keep the accepted transcript immutable."""
+        current_principal()
+        raise HTTPException(404, "Message operation unavailable")
+
+    async def create_element(self, element: Element) -> None:
+        """Reject document storage until its scoped adapter is implemented."""
+        current_principal()
+        raise HTTPException(404, "Document elements are not enabled")
+
+    async def get_element(self, thread_id: str, element_id: str) -> ElementDict | None:
+        """Check the thread owner before reporting unsupported elements."""
+        await runtime().store.get(current_principal(), thread_id)
+        return None
+
+    async def delete_element(self, element_id: str, thread_id: str | None = None) -> None:
+        """Reject document mutations in the local chat phase."""
+        current_principal()
+        raise HTTPException(404, "Document elements are not enabled")
+
+    async def upsert_feedback(self, feedback: Feedback) -> str:
+        """Reject unsupported feedback storage."""
+        current_principal()
+        raise HTTPException(404, "Feedback is not enabled")
+
+    async def delete_feedback(self, feedback_id: str) -> bool:
+        """Reject unsupported feedback deletion."""
+        current_principal()
+        raise HTTPException(404, "Feedback is not enabled")
+
+    async def get_favorite_steps(self, user_id: str) -> list[StepDict]:
+        """Check identity even when the favorites feature is disabled."""
+        await self.get_user(user_id)
+        return []
+
+    async def build_debug_url(self) -> str:
+        """Link to the local conversation management page."""
+        current_principal()
+        return "/conversations"
+
+    async def close(self) -> None:
+        # Connections are short-lived; server resources close in the parent lifespan.
+        """Connections are released by each store operation."""
+        return None

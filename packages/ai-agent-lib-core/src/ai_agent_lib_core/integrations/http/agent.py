@@ -34,6 +34,7 @@ from ai_agent_lib_core.contracts import (
 )
 from ai_agent_lib_core.integrations.http.lifecycle import ServiceLifecycle
 from ai_agent_lib_core.integrations.spans import content_free_span
+from ai_agent_lib_core.observability.diagnostics import Diagnostics
 from ai_agent_lib_core.pipeline.context import bind_request_context
 
 __all__ = [
@@ -423,6 +424,7 @@ def agent_app(
     lifecycle: ServiceLifecycle,
     max_body_bytes: int = 1_000_000,
     stream: Stream | None = None,
+    diagnostics: Diagnostics | None = None,
 ) -> Starlette:
     """Build the HTTP application of an agent.
 
@@ -442,10 +444,27 @@ def agent_app(
         stream: Runs the agent and yields each step. With it, ``POST
             /invoke/stream`` takes the same body and answers with server-sent
             events, so a chat front end can show progress.
+        diagnostics: Optional recorder shared with the container. Adds metadata
+            summaries to /invoke without changing its response. Streaming has
+            no accepted-answer envelope and is not summarized by this option.
     """
+    if diagnostics is not None:
+        run = _observed_run(run, diagnostics)
     invoke = _Invoke(services, run, application, lifecycle, max_body_bytes)
     routes = [Route(INVOKE_PATH, invoke.handle, methods=["POST"])]
     if stream is not None:
         streaming = _StreamRoute(services, stream, application, lifecycle, max_body_bytes)
         routes.append(Route(STREAM_PATH, streaming.handle, methods=["POST"]))
     return Starlette(routes=[*routes, *health_routes(lifecycle)])
+
+
+def _observed_run(run: Run, diagnostics: Diagnostics) -> Run:
+    async def observed(context: RequestContext, given: Any) -> Any:
+        async with diagnostics.operation(context):
+            output = await run(context, given)
+            # An unserializable return is not an accepted HTTP answer. Validate
+            # with the same encoder as the envelope before writing completion.
+            JSONResponse(output)
+            return output
+
+    return observed

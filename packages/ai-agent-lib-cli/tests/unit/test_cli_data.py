@@ -487,7 +487,7 @@ def test_new_mcp_from_csv_writes_a_server_over_the_developers_data(
     assert "test_greet_says_hello" not in tests
     readme = (service / "README.md").read_text(encoding="utf-8")
     assert "| `analyst` | allowed | `email`, `phone` are masked, at most 50 rows |" in readme
-    assert "proposed from the CSV files" in readme
+    assert "CSV files in `data/`" in readme
 
     # The plan is part of the answers, so a link or an update needs no data.
     assert load_answers(workspace).mcp_servers[0].plan.origin == "csv"

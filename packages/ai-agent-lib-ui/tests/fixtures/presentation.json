@@ -1,0 +1,14 @@
+{
+  "schema": "agentlib.presentation/v1",
+  "agent_id": "rmprep",
+  "agent_version": "0.1.0",
+  "registry_revision": "revision-1",
+  "title": "Relationship manager preparation",
+  "adapter": "question-answer/v1",
+  "api_audience": "api://rmprep",
+  "required_scopes": ["agent.invoke"],
+  "capabilities": ["artifacts", "checkpoints", "future_optional_feature"],
+  "max_question_bytes": 65536,
+  "max_response_bytes": 1048576,
+  "max_artifact_bytes": 262144
+}

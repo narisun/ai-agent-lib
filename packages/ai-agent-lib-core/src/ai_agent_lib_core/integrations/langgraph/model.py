@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -13,6 +14,7 @@ from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.runnables import Runnable, RunnableLambda
 from langchain_core.tools import BaseTool
+from langchain_core.utils.function_calling import convert_to_openai_tool
 from pydantic import BaseModel, PrivateAttr
 
 from ai_agent_lib_core.contracts import (
@@ -23,9 +25,16 @@ from ai_agent_lib_core.contracts import (
     StructuredOutput,
     ValidationFailed,
 )
+from ai_agent_lib_core.contracts.diagnostics import AttemptRef, DiagnosticLinks, TokenUsage
 from ai_agent_lib_core.integrations.langgraph.bridge import LoopBridge
-from ai_agent_lib_core.integrations.langgraph.context import current_request_context
+from ai_agent_lib_core.integrations.langgraph.context import (
+    current_diagnostic_links,
+    current_request_context,
+)
+from ai_agent_lib_core.integrations.langgraph.model_trace import ModelTrace, TraceCall
 from ai_agent_lib_core.integrations.langgraph.providers import create_chat_model
+from ai_agent_lib_core.observability.diagnostics import Diagnostics
+from ai_agent_lib_core.observability.usage import normalize_usage
 from ai_agent_lib_core.pipeline import Handler, ModelCall, ModelStage, Pipeline
 
 __all__ = [
@@ -37,13 +46,22 @@ __all__ = [
 ]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class _Invocation:
     """Everything the provider call needs, carried as the pipeline payload."""
 
     messages: list[BaseMessage]
     stop: list[str] | None
     kwargs: Mapping[str, Any] = field(default_factory=dict)
+    trace: TraceCall | None = None
+    returned_attempt: int | None = None
+    links: DiagnosticLinks = field(default_factory=DiagnosticLinks)
+    provider_reply: AIMessage | None = None
+
+    def reset_response(self) -> None:
+        """Clear the previous attempt before dispatching a retry."""
+        self.returned_attempt = None
+        self.provider_reply = None
 
 
 def describe_model_response(message: AIMessage) -> Mapping[str, AuditValue]:
@@ -185,6 +203,10 @@ class GovernedChatModel(BaseChatModel):
     _pipeline: Pipeline[ModelStage, ModelCall, AIMessage] = PrivateAttr()
     _handler: Handler[ModelCall, AIMessage] = PrivateAttr()
     _bridge: Callable[[], LoopBridge] = PrivateAttr()
+    _trace: ModelTrace | None = PrivateAttr(default=None)
+    _diagnostics: Diagnostics | None = PrivateAttr(default=None)
+    _trace_tools: Sequence[Any] = PrivateAttr(default=())
+    _trace_options: Mapping[str, Any] = PrivateAttr(default_factory=dict)
 
     @classmethod
     def wrap(
@@ -198,6 +220,10 @@ class GovernedChatModel(BaseChatModel):
         target: Runnable[Any, Any] | None = None,
         inner: BaseChatModel | None = None,
         output: StructuredOutput | None = None,
+        trace: ModelTrace | None = None,
+        diagnostics: Diagnostics | None = None,
+        trace_tools: Sequence[Any] = (),
+        trace_options: Mapping[str, Any] | None = None,
     ) -> Self:
         """Build a governed model for ``alias``.
 
@@ -218,6 +244,10 @@ class GovernedChatModel(BaseChatModel):
         model._handler = pipeline.bind(model._call_provider)
         model._bridge = bridge
         model._output = output
+        model._trace = trace
+        model._diagnostics = diagnostics
+        model._trace_tools = trace_tools
+        model._trace_options = trace_options if trace_options is not None else {}
         return model
 
     @property
@@ -258,6 +288,10 @@ class GovernedChatModel(BaseChatModel):
             bridge=self._bridge,
             target=bound,
             inner=self._inner,
+            trace=self._trace,
+            diagnostics=self._diagnostics,
+            trace_tools=tuple(tools),
+            trace_options=dict(kwargs),
         )
 
     def with_structured_output(
@@ -301,6 +335,10 @@ class GovernedChatModel(BaseChatModel):
             target=bound,
             inner=self._inner,
             output=output,
+            trace=self._trace,
+            diagnostics=self._diagnostics,
+            trace_tools=(output.tool_definition(),),
+            trace_options=dict(kwargs),
         )
 
         def finish(message: AIMessage) -> Any:
@@ -325,31 +363,168 @@ class GovernedChatModel(BaseChatModel):
             alias=self.alias,
             provider=self.provider_name,
             model_id=self.model_id,
-            payload=_Invocation(messages=messages, stop=stop, kwargs=kwargs),
+            payload=_Invocation(
+                messages=messages,
+                stop=stop,
+                kwargs=kwargs,
+                trace=self._new_call(),
+                links=current_diagnostic_links()
+                if self._diagnostics is not None
+                else DiagnosticLinks(),
+            ),
             text=messages_text(messages),
             output=self._output,
         )
+
+    def _new_call(self) -> TraceCall | None:
+        if self._diagnostics is not None:
+            return TraceCall(self._diagnostics.ids.new_id())
+        return self._trace.new_call() if self._trace is not None else None
 
     async def _call_provider(self, call: ModelCall) -> AIMessage:
         invocation = call.payload
         if not isinstance(invocation, _Invocation):
             raise TypeError("the model call payload was replaced inside the pipeline")
+        await self._decision(call, invocation, passed=False, reason="retry")
+        invocation.reset_response()
+        if invocation.trace is not None:
+            invocation.trace.attempt += 1
+        recorder = self._diagnostics
+        started = recorder.clock.monotonic() if recorder is not None else 0.0
+        if recorder is not None and call.context is not None and invocation.trace is not None:
+            recorder.begin_attempt(
+                call.context,
+                AttemptRef(call_id=invocation.trace.call_id, attempt=invocation.trace.attempt),
+            )
+        reply: AIMessage | None = None
+        outcome: Literal["returned", "failed", "cancelled"] = "failed"
+        try:
+            reply = await self._request_provider(call, invocation)
+            outcome = "returned"
+            invocation.returned_attempt = invocation.trace.attempt if invocation.trace else None
+            return reply
+        except asyncio.CancelledError:
+            outcome = "cancelled"
+            raise
+        finally:
+            # Tracing may be cancelled after the SDK has already returned usage.
+            reply = invocation.provider_reply
+            if recorder is not None and call.context is not None and invocation.trace is not None:
+                await recorder.record_attempt(
+                    call.context,
+                    ref=AttemptRef(
+                        call_id=invocation.trace.call_id, attempt=invocation.trace.attempt
+                    ),
+                    model_alias=self.alias,
+                    provider=self.provider_name,
+                    model_id=self.model_id,
+                    outcome=outcome,
+                    links=invocation.links,
+                    started=started,
+                    usage=normalize_usage(
+                        reply.usage_metadata,
+                        source="langchain",
+                        kind="simulated" if self.provider_name == "fake" else "reported",
+                    )
+                    if reply is not None
+                    else TokenUsage(),
+                    tool_call_ids=tuple(
+                        item["id"] for item in reply.tool_calls if item["id"] is not None
+                    )
+                    if reply is not None
+                    else (),
+                )
+
+    async def _request_provider(self, call: ModelCall, invocation: _Invocation) -> AIMessage:
         extra = dict(invocation.kwargs)
         if invocation.stop is not None:
             extra["stop"] = invocation.stop
+        await self._trace_event(
+            "model.request",
+            call,
+            invocation,
+            lambda: {
+                "messages": [message.model_dump() for message in invocation.messages],
+                "tools": [convert_to_openai_tool(tool) for tool in self._trace_tools],
+                "binding_options": dict(self._trace_options),
+                "invocation_options": extra,
+            },
+        )
         try:
             # No config is passed: the underlying call inherits callbacks and
             # tracing from the surrounding run through LangChain's own context.
             reply = await self._target.ainvoke(invocation.messages, **extra)
+        except asyncio.CancelledError as error:
+            error_type = type(error).__name__
+            await self._trace_event(
+                "model.error",
+                call,
+                invocation,
+                lambda: {"error_type": error_type},
+            )
+            raise
         except Exception as error:
+            error_type = type(error).__name__
+            await self._trace_event(
+                "model.error",
+                call,
+                invocation,
+                lambda: {"error_type": error_type},
+            )
             mapped = self._provider.classify_error(error)
             if mapped is None or mapped is error:
                 raise
             raise mapped from error
         if not isinstance(reply, AIMessage):
+            await self._trace_event(
+                "model.error", call, invocation, lambda: {"error_type": "TypeError"}
+            )
             raise TypeError(f"the model returned {type(reply).__name__}, not an AIMessage")
+        invocation.provider_reply = reply
         _record_usage(call, reply)
+        await self._trace_event(
+            "model.response", call, invocation, lambda: {"response": reply.model_dump()}
+        )
         return reply
+
+    async def _decision(
+        self, call: ModelCall, invocation: _Invocation, *, passed: bool, reason: str
+    ) -> None:
+        if (
+            self._diagnostics is not None
+            and call.context is not None
+            and invocation.trace is not None
+            and invocation.returned_attempt is not None
+        ):
+            await self._diagnostics.decide(
+                call.context,
+                AttemptRef(call_id=invocation.trace.call_id, attempt=invocation.returned_attempt),
+                stage="model_pipeline",
+                outcome="passed" if passed else "rejected",
+                reason_code=reason,
+            )
+
+    async def _invoke_governed(self, call: ModelCall) -> AIMessage:
+        invocation = call.payload
+        if not isinstance(invocation, _Invocation):
+            raise TypeError("invalid model invocation")
+        try:
+            reply = await self._handler(call)
+        except BaseException:
+            await self._decision(call, invocation, passed=False, reason="pipeline_failed")
+            raise
+        await self._decision(call, invocation, passed=True, reason="pipeline_passed")
+        return reply
+
+    async def _trace_event(
+        self,
+        event: str,
+        call: ModelCall,
+        invocation: _Invocation,
+        payload: Callable[[], Mapping[str, object]],
+    ) -> None:
+        if self._trace is not None and invocation.trace is not None:
+            await self._trace.write(event, call, invocation.trace, payload)
 
     async def _agenerate(
         self,
@@ -358,7 +533,7 @@ class GovernedChatModel(BaseChatModel):
         run_manager: AsyncCallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> ChatResult:
-        reply = await self._handler(self._make_call(messages, stop, kwargs))
+        reply = await self._invoke_governed(self._make_call(messages, stop, kwargs))
         return ChatResult(generations=[ChatGeneration(message=reply)])
 
     def _generate(
@@ -369,5 +544,5 @@ class GovernedChatModel(BaseChatModel):
         **kwargs: Any,
     ) -> ChatResult:
         call = self._make_call(messages, stop, kwargs)
-        reply = self._bridge().run(lambda: self._handler(call))
+        reply = self._bridge().run(lambda: self._invoke_governed(call))
         return ChatResult(generations=[ChatGeneration(message=reply)])

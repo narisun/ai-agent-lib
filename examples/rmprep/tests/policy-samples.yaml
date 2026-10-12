@@ -1,0 +1,67 @@
+# Sample requests for the rules in policies/agentlib/rules/data.yaml.
+# Each says who asks for what, and what the answer should be.
+#
+#   agentlib policy test          decide them with the rules, as the services do locally
+#   agentlib policy test --opa    also with OPA, as deployed services do; the two must agree
+#
+# This file is yours. agentlib appends samples for a new service and never
+# changes or removes one that is here.
+schema: agentlib.policy-samples/v1
+samples:
+  - name: an analyst calls a tool of rmprep-data
+    action: tool.call
+    application: rmprep-data
+    resource: "rmprep-data/rmprep-data.get_memo_evidence"
+    classification: confidential
+    roles: [analyst]
+    expect: allow
+    reason: rmprep-data-staff-call-the-tools
+
+  - name: anyone else is denied at rmprep-data
+    action: tool.call
+    application: rmprep-data
+    resource: "rmprep-data/rmprep-data.get_memo_evidence"
+    classification: confidential
+    roles: [intern]
+    expect: deny
+    reason: no_matching_rule
+
+  - name: a manager sees every column of rmprep-data
+    action: data.query
+    application: rmprep-data
+    resource: rmprep.profile
+    classification: confidential
+    roles: [manager]
+    expect: allow
+    reason: rmprep-data-managers-see-everything
+
+  - name: an analyst reads rmprep-data
+    action: data.query
+    application: rmprep-data
+    resource: rmprep.profile
+    classification: confidential
+    roles: [analyst]
+    expect: allow
+    reason: rmprep-data-analysts-read-the-data
+
+  - name: rmprep uses its default model
+    action: model.route
+    application: rmprep
+    resource: default
+    expect: allow
+    reason: rmprep-uses-its-models
+
+  - name: rmprep may not call a tool no rule names
+    action: tool.call
+    application: rmprep
+    resource: delete_everything
+    expect: deny
+    reason: no_matching_rule
+
+  - name: rmprep calls a tool of rmprep-data
+    action: tool.call
+    application: rmprep
+    resource: "rmprep-data/rmprep-data.get_memo_evidence"
+    classification: confidential
+    expect: allow
+    reason: rmprep-calls-rmprep-data

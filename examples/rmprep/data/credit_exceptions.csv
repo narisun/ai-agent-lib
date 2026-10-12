@@ -1,0 +1,9 @@
+exception_id,uen,facility_id,exception_type,requirement,due_date,received_date,status,severity,owner,waiver_expiry,cure_plan,last_updated
+CE-JONE-001,JONE-0022,FAC000000130,Covenant Default,Execute a covenant waiver and approve the liquidity remediation plan,2026-07-08,,Open,Critical,Alexis Wilson,2026-08-15,Weekly liquidity reporting and no additional debt without approval,2026-07-29
+CE-JONE-002,JONE-0022,FAC000000130,Financial Statements,Deliver audited statements and covenant compliance certificate,2026-06-30,,Open,Critical,Alexis Wilson,,Escalated to the CFO and guarantor,2026-07-29
+CE-BUSH-001,BUSH-0009,FAC000000080,Financial Statements,Deliver audited statements and updated projections,2026-06-30,,Open,High,Lauren Cortez,,Client committed to provide the package before the next credit call,2026-07-28
+CE-BARG-001,BARG-0002,,Covenant Waiver,Finalize waiver terms and enhanced reporting requirements,2026-07-15,,Open,High,Kathryn Young,2026-09-30,Monthly borrowing and backlog reporting until leverage returns to plan,2026-07-31
+CE-SHIN-001,SHIN-0039,FAC000000020,Renewal Package,Complete financial spreading collateral review and approval memorandum,2026-07-20,,Open,Critical,Sherry Walker DDS,,Daily coordination between the RM and credit team until approval,2026-07-30
+CE-WAWO-001,WAWO-0046,FAC000000190,Borrowing Base Certificate,Deliver the July borrowing-base certificate and receivables aging,2026-07-25,,Open,High,Suzanne Baker,,Freeze discretionary advances until reporting is current,2026-07-31
+CE-MALO-001,MALO-0027,,Compliance Certificate,Deliver the quarterly covenant compliance certificate,2026-07-20,2026-07-29,Resolved,Medium,Amy Cannon,,Certificate received and reviewed without exception,2026-07-30
+CE-ALLO-001,ALLO-0001,FAC000000162,Insurance Certificate,Renew property and casualty insurance evidence,2026-07-01,2026-06-28,Closed,Low,Erica Baker,,Evidence accepted before expiration,2026-06-28

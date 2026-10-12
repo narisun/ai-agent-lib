@@ -27,13 +27,17 @@ from ai_agent_lib_core.config import (
 )
 from ai_agent_lib_core.contracts import OptionsModel, ProviderSelection, Section
 
+# Include the drive on Windows so this tests an absolute path even when the
+# temporary service directory and checkout are on different drives.
+ABSOLUTE_AUDIT_PATH = Path("/var/log/audit.jsonl").absolute()
+
 SETTINGS = [
     EnvSetting(Key.MODEL_PROVIDER, "fake", comment="The model.\nNo key is needed."),
     EnvSetting(Key.MODEL_ID, "fake-model"),
     EnvSetting(provider_key(Section.CHECKPOINT), "none"),
     EnvSetting(options_key(Section.POLICY), {"path": "../shared/rules.yaml"}),
     EnvSetting(options_key(Section.REGISTRY), {"agents_path": "registry/agents.yaml"}),
-    EnvSetting(options_key(Section.AUDIT), {"path": "/var/log/audit.jsonl"}),
+    EnvSetting(options_key(Section.AUDIT), {"path": str(ABSOLUTE_AUDIT_PATH)}),
     EnvSetting(
         Key.DATA_SOURCES,
         {"people": {"kind": "duckdb_csv", "data_dir": "data", "queries_dir": "queries"}},
@@ -68,7 +72,7 @@ def test_a_file_written_from_logical_keys_resolves_to_what_was_asked(tmp_path: P
     assert rules.path == base / "../shared/rules.yaml"
     assert registry.agents_path == base / "registry/agents.yaml"
     assert registry.tools_path == base / "registry/mcp-tools.yaml"  # a default is rebased too
-    assert audit.path == Path("/var/log/audit.jsonl").absolute()  # an absolute path stays as it is
+    assert audit.path == ABSOLUTE_AUDIT_PATH  # an absolute path stays as it is
     assert (people.data_dir, people.queries_dir) == (base / "data", base / "queries")
     assert config.tls_ca_bundle == base / "certs/ca.pem"
 

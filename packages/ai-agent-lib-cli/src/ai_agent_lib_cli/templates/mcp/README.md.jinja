@@ -2,8 +2,25 @@
 
 {{ description }}
 
-An ordinary MCP server. The library governs every tool call (identity, the
-tool registry, policy, guardrails and audit) and every query the tools make.
+This MCP server exposes tools for agents to call. The library checks caller
+identity, registered tools, permissions, and guardrails, then records an audit
+event. Data queries also pass through the library's permission and result checks.
+
+## Before you start
+
+Run commands from the **workspace root**, where `agentlib.toml` lives.
+Follow [Select Python](../../README.md#select-python) in the workspace README
+to set `PYTHON` to the virtual environment's executable. Select it again in
+every new terminal. These commands use Windows Command Prompt; in bash/zsh replace
+`"%PYTHON%"` with `"$PYTHON"` after setting `PYTHON` as that README describes.
+
+Install the workspace once, and again after changing dependencies:
+
+```bat
+"%PYTHON%" -m ai_agent_lib_cli install
+```
+
+## Available tools
 
 | Tool | What it does |
 | --- | --- |
@@ -17,33 +34,31 @@ tool registry, policy, guardrails and audit) and every query the tools make.
 {% endif %}
 
 {% if plan.origin == "csv" %}
-The tools were proposed from the CSV files now in `data/`: one named query
-per tool, in `queries/`. They are a starting point. Keep the ones you want,
-change what they select, and delete the rest.
+Each tool uses a named query in `queries/` over the CSV files in `data/`.
+Review the selected columns and parameters, and keep the tools your application
+needs.
 
 {% endif %}
 {% if plan.origin == "redshift" %}
-The tools were proposed from the Redshift catalogue: one named query per
-tool, in `queries/`. They are a starting point. Keep the ones you want, change
-what they select, and delete the rest.
+Each tool uses a named query in `queries/`, generated from the Redshift
+catalogue. Review the selected columns and parameters, and keep the tools your
+application needs. Local tests use sample CSV data.
 
 {% endif %}
 {% if rest %}
-The tools were proposed from an OpenAPI document: one endpoint definition per
-tool, in `queries/`. A definition fixes the address, the parameters and the
-fields that are returned, so a model can neither reach another address nor
-read a field the definition does not list. They are a starting point. Keep the
-ones you want, change the columns they return, and delete the rest.
+Each tool uses an endpoint definition in `queries/`, generated from the OpenAPI
+document. The definition fixes the endpoint, allowed parameters, and returned
+fields. Review those definitions and keep the tools your application needs.
 
 {% endif %}
 ## Test it
 
-```bash
-python -m pytest mcp-servers/{{ name }}
+```bat
+"%PYTHON%" -m pytest mcp-servers/{{ name }}
 ```
 
-The tests need no account and no network. {{ "The API is not called: `" ~ responses_file ~ "` holds what it answers,\nby method and path. " if rest else "" }}They run the real rules file, so
-they show what each role is allowed to see:
+The tests use local {{ "API responses from `" ~ responses_file ~ "`, keyed by method and path" if rest else "CSV data" }}.
+They apply the workspace's policy rules to check what each role may see:
 
 | Role | Tool call | Data |
 | --- | --- | --- |
@@ -55,38 +70,64 @@ they show what each role is allowed to see:
 {% endif %}
 | anything else | denied | none |
 
-Start a change with a test in `tests/test_{{ package }}.py`: pick the caller's
-roles, call the tool, and say what that caller should be shown.
+**Expected result:** the tests pass for allowed and denied callers. To change
+behavior, add a test in `tests/test_{{ package }}.py` that sets the caller's roles,
+calls the tool, and asserts the expected result.
 {% if not sample %}
-The generated tests check the columns each role sees. Add the rows you expect.
+The generated tests check the columns each role sees. Add assertions for the
+rows your application expects.
 {% endif %}
 
-## Run it
-
-```bash
-{{ name }}        # serves http://127.0.0.1:{{ port }}/mcp, with /healthz and /readyz
-```
-
-On this machine a caller without a token is the development identity in
-`{{ var.identity_options }}`. Local state is written under `.agentlib/`.
 {% if rest %}
+## Configure API access
 
-Running the server calls the real API at `{{ plan.options.base_url }}`. That
-address is the `base_url` of the data source in `.env`. If the API wants a
-token:
+At runtime, tools call `{{ plan.options.base_url }}`, the data source's `base_url`
+in `mcp-servers/{{ name }}/.env`. Configure access before starting the server.
+If the API requires a token:
 
 1. Add `"auth_secret": "{{ plan.source }}_token"` to the data source's options
-   in `.env`. The token is sent as a bearer token; `auth_header` and
-   `auth_scheme` change that.
-2. Set `{{ var.secret_prefix }}{{ plan.source | upper }}_TOKEN` in `.env`, never in
-   `.env.example`. When deployed, the secret comes from the secrets provider.
+   in `.env`. The token is sent as a bearer token; use `auth_header` and
+   `auth_scheme` to configure a different format.
+2. Set `{{ var.secret_prefix }}{{ plan.source | upper }}_TOKEN` in `.env`.
+   Keep credentials out of `.env.example` and source control. In a deployment,
+   configure the token through the selected secrets provider.
+
 {% endif %}
+## Run it
+
+Open a terminal at the workspace root and select Python as described above.
+Start this server **before** any agent that calls its tools:
+
+```bat
+"%PYTHON%" -m ai_agent_lib_cli run {{ name }}
+```
+
+Leave this terminal running. Wait for the `ready` log event before starting
+an agent in another terminal. The MCP endpoint is
+`http://127.0.0.1:{{ port }}/mcp`; `/healthz` reports liveness and `/readyz`
+reports readiness. Press Ctrl+C in the server terminal to stop it.
+
+To check readiness from another terminal, select Python there and run:
+
+```bat
+"%PYTHON%" -c "from urllib.request import urlopen; print(urlopen('http://127.0.0.1:{{ port }}/readyz', timeout=10).status)"
+```
+
+**Expected result:** a ready server prints `200`. A connection error means the
+listener is unavailable; HTTP 503 means it has not become ready. Read the server's
+output or run `"%PYTHON%" -m ai_agent_lib_cli doctor {{ name }}` to diagnose a failure.
+
+On this machine a caller without a token is the development identity in
+`{{ var.identity_options }}`. Local state is written under
+`mcp-servers/{{ name }}/.agentlib/`.
 
 ## What to read
 
+These file paths are relative to this service folder:
+
 | File | Shows |
 | --- | --- |
-| `src/{{ package }}/server.py` | The tools, and the two places the library appears |
+| `src/{{ package }}/server.py` | Tool functions and their library integrations |
 {% if sample %}
 | `queries/people_by_team.sql` | A named query: SQL with a declared interface |
 | `data/people.csv` | The sample data. Each CSV file is a table |
@@ -99,44 +140,63 @@ token:
 | `.env.example` | How the service is configured locally |
 
 {% if plan.notes or plan.deployed %}
-## Before it is deployed
+## Review data settings for deployment
 
 {% for note in plan.notes %}
 - {{ note }}
 {% endfor %}
 {% if plan.deployed %}
-- Deployed, the same query files run on the real database. In the
-  `deploy.env` that `python -m ai_agent_lib_cli deploy {{ name }}` writes, give
-  `{{ var.data_sources }}` this value instead of the local one:
+- The same query files run against Redshift after deployment. Generate
+  `deploy.env` with `"%PYTHON%" -m ai_agent_lib_cli deploy {{ name }}`, then set
+  `{{ var.data_sources }}` to:
 
   ```text
   {{ plan.deployed_setting }}
   ```
 
-  `agentlib deploy {{ name }} --plan` then lists what the service's role must
+  `"%PYTHON%" -m ai_agent_lib_cli deploy {{ name }} --plan` then lists what the service's role must
   be allowed to do, and why.
 {% endif %}
 
 {% endif %}
 {% if plan.kind == "duckdb_csv" %}
-## Adding a tool over your own data
+## Add a tool over your own data
 
 1. Put a CSV file in `data/` and a query in `queries/`. The query's header
    declares its parameters, its row limit and its classification.
 2. Write a failing test that calls the new tool as a role and says what that
    role should see.
-3. Add the tool in `server.py` and list it under `{{ server_id }}` in
-   `registry/mcp-tools.yaml`.
-4. Run `python -m ai_agent_lib_cli registry pin {{ server_id }}` to pin its arguments.
-5. If a new role or a new column to mask is involved, add or change a rule in
-   `policies/agentlib/rules/data.yaml`.
+3. Add the tool in `src/{{ package }}/server.py` and list it under `{{ server_id }}`
+   in the workspace's `registry/mcp-tools.yaml`.
+4. From the workspace root, run
+   `"%PYTHON%" -m ai_agent_lib_cli registry pin {{ server_id }}` to pin its arguments.
+5. Update the workspace's `policies/agentlib/rules/data.yaml` for any new roles
+   or columns to mask, and add samples in `tests/policy-samples.yaml`.
+6. Run `"%PYTHON%" -m ai_agent_lib_cli check` from the workspace root.
 
 The queries are written in the dialect of the production database and run
 unchanged over CSV files locally.
 {% endif %}
 
-## Deploying
+## Prepare a deployment
 
-`python -m ai_agent_lib_cli deploy {{ name }}` writes `deploy.env` here, for the settings
-the server runs with in AWS. Fill it in, then `agentlib deploy {{ name }} --plan`
-shows every permission its adapters need and why.
+From the workspace root:
+
+```bat
+"%PYTHON%" -m ai_agent_lib_cli deploy {{ name }}
+```
+
+The first run creates `mcp-servers/{{ name }}/deploy.env`. Fill in the deployment
+settings and add the provider dependencies reported by the CLI to the service's
+`pyproject.toml`. Install them, review the plan, then generate the deployment files:
+
+```bat
+"%PYTHON%" -m ai_agent_lib_cli install
+"%PYTHON%" -m ai_agent_lib_cli deploy {{ name }} --plan
+"%PYTHON%" -m ai_agent_lib_cli deploy {{ name }}
+```
+
+**Expected result:** `deploy/{{ name }}/` contains Terraform and image-build
+files. Follow its README to build images and apply infrastructure on a build
+machine or CI runner with a container engine, Terraform, and the required
+registry and AWS permissions.

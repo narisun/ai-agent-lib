@@ -12,12 +12,19 @@ from ai_agent_lib_core.config import DEFAULT_BINDINGS
 from ai_agent_lib_core.config.bindings import PREFIX, SECRET_VARIABLE_PREFIX, secret_name
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CONFIG_PACKAGE = Path("packages/ai-agent-lib-core/src/ai_agent_lib_core/config")
+CONFIG_PACKAGES = (
+    Path("packages/ai-agent-lib-core/src/ai_agent_lib_core/config"),
+    Path("packages/ai-agent-lib-ui/src/ai_agent_lib_ui/config"),
+)
 
 
 def _source_files_outside_config() -> list[Path]:
     files = sorted(REPO_ROOT.glob("packages/*/src/**/*.py"))
-    return [path for path in files if CONFIG_PACKAGE not in path.relative_to(REPO_ROOT).parents]
+    return [
+        path
+        for path in files
+        if not any(config in path.relative_to(REPO_ROOT).parents for config in CONFIG_PACKAGES)
+    ]
 
 
 def test_the_scan_covers_the_library_but_not_config() -> None:
@@ -25,6 +32,7 @@ def test_the_scan_covers_the_library_but_not_config() -> None:
     relative = {path.relative_to(REPO_ROOT).as_posix() for path in files}
     assert any("/contracts/" in name for name in relative)
     assert any("ai_agent_lib_aws" in name for name in relative)
+    assert any("ai_agent_lib_ui/application/" in name for name in relative)
     assert not any("/config/" in name for name in relative)
 
 

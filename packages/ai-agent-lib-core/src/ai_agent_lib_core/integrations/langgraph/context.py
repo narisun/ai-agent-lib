@@ -2,12 +2,33 @@
 
 from __future__ import annotations
 
+from langgraph.config import get_config
 from langgraph.runtime import get_runtime
+from pydantic import ValidationError
 
 from ai_agent_lib_core.contracts import RequestContext
+from ai_agent_lib_core.contracts.diagnostics import DiagnosticLinks
 from ai_agent_lib_core.pipeline import bound_request_context
 
 __all__ = ["current_request_context"]
+
+
+def current_diagnostic_links() -> DiagnosticLinks:
+    """Read known framework links, without inspecting messages or checkpoint data.
+
+    checkpoint_id, when supplied in configuration, names the input checkpoint. It
+    does not claim to be the checkpoint produced after this model call finishes.
+    """
+    try:
+        config = get_config()
+    except RuntimeError:
+        return DiagnosticLinks()
+    node = config.get("metadata", {}).get("langgraph_node")
+    checkpoint = config.get("configurable", {}).get("checkpoint_id")
+    try:
+        return DiagnosticLinks(node=node, checkpoint_id=checkpoint)
+    except ValidationError:
+        return DiagnosticLinks()
 
 
 def current_request_context() -> RequestContext | None:

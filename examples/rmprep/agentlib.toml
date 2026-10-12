@@ -1,0 +1,416 @@
+# Written by agentlib. It records the answers this workspace was generated from.
+# Generate the same workspace elsewhere with: agentlib init --answers agentlib.toml <folder>
+
+[workspace]
+name = "rmprep"
+owner = "commercial-banking"
+
+[library]
+source = "path"
+path = "../.."
+
+[[mcp_servers]]
+name = "rmprep-data"
+server_id = "rmprep-data"
+description = "Governed client evidence for relationship manager meeting preparation"
+port = 8100
+
+[mcp_servers.data]
+origin = "csv"
+source = "rmprep"
+kind = "duckdb_csv"
+options = "{}"
+deployed = "{}"
+notes = ["Runtime CSV files are in workspace data/; EAP_DATA_SOURCES sets ../../data.", "This catalog records the query inventory. Custom server.py exposes four composite tools.", "Copy this example to retain its business logic; generation inputs recreate only scaffolding."]
+
+[[mcp_servers.data.queries]]
+name = "activities"
+description = "Reviewed activities evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["activity_id", "uen", "type", "subject", "activity_date", "owner", "notes"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed activities evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"activity_id\" AS \"activity_id\",\n       t.\"uen\" AS \"uen\",\n       t.\"type\" AS \"type\",\n       t.\"subject\" AS \"subject\",\n       t.\"activity_date\" AS \"activity_date\",\n       t.\"owner\" AS \"owner\",\n       t.\"notes\" AS \"notes\"\nFROM \"activities\" t \nWHERE t.uen = :uen AND t.activity_date BETWEEN :start_date AND :end_date\nORDER BY activity_date DESC, activity_id\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "benchmarks"
+description = "Reviewed benchmarks evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["naics_industry", "sector", "indicator", "external_macro", "cohort_avg", "unit", "higher_is_better"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed benchmarks evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"naics_industry\" AS \"naics_industry\",\n       t.\"sector\" AS \"sector\",\n       t.\"indicator\" AS \"indicator\",\n       t.\"external_macro\" AS \"external_macro\",\n       t.\"cohort_avg\" AS \"cohort_avg\",\n       t.\"unit\" AS \"unit\",\n       t.\"higher_is_better\" AS \"higher_is_better\"\nFROM \"benchmarks\" t JOIN accounts a ON a.uen = :uen\nWHERE t.naics_industry = CAST(SUBSTRING(CAST(a.naics_code AS VARCHAR), 1, 5) AS BIGINT) AND :start_date <= :end_date\nORDER BY \"naics_industry\", \"indicator\"\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "borrowing_base"
+description = "Reviewed borrowing base evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["facility_id", "uen", "as_of", "eligible_ar", "eligible_inventory", "advance_rate_ar_pct", "advance_rate_inventory_pct", "availability", "currency", "facility_commitment_usd", "availability_pct_of_commitment"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = false
+definition = "-- description: Reviewed borrowing base evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"facility_id\" AS \"facility_id\",\n       t.\"uen\" AS \"uen\",\n       t.\"as_of\" AS \"as_of\",\n       t.\"eligible_ar\" AS \"eligible_ar\",\n       t.\"eligible_inventory\" AS \"eligible_inventory\",\n       t.\"advance_rate_ar_pct\" AS \"advance_rate_ar_pct\",\n       t.\"advance_rate_inventory_pct\" AS \"advance_rate_inventory_pct\",\n       t.\"availability\" AS \"availability\",\n       t.\"currency\" AS \"currency\",\n       f.commitment AS facility_commitment_usd,\n       CASE WHEN t.currency = 'USD' THEN ROUND(100.0 * t.availability / NULLIF(f.commitment, 0), 2) END AS availability_pct_of_commitment\nFROM \"borrowing_base\" t JOIN facilities f ON f.facility_id = t.facility_id AND f.uen = t.uen\nWHERE t.uen = :uen AND t.as_of BETWEEN :start_date AND :end_date\nORDER BY as_of DESC, facility_id\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "catalog"
+description = "Reviewed catalog evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "search", type = "string", example = "Jones" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["product_id", "name", "family", "description", "client_benefit", "min_annual_revenue", "min_dscr", "max_risk_rating", "eligibility_criteria", "revenue_to_bank", "typical_pricing"]
+masked = []
+classification = "internal"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed catalog evidence; dated rows are bounded by the requested dates.\n-- param search: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: internal\nSELECT t.\"product_id\" AS \"product_id\",\n       t.\"name\" AS \"name\",\n       t.\"family\" AS \"family\",\n       t.\"description\" AS \"description\",\n       t.\"client_benefit\" AS \"client_benefit\",\n       t.\"min_annual_revenue\" AS \"min_annual_revenue\",\n       t.\"min_dscr\" AS \"min_dscr\",\n       t.\"max_risk_rating\" AS \"max_risk_rating\",\n       t.\"eligibility_criteria\" AS \"eligibility_criteria\",\n       t.\"revenue_to_bank\" AS \"revenue_to_bank\",\n       t.\"typical_pricing\" AS \"typical_pricing\"\nFROM \"catalog\" t \nWHERE STRPOS(LOWER(CAST(t.name AS VARCHAR)), LOWER(:search)) > 0 AND :start_date <= :end_date\nORDER BY \"product_id\"\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "commitments"
+description = "Reviewed commitments evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["commitment_id", "uen", "meeting_date", "owner", "commitment", "due_date", "status", "client_or_bank", "priority", "last_updated"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed commitments evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"commitment_id\" AS \"commitment_id\",\n       t.\"uen\" AS \"uen\",\n       t.\"meeting_date\" AS \"meeting_date\",\n       t.\"owner\" AS \"owner\",\n       t.\"commitment\" AS \"commitment\",\n       t.\"due_date\" AS \"due_date\",\n       t.\"status\" AS \"status\",\n       t.\"client_or_bank\" AS \"client_or_bank\",\n       t.\"priority\" AS \"priority\",\n       t.\"last_updated\" AS \"last_updated\"\nFROM \"commitments\" t \nWHERE t.uen = :uen AND t.last_updated BETWEEN :start_date AND :end_date\nORDER BY due_date, commitment_id\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "commodities"
+description = "Reviewed commodities evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "search", type = "string", example = "Jones" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["name", "value", "unit", "as_of", "source", "qoq_change_pct", "note"]
+masked = []
+classification = "internal"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed commodities evidence; dated rows are bounded by the requested dates.\n-- param search: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: internal\nSELECT t.\"name\" AS \"name\",\n       t.\"value\" AS \"value\",\n       t.\"unit\" AS \"unit\",\n       t.\"as_of\" AS \"as_of\",\n       t.\"source\" AS \"source\",\n       t.\"qoq_change_pct\" AS \"qoq_change_pct\",\n       t.\"note\" AS \"note\"\nFROM \"commodities\" t \nWHERE STRPOS(LOWER(CAST(t.name AS VARCHAR)), LOWER(:search)) > 0 AND t.as_of BETWEEN :start_date AND :end_date\nORDER BY \"name\", \"as_of\"\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "company"
+description = "Reviewed company evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["uen", "company_name", "cik"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed company evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"uen\" AS \"uen\",\n       t.\"company_name\" AS \"company_name\",\n       t.\"cik\" AS \"cik\"\nFROM \"company\" t \nWHERE t.uen = :uen AND :start_date <= :end_date\nORDER BY \"uen\"\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "contacts"
+description = "Reviewed contacts evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["uen", "first_name", "last_name", "title", "email", "phone", "is_primary", "role", "department"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed contacts evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"uen\" AS \"uen\",\n       t.\"first_name\" AS \"first_name\",\n       t.\"last_name\" AS \"last_name\",\n       t.\"title\" AS \"title\",\n       t.\"email\" AS \"email\",\n       t.\"phone\" AS \"phone\",\n       t.\"is_primary\" AS \"is_primary\",\n       t.\"role\" AS \"role\",\n       t.\"department\" AS \"department\"\nFROM \"contacts\" t \nWHERE t.uen = :uen AND :start_date <= :end_date\nORDER BY \"uen\", \"first_name\", \"last_name\", \"title\"\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "counterparties"
+description = "Reviewed counterparties evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["uen", "counterparty", "role", "direction", "rail", "country", "currency", "annual_value", "counterparty_bank", "note"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed counterparties evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"uen\" AS \"uen\",\n       t.\"counterparty\" AS \"counterparty\",\n       t.\"role\" AS \"role\",\n       t.\"direction\" AS \"direction\",\n       t.\"rail\" AS \"rail\",\n       t.\"country\" AS \"country\",\n       t.\"currency\" AS \"currency\",\n       t.\"annual_value\" AS \"annual_value\",\n       t.\"counterparty_bank\" AS \"counterparty_bank\",\n       t.\"note\" AS \"note\"\nFROM \"counterparties\" t \nWHERE t.uen = :uen AND :start_date <= :end_date\nORDER BY annual_value DESC, counterparty, direction, rail, currency\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "covenants"
+description = "Reviewed covenants evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["facility_id", "name", "threshold", "current_value", "in_compliance", "next_test_date", "uen"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed covenants evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"facility_id\" AS \"facility_id\",\n       t.\"name\" AS \"name\",\n       t.\"threshold\" AS \"threshold\",\n       t.\"current_value\" AS \"current_value\",\n       t.\"in_compliance\" AS \"in_compliance\",\n       t.\"next_test_date\" AS \"next_test_date\",\n       f.uen AS uen\nFROM \"covenants\" t JOIN facilities f ON f.facility_id = t.facility_id\nWHERE f.uen = :uen AND :start_date <= :end_date\nORDER BY \"facility_id\", \"name\"\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "credit"
+description = "Reviewed credit evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["uen", "risk_rating", "prior_risk_rating", "risk_rating_as_of", "annual_review_date", "trigger_exceptions", "ebitda", "profit_margin_pct", "debt_to_net_worth", "fixed_charge_coverage", "debt_service_coverage", "current_ratio", "pd_pct", "lgd_pct", "rating_outlook", "watch_status"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed credit evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"uen\" AS \"uen\",\n       t.\"risk_rating\" AS \"risk_rating\",\n       t.\"prior_risk_rating\" AS \"prior_risk_rating\",\n       t.\"risk_rating_as_of\" AS \"risk_rating_as_of\",\n       t.\"annual_review_date\" AS \"annual_review_date\",\n       t.\"trigger_exceptions\" AS \"trigger_exceptions\",\n       t.\"ebitda\" AS \"ebitda\",\n       t.\"profit_margin_pct\" AS \"profit_margin_pct\",\n       t.\"debt_to_net_worth\" AS \"debt_to_net_worth\",\n       t.\"fixed_charge_coverage\" AS \"fixed_charge_coverage\",\n       t.\"debt_service_coverage\" AS \"debt_service_coverage\",\n       t.\"current_ratio\" AS \"current_ratio\",\n       t.\"pd_pct\" AS \"pd_pct\",\n       t.\"lgd_pct\" AS \"lgd_pct\",\n       t.\"rating_outlook\" AS \"rating_outlook\",\n       t.\"watch_status\" AS \"watch_status\"\nFROM \"credit_metrics\" t \nWHERE t.uen = :uen AND t.risk_rating_as_of BETWEEN :start_date AND :end_date\nORDER BY \"uen\"\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "credit_exceptions"
+description = "Reviewed credit exceptions evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["exception_id", "uen", "facility_id", "exception_type", "requirement", "due_date", "received_date", "status", "severity", "owner", "waiver_expiry", "cure_plan", "last_updated"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed credit exceptions evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"exception_id\" AS \"exception_id\",\n       t.\"uen\" AS \"uen\",\n       t.\"facility_id\" AS \"facility_id\",\n       t.\"exception_type\" AS \"exception_type\",\n       t.\"requirement\" AS \"requirement\",\n       t.\"due_date\" AS \"due_date\",\n       t.\"received_date\" AS \"received_date\",\n       t.\"status\" AS \"status\",\n       t.\"severity\" AS \"severity\",\n       t.\"owner\" AS \"owner\",\n       t.\"waiver_expiry\" AS \"waiver_expiry\",\n       t.\"cure_plan\" AS \"cure_plan\",\n       t.\"last_updated\" AS \"last_updated\"\nFROM \"credit_exceptions\" t \nWHERE t.uen = :uen AND t.last_updated BETWEEN :start_date AND :end_date\nORDER BY due_date, exception_id\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "data_model"
+description = "Reviewed data model evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "search", type = "string", example = "Jones" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["domain", "table", "column", "datatype", "nullable", "pk", "uk", "fk", "description"]
+masked = []
+classification = "internal"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed data model evidence; dated rows are bounded by the requested dates.\n-- param search: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: internal\nSELECT t.\"domain\" AS \"domain\",\n       t.\"table\" AS \"table\",\n       t.\"column\" AS \"column\",\n       t.\"datatype\" AS \"datatype\",\n       t.\"nullable\" AS \"nullable\",\n       t.\"pk\" AS \"pk\",\n       t.\"uk\" AS \"uk\",\n       t.\"fk\" AS \"fk\",\n       t.\"description\" AS \"description\"\nFROM \"data_model\" t \nWHERE STRPOS(LOWER(CAST(t.\"table\" AS VARCHAR)), LOWER(:search)) > 0 AND t.\"table\" <> 'rm_scenarios' AND :start_date <= :end_date\nORDER BY \"table\", \"column\"\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "deposit_history"
+description = "Reviewed deposit history evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["uen", "as_of", "account_type", "avg_balance", "idle_estimate", "apy_pct", "currency", "period_end_balance", "earnings_credit_rate_pct", "sweep_enabled"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed deposit history evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"uen\" AS \"uen\",\n       t.\"as_of\" AS \"as_of\",\n       t.\"account_type\" AS \"account_type\",\n       t.\"avg_balance\" AS \"avg_balance\",\n       t.\"idle_estimate\" AS \"idle_estimate\",\n       t.\"apy_pct\" AS \"apy_pct\",\n       t.\"currency\" AS \"currency\",\n       t.\"period_end_balance\" AS \"period_end_balance\",\n       t.\"earnings_credit_rate_pct\" AS \"earnings_credit_rate_pct\",\n       t.\"sweep_enabled\" AS \"sweep_enabled\"\nFROM \"balances\" t \nWHERE t.uen = :uen AND t.as_of BETWEEN :start_date AND :end_date\nORDER BY as_of DESC, account_type, currency\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "deposits"
+description = "Reviewed deposits evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["uen", "as_of", "account_type", "avg_balance", "idle_estimate", "apy_pct", "currency", "period_end_balance", "earnings_credit_rate_pct", "sweep_enabled"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed deposits evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"uen\" AS \"uen\",\n       t.\"as_of\" AS \"as_of\",\n       t.\"account_type\" AS \"account_type\",\n       t.\"avg_balance\" AS \"avg_balance\",\n       t.\"idle_estimate\" AS \"idle_estimate\",\n       t.\"apy_pct\" AS \"apy_pct\",\n       t.\"currency\" AS \"currency\",\n       t.\"period_end_balance\" AS \"period_end_balance\",\n       t.\"earnings_credit_rate_pct\" AS \"earnings_credit_rate_pct\",\n       t.\"sweep_enabled\" AS \"sweep_enabled\"\nFROM \"balances\" t \nWHERE t.uen = :uen AND t.as_of = (SELECT MAX(b.as_of) FROM balances b WHERE b.uen = :uen AND b.as_of BETWEEN :start_date AND :end_date) AND t.as_of BETWEEN :start_date AND :end_date\nORDER BY account_type, currency\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "facilities"
+description = "Reviewed facilities evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["facility_id", "uen", "lender", "facility_type", "commitment", "outstanding", "interest_rate_basis", "origination_date", "maturity_date", "purpose", "collateral_type", "collateral_value", "ltv_pct", "our_hold", "facility_risk_rating", "spread_bps", "all_in_rate_pct", "unused_fee_bps", "days_to_maturity", "amount_currency"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed facilities evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"facility_id\" AS \"facility_id\",\n       t.\"uen\" AS \"uen\",\n       t.\"lender\" AS \"lender\",\n       t.\"facility_type\" AS \"facility_type\",\n       t.\"commitment\" AS \"commitment\",\n       t.\"outstanding\" AS \"outstanding\",\n       t.\"interest_rate_basis\" AS \"interest_rate_basis\",\n       t.\"origination_date\" AS \"origination_date\",\n       t.\"maturity_date\" AS \"maturity_date\",\n       t.\"purpose\" AS \"purpose\",\n       t.\"collateral_type\" AS \"collateral_type\",\n       t.\"collateral_value\" AS \"collateral_value\",\n       t.\"ltv_pct\" AS \"ltv_pct\",\n       t.\"our_hold\" AS \"our_hold\",\n       t.\"facility_risk_rating\" AS \"facility_risk_rating\",\n       t.\"spread_bps\" AS \"spread_bps\",\n       t.\"all_in_rate_pct\" AS \"all_in_rate_pct\",\n       t.\"unused_fee_bps\" AS \"unused_fee_bps\",\n       DATEDIFF(day, :end_date, t.maturity_date) AS days_to_maturity,\n       'USD' AS amount_currency\nFROM \"facilities\" t \nWHERE t.uen = :uen AND t.origination_date BETWEEN :start_date AND :end_date\nORDER BY maturity_date, facility_id\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "financials"
+description = "Reviewed financials evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["uen", "concept", "label", "statement", "value", "unit", "fiscal_year", "period_end", "is_annual"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed financials evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"uen\" AS \"uen\",\n       t.\"concept\" AS \"concept\",\n       t.\"label\" AS \"label\",\n       t.\"statement\" AS \"statement\",\n       t.\"value\" AS \"value\",\n       t.\"unit\" AS \"unit\",\n       t.\"fiscal_year\" AS \"fiscal_year\",\n       t.\"period_end\" AS \"period_end\",\n       t.\"is_annual\" AS \"is_annual\"\nFROM \"financial_facts\" t \nWHERE t.uen = :uen AND t.period_end BETWEEN :start_date AND :end_date\nORDER BY period_end DESC, concept, statement, is_annual\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "find_clients"
+description = "Reviewed find clients evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "search", type = "string", example = "Jones" }]
+columns = ["uen", "name", "industry", "country", "currency", "match_rank"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed find clients evidence; dated rows are bounded by the requested dates.\n-- param search: string\n-- max_rows: 50\n-- classification: confidential\nSELECT uen, name, industry, country, currency,\n       CASE WHEN LOWER(uen) = LOWER(:search) OR LOWER(name) = LOWER(:search) THEN 0 ELSE 1 END AS match_rank\nFROM accounts\nWHERE :search <> '' AND (LOWER(uen) = LOWER(:search) OR STRPOS(LOWER(name), LOWER(:search)) > 0)\nORDER BY match_rank, name, uen\n"
+
+[[mcp_servers.data.queries]]
+name = "forward_curve"
+description = "Reviewed forward curve evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "search", type = "string", example = "Jones" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["curve", "tenor", "rate", "as_of", "source"]
+masked = []
+classification = "internal"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed forward curve evidence; dated rows are bounded by the requested dates.\n-- param search: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: internal\nSELECT t.\"curve\" AS \"curve\",\n       t.\"tenor\" AS \"tenor\",\n       t.\"rate\" AS \"rate\",\n       t.\"as_of\" AS \"as_of\",\n       t.\"source\" AS \"source\"\nFROM \"forward_curve\" t \nWHERE STRPOS(LOWER(CAST(t.curve AS VARCHAR)), LOWER(:search)) > 0 AND t.as_of BETWEEN :start_date AND :end_date\nORDER BY \"curve\", \"tenor\", \"as_of\"\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "fx"
+description = "Reviewed fx evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "search", type = "string", example = "Jones" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["pair", "rate", "as_of", "source", "ytd_change_pct", "fwd_3m_pct", "fwd_12m_pct", "implied_vol_3m_pct"]
+masked = []
+classification = "internal"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed fx evidence; dated rows are bounded by the requested dates.\n-- param search: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: internal\nSELECT t.\"pair\" AS \"pair\",\n       t.\"rate\" AS \"rate\",\n       t.\"as_of\" AS \"as_of\",\n       t.\"source\" AS \"source\",\n       t.\"ytd_change_pct\" AS \"ytd_change_pct\",\n       t.\"fwd_3m_pct\" AS \"fwd_3m_pct\",\n       t.\"fwd_12m_pct\" AS \"fwd_12m_pct\",\n       t.\"implied_vol_3m_pct\" AS \"implied_vol_3m_pct\"\nFROM \"fx\" t \nWHERE STRPOS(LOWER(CAST(t.pair AS VARCHAR)), LOWER(:search)) > 0 AND t.as_of BETWEEN :start_date AND :end_date\nORDER BY \"pair\", \"as_of\"\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "operational_service_cases"
+description = "Reviewed operational service cases evidence; dated rows are bounded by the requested"
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["uen", "request", "product", "close_date", "status", "category", "priority", "opened_date"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = false
+definition = "-- description: Reviewed operational service cases evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"uen\" AS \"uen\",\n       t.\"request\" AS \"request\",\n       t.\"product\" AS \"product\",\n       t.\"close_date\" AS \"close_date\",\n       t.\"status\" AS \"status\",\n       t.\"category\" AS \"category\",\n       t.\"priority\" AS \"priority\",\n       t.\"opened_date\" AS \"opened_date\"\nFROM \"operational_service_cases\" t \nWHERE t.uen = :uen AND t.opened_date BETWEEN :start_date AND :end_date\nORDER BY opened_date DESC, request, product\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "opportunities"
+description = "Reviewed opportunities evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["opportunity_id", "uen", "name", "product", "stage", "amount", "probability", "close_date", "competitor", "owner", "created_date", "next_step"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed opportunities evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"opportunity_id\" AS \"opportunity_id\",\n       t.\"uen\" AS \"uen\",\n       t.\"name\" AS \"name\",\n       t.\"product\" AS \"product\",\n       t.\"stage\" AS \"stage\",\n       t.\"amount\" AS \"amount\",\n       t.\"probability\" AS \"probability\",\n       t.\"close_date\" AS \"close_date\",\n       t.\"competitor\" AS \"competitor\",\n       t.\"owner\" AS \"owner\",\n       t.\"created_date\" AS \"created_date\",\n       t.\"next_step\" AS \"next_step\"\nFROM \"opportunities\" t \nWHERE t.uen = :uen AND t.created_date BETWEEN :start_date AND :end_date\nORDER BY created_date DESC, opportunity_id\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "payment_summaries"
+description = "Reviewed payment summaries evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["uen", "rail", "direction", "period_start", "period_end", "transaction_count", "total_value", "currency", "fee_revenue"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed payment summaries evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"uen\" AS \"uen\",\n       t.\"rail\" AS \"rail\",\n       t.\"direction\" AS \"direction\",\n       t.\"period_start\" AS \"period_start\",\n       t.\"period_end\" AS \"period_end\",\n       t.\"transaction_count\" AS \"transaction_count\",\n       t.\"total_value\" AS \"total_value\",\n       t.\"currency\" AS \"currency\",\n       t.\"fee_revenue\" AS \"fee_revenue\"\nFROM \"payment_summaries\" t \nWHERE t.uen = :uen AND t.period_end BETWEEN :start_date AND :end_date\nORDER BY period_end DESC, rail, direction, currency\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "payment_totals"
+description = "Reviewed payment totals evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["uen", "rail", "direction", "currency", "first_value_date", "last_value_date", "transaction_count", "total_value", "gross_fees"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed payment totals evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.uen AS uen,\n       COALESCE(r.xref_name, t.rail) AS rail,\n       COALESCE(d.xref_name, t.direction) AS direction,\n       t.currency AS currency, MIN(t.value_date) AS first_value_date,\n       MAX(t.value_date) AS last_value_date, COUNT(*) AS transaction_count,\n       SUM(CAST(t.amount AS DECIMAL(24, 2))) AS total_value,\n       SUM(CAST(t.fee AS DECIMAL(24, 2))) AS gross_fees\nFROM transactions t\nLEFT JOIN (SELECT LOWER(xref_value) AS value_key, MIN(xref_name) AS xref_name\n           FROM xref WHERE xref_type = 'payment_rail' GROUP BY LOWER(xref_value)) r\nON LOWER(t.rail) = r.value_key\nLEFT JOIN (SELECT LOWER(xref_value) AS value_key, MIN(xref_name) AS xref_name\n           FROM xref WHERE xref_type = 'payment_direction' GROUP BY LOWER(xref_value)) d\nON LOWER(t.direction) = d.value_key\nWHERE t.uen = :uen AND t.value_date BETWEEN :start_date AND :end_date\nGROUP BY t.uen, COALESCE(r.xref_name, t.rail), COALESCE(d.xref_name, t.direction), t.currency\nORDER BY currency, rail, direction\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "profile"
+description = "Reviewed profile evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["uen", "connected_uen", "name", "industry", "sic_code", "naics_code", "annual_revenue", "employees", "city", "state", "country", "currency", "relationship_manager", "segment", "customer_since", "founded_year", "business_description", "locations", "nps", "logo_url"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed profile evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"uen\" AS \"uen\",\n       t.\"connected_uen\" AS \"connected_uen\",\n       t.\"name\" AS \"name\",\n       t.\"industry\" AS \"industry\",\n       LPAD(CAST(t.sic_code AS VARCHAR), 4, '0') AS sic_code,\n       CAST(t.naics_code AS VARCHAR) AS naics_code,\n       t.\"annual_revenue\" AS \"annual_revenue\",\n       t.\"employees\" AS \"employees\",\n       t.\"city\" AS \"city\",\n       t.\"state\" AS \"state\",\n       t.\"country\" AS \"country\",\n       t.\"currency\" AS \"currency\",\n       t.\"relationship_manager\" AS \"relationship_manager\",\n       t.\"segment\" AS \"segment\",\n       t.\"customer_since\" AS \"customer_since\",\n       t.\"founded_year\" AS \"founded_year\",\n       t.\"business_description\" AS \"business_description\",\n       t.\"locations\" AS \"locations\",\n       t.\"nps\" AS \"nps\",\n       t.\"logo_url\" AS \"logo_url\"\nFROM \"accounts\" t \nWHERE t.uen = :uen AND :start_date <= :end_date\nORDER BY \"uen\"\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "profitability"
+description = "Reviewed profitability evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["uen", "period", "line_of_business", "product", "revenue_nii", "revenue_fee", "expense_direct", "risk_cost", "allocated_capital"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed profitability evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"uen\" AS \"uen\",\n       t.\"period\" AS \"period\",\n       t.\"line_of_business\" AS \"line_of_business\",\n       t.\"product\" AS \"product\",\n       t.\"revenue_nii\" AS \"revenue_nii\",\n       t.\"revenue_fee\" AS \"revenue_fee\",\n       t.\"expense_direct\" AS \"expense_direct\",\n       t.\"risk_cost\" AS \"risk_cost\",\n       t.\"allocated_capital\" AS \"allocated_capital\"\nFROM \"product_profitability\" t \nWHERE t.uen = :uen AND :start_date <= :end_date\nORDER BY period DESC, line_of_business, product\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "rates"
+description = "Reviewed rates evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "search", type = "string", example = "Jones" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["name", "value", "unit", "as_of", "source"]
+masked = []
+classification = "internal"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed rates evidence; dated rows are bounded by the requested dates.\n-- param search: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: internal\nSELECT t.\"name\" AS \"name\",\n       t.\"value\" AS \"value\",\n       t.\"unit\" AS \"unit\",\n       t.\"as_of\" AS \"as_of\",\n       t.\"source\" AS \"source\"\nFROM \"rates\" t \nWHERE STRPOS(LOWER(CAST(t.name AS VARCHAR)), LOWER(:search)) > 0 AND t.as_of BETWEEN :start_date AND :end_date\nORDER BY \"name\", \"as_of\"\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "relationship"
+description = "Reviewed relationship evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["uen", "nii", "nir", "total_deposits", "roe", "coverage_team", "strategic_priorities", "ask", "commercial", "tps", "capital_markets", "wealth", "retail", "products_held", "total_exposure", "primary_operating_account", "last_review_date", "next_review_date", "wallet_share_pct", "raroc_pct"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed relationship evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"uen\" AS \"uen\",\n       t.\"nii\" AS \"nii\",\n       t.\"nir\" AS \"nir\",\n       t.\"total_deposits\" AS \"total_deposits\",\n       t.\"roe\" AS \"roe\",\n       t.\"coverage_team\" AS \"coverage_team\",\n       t.\"strategic_priorities\" AS \"strategic_priorities\",\n       t.\"ask\" AS \"ask\",\n       t.\"commercial\" AS \"commercial\",\n       t.\"tps\" AS \"tps\",\n       t.\"capital_markets\" AS \"capital_markets\",\n       t.\"wealth\" AS \"wealth\",\n       t.\"retail\" AS \"retail\",\n       t.\"products_held\" AS \"products_held\",\n       t.\"total_exposure\" AS \"total_exposure\",\n       t.\"primary_operating_account\" AS \"primary_operating_account\",\n       t.\"last_review_date\" AS \"last_review_date\",\n       t.\"next_review_date\" AS \"next_review_date\",\n       t.\"wallet_share_pct\" AS \"wallet_share_pct\",\n       t.\"raroc_pct\" AS \"raroc_pct\"\nFROM \"relationship\" t \nWHERE t.uen = :uen AND :start_date <= :end_date\nORDER BY \"uen\"\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "service_requests"
+description = "Reviewed service requests evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["uen", "request", "product", "close_date", "status", "category", "priority", "opened_date"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed service requests evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"uen\" AS \"uen\",\n       t.\"request\" AS \"request\",\n       t.\"product\" AS \"product\",\n       t.\"close_date\" AS \"close_date\",\n       t.\"status\" AS \"status\",\n       t.\"category\" AS \"category\",\n       t.\"priority\" AS \"priority\",\n       t.\"opened_date\" AS \"opened_date\"\nFROM \"service_requests\" t \nWHERE t.uen = :uen AND t.opened_date BETWEEN :start_date AND :end_date\nORDER BY opened_date DESC, request, product\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "source_readiness"
+description = "Reviewed source readiness evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["readiness_id", "uen", "domain", "as_of_date", "completeness_pct", "reconciliation_status", "quality_status", "issue", "owner", "last_updated"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed source readiness evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"readiness_id\" AS \"readiness_id\",\n       t.\"uen\" AS \"uen\",\n       t.\"domain\" AS \"domain\",\n       t.\"as_of_date\" AS \"as_of_date\",\n       t.\"completeness_pct\" AS \"completeness_pct\",\n       t.\"reconciliation_status\" AS \"reconciliation_status\",\n       t.\"quality_status\" AS \"quality_status\",\n       t.\"issue\" AS \"issue\",\n       t.\"owner\" AS \"owner\",\n       t.\"last_updated\" AS \"last_updated\"\nFROM \"source_readiness\" t \nWHERE t.uen = :uen AND t.last_updated BETWEEN :start_date AND :end_date\nORDER BY domain, readiness_id\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "transactions"
+description = "Reviewed transactions evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["transaction_id", "uen", "rail", "direction", "value_date", "amount", "currency", "fee", "counterparty", "memo"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed transactions evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"transaction_id\" AS \"transaction_id\",\n       t.\"uen\" AS \"uen\",\n       t.\"rail\" AS \"rail\",\n       t.\"direction\" AS \"direction\",\n       t.\"value_date\" AS \"value_date\",\n       t.\"amount\" AS \"amount\",\n       t.\"currency\" AS \"currency\",\n       t.\"fee\" AS \"fee\",\n       t.\"counterparty\" AS \"counterparty\",\n       t.\"memo\" AS \"memo\"\nFROM \"transactions\" t \nWHERE t.uen = :uen AND t.value_date BETWEEN :start_date AND :end_date\nORDER BY value_date DESC, transaction_id\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "treasury_controls"
+description = "Reviewed treasury controls evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["control_id", "uen", "product", "control_type", "status", "severity", "observation", "detected_date", "owner", "target_date", "last_updated"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed treasury controls evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"control_id\" AS \"control_id\",\n       t.\"uen\" AS \"uen\",\n       t.\"product\" AS \"product\",\n       t.\"control_type\" AS \"control_type\",\n       t.\"status\" AS \"status\",\n       t.\"severity\" AS \"severity\",\n       t.\"observation\" AS \"observation\",\n       t.\"detected_date\" AS \"detected_date\",\n       t.\"owner\" AS \"owner\",\n       t.\"target_date\" AS \"target_date\",\n       t.\"last_updated\" AS \"last_updated\"\nFROM \"treasury_controls\" t \nWHERE t.uen = :uen AND t.last_updated BETWEEN :start_date AND :end_date\nORDER BY target_date, control_id\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "utilization"
+description = "Reviewed utilization evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["facility_id", "as_of", "drawn", "available", "utilization_pct", "uen", "amount_currency"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed utilization evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"facility_id\" AS \"facility_id\",\n       t.\"as_of\" AS \"as_of\",\n       t.\"drawn\" AS \"drawn\",\n       t.\"available\" AS \"available\",\n       t.\"utilization_pct\" AS \"utilization_pct\",\n       f.uen AS uen,\n       'USD' AS amount_currency\nFROM \"utilization\" t JOIN facilities f ON f.facility_id = t.facility_id\nWHERE f.uen = :uen AND t.as_of BETWEEN :start_date AND :end_date\nORDER BY as_of DESC, facility_id\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "working_capital"
+description = "Reviewed working capital evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "uen", type = "string", example = "JONE-0022" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["uen", "period_end", "dso_days", "dio_days", "dpo_days", "cash_conversion_cycle_days", "ar_over_90_pct", "inventory_aging_pct", "net_working_capital", "currency", "data_quality"]
+masked = []
+classification = "confidential"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed working capital evidence; dated rows are bounded by the requested dates.\n-- param uen: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: confidential\nSELECT t.\"uen\" AS \"uen\",\n       t.\"period_end\" AS \"period_end\",\n       t.\"dso_days\" AS \"dso_days\",\n       t.\"dio_days\" AS \"dio_days\",\n       t.\"dpo_days\" AS \"dpo_days\",\n       t.\"cash_conversion_cycle_days\" AS \"cash_conversion_cycle_days\",\n       t.\"ar_over_90_pct\" AS \"ar_over_90_pct\",\n       t.\"inventory_aging_pct\" AS \"inventory_aging_pct\",\n       t.\"net_working_capital\" AS \"net_working_capital\",\n       t.\"currency\" AS \"currency\",\n       t.\"data_quality\" AS \"data_quality\"\nFROM \"working_capital\" t \nWHERE t.uen = :uen AND t.period_end BETWEEN :start_date AND :end_date\nORDER BY period_end DESC\nOFFSET :row_offset\n"
+
+[[mcp_servers.data.queries]]
+name = "xref"
+description = "Reviewed xref evidence; dated rows are bounded by the requested dates."
+parameters = [{ name = "search", type = "string", example = "Jones" }, { name = "start_date", type = "date", example = "2025-08-03" }, { name = "end_date", type = "date", example = "2026-08-03" }, { name = "row_offset", type = "integer", example = 0 }]
+columns = ["xref_id", "xref_type", "xref_name", "xref_value", "xref_description"]
+masked = []
+classification = "internal"
+max_rows = 50
+returns_rows = true
+definition = "-- description: Reviewed xref evidence; dated rows are bounded by the requested dates.\n-- param search: string\n-- param start_date: date\n-- param end_date: date\n-- param row_offset: integer\n-- max_rows: 50\n-- classification: internal\nSELECT t.\"xref_id\" AS \"xref_id\",\n       t.\"xref_type\" AS \"xref_type\",\n       t.\"xref_name\" AS \"xref_name\",\n       t.\"xref_value\" AS \"xref_value\",\n       t.\"xref_description\" AS \"xref_description\"\nFROM \"xref\" t \nWHERE STRPOS(LOWER(CAST(t.xref_type AS VARCHAR)), LOWER(:search)) > 0 AND :start_date <= :end_date\nORDER BY \"xref_id\"\nOFFSET :row_offset\n"
+
+[[agents]]
+name = "rmprep"
+description = "Prepare relationship manager client meeting memos and answer follow-up questions"
+model_provider = "fake"
+port = 8000
+mcp_servers = ["rmprep-data"]

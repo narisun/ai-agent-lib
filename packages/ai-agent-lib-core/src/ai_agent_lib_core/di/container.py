@@ -41,6 +41,7 @@ from ai_agent_lib_core.contracts import (
     IdentityVerifier,
     IdGenerator,
     ModelRef,
+    ModelTraceSink,
     PolicyDecisionPoint,
     ProviderSelection,
     RegistrySource,
@@ -66,6 +67,8 @@ from ai_agent_lib_core.di.providers import (
     ServicePort,
     ServiceProviders,
 )
+from ai_agent_lib_core.observability.diagnostics import Diagnostics
+from ai_agent_lib_core.observability.model_trace import JsonlModelTraceSink
 from ai_agent_lib_core.pipeline import (
     BudgetLedger,
     GovernedDataSource,
@@ -121,6 +124,10 @@ class ServiceContainer:
         mcp_connector: Opens connections to MCP servers. Defaults to
             Streamable HTTP; a test passes an in-process connector.
         sleep: Waits between retries. A test passes one that does not wait.
+        model_trace: Optional diagnostic sink for model exchanges. Overrides the
+            configured file destination. An injected sink remains caller-owned.
+        diagnostics: Optional metadata recorder, independent of content tracing.
+            The caller owns its sink and shares it with the HTTP entry point.
     """
 
     def __init__(
@@ -133,6 +140,8 @@ class ServiceContainer:
         telemetry: Telemetry | None = None,
         mcp_connector: McpConnector | None = None,
         sleep: Callable[[float], Awaitable[None]] | None = None,
+        model_trace: ModelTraceSink | None = None,
+        diagnostics: Diagnostics | None = None,
     ) -> None:
         self._config = config
         self._providers = providers if providers is not None else ServiceProviders.default()
@@ -141,6 +150,10 @@ class ServiceContainer:
         self._telemetry: Telemetry = (
             telemetry if telemetry is not None else self._default_telemetry(config)
         )
+        self._model_trace = model_trace
+        self._diagnostics = diagnostics
+        if self._model_trace is None and config.model_trace_path is not None:
+            self._model_trace = JsonlModelTraceSink(config.model_trace_path)
         self._services: dict[_Key, object] = {}
         self._build_order: list[_Key] = []
         self._building: list[_Key] = []
@@ -735,6 +748,8 @@ class ServiceContainer:
                 frame_tool_results=self._frame_tool_results(),
                 bridge=self._bridge,
                 operations=self._operations,
+                model_trace=self._model_trace,
+                diagnostics=self._diagnostics,
             )
         return self._langgraph
 

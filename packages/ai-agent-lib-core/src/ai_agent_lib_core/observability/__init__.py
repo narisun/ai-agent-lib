@@ -1,5 +1,6 @@
 """What the people who run a service see: operational logs, traces and metrics."""
 
+from ai_agent_lib_core.observability.diagnostics import Diagnostics, bind_diagnostic_links
 from ai_agent_lib_core.observability.errors import (
     error_fields,
     explain,
@@ -13,6 +14,7 @@ from ai_agent_lib_core.observability.logs import (
     configure_logging,
     redact,
 )
+from ai_agent_lib_core.observability.model_trace import JsonlModelTraceSink
 from ai_agent_lib_core.observability.otel import (
     build_providers,
     configure_telemetry,
@@ -21,7 +23,10 @@ from ai_agent_lib_core.observability.otel import (
 
 __all__ = [
     "LIBRARY_LOGGERS",
+    "Diagnostics",
     "JsonLogFormatter",
+    "JsonlModelTraceSink",
+    "bind_diagnostic_links",
     "build_providers",
     "configure_logging",
     "configure_telemetry",

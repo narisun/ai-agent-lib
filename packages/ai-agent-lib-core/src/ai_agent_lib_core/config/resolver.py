@@ -164,6 +164,11 @@ class ConfigResolver:
                 no_proxy=values.get(Key.NO_PROXY),
             ),
             data_sources=self._data_sources(values),
+            model_trace_path=(
+                self._path(values, Key.MODEL_TRACE_PATH)
+                if values.get(Key.MODEL_TRACE_PATH, "").strip()
+                else None
+            ),
         )
         shown = {key: self._display(key, value) for key, value in values.items()}
         shown.setdefault(Key.PROFILE, profile.value)

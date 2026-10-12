@@ -55,6 +55,7 @@ class Key(enum.StrEnum):
     MODEL_PROVIDER = "model.provider"
     MODEL_ID = "model.model_id"
     MODEL_ALIASES = "model.aliases"
+    MODEL_TRACE_PATH = "model.trace_path"
     DATA_SOURCES = "data.sources"
     AWS_PROFILE = "external.aws_profile"
     AWS_REGION = "external.aws_region"
@@ -194,10 +195,10 @@ def _default_bindings() -> tuple[Binding, ...]:
             description="Default adapter set: local or aws.",
             example="local",
             details=(
-                "Chooses the whole default adapter set in one word. `local` runs with no cloud "
-                "account: files, SQLite, an in-process rules engine and a development identity. "
-                "`aws` selects the managed adapters. A profile only supplies defaults; any section"
-                " can still name another adapter."
+                "`local` selects file storage, SQLite, local rules, a development identity, "
+                "and the Anthropic model provider. `aws` selects the AWS deployment defaults. "
+                "Override individual providers to match your environment; use "
+                "`EAP_MODEL_PROVIDER=fake` for the local tutorial."
             ),
         ),
         Binding(
@@ -226,6 +227,21 @@ def _default_bindings() -> tuple[Binding, ...]:
             ),
         ),
         Binding(
+            name=f"{PREFIX}MODEL_TRACE_PATH",
+            key=Key.MODEL_TRACE_PATH,
+            description="Optional JSONL file for diagnostic model requests and responses.",
+            example=".agentlib/model-trace.jsonl",
+            details=(
+                "Set a path such as `.agentlib/model-trace.jsonl` to inspect complete "
+                "LangChain messages, tool definitions, and replies at the provider boundary. "
+                "Relative paths resolve from the service's `.env` folder. Unset or blank "
+                "disables capture. Credential patterns are masked, but conversation content "
+                "is retained: use test data and restrict access to the file. Each provider "
+                "attempt is recorded separately; SDK HTTP bodies are outside this trace."
+            ),
+            default="disabled",
+        ),
+        Binding(
             name=f"{PREFIX}LIMITS",
             key=Key.LIMITS,
             description="JSON timeouts, retries and budgets of governed calls.",
@@ -246,11 +262,12 @@ def _default_bindings() -> tuple[Binding, ...]:
         Binding(
             name=f"{PREFIX}TLS_CA_BUNDLE",
             key=Key.TLS_CA_BUNDLE,
-            description="Enterprise CA file for the AWS clients, such as the Bedrock model client.",
+            description="Enterprise CA file for the Bedrock clients.",
             details=(
-                "Path to the enterprise CA bundle that the AWS clients trust, for networks that "
-                "inspect TLS. It applies to the Bedrock model client and the other boto3 clients "
-                "only; HTTP adapters take their own `ca_file` option."
+                "Path to the enterprise CA bundle for Bedrock clients, for networks that "
+                "inspect TLS. It overrides `AWS_CA_BUNDLE` for Bedrock only; other AWS clients "
+                "use `AWS_CA_BUNDLE`. HTTP adapters take `ca_file`, checkpoint PostgreSQL "
+                "takes `ca_bundle`, and pip uses its own certificate configuration."
             ),
         ),
         Binding(

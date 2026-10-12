@@ -1,5 +1,5 @@
-# Written by agentlib. The gate every change to {{ name }} passes: the same
-# 'agentlib check' a developer runs, on Linux and on Windows.
+# Written by agentlib. Run the workspace checks on Linux and Windows.
+# Complete README.md's "Configure CI" section before relying on this workflow.
 name: check
 
 on:
@@ -19,15 +19,15 @@ jobs:
     runs-on: {{ '${{ matrix.os }}' }}
     steps:
       - uses: actions/checkout@v4
-{% if library.kind == "path" %}
-      # This workspace installs ai-agent-lib from a checkout on a developer's
-      # machine, which CI does not have. Install it from your package index
-      # instead (see the comment in pyproject.toml), then delete this step.
-      - run: echo "Install ai-agent-lib from a package index to run this workflow." && exit 1
-{% endif %}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+{% if library.kind == "path" %}
+      # A desktop path cannot be installed on a GitHub runner. Remove this step
+      # only after configuring a package index or a library checkout for CI.
+      - name: Configure the library source for CI
+        run: python -c "raise SystemExit('CI setup required. Follow README.md, Configure CI, to replace the desktop library path before removing this step.')"
+{% endif %}
       - run: python -m pip install "ai-agent-lib-cli{{ library.version or "" }}"
       - run: python -m ai_agent_lib_cli install
       - run: python -m ai_agent_lib_cli check

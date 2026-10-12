@@ -1,0 +1,8 @@
+body { font-family: system-ui, sans-serif; }
+pre, .table-wrapper { max-width: 100%; overflow: auto; max-height: 65vh; }
+.markdown-body { overflow-wrap: anywhere; min-width: 0; }
+#chat-profiles { max-width: min(14rem, 42vw); min-width: 0; }
+@media (max-width: 640px) {
+  #header { flex-wrap: wrap; height: auto; min-height: 60px; gap: .25rem; }
+  #header > div { min-width: 0; max-width: 100%; flex-wrap: wrap; }
+}

@@ -1,0 +1,7 @@
+uen,request,product,close_date,status,category,priority,opened_date
+ALLO-0001,Wire fee investigation and pricing credit,Wire Transfer,,In Progress,Fees,1 - Critical,2026-07-12
+ALLO-0001,Online banking entitlement remediation,Online Banking for Business,,New,Access,2 - High,2026-07-22
+BUSH-0009,Unable to release urgent supplier wire,Wire Transfer,,In Progress,Payments,1 - Critical,2026-07-17
+BUSH-0009,Payment approval entitlement cleanup,Online Banking for Business,,New,Access,2 - High,2026-07-21
+CANA-0010,Analysis fee dispute escalation,Analyzed Operating DDA,,In Progress,Fees,1 - Critical,2026-07-20
+CANA-0010,Treasury portal entitlement remediation,Online Banking for Business,,New,Access,2 - High,2026-07-24

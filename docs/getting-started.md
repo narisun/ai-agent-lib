@@ -3,11 +3,13 @@
 Build an agent named `helper`, add a tool, and test its behavior and
 permissions. Then add shared tools through an MCP server. This walkthrough
 uses the same `tutorial/` workspace as the [developer guide](developer-guide.html).
-If you already completed a step there or in the README, continue from the
-next step rather than generating the project again.
+If you started in the README or developer guide, continue with the next
+unfinished step in that workspace.
 
-You need basic Python knowledge: functions, imports, and running a command
-in a terminal. New library terms are explained as you encounter them.
+This tutorial assumes familiarity with Python functions, classes, imports,
+and tests. Library terms are explained as you encounter them. For the
+design behind the code, read the guide's
+[introduction to principles and patterns](developer-guide.html#principles).
 
 Follow steps 1–5 for the local walkthrough. After that, choose what you need:
 [HTTP](#6-optional-call-the-agent-over-http),
@@ -26,12 +28,10 @@ Follow steps 1–5 for the local walkthrough. After that, choose what you need:
 - Access to your approved package index, or a team-provided wheelhouse
   (a folder of pre-downloaded Python packages).
 
-Python and pip are sufficient for the local tutorial. You do not need
-Docker, uv, a cloud account, administrator rights, or permission to activate
-PowerShell scripts. After installing packages, the local tests and fake
-model need no external services. Dependencies with native code still need
-wheels compatible with your Python version and operating system if you
-cannot compile them.
+On Windows, use **Command Prompt (cmd.exe)**. The local walkthrough runs with
+Python and pip. It uses a fake model, sample data, and local providers for
+permissions, audit records, and conversation state. Each optional section
+lists the additional access or tools it needs.
 
 ## 1. Create and run an agent
 
@@ -44,26 +44,27 @@ inside the library checkout and an application workspace named `tutorial/`
 beside it. A virtual environment keeps project packages separate from system
 Python. Use a different workspace name if that folder already exists.
 
-### Windows PowerShell
+### Windows Command Prompt (cmd.exe)
 
-Run from the library root and keep this terminal open:
+In **Command Prompt**, run these commands one line at a time from the library
+root. Keep this window open for the following steps:
 
-```powershell
-$Library = (Get-Location).Path
+```bat
+set "LIBRARY=%CD%"
 python -m venv .venv
-$Python = Join-Path $Library ".venv\Scripts\python.exe"
-& $Python -m pip install -e ./packages/ai-agent-lib-core -e ./packages/ai-agent-lib-cli
-& $Python -m ai_agent_lib_cli init tutorial --dir .. --lib-path $Library --owner learning
-Set-Location ../tutorial
-& $Python -m ai_agent_lib_cli new agent helper --description "A practice assistant" --model fake
-& $Python -m ai_agent_lib_cli install
-& $Python -m pytest
-& $Python -m helper "Say hello to Ada."
+set "PYTHON=%LIBRARY%\.venv\Scripts\python.exe"
+"%PYTHON%" -m pip install -e ./packages/ai-agent-lib-core -e ./packages/ai-agent-lib-cli
+"%PYTHON%" -m ai_agent_lib_cli init tutorial --dir .. --lib-path "%LIBRARY%" --owner learning
+cd /d ..\tutorial
+"%PYTHON%" -m ai_agent_lib_cli new agent helper --description "A practice assistant" --model fake
+"%PYTHON%" -m ai_agent_lib_cli install
+"%PYTHON%" -m pytest
+"%PYTHON%" -m helper "Say hello to Ada."
 ```
 
 If you use the Windows Python launcher, replace the environment creation
 command with `py -3.11 -m venv .venv`. The remaining commands use the
-environment's interpreter directly; you do not need to activate scripts.
+environment's interpreter directly.
 
 ### macOS or Linux, using bash or zsh
 
@@ -82,46 +83,47 @@ cd ../tutorial
 "$PYTHON" -m helper "Say hello to Ada."
 ```
 
-**Checkpoint:** the tests pass and the final command prints:
+**Expected result:** the tests pass and the final command prints:
 
 ```text
 fake: Say hello to Ada.
 ```
 
-The fake model echoes your question. It does not decide to call the greeting
-tool. In step 3, a scripted test will tell it exactly which tool to call.
+The fake model echoes your question. In step 3, scripted model replies will
+exercise a tool call and verify its result.
 
 Here is what the setup commands did:
 
 | Command or option | Purpose |
 | --- | --- |
 | `python -m venv .venv` | Creates an isolated place for Python packages |
-| `pip install -e …` | Installs the library packages in editable mode, so source changes are available without reinstalling them |
+| `python -m pip install -e …` | Installs the library packages in editable mode, so source changes are available as you edit them |
 | `init tutorial` | Creates the application workspace |
-| `--lib-path` | Uses this local library checkout instead of a published version |
+| `--lib-path` | Selects this library checkout as the workspace's library source |
 | `new agent helper` | Writes the agent, configuration, and tests |
 | `install` | Uses the current Python's pip to install workspace services and development tools |
-| `pytest` | Runs the generated tests |
+| `python -m pytest` | Runs the generated tests |
 | `python -m helper` | Asks the generated agent one question |
 
-Run `install` again whenever you add a service or change its dependencies.
+Run `"%PYTHON%" -m ai_agent_lib_cli install` again whenever you add a service
+or change its dependencies.
 
 ### Command convention for the rest of this tutorial
 
-Run commands from `tutorial/`. Examples use PowerShell's `& $Python` prefix;
+Run commands from `tutorial/`. Examples use Command Prompt's `"%PYTHON%"` prefix;
 on macOS/Linux, replace it with `"$PYTHON"`. Both point to the same virtual
-environment used during setup. PowerShell's `&` runs the executable stored
-in a variable; you do not type it in bash or zsh.
+environment used during setup. `set "PYTHON=..."` stores the executable's path;
+`%PYTHON%` reads that variable. Keep the surrounding quotes when running it
+so paths containing spaces work. `cd /d` changes both the folder and drive.
 
 ### Using a new terminal
 
-Shell variables do not carry over to a new terminal. First open that terminal
-in `tutorial/`, then restore the interpreter path:
+In each new terminal, open `tutorial/` and set the interpreter path:
 
-```powershell
-# Windows PowerShell, from tutorial/
-$Library = (Resolve-Path ../ai-agent-lib).Path
-$Python = Join-Path $Library ".venv\Scripts\python.exe"
+```bat
+rem Windows Command Prompt, from tutorial/
+set "LIBRARY=%CD%\..\ai-agent-lib"
+set "PYTHON=%LIBRARY%\.venv\Scripts\python.exe"
 ```
 
 ```bash
@@ -152,7 +154,7 @@ the application workspace.
 | `policies/agentlib/rules/data.yaml` | Rules that decide which actions are allowed |
 | `tests/policy-samples.yaml` | Requests the rules should allow or deny |
 | `agentlib.toml` | The answers used to generate the workspace |
-| `agentlib.lock` | Generated-file hashes used when updating templates; not a dependency lock |
+| `agentlib.lock` | Generated-file hashes used to preserve your edits when updating templates |
 
 A **graph** is a set of steps and the connections between them. LangGraph
 runs these steps. `ServiceContainer` supplies configured services to the
@@ -177,8 +179,8 @@ def test_farewell_trims_the_name() -> None:
     assert farewell("  Ada  ") == "Goodbye, Ada!"
 ```
 
-```powershell
-& $Python -m pytest agents/helper/tests/test_farewell.py
+```bat
+"%PYTHON%" -m pytest agents/helper/tests/test_farewell.py
 ```
 
 **Expected failure:** Python cannot import `farewell`, because you have not
@@ -228,8 +230,8 @@ Append this entry to the existing `samples:` list in
     reason: helper-calls-its-own-tools
 ```
 
-```powershell
-& $Python -m ai_agent_lib_cli policy test
+```bat
+"%PYTHON%" -m ai_agent_lib_cli policy test
 ```
 
 **Expected failure:** the new sample is denied because no rule names
@@ -247,7 +249,7 @@ It should look like:
     resources: [greet, farewell]
 ```
 
-Run `& $Python -m ai_agent_lib_cli policy test` again. It should pass.
+Run `"%PYTHON%" -m ai_agent_lib_cli policy test` again. It should pass.
 
 ### D. Check that the graph calls the tool
 
@@ -287,26 +289,23 @@ async def test_agent_uses_farewell() -> None:
 
 The scripted model requests the tool, receives its result, and gives the
 final answer. Checking the second model call proves the result reached it.
-`frame_untrusted` marks the tool's output as data, rather than new instructions.
+`frame_untrusted` labels the tool's output as untrusted data for the model.
 
-`async with` starts and closes the test services. `await` waits for the
-agent's work without blocking other asynchronous tasks. The generated
-pytest configuration already supports these asynchronous tests.
+`async with` manages startup and cleanup of the test services. The generated
+pytest configuration supports asynchronous tests.
 
-**The graph test uses fake permissions.** The policy sample in step C checks
-the actual rule. A passing graph test alone does not prove that configuration
-will permit the call.
+The graph test uses fake permissions to isolate the workflow. The policy
+sample in step C checks the actual rule. Run both to verify behavior and access:
 
-```powershell
-& $Python -m pytest agents/helper
-& $Python -m ai_agent_lib_cli policy test
-& $Python -m ai_agent_lib_cli check
+```bat
+"%PYTHON%" -m pytest agents/helper
+"%PYTHON%" -m ai_agent_lib_cli policy test
+"%PYTHON%" -m ai_agent_lib_cli check
 ```
 
-**Checkpoint:** tests and policy samples pass. `check` also runs lint,
+**Expected result:** tests and policy samples pass. `check` also runs lint,
 formatting, and type checks. If pasted code needs formatting, run
-`& $Python -m ruff format .` and retry. The command-line agent still echoes
-questions until you select a real model.
+`"%PYTHON%" -m ruff format .` and retry.
 
 ## 4. Check and change configuration
 
@@ -320,22 +319,21 @@ EAP_DEPLOYMENT_ENV=local
 EAP_MODEL_PROVIDER=fake
 ```
 
-These are selected lines, not a replacement for the whole file. Keep its
-other generated settings.
+Check these entries and keep the file's other generated settings.
 
 - `EAP_PROFILE` chooses defaults: `local` or `aws`.
 - `EAP_DEPLOYMENT_ENV` says where this process runs: `local`, `dev`, or `prod`.
   Non-local environments reject development-only adapters.
-- `EAP_MODEL_PROVIDER` chooses the model implementation. `fake` needs no account.
+- `EAP_MODEL_PROVIDER` chooses the model implementation. `fake` runs in process.
 
 Process environment variables override `.env`; `.env` overrides profile
 defaults. Relative file paths are resolved from the folder containing
-`.env`, not from your terminal. Restart a service after editing its settings.
+`.env`. Restart a service after editing its settings.
 
-```powershell
-& $Python -m ai_agent_lib_cli config explain helper
-& $Python -m ai_agent_lib_cli config options model fake
-& $Python -m ai_agent_lib_cli doctor helper
+```bat
+"%PYTHON%" -m ai_agent_lib_cli config explain helper
+"%PYTHON%" -m ai_agent_lib_cli config options model fake
+"%PYTHON%" -m ai_agent_lib_cli doctor helper
 ```
 
 `explain` shows values and their sources, with secrets masked. `options`
@@ -343,7 +341,7 @@ lists accepted keys and defaults. `doctor` builds and validates the selected
 services; with cloud adapters, that can contact external services.
 
 For JSON options, use double quotes around keys and strings, and keep the
-value on one line. Unknown options are rejected rather than ignored.
+value on one line. An unknown option produces a configuration error.
 
 ## 5. Add a shared tool server
 
@@ -353,47 +351,48 @@ agent is enough for a tool that only that agent needs.
 
 From `tutorial/`, add a sample server named `directory`:
 
-```powershell
-& $Python -m ai_agent_lib_cli new mcp directory --description "The people directory"
-& $Python -m ai_agent_lib_cli install
-& $Python -m ai_agent_lib_cli link helper directory
-& $Python -m pytest
-& $Python -m ai_agent_lib_cli policy test
+```bat
+"%PYTHON%" -m ai_agent_lib_cli new mcp directory --description "The people directory"
+"%PYTHON%" -m ai_agent_lib_cli install
+"%PYTHON%" -m ai_agent_lib_cli link helper directory
+"%PYTHON%" -m pytest
+"%PYTHON%" -m ai_agent_lib_cli policy test
 ```
 
 The server lives in `mcp-servers/directory/`. It has sample CSV data, named
-queries, tool functions, and tests. A **named query** is defined in advance
-and called with parameters; the model is not given arbitrary SQL access.
+queries, tool functions, and tests. A **named query** defines the allowed query
+in advance. The tool supplies values for its declared parameters.
 
 `link` updates registrations and permissions and adds a test of the agent
-and server together. That test uses an in-process server and a scripted
-model, so you do not need to start either service to run the tests.
+and server together. That test manages an in-process server and uses a
+scripted model to call its tools.
 
-**Checkpoint:** the expanded test suite and policy samples pass.
+**Expected result:** the expanded test suite and policy samples pass.
 
 After linking, start the server before asking the agent a question. In one
 terminal, with the Python variable set and the working directory at `tutorial/`:
 
-```powershell
-& $Python -m ai_agent_lib_cli run directory
+```bat
+"%PYTHON%" -m ai_agent_lib_cli run directory
 ```
 
-In a second terminal, [restore the Python variable](#using-a-new-terminal), then:
+Wait for the server's `ready` log event. In a second terminal,
+[set the Python variable](#using-a-new-terminal), then run:
 
-```powershell
-& $Python -m helper "Who is in the payments team?"
+```bat
+"%PYTHON%" -m helper "Who is in the payments team?"
 ```
 
-The fake model still echoes the question. The connection test, rather than
-that echoed answer, proves that the agent can use a server tool. Press
-Ctrl+C in the server terminal when finished.
+**Expected result:** the fake model prints `fake: Who is in the payments team?`.
+The generated connection test verifies calls to the server's tools. Keep the
+server running for the HTTP example, or press Ctrl+C to stop it.
 
 When a tool's arguments change, review the change and update its **schema
 pin**, the hash of its expected input definition:
 
-```powershell
-& $Python -m ai_agent_lib_cli registry pin directory
-& $Python -m ai_agent_lib_cli check
+```bat
+"%PYTHON%" -m ai_agent_lib_cli registry pin directory
+"%PYTHON%" -m ai_agent_lib_cli check
 ```
 
 ## 6. Optional: call the agent over HTTP
@@ -401,12 +400,12 @@ pin**, the hash of its expected input definition:
 HTTP lets another program call the agent. If you completed step 5, keep
 `directory` running in its own terminal. Start the agent in another:
 
-```powershell
-& $Python -m ai_agent_lib_cli run helper
+```bat
+"%PYTHON%" -m ai_agent_lib_cli run helper
 ```
 
-Save this complete script as `try_http.py` in `tutorial/`. It uses Python's
-standard library, so it needs no additional package or command-line tool:
+Wait for the agent's `ready` log event. Save this script as `try_http.py` in
+`tutorial/`. It sends a request using Python's standard library:
 
 ```python
 import json
@@ -427,8 +426,8 @@ with urlopen(request, timeout=30) as response:
 
 In a separate terminal with the interpreter variable restored, run:
 
-```powershell
-& $Python try_http.py
+```bat
+"%PYTHON%" try_http.py
 ```
 
 **Expected result:** readiness succeeds and the response includes an
@@ -447,8 +446,8 @@ updates and authenticated requests, see the
 ## 7. Optional: generate tools over your own data
 
 Choose one source below. The CLI proposes queries and generates a server
-with tests. Review the proposals and the generated rules before using real
-data: column-name guesses are not a complete data-classification review.
+with tests. Before using real data, review which fields the tools return,
+how those fields are classified, and which roles may access them.
 
 ### CSV files
 
@@ -464,18 +463,18 @@ id,team,amount,email
 
 Preview the proposal, then generate the server:
 
-```powershell
-& $Python -m ai_agent_lib_cli new mcp claims-mcp --from-csv ./inputs/claims --propose
-& $Python -m ai_agent_lib_cli new mcp claims-mcp --from-csv ./inputs/claims --description "Tools over practice claims"
-& $Python -m ai_agent_lib_cli install
-& $Python -m pytest mcp-servers/claims-mcp
-& $Python -m ai_agent_lib_cli doctor claims-mcp
+```bat
+"%PYTHON%" -m ai_agent_lib_cli new mcp claims-mcp --from-csv ./inputs/claims --propose
+"%PYTHON%" -m ai_agent_lib_cli new mcp claims-mcp --from-csv ./inputs/claims --description "Tools over practice claims"
+"%PYTHON%" -m ai_agent_lib_cli install
+"%PYTHON%" -m pytest mcp-servers/claims-mcp
+"%PYTHON%" -m ai_agent_lib_cli doctor claims-mcp
 ```
 
-`--propose` writes nothing. Generation copies the CSV files into the server's
-`data/` folder and writes query definitions under `queries/`. Each file is
-a table. `--per-table` limits how many tools are proposed; repeat `--query`
-to keep selected query names from the proposal.
+`--propose` prints proposed tools for review. The second command copies the CSV
+files into the server's `data/` folder and writes query definitions under
+`queries/`. Each file is a table. `--per-table` limits how many tools are proposed;
+repeat `--query` to keep selected query names from the proposal.
 
 The generated tests check calls and permissions. Add assertions for the
 results your application actually needs. For this dataset, inspect
@@ -483,56 +482,55 @@ results your application actually needs. For this dataset, inspect
 
 The agent can use this server after you link it:
 
-```powershell
-& $Python -m ai_agent_lib_cli link helper claims-mcp
-& $Python -m pytest tests
-& $Python -m ai_agent_lib_cli check
+```bat
+"%PYTHON%" -m ai_agent_lib_cli link helper claims-mcp
+"%PYTHON%" -m pytest tests
+"%PYTHON%" -m ai_agent_lib_cli check
 ```
 
 Start `claims-mcp` as well as `directory` before running the linked agent.
-The generated tests need neither server running. If you later change the
-tool arguments, review them and run
-`& $Python -m ai_agent_lib_cli registry pin claims-mcp`.
+The generated tests manage their own in-process servers. If you later change
+the tool arguments, review them and run
+`"%PYTHON%" -m ai_agent_lib_cli registry pin claims-mcp`.
 
 ### A REST API described by OpenAPI
 
 If you have an OpenAPI 3 document, save it as `inputs/rates.yaml` or replace
 that path below with your document's path:
 
-```powershell
-& $Python -m ai_agent_lib_cli new mcp rates-mcp --from-openapi ./inputs/rates.yaml --propose
-& $Python -m ai_agent_lib_cli new mcp rates-mcp --from-openapi ./inputs/rates.yaml --description "Tools over the rates API"
-& $Python -m ai_agent_lib_cli install
-& $Python -m pytest mcp-servers/rates-mcp
+```bat
+"%PYTHON%" -m ai_agent_lib_cli new mcp rates-mcp --from-openapi ./inputs/rates.yaml --propose
+"%PYTHON%" -m ai_agent_lib_cli new mcp rates-mcp --from-openapi ./inputs/rates.yaml --description "Tools over the rates API"
+"%PYTHON%" -m ai_agent_lib_cli install
+"%PYTHON%" -m pytest mcp-servers/rates-mcp
 ```
 
 The CLI creates tools for supported GET operations returning JSON records.
-Generation does not call the API. Tests use `tests/api_responses.json`
-inside the generated server; replace its sample responses with representative
+Generation reads the OpenAPI document. Tests use local responses from
+`tests/api_responses.json`; replace its sample responses with representative
 test data. Read that server's README before configuring API authentication
 or running diagnostics that contact the real service.
 
 ### Redshift tables
 
-This optional path needs an AWS account with permission to read the database
-catalogue and credentials available to the Python AWS SDK. Use your team's
-approved credential setup. If that requires a sign-in tool you cannot install,
-run this step on an approved development or CI host.
+This path needs permission to read the Redshift database catalogue and AWS
+credentials available to the Python AWS SDK. Run it on a development machine
+or CI host configured with your team's approved AWS access.
 
 The checkout-based `install` command includes the local AWS package. Run
 the following after replacing `your-workgroup` and `your-profile` with your
 approved values; adjust the schema and database names as needed:
 
-```powershell
-& $Python -m ai_agent_lib_cli new mcp sales-mcp --from-redshift sales --database dev --workgroup your-workgroup --aws-profile your-profile --description "Tools over sales tables"
-& $Python -m ai_agent_lib_cli install
-& $Python -m pytest mcp-servers/sales-mcp
+```bat
+"%PYTHON%" -m ai_agent_lib_cli new mcp sales-mcp --from-redshift sales --database dev --workgroup your-workgroup --aws-profile your-profile --description "Tools over sales tables"
+"%PYTHON%" -m ai_agent_lib_cli install
+"%PYTHON%" -m pytest mcp-servers/sales-mcp
 ```
 
-Generation reads table and column metadata, not table rows. It creates local
-stand-in CSV files for testing. Those made-up rows verify the integration,
-not the correctness of results from your real database. The generated README
-explains the configuration for querying Redshift.
+Generation reads table and column metadata and creates sample CSV files for
+local tests. These tests verify tool integration and permissions. Add tests
+with representative data and expected results to verify your queries. The
+generated README explains how to configure queries against Redshift.
 
 ### Review who can see the data
 
@@ -544,14 +542,14 @@ the actual rules, since classifications and masking depend on the source.
 Add allowed and denied samples to `tests/policy-samples.yaml`, and assertions
 about returned rows and masked columns to the server's tests. Then run:
 
-```powershell
-& $Python -m ai_agent_lib_cli policy test
-& $Python -m pytest
+```bat
+"%PYTHON%" -m ai_agent_lib_cli policy test
+"%PYTHON%" -m pytest
 ```
 
 If the deployment uses OPA (Open Policy Agent), also run
-`& $Python -m ai_agent_lib_cli policy test --opa` on a machine where that
-separate policy engine is available. OPA is not required for this local tutorial.
+`"%PYTHON%" -m ai_agent_lib_cli policy test --opa` on a machine where that
+policy engine is installed.
 
 ## 8. Optional: use and evaluate a real model
 
@@ -560,9 +558,9 @@ a model ID available to your account. Its calls can incur charges.
 
 First inspect the supported settings:
 
-```powershell
-& $Python -m ai_agent_lib_cli config options model anthropic
-& $Python -m ai_agent_lib_cli config options model bedrock
+```bat
+"%PYTHON%" -m ai_agent_lib_cli config options model anthropic
+"%PYTHON%" -m ai_agent_lib_cli config options model bedrock
 ```
 
 Choose one provider and update `agents/helper/pyproject.toml`:
@@ -573,11 +571,10 @@ Choose one provider and update `agents/helper/pyproject.toml`:
   `ai-agent-lib-aws[bedrock]` to the `dependencies` list.
 
 Keep any version constraints your project already uses. An **extra** is the
-optional dependency group in brackets; changing configuration alone does
-not install it.
+optional dependency group in brackets. Install the updated dependencies:
 
-```powershell
-& $Python -m ai_agent_lib_cli install
+```bat
+"%PYTHON%" -m ai_agent_lib_cli install
 ```
 
 In `agents/helper/.env`, set `EAP_MODEL_PROVIDER` to your choice and
@@ -589,22 +586,22 @@ use, the environment-backed secret provider accepts
 
 Start any MCP servers linked to the agent, then check and ask:
 
-```powershell
-& $Python -m ai_agent_lib_cli config explain helper
-& $Python -m ai_agent_lib_cli doctor helper
-& $Python -m helper "Say goodbye to Ada."
+```bat
+"%PYTHON%" -m ai_agent_lib_cli config explain helper
+"%PYTHON%" -m ai_agent_lib_cli doctor helper
+"%PYTHON%" -m helper "Say goodbye to Ada."
 ```
 
 The model can now choose tools. Its exact wording may vary. The generated
-configuration tests still read `.env.example` and use scripted replies, so
-your ordinary test suite stays repeatable.
+configuration tests read `.env.example` and use scripted replies to keep
+the test suite repeatable.
 
 An **evaluation** checks real-model response quality against example
 questions. Review `agents/helper/evals/cases.jsonl` and
 `agents/helper/tests/test_helper_eval.py`, then run explicitly:
 
-```powershell
-& $Python -m ai_agent_lib_cli eval helper
+```bat
+"%PYTHON%" -m ai_agent_lib_cli eval helper
 ```
 
 These tests are excluded from the default run. With a fake model, the
@@ -616,51 +613,83 @@ can incur charges. Inspect individual failures as well as the overall score.
 After upgrading the library, start from a committed or backed-up workspace
 and run:
 
-```powershell
-& $Python -m ai_agent_lib_cli update --diff
-& $Python -m ai_agent_lib_cli install
-& $Python -m ai_agent_lib_cli check
+```bat
+"%PYTHON%" -m ai_agent_lib_cli update --diff
+"%PYTHON%" -m ai_agent_lib_cli install
+"%PYTHON%" -m ai_agent_lib_cli check
 ```
 
-**`update --diff` is not a dry run.** Unmodified generated files are updated.
-Files you edited are preserved, and `--diff` shows the template changes for
-those files so you can merge them yourself. Review the resulting diff before
-committing. Keep `agentlib.lock`: its hashes distinguish generated files from
+**`update --diff` applies changes** to unmodified generated files. It preserves
+files you edited and prints their proposed template changes for you to merge.
+Review the resulting diff before committing. Keep `agentlib.lock`: its hashes
+distinguish generated files from
 files you have changed.
 
 ## 10. Optional: prepare a deployment
 
-Local development remains a Python/pip workflow. Building container images
-and applying infrastructure needs a suitable machine or CI runner with the
-required tools and permissions.
+Use the Python CLI to generate deployment files. To build container images
+and apply infrastructure, use a build machine or CI runner with a container
+engine, Terraform, and permission to publish images and manage the AWS resources.
 
 From `tutorial/`, create the deployment settings file:
 
-```powershell
-& $Python -m ai_agent_lib_cli deploy helper
+```bat
+"%PYTHON%" -m ai_agent_lib_cli deploy helper
 ```
 
 On the first run this writes `agents/helper/deploy.env` with example values.
 Edit it with your platform team's non-local settings before continuing.
-Use secret references rather than secret values. Add any required extras
+Use secret references for credentials. Add any required extras
 to the service's dependencies; for example, Bedrock needs the AWS `bedrock`
 extra and a PostgreSQL checkpoint store needs its `postgres` extra.
 
-```powershell
-& $Python -m ai_agent_lib_cli install
-& $Python -m ai_agent_lib_cli deploy helper --plan
-& $Python -m ai_agent_lib_cli deploy helper
+```bat
+"%PYTHON%" -m ai_agent_lib_cli install
+"%PYTHON%" -m ai_agent_lib_cli deploy helper --plan
+"%PYTHON%" -m ai_agent_lib_cli deploy helper
 ```
 
 The plan explains the adapters, permissions, supporting containers, and
-warnings. The command generates Terraform and image-build files; it does
-not provision AWS resources. Read `deploy/helper/README.md` for dependency
-locking, image building, and infrastructure steps on the deployment host.
+warnings. The second deployment command writes Terraform and image-build
+files. Read `deploy/helper/README.md` for the next steps: locking dependencies,
+building images, and applying infrastructure on the deployment host.
 
 For shared deployments, configure real authentication, narrow permissions,
 and the correct `EAP_DEPLOYMENT_ENV`. See the
 [deployment guide](developer-guide.html#deploy) and
-[release scope](release-scope.md) before relying on a feature's guarantees.
+[release scope](release-scope.md) for supported behavior and operational limits.
+
+## Common questions and how-to recipes
+
+To see the messages sent to the model and its responses, add this to
+`agents/helper/.env`, then restart the agent:
+
+```dotenv
+EAP_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl
+```
+
+Run your questions with the same `--thread` value to continue a conversation.
+Inspect `agents/helper/.agentlib/model-trace.jsonl` for each model call's messages,
+tool definitions, response, and attempt number. This opt-in file contains
+conversation content; use test data and keep it private. Remove the setting and
+restart to stop capture.
+
+New agents include runnable examples. From the workspace root, use
+`"%PYTHON%" -m helper.examples.trace_react` for the scripted tool loop. Follow
+[Anthropic setup](anthropic-example.md) before running
+`"%PYTHON%" -m helper.examples.trace_anthropic` with a real model.
+The [annotated verified run](verified-anthropic-run.md) includes captured JSON
+and explains the tool result and checkpoint messages that became model input.
+
+Use the developer guide's Q&A for these tasks:
+
+| You want to… | Recipe |
+| --- | --- |
+| Enable and read model diagnostics | [Inspect model input and output](developer-guide.html#model-debugging) |
+| Understand the model–tool loop and restored history | [Run the scripted ReAct example](developer-guide.html#react-context) |
+| Follow a real two-question conversation | [Inspect the verified Anthropic run](developer-guide.html#verified-anthropic) |
+| Continue or start a conversation | [Use scoped checkpoint threads](developer-guide.html#checkpoint-questions) |
+| Investigate missing context, repeated tool calls, or an empty trace | [Common questions](developer-guide.html#faq) |
 
 ## When something goes wrong
 
@@ -668,7 +697,7 @@ and the correct `EAP_DEPLOYMENT_ENV`. See the
 | --- | --- |
 | `No module named helper` | Use the interpreter from setup and rerun the workspace's `install` command. |
 | pip cannot find a package | Check the approved index or wheelhouse, Python version, and compatible wheels. |
-| A setting seems ignored | Run `config explain helper`; a process variable may override `.env`. Restart after changes. |
+| A setting seems ignored | Run `"%PYTHON%" -m ai_agent_lib_cli config explain helper`; a process variable may override `.env`. Restart after changes. |
 | The agent answers with `fake:` | That is the default model's expected behavior. Use scripted tests for tools or configure a real model. |
 | Connection refused after linking a server | Start each linked MCP server and check its address and port. |
 | A request is denied | Compare caller, application, action, and resource with the intended rule. Add a policy sample before changing permissions. |
@@ -689,4 +718,4 @@ reporting a bug, and remove credentials and sensitive data from reports.
 | Environment variables | [Configuration reference](variables.md) |
 | User identity and service delegation | [Identity guide](identity.md) |
 | AWS adapters and dependencies | [AWS package](../packages/ai-agent-lib-aws/README.md) |
-| Current behavior versus the target design | [Release scope](release-scope.md) |
+| Supported behavior and operational limits | [Release scope](release-scope.md) |

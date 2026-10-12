@@ -1,0 +1,16 @@
+# This isolated experiment is not a library distribution.
+[tool.pytest.ini_options]
+testpaths = ["checks"]
+python_files = ["check_*.py"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-ra"
+
+[tool.ruff]
+extend = "../../pyproject.toml"
+
+[tool.ruff.lint.per-file-ignores]
+"checks/**" = ["D", "S101", "S105", "S106", "ARG"]
+"spike/data_layer.py" = ["D102", "ARG002"]
+

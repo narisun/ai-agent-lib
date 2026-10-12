@@ -1,0 +1,154 @@
+opportunity_id,uen,name,product,stage,amount,probability,close_date,competitor,owner,created_date,next_step
+OPP000000002100,BENC-0003,Positive Pay — payment fraud protection,Positive Pay,Closed Lost,133656.89,0,2026-06-28,RBC,Shannon Thomas,2026-05-10,
+OPP000000002101,BENC-0003,Positive Pay — payment fraud protection,Positive Pay,Negotiation,284526.75,83,2026-05-11,TD Bank,Shannon Thomas,2025-08-16,Agreement in legal review; credit approval in progress
+OPP000000001700,BUSH-0009,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,130815.76,100,2026-05-20,,Lauren Cortez,2025-12-19,
+OPP000000001701,BUSH-0009,Lockbox — receivables automation,Lockbox,Closed Won,224807.79,100,2026-07-11,Wells Fargo,Lauren Cortez,2025-10-30,
+OPP000000001400,CHAN-0011,Positive Pay — payment fraud protection,Positive Pay,Closed Won,307351.15,100,2026-02-15,Bank of America,Daniel Hurley,2025-09-29,
+OPP000000001401,CHAN-0011,Treasury Management — operating account consolidation,Treasury Management,Negotiation,275244.26,85,2026-03-28,Citizens Bank,Daniel Hurley,2025-04-21,Agreement in legal review; credit approval in progress
+OPP000000001800,DGYU-0012,Revolving Credit Facility — working capital,Revolving Credit,Proposal,44877614.28,54,2026-01-12,U.S. Bank,Steven Smith,2025-10-04,Pricing proposal delivered — awaiting client feedback
+OPP000000000400,DULU-0014,Treasury Management — operating account consolidation,Treasury Management,Proposal,307263.33,56,2026-05-26,U.S. Bank,Jesse Perry,2026-03-12,Pricing proposal delivered — awaiting client feedback
+OPP000000001500,ESTW-0015,Lockbox — receivables automation,Lockbox,Negotiation,227286.17,72,2026-06-09,Fifth Third,Katherine Wallace,2026-04-23,Agreement in legal review; credit approval in progress
+OPP000000001501,ESTW-0015,Investment Sweep — idle cash deployment,Sweep Account,Prospecting,261820.27,11,2026-01-12,TD Bank,Katherine Wallace,2025-05-13,Discovery meeting with the treasurer being scheduled
+OPP000000002300,FARI-0016,FX Forward Program — cross-currency hedging,FX Hedging,Negotiation,332018.72,80,2026-11-11,Fifth Third,Stacey Martin,2026-06-30,Agreement in legal review; credit approval in progress
+OPP000000002301,FARI-0016,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,70067.71,100,2026-05-03,U.S. Bank,Stacey Martin,2026-02-11,
+OPP000000000600,FILS-0017,Investment Sweep — idle cash deployment,Sweep Account,Prospecting,202351.79,22,2026-11-23,Bank of America,Kathleen Wheeler,2026-01-23,Discovery meeting with the treasurer being scheduled
+OPP000000004600,FRES-0018,Commercial Card Program — AP automation,Card Program,Negotiation,180572.53,71,2026-03-15,U.S. Bank,Audrey Mendoza,2025-07-11,Agreement in legal review; credit approval in progress
+OPP000000004601,FRES-0018,Treasury Management — operating account consolidation,Treasury Management,Negotiation,91497.64,65,2026-10-05,PNC,Audrey Mendoza,2026-05-02,Agreement in legal review; credit approval in progress
+OPP000000004500,GREA-0019,Investment Sweep — idle cash deployment,Sweep Account,Proposal,217965.60,58,2026-10-30,Fifth Third,Ruben Ruiz,2026-02-16,Pricing proposal delivered — awaiting client feedback
+OPP000000004501,GREA-0019,Investment Sweep — idle cash deployment,Sweep Account,Prospecting,179624.63,18,2026-03-30,JPMorgan Chase,Ruben Ruiz,2025-09-14,Discovery meeting with the treasurer being scheduled
+OPP000000001200,GUID-0020,Investment Sweep — idle cash deployment,Sweep Account,Proposal,70483.27,41,2026-03-17,RBC,Aaron Ross,2025-11-04,Pricing proposal delivered — awaiting client feedback
+OPP000000002200,IGLO-0021,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,87446.95,100,2026-05-03,TD Bank,Mrs. Amber Franklin,2026-06-22,
+OPP000000002201,IGLO-0021,Revolving Credit Facility — working capital,Revolving Credit,Negotiation,30028859.76,72,2026-11-05,Fifth Third,Mrs. Amber Franklin,2026-06-30,Agreement in legal review; credit approval in progress
+OPP000000002400,JONE-0022,Lockbox — receivables automation,Lockbox,Closed Won,218191.45,100,2026-04-21,,Alexis Wilson,2026-01-11,
+OPP000000000000,KING-0023,Treasury Management — operating account consolidation,Treasury Management,Prospecting,57029.30,20,2026-03-07,PNC,Denise Proctor,2025-08-19,Discovery meeting with the treasurer being scheduled
+OPP000000002600,LIFE-0025,FX Forward Program — cross-currency hedging,FX Hedging,Closed Lost,210694.13,0,2026-03-18,U.S. Bank,Theresa Carney,2025-09-21,
+OPP000000000800,MALO-0027,FX Forward Program — cross-currency hedging,FX Hedging,Negotiation,288015.19,84,2026-09-29,PNC,Amy Cannon,2025-11-22,Agreement in legal review; credit approval in progress
+OPP000000000801,MALO-0027,Investment Sweep — idle cash deployment,Sweep Account,Proposal,270011.88,59,2026-08-17,Fifth Third,Amy Cannon,2025-12-27,Pricing proposal delivered — awaiting client feedback
+OPP000000000900,MALO-0027,Revolving Credit Facility — working capital,Revolving Credit,Proposal,28921603.06,47,2026-10-30,Wells Fargo,Amy Cannon,2026-01-23,Pricing proposal delivered — awaiting client feedback
+OPP000000003800,MALO-0027,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,67509.75,100,2026-05-16,TD Bank,Amy Cannon,2025-08-21,
+OPP000000004300,MAPL-0028,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,217612.93,100,2026-04-19,Fifth Third,Stephanie Pierce,2025-12-06,
+OPP000000002500,MCCO-0030,Investment Sweep — idle cash deployment,Sweep Account,Closed Lost,340632.70,0,2026-04-21,RBC,Cathy Taylor,2026-06-30,
+OPP000000002900,NEWM-0031,Positive Pay — payment fraud protection,Positive Pay,Closed Lost,145670.63,0,2026-06-18,Fifth Third,Amber Morton,2025-12-04,
+OPP000000001600,REMB-0036,FX Forward Program — cross-currency hedging,FX Hedging,Negotiation,297095.88,75,2026-03-18,Wells Fargo,Damon Deleon,2025-12-19,Agreement in legal review; credit approval in progress
+OPP000000004900,REMB-0036,Investment Sweep — idle cash deployment,Sweep Account,Prospecting,150747.27,11,2026-08-20,U.S. Bank,Damon Deleon,2026-01-25,Discovery meeting with the treasurer being scheduled
+OPP000000000500,SHIN-0039,Lockbox — receivables automation,Lockbox,Prospecting,218398.38,10,2026-04-21,JPMorgan Chase,Sherry Walker DDS,2025-07-03,Discovery meeting with the treasurer being scheduled
+OPP000000000200,SIMM-0040,Investment Sweep — idle cash deployment,Sweep Account,Closed Lost,87771.25,0,2026-05-31,TD Bank,Jill Smith,2026-02-23,
+OPP000000000201,SIMM-0040,Treasury Management — operating account consolidation,Treasury Management,Negotiation,90773.24,81,2026-02-02,PNC,Jill Smith,2025-03-01,Agreement in legal review; credit approval in progress
+OPP000000003200,SUNM-0043,FX Forward Program — cross-currency hedging,FX Hedging,Closed Lost,52644.21,0,2026-01-06,Citizens Bank,Jennifer Guerrero,2025-06-26,
+OPP000000002700,THEV-0044,FX Forward Program — cross-currency hedging,FX Hedging,Prospecting,178260.47,17,2026-03-25,JPMorgan Chase,Brandon Hogan,2025-06-08,Discovery meeting with the treasurer being scheduled
+OPP000000002701,THEV-0044,Revolving Credit Facility — working capital,Revolving Credit,Prospecting,4862083.57,16,2026-08-16,Citizens Bank,Brandon Hogan,2025-08-08,Discovery meeting with the treasurer being scheduled
+OPP000000000300,VERM-0045,Revolving Credit Facility — working capital,Revolving Credit,Negotiation,16090887.16,71,2026-06-06,PNC,Brent Greene,2026-03-31,Agreement in legal review; credit approval in progress
+OPP000000003100,WAWO-0046,Revolving Credit Facility — working capital,Revolving Credit,Proposal,38007299.25,57,2026-11-28,Citizens Bank,Suzanne Baker,2026-04-12,Pricing proposal delivered — awaiting client feedback
+OPP-9001,ADUD-0013,Positive Pay — payment fraud protection,Positive Pay,Prospecting,212630.07,19,2027-02-04,Fifth Third,Cynthia Rogers,2026-05-15,Discovery meeting with the treasurer being scheduled
+OPP-9002,ALLO-0001,FX Forward Program — cross-currency hedging,FX Hedging,Proposal,146982.42,55,2026-10-17,JPMorgan Chase,Erica Baker,2026-06-23,Pricing proposal delivered — awaiting client feedback
+OPP-9003,ALLO-0001,Lockbox — receivables automation,Lockbox,Qualification,228949.09,31,2026-12-10,JPMorgan Chase,Erica Baker,2026-04-21,Confirming decision process and budget with the CFO
+OPP-9004,BARG-0002,Lockbox — receivables automation,Lockbox,Proposal,215140.39,52,2026-11-11,TD Bank,Kathryn Young,2026-05-01,Pricing proposal delivered — awaiting client feedback
+OPP-9005,BETT-0004,Lockbox — receivables automation,Lockbox,Proposal,65438.77,59,2026-10-26,U.S. Bank,Susan Fields,2026-05-03,Pricing proposal delivered — awaiting client feedback
+OPP-9006,BETT-0004,Positive Pay — payment fraud protection,Positive Pay,Proposal,117372.65,49,2026-11-27,Fifth Third,Susan Fields,2026-03-10,Pricing proposal delivered — awaiting client feedback
+OPP-9007,BLOU-0005,Lockbox — receivables automation,Lockbox,Qualification,131559.80,37,2026-09-22,PNC,Howard Anderson,2026-05-12,Confirming decision process and budget with the CFO
+OPP-9008,BOBS-0006,FX Forward Program — cross-currency hedging,FX Hedging,Proposal,137928.53,52,2026-12-09,Fifth Third,David Wood,2026-06-07,Pricing proposal delivered — awaiting client feedback
+OPP-9009,BOBS-0006,Lockbox — receivables automation,Lockbox,Proposal,123159.26,45,2026-12-14,Citizens Bank,David Wood,2026-04-27,Pricing proposal delivered — awaiting client feedback
+OPP-9010,BOST-0007,Positive Pay — payment fraud protection,Positive Pay,Proposal,206837.74,57,2027-02-05,Truist,Johnny Lopez,2026-03-02,Pricing proposal delivered — awaiting client feedback
+OPP-9011,BUCK-0008,FX Forward Program — cross-currency hedging,FX Hedging,Qualification,83202.67,40,2026-12-29,U.S. Bank,Aaron Johnson,2026-06-10,Confirming decision process and budget with the CFO
+OPP-9012,CANA-0010,Treasury Management — operating account consolidation,Treasury Management,Qualification,95075.79,36,2026-11-10,TD Bank,Stephanie Webster,2026-04-06,Confirming decision process and budget with the CFO
+OPP-9013,CANA-0010,Investment Sweep — idle cash deployment,Sweep Account,Qualification,186407.09,28,2026-12-09,PNC,Stephanie Webster,2026-05-02,Confirming decision process and budget with the CFO
+OPP-9014,KLEI-0024,Lockbox — receivables automation,Lockbox,Qualification,208570.82,33,2027-01-17,U.S. Bank,Sheena Neal,2026-07-02,Confirming decision process and budget with the CFO
+OPP-9015,LIPM-0026,Lockbox — receivables automation,Lockbox,Proposal,100177.21,52,2026-10-11,Wells Fargo,Jon Vega,2026-07-10,Pricing proposal delivered — awaiting client feedback
+OPP-9016,MAST-0029,Treasury Management — operating account consolidation,Treasury Management,Proposal,181605.72,56,2026-12-15,RBC,Madison Cook,2026-03-06,Pricing proposal delivered — awaiting client feedback
+OPP-9017,MAST-0029,Investment Sweep — idle cash deployment,Sweep Account,Prospecting,109789.33,23,2027-01-27,Wells Fargo,Madison Cook,2026-06-18,Discovery meeting with the treasurer being scheduled
+OPP-9018,OLSS-0032,Positive Pay — payment fraud protection,Positive Pay,Prospecting,126511.21,22,2026-11-07,Bank of America,John Smith,2026-05-05,Discovery meeting with the treasurer being scheduled
+OPP-9019,OLSS-0032,FX Forward Program — cross-currency hedging,FX Hedging,Proposal,152231.32,43,2027-01-11,Bank of America,John Smith,2026-03-10,Pricing proposal delivered — awaiting client feedback
+OPP-9020,PEND-0033,Positive Pay — payment fraud protection,Positive Pay,Prospecting,116182.02,11,2026-11-01,RBC,Haley Brown,2026-05-31,Discovery meeting with the treasurer being scheduled
+OPP-9021,PRAI-0034,FX Forward Program — cross-currency hedging,FX Hedging,Prospecting,107829.50,13,2027-01-01,U.S. Bank,Brandon Patel,2026-06-05,Discovery meeting with the treasurer being scheduled
+OPP-9022,PRAI-0034,Lockbox — receivables automation,Lockbox,Proposal,128866.87,58,2026-09-19,TD Bank,Brandon Patel,2026-06-23,Pricing proposal delivered — awaiting client feedback
+OPP-9023,PREM-0035,Lockbox — receivables automation,Lockbox,Prospecting,237013.04,13,2026-12-10,U.S. Bank,Lisa Morrison,2026-04-21,Discovery meeting with the treasurer being scheduled
+OPP-9024,SEBA-0037,Lockbox — receivables automation,Lockbox,Prospecting,249221.87,21,2027-02-08,JPMorgan Chase,Tracey Stone,2026-06-25,Discovery meeting with the treasurer being scheduled
+OPP-9025,SEBA-0037,FX Forward Program — cross-currency hedging,FX Hedging,Qualification,208536.93,34,2026-11-30,JPMorgan Chase,Tracey Stone,2026-06-19,Confirming decision process and budget with the CFO
+OPP-9026,SHAM-0038,FX Forward Program — cross-currency hedging,FX Hedging,Prospecting,162614.37,23,2027-01-24,Bank of America,Kimberly Smith,2026-06-13,Discovery meeting with the treasurer being scheduled
+OPP-9027,SHAM-0038,Lockbox — receivables automation,Lockbox,Qualification,223624.75,32,2026-09-28,Truist,Kimberly Smith,2026-04-19,Confirming decision process and budget with the CFO
+OPP-9028,SLEE-0041,Treasury Management — operating account consolidation,Treasury Management,Prospecting,45291.99,25,2026-12-14,Bank of America,Christopher Wolfe,2026-03-21,Discovery meeting with the treasurer being scheduled
+OPP-9029,SLEE-0041,Investment Sweep — idle cash deployment,Sweep Account,Prospecting,197000.70,22,2026-10-07,Fifth Third,Christopher Wolfe,2026-03-12,Discovery meeting with the treasurer being scheduled
+OPP-9030,STHU-0042,Investment Sweep — idle cash deployment,Sweep Account,Qualification,78542.01,34,2027-02-22,PNC,Shelly Jordan,2026-05-20,Confirming decision process and budget with the CFO
+OPP-9501,ADUD-0013,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,283210.34,100,2025-06-08,Truist,Cynthia Rogers,2025-02-17,
+OPP-9502,ALLO-0001,Revolving Credit Facility — working capital,Revolving Credit,Closed Won,62991694.95,100,2025-09-07,Bank of America,Erica Baker,2025-05-21,
+OPP-9503,ALLO-0001,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,286217.50,100,2025-05-25,Wells Fargo,Erica Baker,2025-03-14,
+OPP-9504,ALLO-0001,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,249110.73,100,2025-10-24,Fifth Third,Erica Baker,2025-08-03,
+OPP-9505,BARG-0002,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,155593.33,100,2024-10-28,JPMorgan Chase,Kathryn Young,2024-07-11,
+OPP-9506,BARG-0002,Treasury Management — operating account consolidation,Treasury Management,Closed Won,258599.92,100,2025-11-29,RBC,Kathryn Young,2025-08-18,
+OPP-9507,BENC-0003,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,245532.74,100,2024-04-04,TD Bank,Shannon Thomas,2024-02-10,
+OPP-9508,BENC-0003,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,40781.61,100,2024-06-09,Citizens Bank,Shannon Thomas,2024-02-10,
+OPP-9509,BETT-0004,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,276589.11,100,2024-05-30,RBC,Susan Fields,2024-04-08,
+OPP-9510,BETT-0004,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,261119.09,100,2025-09-04,Citizens Bank,Susan Fields,2025-05-08,
+OPP-9511,BETT-0004,Treasury Management — operating account consolidation,Treasury Management,Closed Won,297082.11,100,2025-01-09,Truist,Susan Fields,2024-10-28,
+OPP-9512,BLOU-0005,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,240438.71,100,2024-06-11,TD Bank,Howard Anderson,2024-03-20,
+OPP-9513,BOBS-0006,Treasury Management — operating account consolidation,Treasury Management,Closed Won,83850.28,100,2025-05-13,Wells Fargo,David Wood,2025-03-27,
+OPP-9514,BOBS-0006,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,104200.40,100,2024-10-24,TD Bank,David Wood,2024-08-11,
+OPP-9515,BOST-0007,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,235800.67,100,2024-03-25,Truist,Johnny Lopez,2024-02-09,
+OPP-9516,BOST-0007,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,213606.95,100,2025-08-14,Wells Fargo,Johnny Lopez,2025-04-18,
+OPP-9517,BOST-0007,Commercial Card Program — AP automation,Card Program,Closed Won,255208.61,100,2025-01-21,JPMorgan Chase,Johnny Lopez,2024-09-26,
+OPP-9518,BUCK-0008,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,64506.83,100,2024-05-11,RBC,Aaron Johnson,2024-02-08,
+OPP-9519,BUCK-0008,Revolving Credit Facility — working capital,Revolving Credit,Closed Won,36524963.31,100,2025-02-05,U.S. Bank,Aaron Johnson,2024-10-29,
+OPP-9520,CANA-0010,Treasury Management — operating account consolidation,Treasury Management,Closed Won,142809.83,100,2024-06-17,U.S. Bank,Stephanie Webster,2024-03-18,
+OPP-9521,CANA-0010,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,194406.88,100,2026-01-29,Bank of America,Stephanie Webster,2025-11-01,
+OPP-9522,CHAN-0011,Treasury Management — operating account consolidation,Treasury Management,Closed Won,143445.79,100,2025-03-20,JPMorgan Chase,Daniel Hurley,2025-01-06,
+OPP-9523,CHAN-0011,Revolving Credit Facility — working capital,Revolving Credit,Closed Won,47828899.87,100,2025-11-12,Bank of America,Daniel Hurley,2025-07-17,
+OPP-9524,DGYU-0012,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,295980.75,100,2025-06-02,RBC,Steven Smith,2025-04-13,
+OPP-9525,DGYU-0012,Revolving Credit Facility — working capital,Revolving Credit,Closed Won,29839031.17,100,2024-07-22,Citizens Bank,Steven Smith,2024-04-30,
+OPP-9526,DULU-0014,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,107356.31,100,2024-03-21,Bank of America,Jesse Perry,2024-01-31,
+OPP-9527,DULU-0014,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,197982.11,100,2024-12-02,Fifth Third,Jesse Perry,2024-09-08,
+OPP-9528,ESTW-0015,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,256224.30,100,2024-07-16,JPMorgan Chase,Katherine Wallace,2024-04-03,
+OPP-9529,FARI-0016,Revolving Credit Facility — working capital,Revolving Credit,Closed Won,21712749.65,100,2024-03-10,Wells Fargo,Stacey Martin,2023-12-27,
+OPP-9530,FRES-0018,Revolving Credit Facility — working capital,Revolving Credit,Closed Won,29969521.51,100,2025-11-24,Citizens Bank,Audrey Mendoza,2025-09-03,
+OPP-9531,FRES-0018,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,222265.77,100,2024-10-21,JPMorgan Chase,Audrey Mendoza,2024-08-12,
+OPP-9532,FRES-0018,Commercial Card Program — AP automation,Card Program,Closed Won,124156.32,100,2025-01-11,RBC,Audrey Mendoza,2024-10-30,
+OPP-9533,GUID-0020,Revolving Credit Facility — working capital,Revolving Credit,Closed Won,55105764.42,100,2024-09-11,U.S. Bank,Aaron Ross,2024-05-30,
+OPP-9534,GUID-0020,Treasury Management — operating account consolidation,Treasury Management,Closed Won,209226.08,100,2025-04-27,Bank of America,Aaron Ross,2025-03-03,
+OPP-9535,IGLO-0021,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,285482.01,100,2024-03-23,Fifth Third,Mrs. Amber Franklin,2024-01-08,
+OPP-9536,JONE-0022,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,250780.97,100,2025-10-20,JPMorgan Chase,Alexis Wilson,2025-08-27,
+OPP-9537,KING-0023,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,72391.59,100,2026-01-02,PNC,Denise Proctor,2025-09-30,
+OPP-9538,KLEI-0024,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,146141.67,100,2025-11-13,JPMorgan Chase,Sheena Neal,2025-08-23,
+OPP-9539,LIFE-0025,Commercial Card Program — AP automation,Card Program,Closed Won,45376.99,100,2025-10-03,Citizens Bank,Theresa Carney,2025-08-13,
+OPP-9540,LIFE-0025,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,268561.07,100,2024-07-24,Truist,Theresa Carney,2024-04-02,
+OPP-9541,LIFE-0025,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,164402.53,100,2026-01-31,Fifth Third,Theresa Carney,2025-10-03,
+OPP-9542,LIPM-0026,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,284818.65,100,2024-07-01,Truist,Jon Vega,2024-03-23,
+OPP-9543,MALO-0027,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,76321.34,100,2024-06-30,Wells Fargo,Amy Cannon,2024-03-15,
+OPP-9544,MAPL-0028,Treasury Management — operating account consolidation,Treasury Management,Closed Won,178324.04,100,2025-10-27,JPMorgan Chase,Stephanie Pierce,2025-07-07,
+OPP-9545,MAST-0029,Treasury Management — operating account consolidation,Treasury Management,Closed Won,88123.37,100,2025-01-21,Bank of America,Madison Cook,2024-12-05,
+OPP-9546,MAST-0029,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,295602.25,100,2025-04-07,Citizens Bank,Madison Cook,2025-01-14,
+OPP-9547,MCCO-0030,Revolving Credit Facility — working capital,Revolving Credit,Closed Won,10393713.11,100,2024-03-25,U.S. Bank,Cathy Taylor,2023-12-17,
+OPP-9548,MCCO-0030,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,274196.52,100,2025-03-27,Bank of America,Cathy Taylor,2025-01-19,
+OPP-9549,NEWM-0031,Treasury Management — operating account consolidation,Treasury Management,Closed Won,286081.43,100,2025-09-04,TD Bank,Amber Morton,2025-05-08,
+OPP-9550,NEWM-0031,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,281360.76,100,2024-05-07,Fifth Third,Amber Morton,2024-02-19,
+OPP-9551,OLSS-0032,Treasury Management — operating account consolidation,Treasury Management,Closed Won,144059.52,100,2024-10-29,Citizens Bank,John Smith,2024-08-29,
+OPP-9552,OLSS-0032,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,108536.38,100,2025-02-27,Wells Fargo,John Smith,2024-12-25,
+OPP-9553,PEND-0033,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,133782.97,100,2024-06-15,RBC,Haley Brown,2024-04-18,
+OPP-9554,PRAI-0034,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,106184.54,100,2024-05-24,U.S. Bank,Brandon Patel,2024-02-07,
+OPP-9555,PRAI-0034,Revolving Credit Facility — working capital,Revolving Credit,Closed Won,44405939.78,100,2025-10-02,PNC,Brandon Patel,2025-08-11,
+OPP-9556,PRAI-0034,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,95810.20,100,2025-06-16,Wells Fargo,Brandon Patel,2025-03-13,
+OPP-9557,PREM-0035,Treasury Management — operating account consolidation,Treasury Management,Closed Won,72296.06,100,2024-08-17,U.S. Bank,Lisa Morrison,2024-05-25,
+OPP-9558,PREM-0035,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,75308.07,100,2025-01-01,RBC,Lisa Morrison,2024-10-03,
+OPP-9559,REMB-0036,Treasury Management — operating account consolidation,Treasury Management,Closed Won,136943.36,100,2025-06-02,Truist,Damon Deleon,2025-02-16,
+OPP-9560,REMB-0036,Revolving Credit Facility — working capital,Revolving Credit,Closed Won,35894458.08,100,2025-03-22,JPMorgan Chase,Damon Deleon,2024-12-24,
+OPP-9561,REMB-0036,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,88877.86,100,2024-07-01,Wells Fargo,Damon Deleon,2024-04-25,
+OPP-9562,SEBA-0037,Treasury Management — operating account consolidation,Treasury Management,Closed Won,257322.20,100,2025-10-10,JPMorgan Chase,Tracey Stone,2025-08-16,
+OPP-9563,SEBA-0037,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,67888.75,100,2024-07-21,U.S. Bank,Tracey Stone,2024-04-17,
+OPP-9564,SEBA-0037,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,139001.18,100,2025-04-09,RBC,Tracey Stone,2025-01-27,
+OPP-9565,SHAM-0038,Revolving Credit Facility — working capital,Revolving Credit,Closed Won,22500223.05,100,2024-09-01,Truist,Kimberly Smith,2024-06-01,
+OPP-9566,SHAM-0038,Treasury Management — operating account consolidation,Treasury Management,Closed Won,231179.50,100,2024-10-23,Citizens Bank,Kimberly Smith,2024-09-01,
+OPP-9567,SHIN-0039,Treasury Management — operating account consolidation,Treasury Management,Closed Won,51180.16,100,2024-04-28,Fifth Third,Sherry Walker DDS,2024-01-14,
+OPP-9568,SHIN-0039,Revolving Credit Facility — working capital,Revolving Credit,Closed Won,12363870.61,100,2025-10-12,U.S. Bank,Sherry Walker DDS,2025-07-09,
+OPP-9569,SIMM-0040,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,43267.92,100,2024-05-11,Fifth Third,Jill Smith,2024-01-29,
+OPP-9570,SIMM-0040,Treasury Management — operating account consolidation,Treasury Management,Closed Won,185969.13,100,2024-07-15,Bank of America,Jill Smith,2024-03-22,
+OPP-9571,SLEE-0041,Revolving Credit Facility — working capital,Revolving Credit,Closed Won,22141320.15,100,2024-03-01,TD Bank,Christopher Wolfe,2024-01-13,
+OPP-9572,SLEE-0041,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,294688.53,100,2024-04-12,Fifth Third,Christopher Wolfe,2024-02-18,
+OPP-9573,STHU-0042,Revolving Credit Facility — working capital,Revolving Credit,Closed Won,24437845.73,100,2024-07-28,U.S. Bank,Shelly Jordan,2024-06-06,
+OPP-9574,SUNM-0043,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,78831.47,100,2026-01-08,TD Bank,Jennifer Guerrero,2025-09-10,
+OPP-9575,SUNM-0043,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,44843.84,100,2025-06-21,U.S. Bank,Jennifer Guerrero,2025-03-26,
+OPP-9576,SUNM-0043,Treasury Management — operating account consolidation,Treasury Management,Closed Won,214201.56,100,2025-08-19,RBC,Jennifer Guerrero,2025-05-04,
+OPP-9577,THEV-0044,Commercial Card Program — AP automation,Card Program,Closed Won,54763.40,100,2024-10-13,Citizens Bank,Brandon Hogan,2024-08-04,
+OPP-9578,THEV-0044,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,299389.61,100,2025-01-17,Fifth Third,Brandon Hogan,2024-12-02,
+OPP-9579,VERM-0045,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,236853.51,100,2025-04-07,JPMorgan Chase,Brent Greene,2025-01-17,
+OPP-9580,VERM-0045,Treasury Management — operating account consolidation,Treasury Management,Closed Won,280971.91,100,2024-10-05,PNC,Brent Greene,2024-06-19,
+OPP-9581,VERM-0045,Investment Sweep — idle cash deployment,Sweep Account,Closed Won,166493.25,100,2025-06-18,TD Bank,Brent Greene,2025-04-20,
+OPP-9582,WAWO-0046,FX Forward Program — cross-currency hedging,FX Hedging,Closed Won,286103.30,100,2025-01-18,Citizens Bank,Suzanne Baker,2024-09-23,
+OPP-9583,WAWO-0046,Revolving Credit Facility — working capital,Revolving Credit,Closed Won,29396564.79,100,2024-12-01,U.S. Bank,Suzanne Baker,2024-08-28,

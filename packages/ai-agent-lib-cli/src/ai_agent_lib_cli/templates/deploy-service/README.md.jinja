@@ -1,47 +1,104 @@
 # Deploying {{ name }}
 
-`agentlib deploy {{ name }}` wrote this folder from `{{ folder }}/deploy.env`, the
-settings {{ name }} runs with in AWS. Nothing here holds a secret.
+Use this folder to build the service image and configure its AWS Fargate
+deployment. The CLI generates these files from `{{ folder }}/deploy.env`.
 
-| File | Whose |
+## Prepare the deployment environment
+
+You need a build machine or CI runner with:
+
+- Python and pip, with access to published library packages on your approved index;
+- a container engine for building images and access to your image registry;
+- Terraform and AWS credentials with permission to manage the deployment;
+- the cluster, network, and other platform resources listed in `terraform.tfvars.example`.
+
+Start from the **workspace root** and follow
+[Select Python](../../README.md#select-python) to set `PYTHON`.
+Windows examples use **Command Prompt (cmd.exe)**. In bash/zsh, use `"$PYTHON"`
+where a command shows `"%PYTHON%"`.
+
+## 1. Review settings and generate files
+
+Edit `{{ folder }}/deploy.env` with the settings for your deployment. Use secret
+references for credentials. Review the plan, then regenerate the files:
+
+```bat
+"%PYTHON%" -m ai_agent_lib_cli deploy {{ name }} --plan
+"%PYTHON%" -m ai_agent_lib_cli deploy {{ name }}
+```
+
+The plan lists selected providers, required AWS permissions, supporting
+containers, and items that need manual review.
+
+| File | How to maintain it |
 | --- | --- |
-| `settings.tf` | agentlib's: the task's environment, from `deploy.env` |
-| `permissions.tf` | agentlib's: what each adapter said it needs from AWS, and why |
-| `main.tf`, `variables.tf`, `Dockerfile`, `Dockerfile.dockerignore` | yours: written once, never overwritten |
+| `settings.tf` | Generated on each run from `deploy.env`; edit the settings file to change it |
+| `permissions.tf` | Generated on each run from the selected adapters' permission requirements |
+| `main.tf`, `variables.tf`, `Dockerfile`, `Dockerfile.dockerignore` | Created once; review and edit them for your deployment |
 
-Change `deploy.env`, never `settings.tf` or `permissions.tf`, and run the command again.
+In `permissions.tf`, `# check:` marks a permission whose resource needs manual
+review. Configure the specific resource in `deploy.env` where supported, or
+adjust the task policy in your service's `main.tf` before production use.
 
-## Steps
+## 2. Lock runtime dependencies
 
-1. Review the plan: `agentlib deploy {{ name }} --plan`. It lists every adapter, every
-   permission and the reason for it, the sidecars, and anything to check by hand.
-2. Write the files: `agentlib deploy {{ name }}`.
-3. Lock the service's runtime dependencies with hashes in a release environment
-   matching the image's Python and operating system. This needs only pip-installed
-   Python tools; Docker is needed only on the machine that builds the image:
+Generate a dependency lock file in a release environment matching the image's
+Python version and operating system. The generated Dockerfile uses Python 3.11
+on Linux. From the workspace root on that Linux host, using bash:
 
-   ```
-   python -m pip install pip-tools
-   python -m piptools compile --generate-hashes --output-file=deploy/{{ name }}/requirements.lock {{ folder }}/pyproject.toml
-   ```
+```bash
+python3.11 -m venv .venv-release
+PYTHON="$PWD/.venv-release/bin/python"
+"$PYTHON" -m pip install pip-tools
+"$PYTHON" -m piptools compile --generate-hashes --output-file=deploy/{{ name }}/requirements.lock {{ folder }}/pyproject.toml
+```
 
-   Commit and review the lock file. Regenerate it when dependencies change. Use
-   your package index for the library; editable local checkouts are not release inputs.
-   Build and push the images, from the workspace folder:
+**Expected result:** `deploy/{{ name }}/requirements.lock` contains pinned
+dependencies and hashes. Review and commit it. Regenerate it when dependencies
+change. Resolve library dependencies from your approved package index.
 
-   ```
-   docker build -f deploy/{{ name }}/Dockerfile -t {{ name }} .
-   docker build -f deploy/opa/Dockerfile -t {{ name }}-opa .   # when the plan lists the OPA sidecar
-   ```
+## 3. Build and publish images
 
-4. Copy `terraform.tfvars.example` to `terraform.tfvars` and fill it in.
-5. `terraform init`, `terraform plan`, read it, `terraform apply`.
+On the image build host, run from the workspace root:
 
-The Dockerfile-specific ignore file excludes other services, `.env` files, local
-state and private keys from the build context. The selected service's `src/` and
-`queries/`, plus the shared `registry/` and `policies/`, are its runtime assets.
-Review and explicitly admit any additional assets your service needs; never copy
-the whole workspace. Configure credentials at runtime through the secrets provider.
+```bat
+docker build -f deploy/{{ name }}/Dockerfile -t {{ name }} .
+```
 
-In `permissions.tf`, a line starting `# check:` marks a resource agentlib could not
-narrow from the settings alone, such as an ID AWS assigns. Narrow it before production.
+If the plan includes the OPA sidecar, also build its image:
+
+```bat
+docker build -f deploy/opa/Dockerfile -t {{ name }}-opa .
+```
+
+These Docker commands also work in bash. Tag and push the images using your
+team's registry workflow, then record their published image digests for step 4.
+
+`Dockerfile.dockerignore` limits the build context to runtime assets: the
+service's `src/` and `queries/`, plus shared `registry/` and `policies/`.
+Review and explicitly include any additional assets your service needs.
+Keep credentials in the runtime secrets provider.
+
+## 4. Review and apply infrastructure
+
+Copy `deploy/{{ name }}/terraform.tfvars.example` to
+`deploy/{{ name }}/terraform.tfvars`. Fill in the platform resource IDs and
+published image references. Use immutable image digests, as shown in the file.
+Set `opa_image` to `null` if the plan uses another policy provider.
+
+From the workspace root, run:
+
+```bat
+terraform -chdir=deploy/{{ name }} init
+terraform -chdir=deploy/{{ name }} plan
+```
+
+Review the planned resource changes. To apply them, run:
+
+```bat
+terraform -chdir=deploy/{{ name }} apply
+```
+
+The Terraform commands work in Command Prompt and bash. After deployment,
+check the ECS service status and startup logs, then verify `/readyz` through
+your configured service endpoint.

@@ -1,33 +1,46 @@
 # agentlib-service
 
-A Terraform module that runs one agentlib service on ECS Fargate.
+A Terraform module that runs one ai-agent-lib service on ECS Fargate.
 
-`agentlib deploy SERVICE` copies it here and writes a root module for the service
-under `deploy/SERVICE/` that calls it. Read that folder's README first.
+Start with your service's README under `deploy/<service>/`. It explains how to
+select Python, generate deployment files with the Python CLI, build images,
+and run Terraform. The service's `main.tf` calls this shared module.
 
-This folder is agentlib's: every `agentlib deploy` rewrites it, so an upgrade of the
-library brings its fixes. Change what it does through its variables, or copy it
-under another name and point your root module at the copy.
+## Configure the module
 
-Its tests need no AWS account: `terraform init -backend=false && terraform test`.
+Set the module's input variables in the service's `main.tf` and
+`terraform.tfvars`. The deployment generator refreshes this shared folder on
+each run. To maintain a custom module, copy it under a new name and update the
+service's module source to point to that copy.
 
-What it makes:
+Your platform must provide the cluster, network, load balancer where used,
+image repositories, secrets, and AWS resources used by the selected adapters.
 
-- a task definition with the service, an OPA sidecar when `opa_image` is set, and
-  an OpenTelemetry collector sidecar when `collector` is true;
-- an ECS service with a deployment circuit breaker that rolls back a bad release;
-- a task role with exactly the permissions in `task_policy_json` (which
-  `agentlib deploy` derives from the adapters the service's settings select),
-  plus what the collector needs to send traces to X-Ray and metrics to CloudWatch;
-- an execution role that can pull images and write this service's logs only;
-- a log group, `/agentlib/NAME`.
+## Run the module tests
 
-Every container has a read-only root file system; `/tmp` is the writable place.
-Fargate creates that volume owned by root, so a short `volume-init` container runs
-first, as root, makes it writable the way `/tmp` always is, and exits; the service,
-which runs as an unprivileged user, starts only once it has succeeded.
-OPA listens on the task's loopback address only. The tasks get no public IP.
+Use a Terraform version that supports mocked providers. Run these commands
+from the workspace root, in Windows Command Prompt or bash:
 
-It does not make the cluster, the network, the load balancer, the image
-repositories, the secrets, or the AWS resources the adapters use: those belong
-to the platform the service is deployed into.
+```bat
+terraform -chdir=deploy/modules/agentlib-service init -backend=false
+terraform -chdir=deploy/modules/agentlib-service test
+```
+
+**Expected result:** the module tests pass using mocked AWS providers.
+
+## Understand the resources
+
+The module creates:
+
+- A task definition with the service, an OPA sidecar when `opa_image` is set,
+  and an OpenTelemetry collector when `collector` is true.
+- An ECS service with a deployment circuit breaker that rolls back failed releases.
+- A task role with `task_policy_json`, derived from the selected adapters,
+  plus permissions the collector needs for X-Ray and CloudWatch.
+- An execution role for pulling images and writing service logs.
+- A log group named `/agentlib/NAME`.
+
+Containers use a read-only root filesystem and a writable `/tmp` volume.
+The `volume-init` container prepares that volume before the service starts
+as an unprivileged user. OPA listens on the task's loopback address; tasks
+use private network addresses.

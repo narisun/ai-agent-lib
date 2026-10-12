@@ -1,0 +1,49 @@
+# What the services of this workspace allow. The first rule that matches a
+# request allows it; a request that no rule matches is denied.
+#
+# One document, two engines. In local development the in-process `rules`
+# provider reads this file. A deployed service asks OPA, which loads the
+# `policies` folder as a bundle (this file becomes `data.agentlib.rules`).
+#
+# This file is yours. agentlib appends the rules a new service needs and never
+# changes or removes a rule that is here.
+schema: agentlib.rules/v1
+rules:
+  # rmprep-data: who may call its tools, and what each role sees of the data.
+  # Analysts and managers may read the supplied snapshot. Each query caps pages
+  # at 50 rows; the analyst policy also enforces that limit.
+  - id: rmprep-data-staff-call-the-tools
+    actions: [tool.call]
+    applications: [rmprep-data]
+    roles: [analyst, manager]
+    resources: ["rmprep-data/*"]
+    max_classification: confidential
+
+  - id: rmprep-data-managers-see-everything
+    actions: [data.query]
+    applications: [rmprep-data]
+    roles: [manager]
+    resources: ["rmprep.*"]
+    max_classification: confidential
+
+  - id: rmprep-data-analysts-read-the-data
+    actions: [data.query]
+    applications: [rmprep-data]
+    roles: [analyst]
+    resources: ["rmprep.*"]
+    max_classification: confidential
+    obligations:
+      max_rows: 50
+
+  # rmprep: the models and tools it may use. A tool of an MCP server is
+  # named <server>/<tool>; the server decides for itself what the caller may see.
+  - id: rmprep-uses-its-models
+    actions: [model.route]
+    applications: [rmprep]
+    resources: [default]
+
+  - id: rmprep-calls-rmprep-data
+    actions: [tool.call]
+    applications: [rmprep]
+    resources: ["rmprep-data/*"]
+    max_classification: confidential
