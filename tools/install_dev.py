@@ -1,6 +1,6 @@
 """Install this repository into the current Python environment using pip only.
 
-Run from a virtual environment: ``python tools/install_dev.py``. Extra arguments
+Run with your selected Python: ``python tools/install_dev.py``. Extra arguments
 are passed to pip, for example ``--no-index --find-links=/path/to/wheels``.
 """
 
@@ -19,7 +19,7 @@ def editable_requirements(project: Path) -> list[str]:
     its declared members so pip installs the agent and MCP distributions.
     """
     config = tomllib.loads(project.read_text(encoding="utf-8"))
-    # UI dependencies have their own interpreter and checks. In particular the
+    # UI dependencies have their own package folder and checks. In particular the
     # selected browser framework and the agent MCP SDK need different versions.
     if config.get("tool", {}).get("ai-agent-lib", {}).get("development-environment") == "ui":
         return []

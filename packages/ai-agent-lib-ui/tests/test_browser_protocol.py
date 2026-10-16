@@ -20,6 +20,7 @@ from uuid import uuid4
 import httpx
 import pytest
 import socketio  # type: ignore[import-untyped]
+from python_runtime import python_command
 
 
 def free_port() -> int:
@@ -216,7 +217,7 @@ class LocalServer:
 
     def command(self, *args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run(  # noqa: S603 - fixed module in this test's interpreter
-            [sys.executable, "-m", "ai_agent_lib_ui", *args, "--config", str(self.config)],
+            python_command("-m", "ai_agent_lib_ui", *args, "--config", str(self.config)),
             capture_output=True,
             text=True,
             env=self.env,
@@ -226,7 +227,7 @@ class LocalServer:
 
     def start(self) -> None:
         self.process = subprocess.Popen(  # noqa: S603 - fixed module and owned test configuration
-            [sys.executable, "-m", "ai_agent_lib_ui", "serve", "--config", str(self.config)],
+            python_command("-m", "ai_agent_lib_ui", "serve", "--config", str(self.config)),
             stdout=self.log,
             stderr=self.log,
             text=True,
@@ -278,6 +279,29 @@ def server(tmp_path_factory: pytest.TempPathFactory) -> Iterator[LocalServer]:
     finally:
         value.close()
         assert "was never awaited" not in (value.path / "server.log").read_text(encoding="utf-8")
+
+
+def test_launcher_health_probes_do_not_reset_ui_connections(server: LocalServer) -> None:
+    root = Path(__file__).resolve().parents[3]
+    log = server.path / "server.log"
+    before = log.stat().st_size
+    probe = (
+        f"import sys; sys.path.insert(0, {str(root)!r}); "
+        "from pathlib import Path; "
+        "from tools.local_processes import Service, is_ready; "
+        f"service = Service('ui', (), Path.cwd(), {server.port}, '/healthz'); "
+        "assert all(is_ready(service) for _ in range(40))"
+    )
+    result = subprocess.run(  # noqa: S603 - exercise our launcher with this test's server
+        python_command("-c", probe), capture_output=True, text=True, check=False, timeout=20
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    # Let the same server handle another request before inspecting its callback errors.
+    with httpx.Client(trust_env=False) as client:
+        assert client.get(server.origin + "/healthz").json() == {"status": "ok"}
+    output = log.read_bytes()[before:].decode("utf-8")
+    assert "ConnectionResetError" not in output, output
+    assert "_call_connection_lost" not in output, output
 
 
 async def connect(

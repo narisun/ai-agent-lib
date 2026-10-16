@@ -88,6 +88,13 @@ where needed. Tools accept neither raw SQL nor arbitrary table names.
 
 ## Design and checks
 
+For local debugging, inspect `rmprep-data.log` in the run folder printed by
+`start-local.bat`. Each admitted named query writes a `data_query` entry with its
+name, duration, row/column counts, truncation and masked columns. Local logging
+also includes bounded, credential-masked parameters such as UEN, dates and offset.
+It does not copy returned records into console lines. Open the MCP span in
+Phoenix to inspect arguments and results when content capture is enabled.
+
 `server.py` declares transport interfaces. It passes the governed query source
 to `ClientEvidence` in `evidence.py`. That class composes results without
 opening files or knowing the database provider. `signals.py` calculates review

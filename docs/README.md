@@ -5,14 +5,14 @@ Python, and pip with your team's approved package source.
 
 | Task | Read | Expected result |
 | --- | --- | --- |
-| Test the included business agent | [Local startup](local-startup.md) | Start rmprep, its MCP server, and Agent Lab; sign in and send a question |
+| Test the included business agent | [Local startup and testing](local-startup.md) | Set the root `.env`, start the stack, test memos and same-thread follow-ups, inspect traces, and stop safely |
 | Build a new agent | [Getting started](getting-started.md) | Create the `tutorial` workspace, add a tool, and test permissions and behavior |
 | Learn the architecture | [Developer guide](developer-guide.html#principles) | Understand interfaces, dependency injection, providers, and the LangGraph boundary |
-| Connect an existing agent to the simulator | [Agent Lab setup](../packages/ai-agent-lib-ui/README.md#1-prepare-a-separate-ui-environment) | Register an HTTP agent, start the UI, and resume saved chats |
+| Connect an existing agent to the simulator | [Agent Lab setup](../packages/ai-agent-lib-ui/README.md#1-prepare-the-ui-packages) | Register an HTTP agent, start the UI, and resume saved chats |
 | Find a configuration variable | [Searchable configuration table](developer-guide.html#variables) | See its purpose, local/AWS values, and provider options |
 | Inspect model context and tool use | [Tracing and ReAct walkthrough](developer-guide.html#model-debugging) | Read model input/output and checkpoint history |
 | Export traces to Langfuse | [Shared integration](langfuse.md) | Configure one separately hosted backend for generated or existing agents |
-| Inspect traces on a restricted desktop | [Local Phoenix trial](phoenix-trial.md) | Run Phoenix in its own Python environment with SQLite and follow Agent Lab's trace links |
+| Inspect traces on a restricted desktop | [Local Phoenix trial](phoenix-trial.md) | Run Phoenix with the same Python, isolated packages, and SQLite and follow Agent Lab's trace links |
 | Understand the business example | [rmprep](../examples/rmprep/README.md) and [context management](../examples/rmprep/docs/context-management.md) | Follow client selection, memo generation, and same-thread questions |
 | Change the library | [Contributor setup](../README.md#working-on-the-library) | Install development dependencies and run the appropriate checks |
 
@@ -67,18 +67,23 @@ A thread ID links turns; it does not make the entire transcript fit in a model
 request. Checkpoint storage and context selection have different jobs. Agent Lab
 sends each new question once and lets the agent assemble model context.
 
-## Use the right Python environment
+## Use the same Python with the right packages
 
-Run these commands from the repository root after the corresponding setup:
+Run these commands from the repository root. Use `setup-local.bat --dev` for
+rmprep and UI checks; the full library and guide checks require the additional
+[contributor dependencies](../README.md#working-on-the-library).
 
 | Work | Interpreter | Focused check |
 | --- | --- | --- |
-| Library, CLI, agents, MCP servers | `.venv\Scripts\python.exe` | `.venv\Scripts\python.exe -m pytest tests/architecture` |
-| Agent Lab | `packages\ai-agent-lib-ui\.venv\Scripts\python.exe` | `packages\ai-agent-lib-ui\.venv\Scripts\python.exe -m pytest packages/ai-agent-lib-ui/tests` |
-| Developer guide | Library interpreter | `.venv\Scripts\python.exe docs\guide\build_guide.py --check` |
+| Library and CLI (contributor setup) | `python` | `python -m pytest tests/architecture` |
+| rmprep (local setup) | `python` with agent packages | First `cd examples\rmprep`, then `python ..\..\tools\package_runtime.py agent -m pytest`; return with `cd ..\..`. |
+| Agent Lab | `python` with the UI package folder | First `cd packages\ai-agent-lib-ui`, then `python ..\..\tools\package_runtime.py ui -m pytest`; return with `cd ..\..`. |
+| Developer guide (contributor setup) | `python` | `python docs\guide\build_guide.py --check` |
+| Local stack readiness | Batch launcher | With services stopped, run `start-local.bat --smoke-test`; it checks startup and shuts down without sending model requests. |
 
 The UI and MCP services use different dependency versions and communicate over
-HTTP. Keep their environments separate. See each package README for its full
+HTTP. Setup isolates their packages while all processes use the same Python.
+Use `setup-local.bat --dev` for local development checks. See each package README for its full
 test and type-check commands.
 
 ## Current behavior and design material
@@ -96,7 +101,7 @@ Its proposed commands are recommendations, not commands available in this checko
 ## Keep documentation in sync
 
 - Edit `docs/guide/guide.src.html`, then run
-  `.venv\Scripts\python.exe docs\guide\build_guide.py`. The builder regenerates
+  `python docs\guide\build_guide.py`. The builder regenerates
   the HTML guide and its template-derived companion files.
 - Edit generated workspace/service instructions in
   `packages/ai-agent-lib-cli/src/ai_agent_lib_cli/templates/`. Test generation

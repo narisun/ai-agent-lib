@@ -51,8 +51,8 @@ def installation_arguments(root: Path, *, dev: bool = True) -> tuple[str, ...]:
 def install(tools: Toolbox, no_dev: bool, workspace: Path | None) -> None:
     """Install every workspace service and its dependencies with Python's pip.
 
-    Run inside a virtual environment. Run again after adding a service or changing
-    its pyproject.toml. No Docker, uv, or administrator privileges are needed.
+    Use the Python selected for this workspace. Run again after adding a service
+    or changing its pyproject.toml. Pip uses that Python's configured package location.
     """
     root = workspace_root(workspace)
     if tools.run_tool("pip", installation_arguments(root, dev=not no_dev), root) != 0:

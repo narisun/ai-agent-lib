@@ -29,41 +29,40 @@ with model attempts, MCP calls and checkpoint references grouped by thread.
 
 ## 1. Install with Python and pip
 
-For browser testing, run `setup-local.bat`, then `start-local.bat` from the library
-repository root in **Command Prompt**. This starts the MCP service, HTTP agent,
-and chat UI together. Follow the [local startup guide](../../docs/local-startup.md)
-for login, model setup, logs, and stopping the stack. The steps below explain
-manual setup and the command-line walkthroughs.
+For browser testing, follow the [local startup and testing guide](../../docs/local-startup.md).
+It covers `setup-local.bat`, Anthropic/Phoenix settings in the root `.env`, login,
+a Jones memo, same-thread follow-ups and client switching. For each later session,
+run `start-local.bat` from the library root in **Command Prompt**, then
+`stop-local.bat` when finished. Saved state is preserved.
 
-In Agent Lab, select **Choose agent → Start chat with rmprep**, then send a memo
-request. Select **Memos** to view it beside chat and switch saved versions. New
-batch configurations enable the `artifacts` capability. Existing configurations
-can add `"artifacts"` to the rmprep binding's `manifest.capabilities` array before
-restarting. Old text-only answers stay in chat; newly generated memos publish
-panel versions. **Logs** opens the LLM input/output, MCP calls and checkpoints for
-each turn. Selecting an old version only changes the viewer; name its memo
-reference in your follow-up to ask the agent about it.
+In Agent Lab, select **Choose agent → Start chat with rmprep**. **Memos** opens
+saved versions beside chat. **Open trace in Agent Lab** opens the response's
+Phoenix trace when enabled; **Logs** provides local diagnostics and checkpoint
+inspection. To ask about an older memo, name its reference in your question;
+selecting it in the panel changes only the viewer.
+
+The remaining steps cover manual setup and command-line walkthroughs. Manual
+agent commands read `agents/rmprep/.env`; they do not automatically load the
+root `.env` used by the batch launcher.
 
 Open **Command Prompt** in the library repository. Use Python 3.11 or newer and
 your team's existing pip configuration, including its enterprise package index.
 
 ```bat
-python -m venv .venv
-.venv\Scripts\activate.bat
 python -m pip install -e packages\ai-agent-lib-core -e packages\ai-agent-lib-aws -e packages\ai-agent-lib-cli
 python -m ai_agent_lib_cli install --workspace examples\rmprep
 cd examples\rmprep
 ```
 
-If you already use the repository's virtual environment, activate it and run
+Use the same approved Python for installation and service startup. Run
 the `install` command. That command installs both example services and the
 development tools using the active Python interpreter and pip.
 
 Create local settings once:
 
 ```bat
-copy agents\rmprep\.env.example agents\rmprep\.env
-copy mcp-servers\rmprep-data\.env.example mcp-servers\rmprep-data\.env
+if not exist agents\rmprep\.env copy agents\rmprep\.env.example agents\rmprep\.env
+if not exist mcp-servers\rmprep-data\.env copy mcp-servers\rmprep-data\.env.example mcp-servers\rmprep-data\.env
 ```
 
 Keep existing `.env` files if you have configured them already. Check that the
@@ -157,7 +156,6 @@ the selected evidence and conversation to the configured provider.
 In a second Command Prompt, starting at the repository root:
 
 ```bat
-.venv\Scripts\activate.bat
 cd examples\rmprep
 python -m rmprep "memo: Prepare a meeting memo for Jones Dairy Farm as of 2026-08-03." --thread jones-aug03
 python -m rmprep "qna: Which covenants need discussion, and what do their source records show?" --thread jones-aug03
@@ -311,10 +309,10 @@ references, comparisons, long histories, tool argument drift and older checkpoin
 
 ## Local Phoenix tracing
 
-The [Phoenix trial](../../docs/phoenix-trial.md) uses a separate Python environment and SQLite.
+The [Phoenix trial](../../docs/phoenix-trial.md) uses the same Python, a separate package folder, and SQLite.
 Run `start-phoenix.bat setup` once from the library repository root, then follow
 the guide to enable Phoenix in the root `.env`. `start-local.bat` starts the local
-Phoenix server before rmprep and Agent Lab, using `.agentlib\phoenix\.venv`.
+Phoenix server before rmprep and Agent Lab, using `.agentlib\phoenix\.venv\Lib\site-packages`.
 `stop-local.bat` in another Command Prompt stops the stack and preserves
 conversations, traces, and checkpoints. **Ctrl+C** in the original launcher also works.
 Each response links to its Phoenix trace; the existing turn inspector remains available.

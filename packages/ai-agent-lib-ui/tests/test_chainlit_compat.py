@@ -2,8 +2,9 @@
 
 import os
 import subprocess
-import sys
 from pathlib import Path
+
+from python_runtime import python_command
 
 
 def test_profile_config_is_shared_without_creating_a_coroutine(tmp_path: Path) -> None:
@@ -30,7 +31,7 @@ async def check():
 asyncio.run(check())
 """
     result = subprocess.run(  # noqa: S603 - installed shell, isolated temporary configuration
-        [sys.executable, "-c", code],
+        python_command("-c", code),
         cwd=tmp_path,
         env={**os.environ, "CHAINLIT_APP_ROOT": str(tmp_path)},
         capture_output=True,

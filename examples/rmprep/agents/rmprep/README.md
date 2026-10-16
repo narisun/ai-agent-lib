@@ -47,7 +47,9 @@ Financial calculations and review findings belong to the MCP evidence layer;
 the agent explains them and proposes questions for the RM to investigate.
 
 Include `Keep it within 450 words.` to set a word limit. Defaults are 1,000 words
-for a memo and 350 for Q&A, including headings, tables and citations. A reply
+for a memo and 350 for Q&A. Heading text, figures, tables and full citations count;
+Markdown heading/list markers and divider-only lines do not. Code is counted
+literally. Counting never rewrites an answer or removes evidence. A reply
 that fails length or citation checks gets up to two model revisions. Continued
 failure raises a validation error. Drafts appear in model traces; only accepted
 replies enter the conversation checkpoint. These checks do not establish that

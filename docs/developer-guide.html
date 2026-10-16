@@ -425,12 +425,12 @@ def test_expiry_uses_the_supplied_clock() -&gt; None:
   calls its governed model and tools, and returns an answer. MCP servers own shared
   tool execution. The UI presents the answer, metrics, documents, and diagnostic links.</p>
   <div class="table-wrap"><table>
-    <thead><tr><th>Component</th><th>Owns</th><th>Local Python environment</th></tr></thead>
+    <thead><tr><th>Component</th><th>Owns</th><th>Local package location</th></tr></thead>
     <tbody>
-      <tr><td>Agent and MCP services</td><td>Business workflow, evidence, policy enforcement, and graph checkpoints</td><td><code>.venv</code> in the library checkout</td></tr>
-      <tr><td>Agent Lab</td><td>Agent selection, displayed chat history, memo versions, and inspection pages</td><td><code>packages/ai-agent-lib-ui/.venv</code></td></tr>
+      <tr><td>Agent and MCP services</td><td>Business workflow, evidence, policy enforcement, and graph checkpoints</td><td><code>.venv/Lib/site-packages</code>; the approved Python runs it</td></tr>
+      <tr><td>Agent Lab</td><td>Agent selection, displayed chat history, memo versions, and inspection pages</td><td><code>packages/ai-agent-lib-ui/.venv/Lib/site-packages</code>; the same approved Python</td></tr>
       <tr><td>Langfuse, when enabled</td><td>Model/tool observations and trace browsing</td><td>A separate service; the agent exports through its existing Python environment</td></tr>
-      <tr><td>Phoenix local trial, when enabled</td><td>Model/tool observations in a local SQLite database</td><td><code>.agentlib/phoenix/.venv</code>; included by <code>start-local.bat</code> when enabled</td></tr>
+      <tr><td>Phoenix local trial, when enabled</td><td>Model/tool observations in a local SQLite database</td><td><code>.agentlib/phoenix/.venv/Lib/site-packages</code> with the same Python; included by <code>start-local.bat</code> when enabled</td></tr>
     </tbody>
   </table></div>
   <p>A saved UI message, a graph checkpoint, and a model input are different things.
@@ -534,7 +534,7 @@ def test_expiry_uses_the_supplied_clock() -&gt; None:
   <div class="table-wrap"><table>
     <thead><tr><th>You need</th><th>What to obtain</th></tr></thead>
     <tbody>
-      <tr><td>Python and pip</td><td>An approved Python 3.11+ installation with pip and <code>venv</code>, and permission to run a project environment. Use the Python version your team supports.</td></tr>
+      <tr><td>Python and pip</td><td>An approved Python 3.11+ installation with pip and permission to install approved packages into its configured location. Use the Python version your team supports.</td></tr>
       <tr><td>Library source</td><td>The team's approved checkout or source archive of <code>ai-agent-lib</code>, with <code>packages/</code> and <code>docs/</code> at its top level.</td></tr>
       <tr><td>Package access</td><td>The team's pip configuration for its Python repository, such as JFrog Artifactory, including its sign-in method and any proxy or certificate setup.</td></tr>
       <tr><td>A development folder</td><td>A location where your account can create files and run Python, for example a team-approved folder under your user profile. Both the library folder and its parent must be writable.</td></tr>
@@ -569,32 +569,32 @@ set "LIBRARY=%CD%"</code></pre>
   <p><strong>Check:</strong> Python reports version 3.11 or newer, pip reports a
   version and installation path, and both folders exist. If your team supplies
   a full path to <code>python.exe</code>, use that path in quotes in place of
-  <code>python</code> here and in the environment-creation command below.</p>
+  <code>python</code> here and select that executable below.</p>
 
-  <h3 id="select-python">B. Create and select your project's Python</h3>
-  <p>A <strong>virtual environment</strong> is a folder containing a Python
-  executable and this project's installed packages. Create it once, inside the
-  library checkout:</p>
-<pre><code class="language-bat" id="desktop-create-environment">python -m venv .venv
-set "PYTHON=%LIBRARY%\.venv\Scripts\python.exe"
+  <h3 id="select-python">B. Select your approved Python</h3>
+  <p>Use your existing enterprise Python and its pip. The commands install packages
+  into that Python's configured location. Select it for this terminal:</p>
+<pre><code class="language-bat" id="desktop-create-environment">set "PYTHON=python"
 "%PYTHON%" -c "import sys; print(sys.executable)"
 "%PYTHON%" -m pip --version</code></pre>
-  <p><strong>Check:</strong> the Python and pip paths are inside
-  <code>ai-agent-lib\.venv</code>. All remaining commands use this Python.
-  If your team supplies a project environment elsewhere, set <code>PYTHON</code>
-  to that environment's full <code>python.exe</code> path instead.</p>
+  <p><strong>Check:</strong> the Python and pip paths point to your approved installation.
+  All remaining commands use this Python. If your team supplies a specific
+  executable, set <code>PYTHON</code> to its full <code>python.exe</code> path.</p>
   <div class="table-wrap"><table>
     <thead><tr><th>Command notation</th><th>Meaning</th></tr></thead>
     <tbody>
       <tr><td><code>set "LIBRARY=%CD%"</code></td><td>Remember the library's current folder. <code>%CD%</code> is Command Prompt's current directory.</td></tr>
-      <tr><td><code>set "PYTHON=..."</code></td><td>Remember the executable's full path for this terminal session.</td></tr>
+      <tr><td><code>set "PYTHON=..."</code></td><td>Remember the Python command or executable path for this terminal session.</td></tr>
       <tr><td><code>"%PYTHON%" -m pip</code></td><td>Run the pip module belonging to that Python. The same <code>-m</code> convention runs pytest and the library CLI.</td></tr>
       <tr><td><code>cd /d "path"</code></td><td>Change to a folder, including on another drive. Keep quotes around paths so spaces work.</td></tr>
     </tbody>
   </table></div>
-  <p>Selecting the executable directly is sufficient to use the environment.
-  See Python's <a href="https://docs.python.org/3/library/venv.html#how-venvs-work">virtual environment documentation</a>
-  for how this works. The setup keeps package installation within that environment.</p>
+  <p>Run pip through <code>python -m pip</code> so installation uses the selected
+  Python. The local scripts use this same executable for all services. The local stack
+  keeps agent/MCP, Agent Lab, and Phoenix packages in separate
+  <code>.venv</code> folders because their upstream packages require different
+  versions. Startup and pip use the default Python; the scripts do not execute
+  Python or pip binaries from those folders.</p>
 
   <h3 id="enterprise-packages">C. Use your enterprise package access</h3>
   <p>A <strong>package index</strong> is the repository pip downloads packages
@@ -612,9 +612,8 @@ set "PYTHON=%LIBRARY%\.venv\Scripts\python.exe"
 <pre><code class="language-bat">set "PIP_CONFIG_FILE=C:\company\python\pip.ini"</code></pre>
     <p>This selects pip's configuration file for this terminal and its child
     processes. Existing user or machine configuration may already be sufficient.
-    Configuration specific to another Python environment is not copied into a new
-    virtual environment. Follow your team's setup again if the new environment
-    cannot reach the index. See <a href="https://pip.pypa.io/en/stable/topics/configuration/">pip configuration</a>.</p>
+    The scripts inherit this configuration when invoking pip, including
+    when installing Agent Lab and Phoenix into their package folders. See <a href="https://pip.pypa.io/en/stable/topics/configuration/">pip configuration</a>.</p>
   </details>
   <p>For certificate or sign-in failures, use the
   <a href="#setup-problems">installation troubleshooting table</a>. Keep
@@ -650,7 +649,6 @@ cd /d "%LIBRARY%\..\tutorial"
   into the selected Python environment using pip.</p>
 <pre><code>your development folder/
   ai-agent-lib/         Shared library source; LIBRARY points here
-    .venv/             Python and installed packages for this walkthrough
   tutorial/            Your application; run the remaining commands here
     agents/helper/     The agent you will change and test</code></pre>
   <p>Both folders use the Python selected in step B. Your application code belongs
@@ -678,7 +676,7 @@ cd /d "%LIBRARY%\..\tutorial"
   <p>The <code>set</code> commands apply only to the current terminal. To resume,
   open Command Prompt in <code>tutorial</code> and select the existing environment:</p>
 <pre><code class="language-bat" id="desktop-resume">set "LIBRARY=%CD%\..\ai-agent-lib"
-set "PYTHON=%LIBRARY%\.venv\Scripts\python.exe"
+set "PYTHON=python"
 "%PYTHON%" -c "import sys; print(sys.executable)"
 "%PYTHON%" -m helper "Say hello to Ada."</code></pre>
   <p>This recipe assumes the two sibling folders shown above. If your library or
@@ -1032,13 +1030,13 @@ EAP_MODEL_PROVIDER=fake</code></pre>
     <thead><tr><th>What you see</th><th>Next action</th></tr></thead>
     <tbody>
       <tr><td><code>python</code> is not recognized, or opens the Store</td><td>Use your team's prepared terminal or approved <code>python.exe</code> path in quotes. Ask for the approved installation path if you do not have it.</td></tr>
-      <tr><td><code>venv</code> or pip is missing</td><td>Ask for the team's supported virtual-environment setup. If they provide an environment, point <code>PYTHON</code> at its executable.</td></tr>
-      <tr><td>Access denied when creating or installing into <code>.venv</code></td><td>Check that the folder is writable and that <code>"%PYTHON%" -c "import sys; print(sys.executable)"</code> points to your project environment. For an application-policy block, provide the blocked tool's name and path to desktop support.</td></tr>
+      <tr><td><code>pip</code> is missing</td><td>Ask for the team's approved Python and pip setup. Point <code>PYTHON</code> at that executable.</td></tr>
+      <tr><td>Access denied when installing packages</td><td>Check that the folder is writable and that <code>"%PYTHON%" -c "import sys; print(sys.executable)"</code> points to your approved Python. For an application-policy block, provide the blocked tool's name and path to desktop support.</td></tr>
       <tr><td><code>"%PYTHON%"</code> cannot run, or <code>agentlib.toml</code> cannot be found</td><td>Use <a href="#new-terminal">the new-terminal recipe</a>. Python selection and the current folder are separate: select the environment and run workspace commands from <code>tutorial</code>.</td></tr>
       <tr><td>HTTP 401/403 or a proxy error during pip installation</td><td>Repeat the enterprise sign-in or proxy setup for this terminal. Confirm the pip repository endpoint with your team; use the same approved package source for each installation step.</td></tr>
       <tr><td><code>CERTIFICATE_VERIFY_FAILED</code></td><td>Ask for the enterprise CA configuration for this Python/pip environment. Pip supports a team-provided certificate bundle through <code>PIP_CERT</code>. Keep certificate verification enabled; the agent's <code>EAP_TLS_CA_BUNDLE</code> setting does not configure pip.</td></tr>
       <tr><td><code>No matching distribution found</code>, missing <code>hatchling</code>, or a compiler requirement</td><td>Share the package name, Python version, and Windows architecture with the package-maintenance team. They need to make compatible releases, build dependencies, and prebuilt wheels available. Use a team-supported build environment for dependencies that need compilation.</td></tr>
-      <tr><td>pip works in the original Python but fails in <code>.venv</code></td><td>Check whether the approved setup was specific to the original environment. Apply the team's pip configuration and authentication setup to the selected environment.</td></tr>
+      <tr><td><code>langchain_aws</code> is missing for Bedrock</td><td>For the local stack, run <code>setup-local.bat --model bedrock</code>. For generated agents, select Bedrock in the CLI and rerun <code>"%PYTHON%" -m ai_agent_lib_cli install</code>. This installs the AWS package's <code>bedrock</code> extra.</td></tr>
       <tr><td>Ruff or a local test process is blocked by desktop policy</td><td>Have the approved tool package or local execution permission enabled by your support team. Use your team's approved development runner for checks your desktop cannot run, and record which checks still need to pass.</td></tr>
     </tbody>
   </table></div>
@@ -1073,34 +1071,57 @@ EAP_MODEL_PROVIDER=fake</code></pre>
 <section id="faq">
   <h2>8. Common questions and how-to recipes</h2>
   <details id="local-startup">
-    <summary>How do I start Agent Lab, the agent, and the MCP server together?</summary>
-    <p><strong>Agent Lab</strong> is the local browser workspace for testing agents
-    and inspecting their responses. The <code>ai-agent-lib-ui</code> package supplies
-    the application. Its flask logo connects three nodes representing the agent,
-    its tools, and saved state.</p>
-    <p>Open Command Prompt in the library repository root and run
-    <code>setup-local.bat</code> once, then <code>start-local.bat</code>.
-    Setup uses your enterprise Python and pip configuration and keeps the UI in
-    its own virtual environment. The launcher starts the rmprep MCP server,
-    HTTP agent, and Agent Lab in order, waiting for readiness at each step.</p>
-    <p>In Agent Lab, select <strong>Choose agent</strong>, then <strong>Start chat</strong>.
-    Each chat identifies its selected agent. Open <strong>Memos</strong> for a memo
-    beside chat and select a saved version. Open <strong>Logs</strong>, choose a chat,
-    then a turn to inspect LLM input/output, MCP calls and checkpoints. Chat history
-    stays in the left sidebar; rename and archive are under
-    <strong>Logs → Manage chat history</strong>.</p>
-    <p>New rmprep batch configurations enable memo artifacts. For an existing UI
-    configuration, add <code>"artifacts"</code> to the rmprep binding's
-    <code>manifest.capabilities</code> array and restart. Generate a new memo to see
-    it in the panel; older text-only answers stay in chat. Viewing an old memo does
-    not change the agent's active context, so include its memo reference in a question.</p>
-    <p>Open <code>http://127.0.0.1:8765</code> when all services are ready.
-    Run <code>stop-local.bat</code> in a second Command Prompt to stop this
-    checkout's managed services, including local Phoenix. Saved conversations,
-    traces and checkpoints remain available on restart. Ctrl+C in the launcher
-    window also works; services started before this update need Ctrl+C once. Follow the <a href="local-startup.md">local
-    startup guide</a> for the login code, model setup, service logs, UI-only
-    startup, and the scripted trace walkthrough.</p>
+    <summary>How do I start Agent Lab, test rmprep, and stop the services?</summary>
+    <p>Use the <a href="local-startup.md">local startup and testing guide</a>
+    for the complete walkthrough. Open <strong>Command Prompt</strong> in the
+    library repository root. Run <code>setup-local.bat</code> once, then configure
+    your model in <code>.env</code> beside <code>start-local.bat</code>. For local
+    tracing, run <code>start-phoenix.bat setup</code> and add the Phoenix settings
+    from that guide. Setup uses your enterprise Python/pip configuration and
+    one Python for all services, with separate package folders for Agent Lab and Phoenix. The default setup installs
+    runtime packages. Run <code>setup-local.bat --dev</code> when you also need
+    the scaffolding CLI and the rmprep/Agent Lab test and development tools.</p>
+<pre><code class="language-bat">start-local.bat</code></pre>
+    <p>Check the printed settings: environment path, model, tracing backend and
+    masked credentials. Wait for <strong>All selected services are ready</strong>,
+    then open <code>http://127.0.0.1:8765</code>. Read the login code in a second
+    Command Prompt at the repository root:</p>
+<pre><code class="language-bat">type .agentlib\ui-rmprep\access-code</code></pre>
+    <p>Sign in, select <strong>Choose agent → Start chat with rmprep</strong>, and
+    ask <code>Prepare a memo for JONE-0022 as of 2026-08-03.</code> In the same
+    chat, ask <code>Explain the covenant breaches and cash conversion cycle change.
+    How was wallet share calculated? Use the saved evidence.</code> The
+    <a href="local-startup.md#generate-a-memo-and-ask-follow-ups">testing checklist</a>
+    gives expected values and follow-ups for client switching.</p>
+    <p>Text streams into a provisional draft; the final response keeps usage and
+    elapsed time visible. <strong>Memos</strong> opens saved versions beside chat.
+    Name a memo reference in your question to ask about an older version; selecting
+    it in the panel changes only the viewer. <strong>Open trace in Agent Lab</strong>
+    opens the turn's Phoenix timeline. <strong>Logs</strong> provides local
+    diagnostics and checkpoint inspection.</p>
+    <p>When finished, run this in the second Command Prompt:</p>
+<pre><code class="language-bat">stop-local.bat</code></pre>
+    <p>Wait for <strong>Stopped gracefully</strong>. Conversations, memo versions,
+    traces and checkpoints remain available on restart. Repeat
+    <code>start-local.bat</code> for your next session. Restart after changing code
+    or environment settings. With services stopped, use
+    <code>start-local.bat --smoke-test</code> to check startup/shutdown without a
+    model request, or <code>start-local.bat demo</code> for scripted tool and
+    checkpoint examples.</p>
+  </details>
+  <details id="rmprep-answer-checks">
+    <summary>Why does rmprep sometimes revise a draft?</summary>
+    <p>The agent checks answer length, exact source references and known evidence-limit
+    errors before saving an answer. A failing draft gets at most two revisions.
+    Drafts and correction requests appear in traces; only the accepted answer enters
+    conversation history.</p>
+    <p>Defaults are 1,000 words for a memo and 350 for Q&amp;A. Ask
+    <code>Keep it within 450 words.</code> for another limit. Heading text, figures,
+    tables and full citations count. Markdown heading/list markers and divider-only
+    lines do not; code is counted literally. Counting preserves the original text
+    and evidence. These checks catch known failure patterns; reviewers still need
+    to assess whether the claims follow from the cited records. See
+    <a href="../examples/rmprep/docs/context-management.md">rmprep context management</a>.</p>
   </details>
   <p>Use these recipes when you want to explain an agent's behavior from the messages,
   tools, and state involved. Commands run from the <code>tutorial/</code> workspace
@@ -1650,7 +1671,7 @@ async def classify(
   <p>On macOS/Linux, use <code>cd "$LIBRARY"</code> for the first line and
   <code>"$PYTHON"</code> for the Python commands. The installation helper uses pip.
   Import-linter checks that code respects the package dependency boundaries.</p>
-  <p>For changes to Agent Lab, use its separate Python environment and
+  <p>For changes to Agent Lab, use its isolated package launcher and
   <a href="../packages/ai-agent-lib-ui/README.md#run-the-checks-and-build-a-wheel">UI checks</a>.
   The library's default test command does not replace that suite. The
   <a href="README.md#find-the-code">code map</a> shows which package owns each responsibility.</p>
@@ -2426,14 +2447,13 @@ python -m your_agent.service</code></pre>
     <a href="phoenix-trial.md">local Phoenix walkthrough</a>. Run
     <code>start-phoenix.bat setup</code> once, then enable Phoenix in the root
     <code>.env</code>. Run <code>start-local.bat</code> to start the local Phoenix server
-    before the MCP, agent, and UI services. It keeps its own Python environment;
+    before the MCP, agent, and UI services. It keeps separate <code>.venv</code> packages and uses the default Python;
     <code>stop-local.bat</code> stops the stack and preserves SQLite traces. The agent
     adds an <strong>Open trace in Agent Lab</strong> link to each response, opening the configured Phoenix trace. The walkthrough
     lists the opt-in settings and a verified Anthropic conversation. Enable one
     tracing backend at a time. Existing Langfuse integrations remain supported.</p>
-    <p>When model output guardrails or a structured-output schema are configured,
-    text is buffered until those checks pass. Otherwise provider tokens can appear
-    immediately. Drafts can still change during business validation; only the final
+    <p>Blocking PII checks and structured-output schemas buffer text until they pass.
+    Default pattern checks validate each growing text update, allowing early display. Drafts can still change during business validation; only the final
     accepted answer enters chat history. Keep <code>live_updates=False</code> when
     application-specific checks must finish before any draft is shown.</p>
     <p>Long chats load recent messages first; use <strong>View older messages</strong>

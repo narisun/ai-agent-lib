@@ -23,6 +23,7 @@ development-environment = "ui"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["tests"]
 addopts = ["--import-mode=importlib", "--strict-config", "--strict-markers", "-ra"]
 filterwarnings = ["error"]
 asyncio_mode = "auto"

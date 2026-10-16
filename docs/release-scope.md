@@ -56,13 +56,15 @@ Ambient task-local side effects are not a dependency-injection interface.
 
 ## Installation and migration
 
-Create a virtual environment with `python -m venv .venv`. In an activated
-environment, contributors run `python tools/install_dev.py`; consumers install
-the CLI with pip and run `python -m ai_agent_lib_cli install` inside a generated
-workspace. If activation is restricted, use the environment's Python executable
-directly. Pip obtains Python wheels; no separate uv or Docker installation is
-required. Offline installation is possible with an organization-provided pip
-wheelhouse. Native extensions still require a wheel compatible with that Python
+Use your enterprise-approved Python and pip. Contributors run
+`python tools/install_dev.py`; consumers install the CLI with pip and run
+`python -m ai_agent_lib_cli install` inside a generated workspace. The local
+batch setup keeps agent/MCP, Agent Lab, and Phoenix dependencies in separate
+`.venv` package folders, loaded by the same default Python executable. Pip also
+runs under that default Python; environment-local binaries are not used. See [local startup](local-startup.md) for model selection and setup.
+Pip retains your team's package-source settings; an organization-provided
+wheelhouse supports offline installation.
+Native extensions still require a wheel compatible with that Python
 and platform; pip cannot replace a missing platform wheel with pure Python.
 
 Run `agentlib update --diff` when upgrading generated projects. It preserves

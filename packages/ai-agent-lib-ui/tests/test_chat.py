@@ -5,7 +5,6 @@ import json
 import os
 import sqlite3
 import subprocess
-import sys
 import threading
 import tomllib
 from collections.abc import AsyncIterator
@@ -17,6 +16,7 @@ from urllib.parse import urlsplit
 
 import httpx
 import pytest
+from python_runtime import python_command
 
 from ai_agent_lib_core.contracts import Principal
 from ai_agent_lib_ui.adapters.catalog import FileCatalog, LocalAccess, pin_bindings, read_registries
@@ -507,7 +507,7 @@ def test_shell_ignores_working_directory_dotenv(settings: Settings, tmp_path: Pa
         "import chainlit; assert 'UI_IGNORED_SENTINEL' not in os.environ"
     )
     result = subprocess.run(  # noqa: S603 - fixed import probe in a temporary test folder
-        [sys.executable, "-I", "-c", script],
+        python_command("-c", script),
         cwd=tmp_path,
         capture_output=True,
         text=True,

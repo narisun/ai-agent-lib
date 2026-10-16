@@ -33,7 +33,15 @@ def test_trace_tutorial_shows_tools_then_checkpoint_history(tmp_path: Path, name
     assert main(["new", "agent", name, "--workspace", str(workspace)], tools) == 0
     service = workspace / "agents" / name
     package = name.replace("-", "_")
-    environment = {**os.environ, "PYTHONPATH": str(service / "src")}
+    environment = {
+        **os.environ,
+        "PYTHONPATH": os.pathsep.join(
+            [
+                str(service / "src"),
+                *filter(None, os.environ.get("PYTHONPATH", "").split(os.pathsep)),
+            ]
+        ),
+    }
     result = subprocess.run(  # noqa: S603 - fixed interpreter and checked-in tutorial
         [sys.executable, "-m", f"{package}.examples.trace_react"],
         cwd=workspace,

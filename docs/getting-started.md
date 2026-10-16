@@ -1,8 +1,15 @@
 # Getting started
 
-To test the included rmprep agent in Agent Lab, follow [local startup](local-startup.md).
-This tutorial creates your own agent. Use the [documentation map](README.md)
-to find configuration, tracing, and contributor instructions.
+Choose the walkthrough for your task:
+
+| Task | Start here |
+| --- | --- |
+| Test rmprep in Agent Lab with Anthropic and Phoenix | [Local startup and testing](local-startup.md): setup, root `.env`, login, memo/follow-ups, traces, and stop/restart. |
+| Build your own agent and tools | Continue below to create the `tutorial` workspace. |
+
+The batch scripts run the checked-in rmprep example. This tutorial uses the
+generated agent's service `.env` and Python commands. Use the
+[documentation map](README.md) for configuration and contributor references.
 
 Build an agent named `helper`, add a tool, and test its behavior and
 permissions. Then add shared tools through an MCP server. This walkthrough
@@ -43,10 +50,10 @@ An **agent** uses a language model to answer questions and choose tools.
 A **tool** is a Python function the agent can call. Start with one agent
 and its built-in greeting tool.
 
-Choose the commands for your terminal. They create a virtual environment
-inside the library checkout and an application workspace named `tutorial/`
-beside it. A virtual environment keeps project packages separate from system
-Python. Use a different workspace name if that folder already exists.
+Choose the commands for your terminal. They use your existing Python and
+create an application workspace named `tutorial/` beside the library checkout.
+Pip installs into your Python's configured package location. Use a different
+workspace name if that folder already exists.
 
 ### Windows Command Prompt (cmd.exe)
 
@@ -55,8 +62,7 @@ root. Keep this window open for the following steps:
 
 ```bat
 set "LIBRARY=%CD%"
-python -m venv .venv
-set "PYTHON=%LIBRARY%\.venv\Scripts\python.exe"
+set "PYTHON=python"
 "%PYTHON%" -m pip install -e ./packages/ai-agent-lib-core -e ./packages/ai-agent-lib-cli
 "%PYTHON%" -m ai_agent_lib_cli init tutorial --dir .. --lib-path "%LIBRARY%" --owner learning
 cd /d ..\tutorial
@@ -66,9 +72,8 @@ cd /d ..\tutorial
 "%PYTHON%" -m helper "Say hello to Ada."
 ```
 
-If you use the Windows Python launcher, replace the environment creation
-command with `py -3.11 -m venv .venv`. The remaining commands use the
-environment's interpreter directly.
+If your team supplies a specific executable, set `PYTHON` to its full path.
+Use the same approved Python for installation, tests, and startup.
 
 ### macOS or Linux, using bash or zsh
 
@@ -76,8 +81,7 @@ Run from the library root and keep this terminal open:
 
 ```bash
 LIBRARY="$PWD"
-python3 -m venv .venv
-PYTHON="$LIBRARY/.venv/bin/python"
+PYTHON=python3
 "$PYTHON" -m pip install -e ./packages/ai-agent-lib-core -e ./packages/ai-agent-lib-cli
 "$PYTHON" -m ai_agent_lib_cli init tutorial --dir .. --lib-path "$LIBRARY" --owner learning
 cd ../tutorial
@@ -100,7 +104,6 @@ Here is what the setup commands did:
 
 | Command or option | Purpose |
 | --- | --- |
-| `python -m venv .venv` | Creates an isolated place for Python packages |
 | `python -m pip install -e …` | Installs the library packages in editable mode, so source changes are available as you edit them |
 | `init tutorial` | Creates the application workspace |
 | `--lib-path` | Selects this library checkout as the workspace's library source |
@@ -115,8 +118,8 @@ or change its dependencies.
 ### Command convention for the rest of this tutorial
 
 Run commands from `tutorial/`. Examples use Command Prompt's `"%PYTHON%"` prefix;
-on macOS/Linux, replace it with `"$PYTHON"`. Both point to the same virtual
-environment used during setup. `set "PYTHON=..."` stores the executable's path;
+on macOS/Linux, replace it with `"$PYTHON"`. Both select the same approved
+Python used during setup. `set "PYTHON=..."` stores the executable's path;
 `%PYTHON%` reads that variable. Keep the surrounding quotes when running it
 so paths containing spaces work. `cd /d` changes both the folder and drive.
 
@@ -127,13 +130,13 @@ In each new terminal, open `tutorial/` and set the interpreter path:
 ```bat
 rem Windows Command Prompt, from tutorial/
 set "LIBRARY=%CD%\..\ai-agent-lib"
-set "PYTHON=%LIBRARY%\.venv\Scripts\python.exe"
+set "PYTHON=python"
 ```
 
 ```bash
 # macOS/Linux, from tutorial/
 LIBRARY="$(cd ../ai-agent-lib && pwd)"
-PYTHON="$LIBRARY/.venv/bin/python"
+PYTHON=python3
 ```
 
 These paths assume your checkout is named `ai-agent-lib` and sits beside

@@ -6,13 +6,12 @@ Agent Lab is a local workspace for testing registered agents through chat and
 inspecting how each response was produced. It uses Chainlit for chat and
 connects to agents over HTTP.
 Install it with the Python package `ai-agent-lib-ui`; commands continue to use
-`python -m ai_agent_lib_ui`.
+`ai_agent_lib_ui`. The repository launcher supplies its isolated package path.
 
-To start Agent Lab together with the rmprep agent and its MCP server, run
-`setup-local.bat`, then `start-local.bat` from the repository root in Command
-Prompt. The [local startup guide](../../docs/local-startup.md) covers login,
-model setup, logs, and other scenarios. The manual instructions below let you
-configure a UI for your own agents.
+To test the included rmprep agent, follow the
+[local startup and testing guide](../../docs/local-startup.md). It covers the
+batch scripts, root `.env`, Anthropic/Phoenix setup, access code, sample questions,
+and stop/restart. The manual instructions below connect **your own agents**.
 
 Use steps 1–4 below to connect your own agents. After your first chat, see
 [responses and inspection](#responses-and-inspection), [memos](#memos-beside-chat),
@@ -22,66 +21,54 @@ and [interrupted requests](#interrupted-requests). For code changes, start with
 This checkout supports a local developer with a configured static identity.
 Enterprise SSO and shared hosting remain separate deployment work.
 
-## 1. Prepare a separate UI environment
+## 1. Prepare the UI packages
 
 Use company-provided **Python 3.11 or newer**, pip configured for JFrog or your
-approved package index, and a browser. Open **Command Prompt** at the repository root:
+approved package index, and a browser. Open **Command Prompt** at the repository root.
+For the complete rmprep stack, use `setup-local.bat`. To install just Agent Lab:
 
 ```bat
-python -m venv packages\ai-agent-lib-ui\.venv
-packages\ai-agent-lib-ui\.venv\Scripts\activate.bat
-python -m pip install -e packages\ai-agent-lib-core -e "packages\ai-agent-lib-ui[chat,dev]"
-python -m pip check
+python tools\package_runtime.py ui --install -e packages\ai-agent-lib-core -e "packages\ai-agent-lib-ui[chat]"
+python tools\package_runtime.py ui --check
 ```
 
-The `chat` extra installs Chainlit 2.12.0 and the local server dependencies;
-`dev` adds the check tools. Keep this environment separate from agent and MCP
-environments: Chainlit requires MCP 1.x, while the library's MCP extra requires
-MCP 2.x. They communicate over HTTP. `python tools\install_dev.py` continues to
-install only the agent development environment.
+The `chat` extra installs Chainlit 2.12.0 and its required dependencies into
+`packages\ai-agent-lib-ui\.venv\Lib\site-packages`. The launcher uses your existing Python with
+that package folder. It runs the default Python and its pip module; `.venv` executables are never
+selected. Use a fresh Command Prompt without activating an environment.
+Chainlit requires MCP 1.x; the agent/MCP server uses MCP 2.x. Separate package
+sets let these HTTP services use the same Python executable reliably.
 
-Agent profiles share the same chat appearance and shell settings. The pinned
-Chainlit release needs a small session-configuration adapter to read those
-settings without trying to run an asynchronous profile lookup inside the active
-WebSocket loop. Profile listing still uses the authenticated registry catalog;
-per-profile shell overrides are not supported. Socket regression tests cover
-this adapter when upgrading Chainlit.
+Pip retains your enterprise index and certificate configuration. Your platform
+team must supply approved packages and native wheels. To install supplied core
+and UI wheels, replace the editable requirements after `--install` with their
+wheel paths, retaining the UI wheel's `[chat]` extra. This preview has not been
+published as a release. Stop the UI before reinstalling its packages.
 
-Pip uses your existing enterprise index and certificate configuration. If your
-desktop requires wheels, ask your platform team to provide approved wheels.
-The Phase 0 installation needed Python-built wheels for `literalai==0.1.201`,
-`syncer==2.0.3`, and `cuid==0.4`. See the
-[wheel preparation example](../../experiments/chainlit-phase0/README.md#2-install-the-pinned-packages).
-Use your approved package source throughout.
-
-For wheels supplied by your team, create and activate a separate UI environment,
-then install the supplied core and UI wheels with the `chat` extra:
-
-```bat
-python -m pip install "C:\approved-wheels\ai_agent_lib_core-0.1.0-py3-none-any.whl" "C:\approved-wheels\ai_agent_lib_ui-0.1.0-py3-none-any.whl[chat]"
-```
-
-Replace `C:\approved-wheels` with your team's location. This preview has not been
-published as a release.
+The commands below use `python tools\package_runtime.py ui -m ai_agent_lib_ui`
+from the repository root. This supplies the UI packages without changing the
+agent's imports. After changing Python versions, reinstall the UI package set.
 
 ## 2. Start your agent and register its address
 
-Start the agent and its MCP services in their own Command Prompt windows and
-environments. The agent must accept `POST /invoke` with `input.question` and
+Start the agent and its MCP services in their own Command Prompt windows using
+the same approved Python. The agent must accept `POST /invoke` with `input.question` and
 return `output.answer`, `thread_id`, and `request_id`.
 
-For [rmprep](../../examples/rmprep/README.md), complete its Python/pip setup first.
+For [rmprep](../../examples/rmprep/README.md), run `setup-local.bat`
+and configure its service `.env` first. These direct commands do not load the
+root `.env` used by `start-local.bat`.
 In a fresh Command Prompt at the repository root, start the MCP service with
-the agent environment's Python:
+your approved Python:
 
 ```bat
-.venv\Scripts\python.exe -m rmprep_data
+python tools\package_runtime.py agent -m rmprep_data
 ```
 
 In another Command Prompt at the repository root, start the HTTP agent:
 
 ```bat
-.venv\Scripts\python.exe -m rmprep.service --host 127.0.0.1 --port 8000
+python tools\package_runtime.py agent -m rmprep.service --host 127.0.0.1 --port 8000
 ```
 
 The checked-in `rmprep` entry in `examples\rmprep\registry\agents.yaml` includes
@@ -98,12 +85,11 @@ business answers.
 
 ## 3. Initialize the UI
 
-Return to the Command Prompt with the **UI environment** active, at the repository
-root. Run the first command as one line:
+Return to a Command Prompt at the repository root. Run the first command as one line:
 
 ```bat
-python -m ai_agent_lib_ui init --env-file examples\rmprep\agents\rmprep\.env --agent rmprep --artifacts-agent rmprep --allow-url http://127.0.0.1:8000
-python -m ai_agent_lib_ui check
+python tools\package_runtime.py ui -m ai_agent_lib_ui init --env-file examples\rmprep\agents\rmprep\.env --agent rmprep --artifacts-agent rmprep --allow-url http://127.0.0.1:8000
+python tools\package_runtime.py ui -m ai_agent_lib_ui check
 ```
 
 `init` reads `EAP_REGISTRY_OPTIONS` and `EAP_IDENTITY_OPTIONS` from that agent's
@@ -130,7 +116,7 @@ not start services, call a model, or claim that an agent is ready to answer.
 
 ```bat
 type .agentlib\ui\access-code
-python -m ai_agent_lib_ui serve
+python tools\package_runtime.py ui -m ai_agent_lib_ui serve
 ```
 
 Copy the displayed code and open [the local UI](http://127.0.0.1:8765). Enter the
@@ -144,9 +130,10 @@ code to sign in. Use the exact `127.0.0.1` address. Keep the server window open.
    sources.** Only this new question is sent, with the same thread ID.
 4. Select **Memos** to view the saved memo. Generate another memo in the same chat,
    then switch between versions with the **Memo version** selector.
-5. Select **Logs**, choose the chat, and open a turn to see its LLM input/output,
-   MCP calls, and checkpoints. Chat history remains in the left sidebar.
-   **Logs → Manage chat history** provides rename, search, archive and restore.
+5. With Phoenix enabled, select **Open trace in Agent Lab** below the response
+   to inspect model input/output, MCP calls, metrics and checkpoint references.
+   **Logs** provides local diagnostics and saved state. **Logs → Manage chat
+   history** provides rename, search, archive and restore.
 6. Stop with **Ctrl+C**, run `serve` again, and reopen your conversation. The
    completed messages and selected agent remain.
 
@@ -187,9 +174,9 @@ when you reopen a conversation. A warming request can write the cache with 0% hi
 Chat shows the answer, usage, elapsed time and an **Open trace in Agent Lab** (or
 **Open trace in Langfuse**) link when tracing is enabled. The Agent Lab link opens
 the configured Phoenix trace. Comparison tables show values without
-repeating long references in each cell. Chat no longer adds References or Turn
-inspector panels, including when you reopen earlier conversations. The saved
-answer still contains its original references; memo documents retain their sources.
+repeating long references in each cell. Full source references remain in the saved
+answer and memo documents for review. Model/tool details are available through
+the trace link and Logs page.
 
 Use the per-response trace link to inspect model input/output, MCP tool arguments
 and results, timing, usage and checkpoint references. Enable content capture for
@@ -204,7 +191,8 @@ inspection never reruns the agent or calls an MCP tool.
 
 The local rmprep service supplies the diagnostic reader. Set
 `EAP_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl` in the agent's `.env`, then
-restart with `start-local.bat rmprep` to capture model exchanges for new turns.
+restart the agent to capture model exchanges for new turns. For the batch stack,
+run `stop-local.bat`, then `start-local.bat`.
 Tracing captures conversation content; use the same private storage and retention
 rules as the agent's checkpoints. The inspector reads the agent's configured trace
 file, so retain that file to inspect earlier turns. Capture is not retroactive.
@@ -364,27 +352,36 @@ SQLite files. The UI never imports an agent graph or reads its checkpoint databa
 The catalog uses `ai_agent_lib_core.kit` for the shared parser; contracts and the
 application stay independent of Chainlit and agent framework imports.
 
+Agent profiles share the same chat appearance and shell settings. The pinned
+Chainlit release needs a small session-configuration adapter to read those
+settings without trying to run an asynchronous profile lookup inside the active
+WebSocket loop. Profile listing still uses the authenticated registry catalog;
+per-profile shell overrides are not supported. Socket regression tests cover
+this adapter when upgrading Chainlit.
+
 ## Run the checks and build a wheel
 
-With the UI environment active, from the repository root:
+From the repository root, install the UI development tools, then run:
 
 ```bat
+python tools\package_runtime.py ui --install -e packages\ai-agent-lib-core -e "packages\ai-agent-lib-ui[chat,dev]"
 cd packages\ai-agent-lib-ui
-python -m pytest
-python -m mypy
-python -m ruff check .
-python -m ruff format --check .
-python -m pip check
+python ..\..\tools\package_runtime.py ui -m pytest
+python ..\..\tools\package_runtime.py ui -m mypy
+python ..\..\tools\package_runtime.py ui -m ruff check .
+python ..\..\tools\package_runtime.py ui -m ruff format --check .
+python ..\..\tools\package_runtime.py ui --check
 python -m pip wheel --no-deps --wheel-dir dist .
 cd ..\..
-python tools\check_consumer.py --profile ui-chat
 ```
 
 Tests use synthetic local agents. They cover real Socket.IO chat, same-thread
 follow-ups, restart/reconnect, ownership, duplicate/concurrent sends, registry
 changes, failed writes and unknown outcomes. The wheel check repeats real-server
-tests using installed packages. `--profile ui` separately checks the lightweight
-contracts installation without the `chat` extra.
+tests using installed packages in CI. On an approved CI runner,
+`python tools\check_consumer.py --profile ui-chat` creates a disposable test
+environment for this check. `--profile ui` checks the lightweight contracts
+installation. These CI checks are optional on restricted desktops.
 
 When Node is already available, pytest also runs a small browser-script regression
 for rapid memo-version switching. This optional check uses Node's built-in tools;
@@ -405,10 +402,10 @@ this local preview does not imply approval for shared production hosting.
 
 ## Local Phoenix tracing
 
-The [Phoenix trial](../../docs/phoenix-trial.md) uses a separate Python environment and SQLite.
+The [Phoenix trial](../../docs/phoenix-trial.md) uses the same Python, a separate package folder, and SQLite.
 Run `start-phoenix.bat setup` once from the library repository root, then follow
 the guide to enable Phoenix in the root `.env`. `start-local.bat` starts the local
-Phoenix server before rmprep and Agent Lab, using `.agentlib\phoenix\.venv`.
+Phoenix server before rmprep and Agent Lab, using `.agentlib\phoenix\.venv\Lib\site-packages`.
 `stop-local.bat` in another Command Prompt stops the stack and keeps saved
 conversations, traces, and checkpoints. **Ctrl+C** in the launcher window also works.
 Each response links to its Phoenix trace using **Open trace in Agent Lab**.

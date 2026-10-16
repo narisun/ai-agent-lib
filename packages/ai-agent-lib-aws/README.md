@@ -6,14 +6,19 @@ the package is installed; some adapters need an extra listed below. A
 service moves from a local adapter to an AWS one by changing configuration,
 never code.
 
-From the repository root in **Command Prompt**, with your agent environment
-active, install the checkout using Python and pip:
+From the repository root in **Command Prompt**, use your enterprise-approved
+Python and its pip to install the checkout:
 
 ```bat
 python -m pip install -e packages/ai-agent-lib-aws
 ```
 
-For Bedrock add `-e "packages/ai-agent-lib-aws[bedrock]"` instead; for PostgreSQL
+For the rmprep/Agent Lab stack, `setup-local.bat --model bedrock` installs the
+Bedrock dependencies, including `langchain-aws`. Set `EAP_MODEL_PROVIDER=bedrock`
+and your model ID in the root `.env` before starting. All services use the same
+Python; the launcher isolates UI/Phoenix packages. See [local setup](../../docs/local-startup.md).
+
+For a manual Bedrock installation, use `-e "packages/ai-agent-lib-aws[bedrock]"` instead; for PostgreSQL
 use `-e "packages/ai-agent-lib-aws[postgres]"`. Combine both as `[bedrock,postgres]`
 when needed. Pip uses your team's configured package index. The selected AWS
 services also need provisioned resources, network access, and credentials.
@@ -36,11 +41,10 @@ in the section's options variable. The variables are listed in
 | guardrails | `bedrock` | One version of a Bedrock guardrail | `guardrail_id`, `guardrail_version`, `points`, the four size limits, `frame_tool_results` |
 
 Local and AWS adapters mix freely. A developer who wants a Bedrock model and
-nothing else from AWS signs in and selects only that provider:
-
-```bash
-aws sso login --profile dev-sso
-```
+nothing else from AWS uses the credentials or profile supplied by their enterprise
+setup and selects only that provider. If the approved setup includes AWS CLI and
+SSO, renew that profile with `aws sso login --profile dev-sso`. The library itself
+uses boto3; setup does not install or require the AWS CLI.
 
 ```dotenv
 AWS_PROFILE=dev-sso

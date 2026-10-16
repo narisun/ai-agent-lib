@@ -1,323 +1,111 @@
-# Start the local testing environment
+# Run and test rmprep locally
 
-Use these batch files from **Windows Command Prompt** to run the rmprep agent,
-its MCP data server, and **Agent Lab** together. Agent Lab is the browser UI for
-testing agents and inspecting their responses. You need Python 3.11 or newer,
-pip configured for your enterprise package index, and this repository on your
-desktop. The scripts create virtual environments inside the checkout using
-your normal user permissions.
+Use this guide to run **Agent Lab**, the **rmprep** agent, its **MCP data server**,
+and optional **Phoenix tracing** on your Windows desktop. The scripts use your
+normal user account and the same enterprise-approved Python executable for every
+service. Packages stay isolated in `.venv` folders; startup and installation
+use the default Python and its pip module.
+
+You need your team's Python 3.11+ and pip setup, an approved package index, a
+writable checkout, and a browser. For Anthropic answers, you also need an approved
+API key and model. Use a provider approved to receive the example business data.
+
+Run commands in **Command Prompt (cmd.exe)** from the repository root: the folder
+containing `start-local.bat`. Complete steps 1–4 once. On later days, run
+`start-local.bat`, test in the browser, then run `stop-local.bat`.
 
 ## 1. Set up once
-
-Open Command Prompt in the repository's top-level `ai-agent-lib` folder:
 
 ```bat
 python --version
 python -m pip --version
-setup-local.bat
+setup-local.bat --model anthropic
 ```
 
-Setup uses your existing pip index, proxy, and certificate configuration. Follow
-your team's Python setup instructions first if those commands fail. When your
-organization provides a Python executable at a specific path, you can run:
+Setup uses your existing pip index, proxy and certificate configuration. All pip
+commands run as `python -m pip` with the selected Python. Setup prints its path
+and the model provider whose dependencies it will install.
+
+| Component | Where its packages go | How it runs |
+| --- | --- | --- |
+| Library, rmprep and MCP server | `.venv\Lib\site-packages` | The same `python` used for setup |
+| Agent Lab | `packages\ai-agent-lib-ui\.venv\Lib\site-packages` | The same Python, loading only the UI package set |
+| Phoenix, when installed | `.agentlib\phoenix\.venv\Lib\site-packages` | The same Python, loading only the Phoenix package set |
+
+These package folders resolve an upstream dependency conflict: Chainlit requires
+MCP 1.x, while the library's MCP server requires MCP 2.x. Services communicate
+over HTTP. The launchers load each folder's packages without running
+`.venv\Scripts\python.exe` or `pip.exe`. Setup uses the default Python's pip
+and preserves your enterprise package-source configuration. Compatible existing
+`.venv` packages can be reused; a different Python version or base installation
+requires setup again. Existing environment executables are left untouched.
+
+Setup creates missing service settings and UI configuration while keeping
+existing files and saved conversations. Stop services before repeating setup.
+Repeat setup after dependency changes or switching Python versions. Component
+packages are replaced after a successful installation and dependency check;
+conversations, traces and checkpoints are stored separately and are preserved.
+
+| Command | Packages installed |
+| --- | --- |
+| `setup-local.bat` | Core library, rmprep, rmprep-data, Agent Lab, and the model dependency selected by the shell, root `.env`, or service `.env` (in that order). Defaults to `fake`. |
+| `setup-local.bat --model bedrock` | The above with `ai-agent-lib-aws[bedrock]`, including `langchain-aws` and boto3. |
+| `setup-local.bat --model anthropic` | The above with the core library's Anthropic extra. |
+| `setup-local.bat --dev` | Also installs the scaffolding CLI and the rmprep/Agent Lab test, lint, and type-check tools. |
+| `start-phoenix.bat setup` | The pinned Phoenix server and its required dependencies. |
+
+`--model` selects packages to install; it does not change your runtime `.env`.
+You can combine it with `--dev`. Each setup replaces the selected component's
+package set; include `--dev` again to retain development tools. Pip resolves dependencies;
+keep dependency resolution enabled.
+
+The first command block selects Anthropic for this walkthrough. For Bedrock,
+use `--model bedrock` instead. If your root `.env` already selects the model,
+`setup-local.bat` detects it automatically. To add Phoenix tracing, run:
 
 ```bat
-"C:\path to approved Python\python.exe" tools\local_dev.py setup
+start-phoenix.bat setup
 ```
 
-Setup installs the library, rmprep agent, and MCP server in `.venv`, and installs
-the UI in `packages\ai-agent-lib-ui\.venv`. The two environments use compatible
-dependencies for their own services. The launcher selects each Python executable
-directly, so you can run it from a fresh Command Prompt window without activating
-an environment.
+Use the same approved Python for setup and startup, in a fresh Command Prompt
+without activating `.venv`. In your team's prepared
+Command Prompt, `where python` and `python -m pip --version` show the selected
+installation. If your team provides an explicit path, use
+`"C:\path to approved Python\python.exe" tools\local_dev.py setup --model bedrock`
+and that same executable with `tools\local_dev.py` to start services. Package
+access and native wheels must come from your approved index.
 
-Setup also copies each service's `.env.example` to `.env` when needed and creates
-the UI configuration in `.agentlib\ui-rmprep\config.json`. **Existing settings,
-credentials, and conversations are kept.** Run setup again after changing package
-dependencies or pulling changes that introduce new dependencies.
+## 2. Set the model and tracing options
 
-The default model is `fake`: it echoes your question and lets you check chat and
-saved threads. To use Anthropic, put your settings in **`.env` beside
-`start-local.bat`** (the repository root):
+Create or edit **`.env` beside `start-local.bat`**. Keep your existing settings;
+add or update these entries, replacing the API-key placeholder:
 
 ```dotenv
 EAP_MODEL_PROVIDER=anthropic
 EAP_MODEL_ID=claude-sonnet-4-5
 ANTHROPIC_API_KEY=your-approved-key
-```
-
-Use a model enabled for your account. Install its Python dependency in the agent
-environment, using your approved pip index:
-
-```bat
-.venv\Scripts\python.exe -m pip install "langchain-anthropic>=1.7.5,<2"
-```
-
-The launcher reads that file automatically for the rmprep agent. You can instead
-select an existing file, without copying credentials:
-
-```bat
-start-local.bat --env-file "F:\path to your settings\.env"
-```
-
-Settings take precedence in this order: **Command Prompt environment variables →
-the selected file (or root `.env`) → `examples\rmprep\agents\rmprep\.env` → library
-defaults**. The selected file replaces the root file, rather than merging both.
-Startup prints the loaded file path and effective model provider/ID; keys are not
-printed. Check that it says `Agent model: anthropic` before testing.
-
-The startup summary also lists configuration variables and the source of each
-winning value. For example:
-
-```text
-Agent model: anthropic / claude-sonnet-4-5
-Agent configuration (credentials, sensitive fields and unrecognized variables are masked):
-  ANTHROPIC_API_KEY=********  [launcher .env]
-  EAP_DEPLOYMENT_ENV="local"  [default]
-  EAP_MODEL_ID="claude-sonnet-4-5"  [launcher .env]
-  EAP_MODEL_OPTIONS={"anthropic": {"prompt_caching": true, "cache_ttl": "5m"}}  [service .env]
-  EAP_MODEL_PROVIDER="anthropic"  [launcher .env]
-  EAP_PROFILE="local"  [launcher .env]
-  RMPREP_CONTEXT_INPUT_TOKENS="64000"  [service .env]
-```
-
-`shell` means the current Command Prompt environment; `launcher .env` means
-the selected file or the root `.env`; `service .env` means rmprep's own file.
-`default` and `profile local` identify library defaults. Blank credentials appear
-as `(empty)`; core settings that treat blank as unset show their resolved default.
-The launcher also prints the separate MCP settings
-and UI configuration file paths.
-
-JSON options keep their structure and non-sensitive values: caching options,
-paths, roles, timeouts and token budgets remain readable. Sensitive fields are
-masked recursively inside objects and lists, including passwords, API keys,
-tokens, signing keys, identity subjects and contact details. Credential containers
-and database connection strings are masked as a whole. URLs keep their endpoints
-and ordinary query settings while masking embedded credentials, sensitive query
-parameters and fragments. Custom HTTP header values are masked; ordinary content
-headers such as `Accept` and `Content-Type` remain visible.
-
-Top-level credentials, including Anthropic, Langfuse and AWS keys, stay masked.
-Unrecognized file-defined variables are masked too. Output stays on one line per
-variable, with long text values shortened after masking. Unrelated shell variables
-are omitted. This is a startup summary of the
-agent's environment and core settings. Phoenix and Langfuse rows also include
-values from a separate tracing file, showing that file's path as the source.
-For tracing, precedence is **shell → launcher file → separate tracing file →
-service file → defaults**. An `EAP_PHOENIX_ENV_FILE` or `EAP_LANGFUSE_ENV_FILE`
-path in the service file is relative to that file. When supplied by the shell
-or launcher file, a relative path uses the agent's working directory,
-`examples\rmprep`. Use an absolute path when sharing a tracing file between agents.
-
-The root file is found beside the batch file even when you launch from another
-folder. An explicit relative `--env-file` path uses your current Command Prompt
-folder. A missing default root file keeps the service settings; a missing explicit
-file stops startup with an error. These overrides apply to `rmprep` and `services`.
-The UI and MCP keep their separate settings, and `demo` uses scripted replies.
-
-Keep registry, identity and local storage settings in each service's own `.env`.
-Relative library configuration paths, including `EAP_MODEL_TRACE_PATH`, continue
-to resolve from the rmprep service's folder, even when set in the root file.
-For other model providers, follow the
-[rmprep model setup](../examples/rmprep/README.md#3-generate-a-memo-with-your-configured-model).
-Starting services checks readiness; model requests happen when you send a message.
-
-## 2. Start a scenario
-
-Run one of these commands from the repository root:
-
-| Command | What it starts | Use it when |
-| --- | --- | --- |
-| `start-local.bat` | rmprep MCP server, rmprep HTTP agent, and Agent Lab | You want to test rmprep in a browser. |
-| `start-local.bat services` | rmprep MCP server and HTTP agent | You want to call the agent from your own client. |
-| `start-local.bat ui` | Agent Lab using its saved configuration | The agents and MCP servers are already running. |
-| `start-local.bat demo` | The scripted rmprep trace and checkpoint walkthrough; exits when complete | You want to see tool calls and conversation history using scripted model replies. |
-| `start-local.bat --smoke-test` | The full stack, checks readiness, then stops it | You want to verify local startup before testing. |
-
-The full stack starts in this order:
-
-1. Phoenix at `http://127.0.0.1:6006`, when enabled for the local trial.
-2. The MCP data server at `http://127.0.0.1:8100/mcp`.
-3. The rmprep agent at `http://127.0.0.1:8000`.
-4. Agent Lab at `http://127.0.0.1:8765`.
-
-The launcher waits for each service to become ready before starting the next.
-Keep the Command Prompt window open while testing. All services run on your
-desktop and listen on loopback.
-
-You can also call the batch file by its full path from another folder:
-
-```bat
-"F:\work\ai-agent-lib\start-local.bat"
-```
-
-For optional centralized tracing, follow the [shared Langfuse guide](langfuse.md).
-The [rmprep walkthrough](langfuse-trial.md) records a verified example.
-`start.bat` in the sibling `langfuse` folder manages its separate container backend. The agent and
-UI continue to use their Python environments and `start-local.bat`. Restricted
-desktops can connect to a shared Langfuse service instead.
-
-## 3. Open Agent Lab and test an agent
-
-When the launcher prints **All selected services are ready**, open
-<http://127.0.0.1:8765> in your browser. Read the login code in a second Command
-Prompt window, from the repository root:
-
-```bat
-type .agentlib\ui-rmprep\access-code
-```
-
-Sign in with that code, select **Choose agent → Start chat with rmprep**. With a real
-model configured, try:
-
-```text
-memo: Prepare a meeting memo for JONE-0022 as of 2026-08-03.
-```
-
-Then ask in the same conversation:
-
-```text
-qna: Explain the main credit risks in that memo and cite the source records.
-```
-
-Select **Memos** in the header to read accepted memos beside chat and switch
-versions. Select **Logs**, choose a chat, and open a turn to see LLM input/output,
-MCP calls and checkpoints. The left sidebar keeps chat history; use
-**Logs → Manage chat history** for rename and archive.
-
-### Understand the response
-
-The UI shows an expandable **Live draft (provisional)** while the model responds.
-Default pattern guardrails check each growing text update before releasing it.
-Blocking PII checks and structured-output validation wait for a complete response.
-When the outcome is saved, the temporary draft panel disappears. Each reply shows
-input/output token counts and elapsed time; cache-hit ratio appears when reported.
-With Phoenix enabled, **Open trace in Agent Lab** opens that response's Phoenix
-trace. Reopening a conversation restores its saved answer, metrics, and trace link.
-The fake model returns its draft at once and reports simulated usage.
-After changing library or UI code, run `stop-local.bat`, then `start-local.bat`.
-
-### Inspect memos and model calls
-
-New batch configurations enable rmprep's `artifacts` capability. For an existing
-`.agentlib\ui-rmprep\config.json`, add `"artifacts"` to the rmprep binding's
-`manifest.capabilities` array, then restart. Generate a new memo: older text-only
-answers remain in chat. Follow the [panel guide](../packages/ai-agent-lib-ui/README.md#memos-beside-chat)
-for version selection and limits.
-
-To enable model tracing, add this to the agent's `.env` and restart the stack:
-
-```dotenv
-EAP_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl
-```
-
-That trace is written under `examples\rmprep\agents\rmprep\.agentlib`. It contains
-conversation content, so use your approved test data and keep it private.
-
-For Anthropic prompt caching, add this to the rmprep agent's `.env` and restart:
-
-```dotenv
 EAP_MODEL_OPTIONS={"anthropic":{"prompt_caching":true,"cache_ttl":"5m"}}
 ```
 
-Responses show cache reads and writes alongside the hit percentage. The first
-request may write the cache with 0% hits; matching requests within five minutes
-can read it. See [rmprep prompt versions and caching](../examples/rmprep/docs/context-management.md#static-prompts-and-anthropic-caching).
+Use a model enabled for your account. Keep the file private and out of Git.
+For a basic connectivity check, you can keep the generated `fake` model; it
+echoes questions. Business memos and natural-language follow-ups need a real model.
 
-## 4. Stop and restart
+For **Amazon Bedrock**, use these model settings instead:
 
-Open a second Command Prompt in the repository root and run:
-
-```bat
-stop-local.bat
+```dotenv
+EAP_MODEL_PROVIDER=bedrock
+EAP_MODEL_ID=your-enabled-model-or-inference-profile-id
+AWS_REGION=your-aws-region
 ```
 
-The command asks all active launchers from this checkout to shut down. Each stops
-its own services in reverse order: Agent Lab, rmprep, the MCP server, then Phoenix.
-It also covers separate `start-local.bat ui`, `start-local.bat services`, and
-`start-phoenix.bat` runs. It needs only Python; it does not load credentials,
-install packages, or identify processes by their names or ports.
+Use the AWS credentials or profile provided by your enterprise setup. If your
+team supplies a named profile, set `AWS_PROFILE` to that profile. Run
+`setup-local.bat --model bedrock`, then restart. This installs `langchain-aws`;
+model access and authentication still come from your AWS account. See the
+[AWS package guide](../packages/ai-agent-lib-aws/README.md) for provider options.
 
-Wait for **Stopped gracefully**, then run `start-local.bat` again. The stop command
-waits up to 150 seconds. The launcher allows 30 seconds per service for cleanup;
-if a service requires a forced stop, exits with an error, or cannot be confirmed
-stopped, the command reports that graceful shutdown was not confirmed and exits
-with an error. Cleanup continues for the other services. Read the named service
-logs before restarting.
-A repeated stop is harmless when no managed launchers are running.
-
-On Windows, the launcher gives Agent Lab and Phoenix a cooperative interrupt
-handler before starting their servers. This lets their normal shutdown finish
-without Windows turning the replayed interrupt into an error. Actual application
-errors still produce a failed shutdown status.
-
-**Ctrl+C in the original launcher window** also stops its stack. If Command Prompt
-asks whether to terminate the batch job, answer `Y`. Use Ctrl+C before closing
-that window. Services started before this update must be stopped this way once;
-they have no launcher control record. Services launched outside these scripts,
-other checkouts, and remote Phoenix/Langfuse servers are managed separately.
-
-Conversations stay in `.agentlib\ui-rmprep\conversations.sqlite`, checkpoints stay
-at the configured agent checkpoint path, and Phoenix traces stay in
-`.agentlib\phoenix\data\phoenix.db`. JSONL traces and audit logs remain in place.
-The stop command never resets or deletes these stores. Launcher status files live
-beside each run's logs; stale records do not authorize stopping another process.
-
-You can run the command by its full path from any folder:
-
-```bat
-"F:\work\ai-agent-lib\stop-local.bat"
-```
-
-Each run has service logs in `.agentlib\local-runs\<run-id>\`. The launcher prints
-the exact filenames, which you can open in an editor or read with `type`.
-If a service fails to start or exits later, the launcher stops the rest of its
-stack and reports which log to read. Services have 90 seconds each to become ready.
-
-## Use another UI configuration
-
-The launcher gives rmprep its own UI state folder, separate from the manual UI
-setup's `.agentlib\ui` folder. To use an existing configuration for other agents:
-
-```bat
-start-local.bat ui --config .agentlib\ui\config.json
-```
-
-Create that configuration with the [UI's `init` command](../packages/ai-agent-lib-ui/README.md)
-first. Repeat `--agent` and `--allow-url` there for each registry agent you want
-to use. The UI-only scenario starts the frontend; start those agents and their
-MCP dependencies separately. Relative config paths are resolved from the repository
-root, even if you launch the batch file from another folder.
-
-## Troubleshooting
-
-| Message or symptom | What to do |
-| --- | --- |
-| `Required file is missing` or an import error | Run `setup-local.bat` from the repository root. Check that pip can access your approved index. |
-| pip cannot find a package or build a wheel | Ask your package administrators to provide the dependency or an approved wheel; see the [UI installation notes](../packages/ai-agent-lib-ui/README.md#1-prepare-a-separate-ui-environment). |
-| A required port is in use | Run `stop-local.bat` for managed runs; use Ctrl+C for a manually started service, or use `start-local.bat ui` if your backends are already running. The launcher leaves existing processes alone. |
-| Registry pins or local identity changed | Review the registry and agent `.env`, then explicitly refresh the UI config using the command below. Existing conversations remain. |
-| The agent only repeats the question | Configure a real model using the rmprep instructions above. Use `start-local.bat demo` for a scripted tool-call example. |
-| Startup selects `fake` when Anthropic was expected | Check `Agent environment file` and `Agent model` in the launcher output. Set both provider and model ID alongside the API key. Use `set EAP_MODEL_PROVIDER=` to clear an unwanted shell override, then restart. |
-| Chrome still shows an old layout after a UI update | Stop and restart the launcher, then reload the chat tab. Updated custom styles get a new asset URL on restart. Wide response tables still scroll within their own container. |
-| A service does not become ready | Read its printed log path. Check both service `.env` files, the registry URLs, and local data paths. The MCP URL should use port 8100 and the rmprep agent URL port 8000 for this scenario. |
-
-After reviewing changed registry or identity settings, refresh the launcher's
-rmprep UI configuration from the repository root:
-
-```bat
-packages\ai-agent-lib-ui\.venv\Scripts\python.exe -m ai_agent_lib_ui init --config .agentlib\ui-rmprep\config.json --env-file examples\rmprep\agents\rmprep\.env --agent rmprep --artifacts-agent rmprep --allow-url http://127.0.0.1:8000 --overwrite
-start-local.bat
-```
-
-The launcher checks saved registry pins on every startup. It does not overwrite
-an existing UI configuration automatically.
-
-## Local Phoenix tracing
-
-The [Phoenix trial](phoenix-trial.md) uses a separate Python environment and SQLite.
-Run `start-phoenix.bat setup` once from the repository root. Add these settings to
-the root `.env`, alongside your model settings:
+To see model input/output and MCP calls in local Phoenix, add:
 
 ```dotenv
 EAP_TELEMETRY=off
@@ -328,15 +116,238 @@ PHOENIX_COLLECTOR_ENDPOINT=http://127.0.0.1:6006
 PHOENIX_PROJECT_NAME=rmprep-trial
 ```
 
-Use content capture with approved test data. Run `start-local.bat` to start
-Phoenix, MCP, rmprep, and Agent Lab together. Phoenix uses
-`.agentlib\phoenix\.venv`; its SQLite database is
-`.agentlib\phoenix\data\phoenix.db`. Each response has an **Open trace in Agent Lab** link to its Phoenix trace.
-`stop-local.bat` stops the stack in reverse order and keeps saved traces.
-The **Logs** page remains available for local diagnostic inspection.
+Content capture includes messages, client evidence and tool arguments/results.
+`EAP_TELEMETRY=off` disables the separate operational exporter; Phoenix still
+receives model/tool spans and usage. Enable one agent tracing backend at a time.
+See the [Phoenix guide](phoenix-trial.md) for settings and trace details.
 
-`services` and `--smoke-test` include Phoenix when enabled; `ui` and `demo` do not.
-A different collector endpoint is managed separately. Startup reports that choice
-and does not launch a local Phoenix instance. Stop any standalone Phoenix window
-before starting the combined stack; an occupied port stops startup without taking
-over the existing process. See the trial guide for settings and troubleshooting.
+The root file supplies rmprep's model and tracing settings to the batch launcher.
+Keep registry, identity and storage settings in each service's own `.env`.
+Manual `python tools\package_runtime.py agent -m rmprep` commands use the service's settings; they do not load
+the launcher's root file automatically.
+
+## 3. Open Agent Lab and test an agent
+
+```bat
+start-local.bat
+```
+
+Before sending a question, check the startup summary:
+
+- **Agent environment file** points to your root `.env`.
+- **Agent model** shows `anthropic` and your model ID.
+- Credentials appear as `********`. JSON options show ordinary values, with
+  sensitive fields masked. Each row identifies where the value came from.
+- If enabled, Phoenix becomes ready before MCP, rmprep and Agent Lab.
+
+Wait for **All selected services are ready**, then open
+[Agent Lab](http://127.0.0.1:8765). Keep the launcher window open. In a second
+Command Prompt at the repository root, read the local access code:
+
+```bat
+type .agentlib\ui-rmprep\access-code
+```
+
+Sign in with that code, then select **Choose agent → Start chat with rmprep**.
+This code belongs to Agent Lab; it is separate from your model API key.
+Local Phoenix opens at <http://127.0.0.1:6006> without a separate login.
+
+### Generate a memo and ask follow-ups
+
+Send these messages one at a time in the **same chat**:
+
+1. `Prepare a meeting memo for Jones Dairy Farm (JONE-0022) as of 2026-08-03.`
+2. `Explain the covenant breaches and the change in cash conversion cycle in that memo. Also, how was its wallet share calculated? Use the saved evidence.`
+3. `Does the recorded waiver expiry prove the waiver was executed? Explain what the evidence establishes and what remains unknown.`
+
+Check the answer against the supplied snapshot:
+
+| Topic | Expected evidence |
+| --- | --- |
+| Covenants | DSCR 1.08 against a minimum 1.25; fixed charge coverage 0.96 against a minimum 1.15. |
+| Cash conversion cycle | 87 days at 2026-03-31 to 106 days at 2026-06-30: an increase of 19 days. The values alone do not establish causes. |
+| Wallet share | Recorded as 40.21%. The source does not supply the numerator, denominator, period or calculation method. |
+| Waiver | A recorded expiry date does not prove execution. The answer should preserve that uncertainty. |
+
+The first question retrieves MCP evidence. A follow-up can reuse complete saved
+evidence without another MCP call. Inspect its model input to confirm the selected
+memo and records are present. Model wording and call counts can vary.
+
+### Test client switching and older memos
+
+In the same chat, ask `Prepare a memo for Canada Goose as of 2026-08-03.`, then
+`How was the wallet share in that memo calculated?`. The selected client should
+be `CANA-0010`, with recorded wallet share **22.55%**. Its calculation method is
+also unavailable in the source.
+
+Open **Memos**, select the earlier Jones memo, and expand **Memo details** to copy
+its reference. Ask `Using <memo-reference>, explain its covenant breaches.`,
+replacing the placeholder with that reference. Selecting a version in the panel
+changes the viewer; name its reference in the question to select it for the agent.
+Both clients' memo versions remain saved. Reopen this chat from the sidebar to
+continue it, or start a new chat for a separate conversation.
+
+### Read the response and trace
+
+Text appears in **Live draft (provisional)** as approved model output arrives.
+The panel disappears when the final outcome is ready. Each response keeps token
+usage and elapsed time visible, plus cache statistics when reported.
+
+**Open trace in Agent Lab** opens that turn's Phoenix trace. Select a model span
+for input/output, a tool span for MCP arguments/results, and the root span for
+request, thread and checkpoint references. Allow a few seconds for ingestion.
+**Logs** provides local diagnostics and saved checkpoint inspection. Opening a
+trace or log does not run the agent again.
+
+Chat presents readable answers without long source references beside every
+figure. The original answer and memo documents retain their references for review.
+MCP service logs include the query, parameters and record statistics.
+
+rmprep defaults to 1,000 words for memos and 350 for Q&A. Ask `Keep it within
+450 words.` to change a limit. Heading text, figures and full citations count;
+Markdown heading/list markers and divider-only lines do not; code is counted
+literally. The agent preserves
+accepted text and checks exact references and known evidence-limit errors.
+A failing draft can be revised twice; rejected drafts remain in traces rather
+than accepted conversation history. See [context management](../examples/rmprep/docs/context-management.md).
+
+## 4. Stop and restart
+
+In a second Command Prompt at the repository root:
+
+```bat
+stop-local.bat
+```
+
+Wait for **Stopped gracefully**. The launcher stops Agent Lab, rmprep, MCP and
+local Phoenix in reverse order and preserves their data. Run `start-local.bat`
+again to resume testing. Restart after editing code or environment settings.
+**Ctrl+C** in the launcher window also stops its stack; use it before closing
+that window. If Command Prompt asks about terminating the batch job, answer `Y`.
+
+| Saved data | Default location under the repository root |
+| --- | --- |
+| Conversations, answers and memo versions | `.agentlib\ui-rmprep\conversations.sqlite` |
+| rmprep checkpoints | `examples\rmprep\agents\rmprep\.agentlib\checkpoints.sqlite` |
+| Phoenix traces | `.agentlib\phoenix\data\phoenix.db` |
+| Service console logs | `.agentlib\local-runs\<run-id>\` — startup prints the exact path |
+| Audit and optional model JSONL files | Each service's `.agentlib` folder |
+
+`stop-local.bat` covers managed launchers from this checkout, including separate
+UI, services and Phoenix runs. Stop manually launched services with Ctrl+C in
+their own windows. Remote tracing servers have their own lifecycle. If graceful
+shutdown is not confirmed, read the reported log before restarting. The stop
+command waits up to 150 seconds; repeating it with no managed services is harmless.
+
+## Run local checks
+
+With the stack stopped, verify startup and shutdown without sending a model request:
+
+```bat
+start-local.bat --smoke-test
+```
+
+It starts configured services, waits for readiness, then stops them. To exercise
+MCP tools and checkpoints with scripted model replies, run:
+
+```bat
+start-local.bat demo
+```
+
+Install the development tools once, then run the focused tests. From the
+repository root:
+
+```bat
+setup-local.bat --dev
+cd examples\rmprep
+python ..\..\tools\package_runtime.py agent -m pytest -q
+cd ..\..
+cd packages\ai-agent-lib-ui
+python ..\..\tools\package_runtime.py ui -m pytest -q
+cd ..\..
+```
+
+Run UI tests from the UI package folder so pytest uses that package's configuration.
+These tests use local fixtures and scripted models. Full contributor checks are
+in the [library README](../README.md#working-on-the-library) and
+[Agent Lab README](../packages/ai-agent-lib-ui/README.md#run-the-checks-and-build-a-wheel).
+
+## Other startup scenarios
+
+| Command | What it starts |
+| --- | --- |
+| `start-local.bat` | Local Phoenix when enabled, MCP, rmprep and Agent Lab. |
+| `start-local.bat services` | Local Phoenix when enabled, MCP and rmprep; use your own HTTP client. |
+| `start-local.bat ui` | Agent Lab using its saved configuration; backends must already be running. |
+| `start-phoenix.bat` | Phoenix alone for browsing saved traces. Stop it before the combined stack. |
+
+Local ports are Phoenix **6006**, MCP **8100**, rmprep **8000**, Agent Lab **8765**.
+The MCP URL is `http://127.0.0.1:8100/mcp`. Each service gets up to 90 seconds to
+become ready. An unexpected exit stops the rest of that launcher's stack and
+reports the relevant log.
+
+For another agent, follow [Agent Lab's manual setup](../packages/ai-agent-lib-ui/README.md).
+Then use `start-local.bat ui --config .agentlib\ui\config.json` and start its
+agent/MCP services separately. Relative `--config` paths use the repository root.
+The default rmprep configuration is `.agentlib\ui-rmprep\config.json`.
+Langfuse is an alternative separately hosted backend; follow the
+[shared Langfuse guide](langfuse.md). `start-local.bat` does not start its backend.
+
+## Which environment settings are used?
+
+Startup prints effective settings and sources. For rmprep, the order is:
+
+**Command Prompt environment → root `.env` → rmprep service `.env` → defaults.**
+
+To select a different file instead of the root `.env`:
+
+```bat
+start-local.bat --env-file "F:\path to your settings\.env"
+```
+
+The root file is found beside the batch file even when launched from another
+folder. An explicit relative `--env-file` uses your current Command Prompt folder.
+A missing default root file keeps service settings; a missing explicit file stops
+startup. `rmprep` and `services` apply these overrides; UI and MCP keep separate
+settings, and `demo` uses scripted replies.
+
+For tracing, an optional separate file adds one level:
+**shell → launcher file → separate tracing file → service file → defaults**.
+Use absolute paths for `EAP_PHOENIX_ENV_FILE` or `EAP_LANGFUSE_ENV_FILE` in the
+root file. In a service `.env`, those paths are relative to that file; in shell
+or launcher settings, relative tracing-file paths use `examples\rmprep`.
+Library storage paths such as `EAP_MODEL_TRACE_PATH` resolve from the service folder.
+
+The summary masks credentials, sensitive JSON fields, database connection strings
+and unknown custom variables. Ordinary options such as caching, timeouts and
+token budgets remain readable. It also names the MCP and UI settings files.
+For optional file-based model inspection, add
+`EAP_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl` to rmprep's settings and restart.
+Capture starts with new turns; retain the file to inspect them later.
+
+## Troubleshooting
+
+| Symptom | First step |
+| --- | --- |
+| Missing package or mismatched Python | Run `setup-local.bat`; for Phoenix, run `start-phoenix.bat setup`. Check your approved pip index and wheels. |
+| Login asks for a code | Run `type .agentlib\ui-rmprep\access-code`. Use `127.0.0.1:8765` consistently. |
+| Startup selects `fake` | Check the printed environment path. Set provider and model ID along with the key. Clear an unwanted shell override with `set EAP_MODEL_PROVIDER=`, then restart. |
+| A port is in use | Run `stop-local.bat` for managed runs, or Ctrl+C in a manually started service's window. Existing processes are left alone. |
+| No Phoenix trace or missing content | Check enabled/content-capture settings, restart, send a new question and allow time for ingestion. See [Phoenix troubleshooting](phoenix-trial.md#troubleshooting). |
+| Cache hit is 0% | Check cache writes. A cold request, changed prompt/context, or expired entry can write a prefix; a later matching request can read it. |
+| The answer revises itself | Inspect model calls in the trace. Drafts are provisional until length, citation and evidence checks pass. |
+| Wrong memo is discussed | Keep the same chat and name the reference from **Memo details**. Viewing an older version alone does not select its model context. |
+| An old layout appears in Chrome | Stop/restart, then reload the tab. Wide tables scroll within their own container. |
+| Registry pins or local identity changed | Review the changes, then refresh UI configuration below. Saved conversations remain. |
+
+After reviewing registry or identity changes, stop the stack and refresh its UI
+configuration from the repository root:
+
+```bat
+python tools\package_runtime.py ui -m ai_agent_lib_ui init --config .agentlib\ui-rmprep\config.json --env-file examples\rmprep\agents\rmprep\.env --agent rmprep --artifacts-agent rmprep --allow-url http://127.0.0.1:8000 --overwrite
+start-local.bat
+```
+
+Startup checks saved bindings and preserves existing UI configuration. Changing
+the configured identity makes the old identity's conversations inaccessible to
+the new identity; it does not delete them.

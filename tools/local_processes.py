@@ -65,7 +65,11 @@ def is_ready(service: Service) -> bool:
     connection = http.client.HTTPConnection("127.0.0.1", service.port, timeout=1)
     try:
         connection.request("GET", service.health_path)
-        return connection.getresponse().status == 200
+        with connection.getresponse() as response:
+            # Closing with unread body bytes can reset the peer's connection on
+            # Windows. Finish the exchange, including non-200 startup replies.
+            response.read()
+            return response.status == 200
     except (OSError, http.client.HTTPException):
         return False
     finally:
@@ -124,7 +128,7 @@ def serve(
 ) -> None:
     """Start in dependency order; clean up on failure, interruption, or a smoke test.
 
-    Every child runs its own interpreter. Logs are files so all services can
+    Every child runs as a separate process. Logs are files so all services can
     share one console and Ctrl+C can stop the complete stack.
     """
     check_ports(services)

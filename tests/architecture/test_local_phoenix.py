@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
-from tools import local_dev, local_processes
+from tools import local_dev, local_processes, package_runtime
 
 from ai_agent_lib_core.config.phoenix import PHOENIX_VARIABLES
 
@@ -21,10 +22,7 @@ def checkout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("")
-    for environment in (".venv", ".agentlib/phoenix/.venv"):
-        python = local_dev.interpreter(root / environment)
-        python.parent.mkdir(parents=True, exist_ok=True)
-        python.touch()
+    package_runtime.package_folder(root, "phoenix").mkdir(parents=True)
     (root / ".env").write_text(
         "EAP_MODEL_PROVIDER=fake\nEAP_PHOENIX_ENABLED=true\n"
         "EAP_LANGFUSE_ENABLED=false\nANTHROPIC_API_KEY=root-private-key\n"
@@ -48,7 +46,8 @@ def test_root_enabled_phoenix_starts_first_in_its_own_environment(
         ["ui"] if scenario == "rmprep" else []
     )
     phoenix = services[0]
-    assert phoenix.command[0] == str(local_dev.interpreter(checkout / ".agentlib/phoenix/.venv"))
+    assert phoenix.command[0] == sys.executable
+    assert phoenix.command[1:3] == ("-I", "-S")
     assert phoenix.command[-4:] == ("--host", "127.0.0.1", "--port", "6006")
     assert phoenix.health_path == "/healthz"
     assert phoenix.environment["PHOENIX_SQL_DATABASE_URL"].endswith("/data/phoenix.db")
@@ -62,7 +61,7 @@ def test_root_enabled_phoenix_starts_first_in_its_own_environment(
 def test_disabled_or_unset_phoenix_needs_no_extra_environment(
     checkout: Path, monkeypatch: pytest.MonkeyPatch, disabled_by: str
 ) -> None:
-    local_dev.interpreter(checkout / ".agentlib/phoenix/.venv").unlink()
+    package_runtime.package_folder(checkout, "phoenix").rmdir()
     args = ["services"]
     if disabled_by == "shell":
         monkeypatch.setenv("EAP_PHOENIX_ENABLED", "false")
@@ -87,7 +86,7 @@ def test_disabled_or_unset_phoenix_needs_no_extra_environment(
 def test_external_destination_does_not_start_a_local_server(
     checkout: Path, monkeypatch: pytest.MonkeyPatch, endpoint: str
 ) -> None:
-    local_dev.interpreter(checkout / ".agentlib/phoenix/.venv").unlink()
+    package_runtime.package_folder(checkout, "phoenix").rmdir()
     monkeypatch.setenv("PHOENIX_COLLECTOR_ENDPOINT", endpoint)
     start = Mock()
     monkeypatch.setattr(local_dev, "serve", start)
@@ -103,7 +102,7 @@ def test_invalid_phoenix_setup_fails_before_starting_children(
     failure: str,
 ) -> None:
     if failure == "missing_environment":
-        local_dev.interpreter(checkout / ".agentlib/phoenix/.venv").unlink()
+        package_runtime.package_folder(checkout, "phoenix").rmdir()
         expected = "start-phoenix.bat setup"
     elif failure == "invalid_flag":
         monkeypatch.setenv("EAP_PHOENIX_ENABLED", "yes")
@@ -142,7 +141,7 @@ def test_separate_settings_file_is_resolved_as_the_agent_would_resolve_it(
 def test_ui_only_and_demo_do_not_own_phoenix(
     checkout: Path, monkeypatch: pytest.MonkeyPatch, scenario: str
 ) -> None:
-    local_dev.interpreter(checkout / ".agentlib/phoenix/.venv").unlink()
+    package_runtime.package_folder(checkout, "phoenix").rmdir()
     start = Mock()
     monkeypatch.setattr(local_dev, "serve", start)
     monkeypatch.setattr(local_dev, "run", Mock())

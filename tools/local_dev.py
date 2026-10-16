@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import shlex
 import signal
 import subprocess
 import sys
+import tomllib
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import NoReturn
@@ -16,6 +19,7 @@ from uuid import uuid4
 if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from tools import package_runtime
 from tools.local_processes import Service, report, serve
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,11 +28,6 @@ WORKSPACE = Path("examples/rmprep")
 AGENT_ENV = WORKSPACE / "agents/rmprep/.env"
 MCP_ENV = WORKSPACE / "mcp-servers/rmprep-data/.env"
 UI_CONFIG = Path(".agentlib/ui-rmprep/config.json")
-
-
-def interpreter(environment: Path) -> Path:
-    """Find a virtual environment's Python without activating it in the shell."""
-    return environment / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
 
 
 def run(command: Sequence[str], root: Path) -> None:
@@ -52,15 +51,15 @@ def copy_settings(path: Path) -> None:
         return
 
 
-def prepare_ui(root: Path, ui_python: Path, config: Path) -> int:
+def prepare_ui(root: Path, config: Path) -> int:
     """Initialize a missing rmprep UI configuration, then validate saved registry pins."""
-    require_file(ui_python)
     if not config.exists():
         require_file(root / AGENT_ENV)
         report("Creating the local rmprep UI configuration...")
         run(
-            [
-                str(ui_python),
+            package_runtime.command(
+                root,
+                "ui",
                 "-m",
                 "ai_agent_lib_ui",
                 "init",
@@ -74,10 +73,15 @@ def prepare_ui(root: Path, ui_python: Path, config: Path) -> int:
                 "rmprep",
                 "--allow-url",
                 "http://127.0.0.1:8000",
-            ],
+            ),
             root,
         )
-    run([str(ui_python), "-m", "ai_agent_lib_ui", "check", "--config", str(config)], root)
+    run(
+        package_runtime.command(
+            root, "ui", "-m", "ai_agent_lib_ui", "check", "--config", str(config)
+        ),
+        root,
+    )
     # The UI CLI above validates settings using its own installed contracts.
     values = json.loads(config.read_text(encoding="utf-8"))
     port = int(values.get("port", 8765))
@@ -87,63 +91,80 @@ def prepare_ui(root: Path, ui_python: Path, config: Path) -> int:
     return port
 
 
-def setup(root: Path) -> None:
-    """Install the rmprep and UI environments using the enterprise pip configuration."""
-    agent_python = interpreter(root / ".venv")
-    ui_python = interpreter(root / UI_PROJECT / ".venv")
-    for environment, python in (
-        (root / ".venv", agent_python),
-        (root / UI_PROJECT / ".venv", ui_python),
+def setup_model(root: Path, selected: str = "auto") -> str:
+    """Read only the provider setting, before third-party packages are installed.
+
+    Precedence matches startup: explicit setup option, shell, root .env, service
+    .env (or its example), then fake. This does not read or print credentials.
+    """
+    if selected != "auto":
+        return selected
+    provider = "fake"
+    service = root / AGENT_ENV
+    for path in (
+        service if service.is_file() else service.with_name(".env.example"),
+        root / ".env",
     ):
-        if not python.exists():
-            report(f"Creating environment: {environment}")
-            run([sys.executable, "-m", "venv", str(environment)], root)
+        if not path.is_file():
+            continue
+        for line in path.read_text(encoding="utf-8-sig").splitlines():
+            key, separator, value = line.partition("=")
+            if separator and key.strip().removeprefix("export ").strip() == "EAP_MODEL_PROVIDER":
+                parts = shlex.split(value, comments=True)
+                provider = parts[0] if len(parts) == 1 else ""
+    provider = os.environ.get("EAP_MODEL_PROVIDER", provider)
+    if provider not in {"fake", "anthropic", "bedrock"}:
+        raise ValueError("Select --model fake, anthropic, or bedrock for local setup.")
+    return provider
+
+
+def setup(root: Path, *, dev: bool = False, model: str = "auto") -> None:
+    """Install isolated packages with the default Python and its pip module."""
+    provider = setup_model(root, model)
+    report(f"Python for all services and pip: {sys.executable}")
+    report(f"Model dependencies: {provider}")
+    # Resolve the local services together. Their package metadata selects the
+    # runtime extras, including DuckDB, MCP, HTTP serving and trace export.
+    agent_install: list[str] = []
+    for project in (
+        Path("packages/ai-agent-lib-core"),
+        WORKSPACE / "agents/rmprep",
+        WORKSPACE / "mcp-servers/rmprep-data",
+    ):
+        requirement = str(root / project)
+        if project == Path("packages/ai-agent-lib-core") and provider == "anthropic":
+            requirement += "[anthropic]"
+        agent_install.extend(("-e", requirement))
+    if provider == "bedrock":
+        agent_install.extend(("-e", f"{root / 'packages/ai-agent-lib-aws'}[bedrock]"))
+    if dev:
+        project_config = tomllib.loads((root / WORKSPACE / "pyproject.toml").read_text("utf-8"))
+        agent_install.extend(("-e", str(root / "packages/ai-agent-lib-cli")))
+        # The CLI comes from this checkout. A second, bare requirement can make
+        # older pip versions look for the unpublished package on the index.
+        agent_install.extend(
+            requirement
+            for requirement in project_config["dependency-groups"]["dev"]
+            if requirement != "ai-agent-lib-cli"
+        )
     report("Installing the library, rmprep agent, and MCP server with pip...")
-    run(
+    package_runtime.install(root, "agent", agent_install)
+    report("Installing Agent Lab's packages for the same Python...")
+    package_runtime.install(
+        root,
+        "ui",
         [
-            str(agent_python),
-            "-m",
-            "pip",
-            "install",
             "-e",
             str(root / "packages/ai-agent-lib-core"),
             "-e",
-            str(root / "packages/ai-agent-lib-aws"),
-            "-e",
-            str(root / "packages/ai-agent-lib-cli"),
+            f"{root / UI_PROJECT}[{'chat,dev' if dev else 'chat'}]",
         ],
-        root,
     )
-    run(
-        [
-            str(agent_python),
-            "-m",
-            "ai_agent_lib_cli",
-            "install",
-            "--workspace",
-            str(root / WORKSPACE),
-        ],
-        root,
-    )
-    report("Installing the UI in its separate environment...")
-    run(
-        [
-            str(ui_python),
-            "-m",
-            "pip",
-            "install",
-            "-e",
-            str(root / "packages/ai-agent-lib-core"),
-            "-e",
-            f"{root / UI_PROJECT}[chat,dev]",
-        ],
-        root,
-    )
-    for python in (agent_python, ui_python):
-        run([str(python), "-m", "pip", "check"], root)
     for relative in (AGENT_ENV, MCP_ENV):
         copy_settings(root / relative)
-    prepare_ui(root, ui_python, root / UI_CONFIG)
+    prepare_ui(root, root / UI_CONFIG)
+    if not dev:
+        report("For automated tests and development tools, run setup-local.bat --dev.")
     report("Setup complete. Run start-local.bat to open the rmprep testing stack.")
 
 
@@ -157,21 +178,27 @@ def services_for(
     phoenix: Service | None = None,
 ) -> list[Service]:
     """Describe the dependency order and interpreter for each supported scenario."""
-    agent_python = str(interpreter(root / ".venv"))
-    ui_python = str(interpreter(root / UI_PROJECT / ".venv"))
     services: list[Service] = [phoenix] if phoenix is not None else []
     if scenario in {"rmprep", "services"}:
         services.extend(
             [
                 Service(
                     "rmprep-data",
-                    (agent_python, "-u", "-m", "rmprep_data", "--port", "8100"),
+                    tuple(
+                        package_runtime.command(
+                            root, "agent", "-m", "rmprep_data", "--port", "8100"
+                        )
+                    ),
                     root / WORKSPACE,
                     8100,
                 ),
                 Service(
                     "rmprep",
-                    (agent_python, "-u", "-m", "rmprep.service", "--port", "8000"),
+                    tuple(
+                        package_runtime.command(
+                            root, "agent", "-m", "rmprep.service", "--port", "8000"
+                        )
+                    ),
                     root / WORKSPACE,
                     8000,
                     environment=agent_env,
@@ -182,14 +209,16 @@ def services_for(
         services.append(
             Service(
                 "ui",
-                (
-                    ui_python,
-                    "-u",
-                    str(root / "tools/local_service.py"),
-                    "ai_agent_lib_ui",
-                    "serve",
-                    "--config",
-                    str(config),
+                tuple(
+                    package_runtime.command(
+                        root,
+                        "ui",
+                        str(root / "tools/local_service.py"),
+                        "ai_agent_lib_ui",
+                        "serve",
+                        "--config",
+                        str(config),
+                    )
                 ),
                 root,
                 ui_port,
@@ -227,7 +256,20 @@ def arguments(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--smoke-test", action="store_true", help="start services, verify readiness, then stop them"
     )
+    parser.add_argument(
+        "--dev", action="store_true", help="setup only: also install the CLI and development tools"
+    )
+    parser.add_argument(
+        "--model",
+        choices=("auto", "fake", "anthropic", "bedrock"),
+        default="auto",
+        help="setup only: model dependencies (default: shell/root/service settings)",
+    )
     args = parser.parse_args(argv)
+    if args.dev and args.scenario != "setup":
+        parser.error("--dev applies to setup; run setup-local.bat --dev")
+    if args.model != "auto" and args.scenario != "setup":
+        parser.error("--model applies to setup; configure the runtime model in .env")
     if args.smoke_test and args.scenario in {"setup", "demo"}:
         parser.error("--smoke-test applies to rmprep, services, or ui")
     if args.env_file is not None and args.scenario not in {"rmprep", "services"}:
@@ -246,15 +288,17 @@ def main(argv: Sequence[str] | None = None, *, root: Path = ROOT) -> int:
         if sys.version_info < (3, 11):  # noqa: UP036 - the setup entry point uses system Python
             raise ValueError("Use Python 3.11 or newer to run these scripts.")
         if args.scenario == "setup":
-            setup(root)
+            setup(root, dev=args.dev, model=args.model)
             return 0
-        agent_python = interpreter(root / ".venv")
+        report(f"Python for all services: {sys.executable}")
         if args.scenario != "ui":
-            require_file(agent_python)
             for relative in (AGENT_ENV, MCP_ENV):
                 require_file(root / relative)
         if args.scenario == "demo":
-            run([str(agent_python), "-m", "rmprep.examples.trace_react"], root / WORKSPACE)
+            run(
+                package_runtime.command(root, "agent", "-m", "rmprep.examples.trace_react"),
+                root / WORKSPACE,
+            )
             return 0
         agent_env = None
         phoenix = None
@@ -276,11 +320,11 @@ def main(argv: Sequence[str] | None = None, *, root: Path = ROOT) -> int:
         if args.config != UI_CONFIG and not config.is_file():
             raise ValueError(
                 f"UI configuration is missing: {config}. "
-                "Create it with python -m ai_agent_lib_ui init in the UI environment first."
+                "Create it with python tools/package_runtime.py ui -m ai_agent_lib_ui init first."
             )
         ui_port = 8765
         if args.scenario in {"rmprep", "ui"}:
-            ui_port = prepare_ui(root, interpreter(root / UI_PROJECT / ".venv"), config)
+            ui_port = prepare_ui(root, config)
         serve(
             services_for(
                 root, args.scenario, config, ui_port, agent_env=agent_env, phoenix=phoenix
@@ -304,6 +348,15 @@ def main(argv: Sequence[str] | None = None, *, root: Path = ROOT) -> int:
 
 
 if __name__ == "__main__":
+    # The supervisor resolves agent configuration through core. Load that same
+    # isolated package set using the caller's Python, before any core imports.
+    options = arguments(None)
+    if options.scenario not in {"setup", "ui"} and not sys.flags.no_site:
+        raise SystemExit(
+            package_runtime.wait_for_child(
+                package_runtime.command(ROOT, "agent", str(Path(__file__).resolve()), *sys.argv[1:])
+            )
+        )
     signal.signal(signal.SIGTERM, interrupt)
     if sys.platform == "win32":
         signal.signal(signal.SIGBREAK, interrupt)

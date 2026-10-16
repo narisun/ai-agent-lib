@@ -36,7 +36,7 @@ Replace the file path and module name with your values. Generated agents already
 declare the `otel` extra; `python -m ai_agent_lib_cli install` installs it using
 pip. Keep the enterprise pip index/certificate configuration supplied by your
 team. Developers connecting to a shared backend need Python, pip and access to
-that server. Agent Lab remains in its separate Python environment.
+that server. Agent Lab uses the same Python with its separate package folder.
 
 ## Settings and privacy
 

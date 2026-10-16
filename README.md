@@ -12,7 +12,7 @@ Choose the path that matches your task:
 
 | I want to… | Start here | What I will have |
 | --- | --- | --- |
-| Test an existing agent in a browser | [Run Agent Lab](#run-agent-lab) | rmprep, its MCP server, chat, memo versions, and response inspection |
+| Test an existing agent in a browser | [Run Agent Lab](#run-agent-lab) | rmprep, its MCP server, chat, memo versions, and trace links |
 | Build my first agent | [Run your first agent](#run-your-first-agent), then the [tutorial](docs/getting-started.md) | A generated Python workspace with runnable code and tests |
 | Understand the design | [Developer guide: principles](docs/developer-guide.html#principles) | How LangGraph, interfaces, dependency injection, and environment providers fit together |
 | Change the library or simulator | [Working on the library](#working-on-the-library) and the [code map](docs/README.md#find-the-code) | The right package, environment, and checks for a change |
@@ -23,58 +23,58 @@ development preview; use the [release scope](docs/release-scope.md) for support 
 
 ## Run Agent Lab
 
-Agent Lab is the browser simulator for testing agents. You need your team's
-Python 3.11+ and pip setup, access to the approved package index, and a writable
-copy of this repository. In **Command Prompt**, from the repository root:
+Agent Lab is the browser simulator for testing agents. Use your team's Python
+3.11+ and pip setup, approved package index, and a writable repository checkout.
+Open **Command Prompt** in the repository root.
+
+**First time:** follow [local setup and model settings](docs/local-startup.md#1-set-up-once).
+Use `setup-local.bat --model anthropic` or `setup-local.bat --model bedrock`,
+then configure the selected provider in the root `.env`. If that file already
+selects your model, `setup-local.bat` detects it. Phoenix tracing is optional.
+All services use the same approved Python. Agent/MCP, Agent Lab, and Phoenix keep
+separate `.venv` package folders. The launchers use the default Python and its
+pip module, rather than executables inside those folders. The generated
+`fake` model echoes questions for a basic connectivity check.
+Setup installs runtime packages. Use `setup-local.bat --dev` to also install
+the scaffolding CLI and the rmprep/Agent Lab development tools.
+
+**Each testing session:**
 
 ```bat
-setup-local.bat
 start-local.bat
 ```
 
-Wait for **All selected services are ready**, then open
-[Agent Lab](http://127.0.0.1:8765). In a second Command Prompt at the repository root:
+Check the printed environment path, model and masked settings. Wait for **All
+selected services are ready**, then open [Agent Lab](http://127.0.0.1:8765).
+Read its login code in a second Command Prompt at the repository root:
 
 ```bat
 type .agentlib\ui-rmprep\access-code
 ```
 
-Enter that code, select **Choose agent → Start chat with rmprep**, and send a
-question. The launcher loads the repository-root `.env` for rmprep, including your
-model provider and API key. To use another file, run
-`start-local.bat --env-file "F:\path to settings\.env"`. Startup prints the selected
-provider and model. Without model overrides, the default fake model echoes your
-question. See the [local startup guide](docs/local-startup.md) for Anthropic setup
-and configuration precedence. The launcher also lists configuration variables
-with their sources, showing JSON options while masking credentials and sensitive fields.
+Select **Choose agent → Start chat with rmprep**. With Anthropic configured, ask:
 
-Replies stream while the agent works, then show the final answer with token usage
-and response time. The temporary draft panel disappears when the outcome is ready.
-**Memos** opens saved document versions; **Logs** shows available model input/output,
-MCP calls, and checkpoints. Optional
-[Langfuse tracing](docs/langfuse.md) adds a trace link to each response.
-For a local Python/pip observability server with SQLite, follow the
-[Phoenix trial](docs/phoenix-trial.md). Run `start-phoenix.bat setup` once, then set
-`EAP_PHOENIX_ENABLED=true` in the root `.env` (and disable Langfuse). With the
-default local endpoint, `start-local.bat` starts Phoenix first in its separate
-environment and stops it with the rest of the stack.
-To stop, run this in a second Command Prompt from the repository root:
+1. `Prepare a meeting memo for Jones Dairy Farm (JONE-0022) as of 2026-08-03.`
+2. In the same chat: `Explain the covenant breaches and cash conversion cycle change. How was its wallet share calculated? Use the saved evidence.`
+
+Text streams into a provisional draft, then the final answer shows token usage
+and response time. **Memos** opens saved versions beside chat. With Phoenix enabled,
+**Open trace in Agent Lab** opens the response's model input/output, MCP calls,
+metrics and checkpoint references. **Logs** provides local diagnostic inspection.
+
+When finished, run in the second Command Prompt:
 
 ```bat
 stop-local.bat
 ```
 
-It asks this checkout's launchers to stop Agent Lab, rmprep, MCP, and local Phoenix
-in reverse order, preserving conversations, traces, and checkpoints. Then run
-`start-local.bat` again. **Ctrl+C** in the launcher window also works.
-Phoenix trace links are labelled **Open trace in Agent Lab**.
-Startup shows effective tracing settings, including separate environment files,
-with credentials masked. `config explain` and `doctor` also check Phoenix and
-Langfuse configuration; enable one tracing backend at a time.
+Wait for **Stopped gracefully**. Conversations, memo versions, traces and
+checkpoints remain available next time you start. Restart after changing code
+or settings. Ctrl+C in the launcher window also stops its stack.
 
-Setup keeps agent/MCP dependencies in `.venv` and UI dependencies in
-`packages\ai-agent-lib-ui\.venv`. The launcher selects the correct interpreter.
-To connect your own agent, follow the [Agent Lab package guide](packages/ai-agent-lib-ui/README.md).
+The [local testing guide](docs/local-startup.md) includes expected answers, client
+switching, older memos, startup checks and troubleshooting. To connect your own
+agent, use the [Agent Lab package guide](packages/ai-agent-lib-ui/README.md).
 
 ## Run your first agent
 
@@ -84,25 +84,22 @@ The tutorial uses a fake model that runs in the Python process and local
 providers for configuration, permissions, audit records, and conversation state.
 
 Open a terminal in the repository's top-level `ai-agent-lib/` folder. Choose
-the commands for your terminal below. They create a virtual environment in
-the library checkout and a separate application workspace named `tutorial/`
-beside it. Use a different workspace name if that folder already exists.
+the commands for your terminal below. They use your existing Python and create
+an application workspace named `tutorial/` beside the library checkout. Use a different workspace name if that folder already exists.
 
-A **virtual environment** keeps project packages separate from system Python.
-These commands use its Python executable directly. If you already created
+Packages install into the selected Python's configured location through its pip. If you already created
 this tutorial using the developer guide,
 continue with [the next steps](docs/getting-started.md#2-understand-your-project).
 
 ### Windows Command Prompt (cmd.exe)
 
 In **Command Prompt**, run the commands one line at a time from the library
-root. `set "PYTHON=..."` stores the executable's full path; `"%PYTHON%"` runs
+root. `set "PYTHON=..."` stores the Python command or executable path; `"%PYTHON%"` runs
 it. Keep the quotes so paths containing spaces work.
 
 ```bat
 set "LIBRARY=%CD%"
-python -m venv .venv
-set "PYTHON=%LIBRARY%\.venv\Scripts\python.exe"
+set "PYTHON=python"
 "%PYTHON%" -m pip install -e ./packages/ai-agent-lib-core -e ./packages/ai-agent-lib-cli
 "%PYTHON%" -m ai_agent_lib_cli init tutorial --dir .. --lib-path "%LIBRARY%" --owner learning
 cd /d ..\tutorial
@@ -112,15 +109,14 @@ cd /d ..\tutorial
 "%PYTHON%" -m helper "Say hello to Ada."
 ```
 
-If your Python installation uses `py -3.11`, use `py -3.11 -m venv .venv` for the
-environment creation step.
+If your team supplies a specific executable, set `PYTHON` to its full path.
+Use `python -m pip`, so pip runs under that approved Python.
 
 ### macOS or Linux, using bash or zsh
 
 ```bash
 LIBRARY="$PWD"
-python3 -m venv .venv
-PYTHON="$LIBRARY/.venv/bin/python"
+PYTHON=python3
 "$PYTHON" -m pip install -e ./packages/ai-agent-lib-core -e ./packages/ai-agent-lib-cli
 "$PYTHON" -m ai_agent_lib_cli init tutorial --dir .. --lib-path "$LIBRARY" --owner learning
 cd ../tutorial
@@ -261,20 +257,17 @@ Use this workflow when changing the library itself. Open a terminal at the
 library root. If you followed the quickstart, return there with
 `cd /d "%LIBRARY%"` in Command Prompt or `cd "$LIBRARY"` in bash/zsh.
 
-Create the virtual environment if it does not already exist, and select its
-interpreter:
+Select your approved Python, then install the contributor dependencies:
 
 ```bat
 rem Windows Command Prompt, from ai-agent-lib/
-python -m venv .venv
-set "PYTHON=%CD%\.venv\Scripts\python.exe"
+set "PYTHON=python"
 "%PYTHON%" tools/install_dev.py
 ```
 
 ```bash
 # macOS/Linux, from ai-agent-lib/
-python3 -m venv .venv
-PYTHON="$PWD/.venv/bin/python"
+PYTHON=python3
 "$PYTHON" tools/install_dev.py
 ```
 

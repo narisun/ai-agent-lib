@@ -19,7 +19,7 @@ That page can be followed using the included files before making an API call.
 
 Open **Command Prompt** at your generated workspace root. Follow
 [Select Python](getting-started.md#using-a-new-terminal)
-to set `PYTHON` to the virtual environment's executable.
+to set `PYTHON` to your approved Python executable.
 
 This agent was created with the `fake` provider. Open
 `agents/helper/pyproject.toml` and add `anthropic` to the extras on its

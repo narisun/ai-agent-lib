@@ -7,7 +7,10 @@ Use Python 3.11 or newer and the pip index and certificates supplied by your tea
 Your package administrators must make the pinned package and its Windows wheels
 available through the enterprise package repository.
 
-## 1. Prepare the separate environment
+For the complete first-run path, use [local startup and testing](local-startup.md).
+This page explains Phoenix settings, trace inspection and captured verification results.
+
+## 1. Install the Phoenix packages
 
 Open Command Prompt in the `ai-agent-lib` repository and run:
 
@@ -16,9 +19,11 @@ start-phoenix.bat setup
 ```
 
 The script installs `arize-phoenix==20.22.0` with pip into
-`.agentlib\phoenix\.venv`. The agent and Agent Lab keep their own environments.
+`.agentlib\phoenix\.venv\Lib\site-packages`, using your existing Python. Agent Lab
+and the agent keep their own `.venv` packages. All three run with the default
+Python executable, without using environment-local Python or pip binaries.
 You only need to repeat setup after changing the pinned Phoenix version or
-recreating this environment. The script preserves your pip configuration.
+changing the selected Python version or rebuilding its packages. The script preserves your pip configuration.
 
 ## 2. Enable Phoenix in the root .env
 
@@ -56,8 +61,8 @@ start-local.bat
 
 The launcher reads the root `.env`, starts Phoenix, and waits for its health check
 before starting the MCP server, rmprep, and Agent Lab. Phoenix uses
-`.agentlib\phoenix\.venv`; the agent and UI keep their separate environments.
-Startup checks the environment is present; it does not install packages. If it is
+the same Python as the agent and UI, with its own package folder.
+Startup checks that the packages match the selected Python; it does not install packages. If it is
 missing, run `start-phoenix.bat setup`, then try again.
 
 Open Agent Lab at <http://127.0.0.1:8765> and Phoenix at
@@ -72,6 +77,7 @@ window also works. SQLite stores traces in
 `.agentlib\phoenix\data\phoenix.db`; restarting keeps them. The `.agentlib` folder
 is excluded from Git. Phoenix's startup log appears alongside the other service
 logs in `.agentlib\local-runs\<run-id>\phoenix.log`.
+Service log files use UTF-8, including first-run database messages on Windows.
 
 `start-local.bat services` also includes Phoenix when enabled. UI-only and scripted
 demo runs keep their existing scope. Command Prompt settings override the root
@@ -88,12 +94,28 @@ For a readiness check that stops everything afterward, run:
 start-local.bat --smoke-test
 ```
 
-The launcher binds the HTTP server to loopback and disables Phoenix's optional
-gRPC collector, built-in agent assistant, and usage telemetry. The pinned server
-normally binds gRPC on all network interfaces, so `tools/phoenix_server.py`
-contains a small version-checked compatibility shim. The native startup banner
-may still list gRPC; this trial receives spans through HTTP only, at
-`http://127.0.0.1:6006/v1/traces`. Review this shim when upgrading Phoenix.
+The launcher configures Phoenix as a local trace viewer. Your agent calls the
+model and MCP tools; Phoenix displays their inputs, outputs, metrics, and
+checkpoint references. It binds HTTP to loopback and receives spans at
+`http://127.0.0.1:6006/v1/traces`.
+
+These server settings are applied automatically; keep your agent's provider and
+API key in the root `.env`:
+
+| Phoenix server feature | Local setting | Reason |
+| --- | --- | --- |
+| Playground model generation | `PHOENIX_ALLOWED_PROVIDERS=NONE` | Run model requests through Agent Lab; traces from every model provider remain visible. |
+| Phoenix's own MCP endpoint | `PHOENIX_ENABLE_MCP_SERVER=false` | Agents use their registered MCP servers. The trace viewer does not need another MCP endpoint. |
+| Code execution | `PHOENIX_ALLOWED_SANDBOX_PROVIDERS=NONE`, `PHOENIX_ENABLE_MCP_CODE_MODE=false` | Viewing traces requires no sandbox binaries. |
+| Built-in assistant | `PHOENIX_DISABLE_AGENT_ASSISTANT=true` | Test your agent through Agent Lab. |
+
+The launcher also disables usage telemetry and the optional gRPC collector.
+The native Phoenix banner may still list gRPC; this trial uses HTTP only.
+`tools/phoenix_server.py` contains version-checked compatibility shims for the
+gRPC listener and the optional Bedrock Playground dependency check. The latter
+only checks for `aioboto3` when Phoenix allows its AWS provider. Neither shim
+changes installed packages, database queries, or warning filters. Review them
+when upgrading Phoenix.
 
 ## 4. Verify a conversation
 
@@ -123,6 +145,34 @@ Model spans measure provider-call duration; the root measures agent work includi
 tools. Agent Lab measures the full response time, including HTTP/UI overhead, so
 the durations need not be identical. Checkpoint contents remain in the agent's
 database; Phoenix receives references, not a second copy of the checkpoint store.
+
+### Verified Jones follow-up after restart
+
+On October 16, 2026, Agent Lab reopened an existing conversation containing Canada
+Goose and Jones Dairy Farm memos. A follow-up named the saved Jones memo and asked
+about covenant breaches, the cash conversion cycle change and wallet-share calculation.
+
+| Model calls | New MCP calls | Revisions | Input / output tokens | UI time | Checkpoint references |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 0 | 0 | 12,391 / 657 | 6.69 s | 4 |
+
+The answer reused the selected memo's saved evidence. It reported DSCR 1.08,
+fixed charge coverage 0.96, cash conversion cycle 87 → 106 days, and recorded
+wallet share 40.21%, preserving the unknown waiver execution and wallet-share
+methodology. Phoenix input/output and usage matched Agent Lab and the model JSONL.
+Source checks covered eight CSV records, 91 fields and seven calculated comparisons.
+Both memo versions remained saved; `stop-local.bat` stopped all four services
+without changing stored conversation, checkpoint or trace rows during shutdown.
+
+The earlier follow-up needed two calls because Markdown markers pushed the raw
+word count over its limit. Content-word counting now excludes those markers;
+regression tests preserve that original draft unchanged and still reject invalid
+citations and answers over their content-word limit. Live wording, timing and call counts vary.
+Follow the [local test questions](local-startup.md#generate-a-memo-and-ask-follow-ups)
+to run this scenario with your own saved memo reference.
+
+<details>
+<summary>Earlier captured runs: October 15, 2026</summary>
 
 ### Verified Anthropic run
 
@@ -174,6 +224,8 @@ Q&A call wrote its cache; the next follow-up reused it. Cache hits and timing va
 between runs. Regression tests also cover trace links and checkpoint references
 for confirmed failed turns; the live conversation above had no failed turns.
 
+</details>
+
 ## Settings
 
 From your agent workspace, run `python -m ai_agent_lib_cli config explain rmprep`
@@ -214,6 +266,26 @@ not import the Phoenix server package. Existing `LangfuseTracing` and
 `langfuse_tracing` imports and invocation APIs remain supported.
 
 ## Troubleshooting
+
+### Remaining upstream warning
+
+Phoenix 20.22.0 can print SQLAlchemy's `Column-expression-level unary distinct()`
+warning during startup or browsing. Its database queries use column-level
+`distinct()` where SQLAlchemy 2.1 expects
+[`select(...).distinct()`](https://docs.sqlalchemy.org/en/21/core/sqlelement.html#sqlalchemy.sql.expression.distinct).
+We leave this warning visible and keep Phoenix's database code unchanged. It
+does not block the verified SQLite trace ingestion and browsing workflow. Review
+an upstream query fix with the next Phoenix upgrade; installing `aioboto3` will
+not fix it.
+
+Disabling Phoenix's unused MCP endpoint avoids the startup
+`PydanticJsonSchemaWarning` caused by its unset-value defaults during schema
+generation. Requesting Phoenix's OpenAPI schema separately can still expose
+that upstream warning. It is not filtered. The startup suggestion to install
+`aioboto3` no longer applies because Playground generation is disabled; Bedrock
+agents keep their own model dependencies and can still send traces to Phoenix.
+
+### Startup and trace checks
 
 | Symptom | Check |
 | --- | --- |

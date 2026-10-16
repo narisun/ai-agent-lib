@@ -22,7 +22,9 @@ def _lint(search_path: Path | None = None) -> subprocess.CompletedProcess[str]:
     """Run import-linter with the repository's rules, optionally on a copy of the code."""
     env = dict(os.environ)  # the linter subprocess needs the caller's environment
     if search_path is not None:
-        env["PYTHONPATH"] = str(search_path)
+        env["PYTHONPATH"] = os.pathsep.join(
+            [str(search_path), *filter(None, env.get("PYTHONPATH", "").split(os.pathsep))]
+        )
     return subprocess.run(  # noqa: S603 - fixed command, no untrusted input
         [sys.executable, "-c", _RUN_LINTER, str(REPO_ROOT / "pyproject.toml")],
         cwd=REPO_ROOT,

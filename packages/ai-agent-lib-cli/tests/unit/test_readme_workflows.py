@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shlex
 import shutil
 import subprocess
 import sys
 import threading
-import venv
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
 
@@ -25,14 +25,14 @@ def workspace(library: LibrarySource) -> WorkspaceAnswers:
 
 
 @pytest.mark.parametrize("source", ["path", "index"])
-def test_cmd_setup_runs_the_selected_python_in_a_path_with_spaces(
+def test_cmd_setup_uses_approved_python_from_a_workspace_with_spaces(
     source: str, tmp_path: Path
 ) -> None:
     cmd = shutil.which("cmd.exe")
     if cmd is None:
         pytest.skip("Windows Command Prompt is not installed")
     checkout = tmp_path / "library's folder & name"
-    venv.EnvBuilder(with_pip=False).create(checkout / ".venv")
+    checkout.mkdir()
     library = (
         LibrarySource.from_path(checkout)
         if source == "path"
@@ -41,6 +41,7 @@ def test_cmd_setup_runs_the_selected_python_in_a_path_with_spaces(
     files = Scaffolder()._workspace_files(workspace(library))
     readme = files[PurePosixPath("README.md")]
     setup = re.findall(r"```bat\n(.*?)```", readme, re.DOTALL)[0]
+    assert "venv" not in readme
     assignments = "\n".join(line for line in setup.splitlines() if line.startswith("set "))
     script = tmp_path / "select_python.cmd"
     script.write_text(
@@ -50,14 +51,15 @@ def test_cmd_setup_runs_the_selected_python_in_a_path_with_spaces(
     result = subprocess.run(  # noqa: S603 - commands rendered from the repository template
         [cmd, "/d", "/v:off", "/c", str(script)],
         cwd=checkout,
+        env={**os.environ, "PATH": str(Path(sys.executable).parent) + os.pathsep + os.defpath},
         capture_output=True,
         text=True,
         check=False,
         timeout=30,
     )
     assert result.returncode == 0, result.stderr
-    expected = checkout.resolve() / ".venv" / "Scripts" / "python.exe"
-    assert Path(result.stdout.strip()) == expected
+    assert Path(result.stdout.strip()) == Path(sys.executable)
+    assert not list(checkout.rglob("pyvenv.cfg"))
 
 
 @pytest.mark.parametrize("source", ["path", "index"])

@@ -13,7 +13,7 @@ from uuid import uuid4
 if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tools.local_dev import interpreter, run
+from tools import package_runtime
 from tools.local_processes import Service, report, serve
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,13 +21,9 @@ VERSION = "20.22.0"
 
 
 def setup(root: Path) -> None:
-    """Install the pinned server into its own environment using enterprise pip settings."""
-    folder = root / ".agentlib" / "phoenix"
-    python = interpreter(folder / ".venv")
-    if not python.exists():
-        run([sys.executable, "-m", "venv", str(folder / ".venv")], root)
-    run([str(python), "-m", "pip", "install", f"arize-phoenix=={VERSION}"], root)
-    run([str(python), "-m", "pip", "check"], root)
+    """Install server dependencies using the existing Python and enterprise pip settings."""
+    report(f"Python for Phoenix and pip: {sys.executable}")
+    package_runtime.install(root, "phoenix", [f"arize-phoenix=={VERSION}"])
     report("Phoenix setup complete. Enable it in the root .env, then run start-local.bat.")
 
 
@@ -48,7 +44,14 @@ def server_environment(folder: Path) -> dict[str, str]:
             "PHOENIX_PORT": "6006",
             "PHOENIX_TELEMETRY_ENABLED": "false",
             "PHOENIX_DISABLE_AGENT_ASSISTANT": "true",
-            "PYTHONUTF8": "1",
+            # This local component collects traces; code evaluation would need
+            # optional sandbox runtimes or downloads that the trial does not use.
+            "PHOENIX_ALLOWED_SANDBOX_PROVIDERS": "NONE",
+            # Agents own model/MCP calls. Phoenix only receives and displays
+            # their traces; it does not need a second playground or MCP server.
+            "PHOENIX_ALLOWED_PROVIDERS": "NONE",
+            "PHOENIX_ENABLE_MCP_SERVER": "false",
+            "PHOENIX_ENABLE_MCP_CODE_MODE": "false",
             "PHOENIX_ENABLE_PROMETHEUS": "false",
         }
     )
@@ -58,24 +61,25 @@ def server_environment(folder: Path) -> dict[str, str]:
 def service(root: Path) -> Service:
     """Describe the same isolated server for standalone and supervised startup."""
     folder = root / ".agentlib" / "phoenix"
-    python = interpreter(folder / ".venv")
-    if not python.is_file():
-        raise ValueError("Run start-phoenix.bat setup first to install the separate environment.")
+    if not package_runtime.package_folder(root, "phoenix").is_dir():
+        raise ValueError("Run start-phoenix.bat setup first to install Phoenix's packages.")
     (folder / "data").mkdir(parents=True, exist_ok=True)
     report(f"Phoenix {VERSION}: http://127.0.0.1:6006")
     report(f"SQLite database: {folder / 'data' / 'phoenix.db'}")
     return Service(
         "phoenix",
-        (
-            str(python),
-            "-u",
-            str(root / "tools/local_service.py"),
-            "tools.phoenix_server",
-            "serve",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            "6006",
+        tuple(
+            package_runtime.command(
+                root,
+                "phoenix",
+                str(root / "tools/local_service.py"),
+                "tools.phoenix_server",
+                "serve",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "6006",
+            )
         ),
         root,
         6006,

@@ -2,9 +2,10 @@
 
 import ast
 import subprocess
-import sys
 import tomllib
 from pathlib import Path
+
+from python_runtime import python_command
 
 PACKAGE = Path(__file__).resolve().parents[1]
 ROOT = PACKAGE.parents[1]
@@ -64,6 +65,6 @@ def test_importing_ui_does_not_load_agent_or_browser_frameworks() -> None:
         "assert not any(n.split('.')[0] in blocked for n in sys.modules)"
     )
     result = subprocess.run(  # noqa: S603 - fixed script in this environment's interpreter
-        [sys.executable, "-I", "-c", script], capture_output=True, text=True, check=False
+        python_command("-c", script), capture_output=True, text=True, check=False
     )
     assert result.returncode == 0, result.stderr

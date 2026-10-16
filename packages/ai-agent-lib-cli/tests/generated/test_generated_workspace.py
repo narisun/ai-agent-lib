@@ -121,7 +121,9 @@ def run_in(workspace: Path, *command: str) -> subprocess.CompletedProcess[str]:
     """Run a tool in the workspace, with its services importable as if installed."""
     sources = sorted(str(path) for path in workspace.glob("*/*/src"))
     environment = dict(os.environ)  # the tool needs the caller's environment to start at all
-    environment["PYTHONPATH"] = os.pathsep.join(sources)
+    environment["PYTHONPATH"] = os.pathsep.join(
+        [*sources, *filter(None, environment.get("PYTHONPATH", "").split(os.pathsep))]
+    )
     environment.pop("PYTEST_ADDOPTS", None)
     return subprocess.run(  # noqa: S603 - this interpreter and fixed arguments
         [sys.executable, "-m", *command],

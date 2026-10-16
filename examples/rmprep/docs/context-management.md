@@ -266,15 +266,15 @@ graph = build_graph(
 Set `EAP_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl` in the agent's `.env`.
 Each model request contains a `Context selection` manifest in its system
 message. It identifies the selected memo IDs, client, meeting date, retrieval
-date, mode, omitted turns and discussion summary. The model messages show the
-actual evidence projection. Message IDs and token estimates are kept in checkpoint
+date and mode. The model messages show the actual evidence projection.
+Message IDs and token estimates are kept in checkpoint
 diagnostics, so those changing values do not invalidate the prompt cache.
 
 The latest checkpoint exposes that manifest and diagnostic counts as `context_diagnostics`, plus
 `memos`, `active_memo_id`, `active_client` and `selection`. This is agent state
-available to checkpoint inspection; the UI's dedicated inspector remains a
-separate frontend phase. Rejected drafts appear in traces but do not create
-memo versions.
+available through Agent Lab's **Logs** page. With Phoenix enabled, **Open trace
+in Agent Lab** opens the turn's model/tool timeline and checkpoint references.
+Rejected drafts appear in traces but do not create memo versions.
 
 Diagnostics include `input_token_budget`, `recent_token_budget`,
 `retained_recent_tokens`, `question_token_budget` and `tool_schema_token_allowance`.

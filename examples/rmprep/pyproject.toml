@@ -65,3 +65,9 @@ python_version = "3.11"
 strict = true
 files = ["."]
 exclude = ['^\.venv/']
+# Resolve namespace test folders and installed services consistently from this workspace.
+explicit_package_bases = true
+mypy_path = [
+    "$MYPY_CONFIG_FILE_DIR/agents/rmprep/src",
+    "$MYPY_CONFIG_FILE_DIR/mcp-servers/rmprep-data/src",
+]

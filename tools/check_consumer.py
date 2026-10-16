@@ -144,6 +144,10 @@ def main() -> None:
             run("-m", "pip", "install", "pytest>=8.2", "pytest-asyncio>=0.24", "aiohttp>=3.10")
             suite = work / "test_ui_protocol.py"
             shutil.copyfile(root / "packages/ai-agent-lib-ui/tests/test_browser_protocol.py", suite)
+            shutil.copyfile(
+                root / "packages/ai-agent-lib-ui/tests/python_runtime.py",
+                work / "python_runtime.py",
+            )
             config = work / "pytest.ini"
             config.write_text(
                 "[pytest]\nasyncio_mode=auto\nasyncio_default_fixture_loop_scope=function\n"

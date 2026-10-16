@@ -14,7 +14,7 @@ see [Langfuse](docs/langfuse.md). Those are optional after the local tests pass.
 
 Run all commands from the **workspace root**, where `agentlib.toml` lives.
 Follow [Select Python](../../README.md#select-python) in the workspace README
-to set `PYTHON` to the virtual environment's executable. Do this in every
+to set `PYTHON` to your approved Python executable. Do this in every
 new terminal. These examples use Windows Command Prompt; in bash/zsh replace `"%PYTHON%"`
 with `"$PYTHON"` after setting `PYTHON` as that README describes.
 
@@ -95,15 +95,16 @@ Leave it running. Wait for the `ready` log event. The server listens at
 successful after startup validation and graph/tool preparation finish.
 
 The generated service enables live replies for the library's chat UI. Model text
-appears in a provisional draft while the agent works. The draft collapses when
+appears in a provisional draft while the agent works. The draft panel disappears when
 the final answer is saved; each reply shows input/output token usage and elapsed
 time. Missing counts display as unavailable; fake-model counts are simulated.
 For per-response model/tool timelines and checkpoint references, follow
 [Connect Langfuse](docs/langfuse.md). The generated service includes the shared
 library adapter; tracing is disabled until you configure it.
 The UI requests `POST /invoke` with `Accept: text/event-stream`. Regular JSON
-requests keep their accepted-answer envelope. Model output guardrails and schema
-checks buffer text until they pass. To also wait for all application-specific
+requests keep their accepted-answer envelope. Default pattern guardrails check
+each growing update; blocking PII and schema checks wait for the complete response.
+To also wait for all application-specific
 checks before showing any draft, set `live_updates=False` in
 `src/{{ package }}/service.py`.
 

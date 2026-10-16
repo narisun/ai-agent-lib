@@ -7,11 +7,12 @@ import signal
 import socket
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
-from tools import local_dev, local_processes
+from tools import local_dev, local_processes, package_runtime
 from tools.local_environment import agent_environment
 from tools.local_processes import RunningService, Service
 
@@ -41,7 +42,7 @@ def test_missing_template_does_not_leave_empty_settings(tmp_path: Path) -> None:
         ("ui", ["ui"]),
     ],
 )
-def test_service_plan_uses_dependency_order_and_separate_interpreters(
+def test_service_plan_uses_one_interpreter_and_isolated_ui_packages(
     tmp_path: Path,
     scenario: str,
     names: list[str],
@@ -53,59 +54,126 @@ def test_service_plan_uses_dependency_order_and_separate_interpreters(
     for service in services:
         assert Path(service.command[0]).is_absolute()
         if service.name == "ui":
-            assert service.command[0] == str(
-                local_dev.interpreter(root / local_dev.UI_PROJECT / ".venv")
-            )
+            assert service.command[0] == sys.executable
+            assert service.command[1:3] == ("-I", "-S")
+            assert str(package_runtime.package_folder(root, "ui")) in service.command
             assert service.command[-1] == str(config)
             assert service.port == 8766
             assert service.health_path == "/healthz"
         else:
-            assert service.command[0] == str(local_dev.interpreter(root / ".venv"))
+            assert service.command[0] == sys.executable
             assert service.cwd == root / local_dev.WORKSPACE
             assert service.health_path == "/readyz"
 
 
-def test_setup_installs_ui_extras_only_in_ui_environment(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("dev", [False, True])
+def test_setup_installs_runtime_packages_and_opt_in_development_tools(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, dev: bool
 ) -> None:
+    workspace = tmp_path / local_dev.WORKSPACE
+    workspace.mkdir(parents=True)
+    manifest = Path(__file__).resolve().parents[2] / local_dev.WORKSPACE / "pyproject.toml"
+    (workspace / "pyproject.toml").write_bytes(manifest.read_bytes())
+    requirements = tomllib.loads(manifest.read_text("utf-8"))["dependency-groups"]["dev"]
     execute = Mock()
+    install_packages = Mock()
+    monkeypatch.setattr(package_runtime, "install", install_packages)
     monkeypatch.setattr(local_dev, "run", execute)
     monkeypatch.setattr(local_dev, "copy_settings", Mock())
     monkeypatch.setattr(local_dev, "prepare_ui", Mock())
+    assert local_dev.main(["setup", *(["--dev"] if dev else [])], root=tmp_path) == 0
+    calls = install_packages.call_args_list
+    assert [call.args[1] for call in calls] == ["agent", "ui"]
+    requirements_to_install = calls[0].args[2]
+    for relative in (
+        "packages/ai-agent-lib-core",
+        "examples/rmprep/agents/rmprep",
+        "examples/rmprep/mcp-servers/rmprep-data",
+    ):
+        assert requirements_to_install.count(str(tmp_path / relative)) == 1
+    assert not any("ai-agent-lib-aws" in value for value in requirements_to_install)
+    assert (str(tmp_path / "packages/ai-agent-lib-cli") in requirements_to_install) is dev
+    assert "ai-agent-lib-cli" not in requirements_to_install
+    for requirement in requirements:
+        if requirement != "ai-agent-lib-cli":
+            assert (requirement in requirements_to_install) is dev
+    assert calls[1].args[2][-1].endswith(f"ai-agent-lib-ui[{'chat,dev' if dev else 'chat'}]")
+    execute.assert_not_called()  # No installation into the default Python's site-packages.
+
+
+def test_setup_keeps_environment_executables_untouched(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    binaries = []
+    for environment in (Path(".venv"), local_dev.UI_PROJECT / ".venv"):
+        python = tmp_path / environment / "Scripts/python.exe"
+        python.parent.mkdir(parents=True)
+        python.write_bytes(b"existing executable, never run")
+        binaries.append(python)
+    install = Mock()
+    monkeypatch.setattr(local_dev, "copy_settings", Mock())
+    monkeypatch.setattr(local_dev, "prepare_ui", Mock())
+    monkeypatch.setattr(package_runtime, "install", install)
     local_dev.setup(tmp_path)
-    commands = [call.args[0] for call in execute.call_args_list]
-    agent = str(local_dev.interpreter(tmp_path / ".venv"))
-    ui = str(local_dev.interpreter(tmp_path / local_dev.UI_PROJECT / ".venv"))
-    installs = [command for command in commands if command[1:4] == ["-m", "pip", "install"]]
-    assert len(installs) == 2
-    assert installs[0][0] == agent
-    assert all("ai-agent-lib-ui" not in value for value in installs[0])
-    assert installs[1][0] == ui
-    assert installs[1][-1].endswith("ai-agent-lib-ui[chat,dev]")
-    assert [
-        agent,
-        "-m",
-        "ai_agent_lib_cli",
-        "install",
-        "--workspace",
-        str(tmp_path / local_dev.WORKSPACE),
-    ] in commands
-    assert [agent, "-m", "pip", "check"] in commands
-    assert [ui, "-m", "pip", "check"] in commands
+    assert [call.args[1] for call in install.call_args_list] == ["agent", "ui"]
+    assert all(path.read_bytes() == b"existing executable, never run" for path in binaries)
+
+
+@pytest.mark.parametrize("scenario", ["rmprep", "services", "ui", "demo"])
+def test_development_option_is_rejected_outside_setup(scenario: str) -> None:
+    with pytest.raises(SystemExit) as error:
+        local_dev.arguments([scenario, "--dev"])
+    assert error.value.code == 2
+
+
+@pytest.mark.parametrize("provider", ["fake", "anthropic", "bedrock"])
+def test_setup_installs_the_selected_model_extra(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, provider: str
+) -> None:
+    install = Mock()
+    monkeypatch.setattr(local_dev, "copy_settings", Mock())
+    monkeypatch.setattr(local_dev, "prepare_ui", Mock())
+    monkeypatch.setattr(package_runtime, "install", install)
+    local_dev.setup(tmp_path, model=provider)
+    command = install.call_args_list[0].args[2]
+    assert (str(tmp_path / "packages/ai-agent-lib-aws") + "[bedrock]" in command) is (
+        provider == "bedrock"
+    )
+    assert (str(tmp_path / "packages/ai-agent-lib-core") + "[anthropic]" in command) is (
+        provider == "anthropic"
+    )
+
+
+def test_setup_model_matches_shell_root_and_service_precedence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("EAP_MODEL_PROVIDER", raising=False)
+    service = tmp_path / local_dev.AGENT_ENV
+    service.parent.mkdir(parents=True)
+    service.with_name(".env.example").write_text("EAP_MODEL_PROVIDER=fake\n")
+    assert local_dev.setup_model(tmp_path) == "fake"
+    service.write_text("EAP_MODEL_PROVIDER=anthropic\n")
+    assert local_dev.setup_model(tmp_path) == "anthropic"
+    (tmp_path / ".env").write_text('export EAP_MODEL_PROVIDER="bedrock" # approved provider\n')
+    assert local_dev.setup_model(tmp_path) == "bedrock"
+    monkeypatch.setenv("EAP_MODEL_PROVIDER", "anthropic")
+    assert local_dev.setup_model(tmp_path) == "anthropic"
+    assert local_dev.setup_model(tmp_path, "bedrock") == "bedrock"
 
 
 def test_existing_ui_configuration_is_checked_without_overwriting(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    python = tmp_path / "python.exe"
-    python.touch()
     config = tmp_path / "config.json"
     config.write_text('{"port": 9876}', encoding="utf-8")
     execute = Mock()
     monkeypatch.setattr(local_dev, "run", execute)
-    assert local_dev.prepare_ui(tmp_path, python, config) == 9876
+    assert local_dev.prepare_ui(tmp_path, config) == 9876
     execute.assert_called_once_with(
-        [str(python), "-m", "ai_agent_lib_ui", "check", "--config", str(config)], tmp_path
+        package_runtime.command(
+            tmp_path, "ui", "-m", "ai_agent_lib_ui", "check", "--config", str(config)
+        ),
+        tmp_path,
     )
     assert config.read_text(encoding="utf-8") == '{"port": 9876}'
 
@@ -165,7 +233,7 @@ def test_missing_custom_ui_config_is_not_initialized_as_rmprep(
 def test_failed_installation_stops_setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     execute = Mock(side_effect=subprocess.CalledProcessError(1, "pip"))
     prepare = Mock()
-    monkeypatch.setattr(local_dev, "run", execute)
+    monkeypatch.setattr(package_runtime, "install", execute)
     monkeypatch.setattr(local_dev, "prepare_ui", prepare)
     assert local_dev.main(["setup"], root=tmp_path) == 1
     execute.assert_called_once()
@@ -279,6 +347,7 @@ def test_batch_help_runs_from_another_directory(tmp_path: Path, name: str) -> No
         "tools/local_dev.py",
         "tools/local_processes.py",
         "tools/local_control.py",
+        "tools/package_runtime.py",
     ):
         (root / relative).write_bytes((source / relative).read_bytes())
     result = subprocess.run(  # noqa: S603 - Windows shell entry point under test
@@ -350,10 +419,6 @@ def test_launcher_passes_selected_file_only_to_agent(
         target = root / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.touch()
-    # Use the platform's environment path when running on Unix too.
-    python = local_dev.interpreter(root / ".venv")
-    python.parent.mkdir(parents=True, exist_ok=True)
-    python.touch()
     for name in ("EAP_MODEL_PROVIDER", "ANTHROPIC_API_KEY"):
         monkeypatch.delenv(name, raising=False)
     (root / ".env").write_text("EAP_MODEL_PROVIDER=anthropic\nANTHROPIC_API_KEY=root-secret\n")
