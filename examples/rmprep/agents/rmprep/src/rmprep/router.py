@@ -3,7 +3,7 @@
 import re
 
 from rmprep.clients import client_names, recent_client_lookup
-from rmprep.focus import conversation_focus
+from rmprep.focus import conversation_focus, focus_update
 from rmprep.memos import index_legacy_memos
 from rmprep.selection import select_context
 from rmprep.state import Route, State
@@ -55,12 +55,8 @@ def router(state: State) -> dict[str, object]:
     return {
         "route": route,
         "context_version": 2,
-        "focus": focus,
-        **(
-            {"memos": memos, "active_memo_id": active_id, "active_client": active_client}
-            if migrated
-            else {}
-        ),
+        **focus_update(focus),
+        **({"memos": memos} if migrated else {}),
         "selection": select_context(
             str(question.content),
             memos,

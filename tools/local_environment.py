@@ -5,7 +5,9 @@ from pathlib import Path
 from tools.local_processes import report
 
 
-def agent_environment(service_env: Path, overrides: Path, *, required: bool) -> dict[str, str]:
+def agent_environment(
+    service_env: Path, overrides: Path, *, required: bool, working_dir: Path | None = None
+) -> dict[str, str]:
     """Merge shell > launcher file > service defaults, keeping secrets in the child.
 
     Service defaults stay in the service's own file. Relative configuration paths
@@ -19,6 +21,7 @@ def agent_environment(service_env: Path, overrides: Path, *, required: bool) -> 
         LayeredConfigSource,
         MappingConfigSource,
     )
+    from ai_agent_lib_core.config.tracing import resolve_tracing_settings
     from ai_agent_lib_core.contracts import ConfigurationError
     from tools.local_config_report import report_environment
 
@@ -34,6 +37,9 @@ def agent_environment(service_env: Path, overrides: Path, *, required: bool) -> 
             LayeredConfigSource(MappingConfigSource(environment), service),
             base_dir=service_env.parent,
         ).explain()
+        tracing = resolve_tracing_settings(
+            service_env, environment=MappingConfigSource(environment), working_dir=working_dir
+        )
     except ConfigurationError as error:
         raise ValueError(str(error)) from error
     if overrides.is_file():
@@ -46,6 +52,8 @@ def agent_environment(service_env: Path, overrides: Path, *, required: bool) -> 
         f"Agent model: {config.model.provider} / {config.model.model_id or '(provider default)'}"
     )
     report_environment(
-        resolution, (("shell", shell), ("launcher .env", launcher), ("service .env", service))
+        resolution,
+        (("shell", shell), ("launcher .env", launcher), ("service .env", service)),
+        tracing=tracing,
     )
     return environment

@@ -165,6 +165,7 @@ def test_supervisor_owns_phoenix_lifecycle_and_stops_it_last(
         if failure == "later_spawn" and len(children) == 2:
             raise OSError("agent failed to spawn")
         child = Mock()
+        child.wait.return_value = 0
         child.poll.return_value = None
         name = names[len(children)]
         child.send_signal.side_effect = lambda event: stopped.append(name)

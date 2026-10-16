@@ -68,6 +68,9 @@ It asks this checkout's launchers to stop Agent Lab, rmprep, MCP, and local Phoe
 in reverse order, preserving conversations, traces, and checkpoints. Then run
 `start-local.bat` again. **Ctrl+C** in the launcher window also works.
 Phoenix trace links are labelled **Open trace in Agent Lab**.
+Startup shows effective tracing settings, including separate environment files,
+with credentials masked. `config explain` and `doctor` also check Phoenix and
+Langfuse configuration; enable one tracing backend at a time.
 
 Setup keeps agent/MCP dependencies in `.venv` and UI dependencies in
 `packages\ai-agent-lib-ui\.venv`. The launcher selects the correct interpreter.

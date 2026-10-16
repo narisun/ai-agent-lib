@@ -54,10 +54,21 @@ date or reference. For a different client, provide its UEN or full name; use
 `memo:` and `qna:` to make the workflow explicit. The selector uses deterministic
 rules, so an exact memo reference is the clearest way to select a document.
 
+To switch to a name that has not appeared in this thread, use an explicit subject:
+`Prepare a memo for Jones Dairy Farm as of 2026-08-03` or
+`Show financials for Jones Dairy Farm`. The agent resolves that name with
+`find_clients` before selecting its evidence. It does not carry the previous
+client's UEN into the new request. An unresolved lookup leaves the last accepted
+focus intact. Ordinary follow-ups such as `What about Cash Flow?` and
+`Prepare a memo for the same client` keep the current client.
+
 A broad memo has a 1,000-word maximum, including headings and references; Q&A
 defaults to 350 words. An explicit request such as `within 600 words` overrides
-that default. The model targets 70% of the available body budget to leave room
-for complete citations. Validation allows at most two revisions; rejected drafts
+that default. Heading text, figures, tables and full source references count toward
+the limit. Markdown heading/list markers and divider-only lines do not count;
+code is counted literally. Counting does not modify the answer or remove evidence.
+The model targets 60% of the available body budget to leave room for complete
+citations. Validation allows at most two revisions; rejected drafts
 remain visible in model traces and never become accepted memo versions.
 
 A successful `find_clients` lookup also remembers the search name in the thread.
@@ -295,7 +306,7 @@ Prompt files are installed with the agent package:
 
 | Resource under `src/rmprep/prompts` | Purpose |
 | --- | --- |
-| `rmprep/common.v3.md` | Shared evidence, citation, client-group and context rules. |
+| `rmprep/common.v5.md` | Shared evidence, citation, client-group and context rules, including content-word counting and unknown reporting years in meeting questions. |
 | `memoagent/system.v2.md` | Memo structure and evidence retrieval instructions. |
 | `qnaagent/system.v3.md` | Reuse supplied evidence for follow-ups; retrieve missing or refreshed client records. |
 

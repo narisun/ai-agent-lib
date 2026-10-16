@@ -83,6 +83,7 @@ def test_stop_during_startup_prevents_launching_later_services(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     child = Mock()
+    child.wait.return_value = 0
     child.poll.return_value = None
     spawn = Mock(return_value=child)
     logs = tmp_path / "logs"
@@ -113,6 +114,7 @@ def test_status_write_failure_cannot_skip_child_cleanup(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     child = Mock()
+    child.wait.return_value = 0
     child.poll.return_value = None
     update = RunControl.update
 
@@ -133,7 +135,47 @@ def test_status_write_failure_cannot_skip_child_cleanup(
     child.kill.assert_not_called()
 
 
-def test_real_supervisor_stops_in_reverse_order_and_preserves_saved_files(tmp_path: Path) -> None:
+@pytest.mark.parametrize("failure", ["kill", "wait"])
+def test_failed_force_stop_does_not_skip_other_children(tmp_path: Path, failure: str) -> None:
+    healthy, broken = Mock(), Mock()
+    healthy.poll.return_value = broken.poll.return_value = None
+    healthy.wait.return_value = 0
+    broken.send_signal.side_effect = OSError("signal unavailable")
+    if failure == "kill":
+        broken.kill.side_effect = OSError("cannot kill")
+    else:
+        broken.wait.side_effect = subprocess.TimeoutExpired("child", 5)
+    children = [
+        local_processes.RunningService(Service(name, (), tmp_path, port), child, tmp_path / name)
+        for name, child, port in [("mcp", healthy, 8100), ("ui", broken, 8765)]
+    ]
+    assert not local_processes.stop_children(children)
+    healthy.send_signal.assert_called_once()
+    healthy.wait.assert_called_once_with(timeout=30)
+
+
+@pytest.mark.parametrize("already_exited", [True, False])
+@pytest.mark.parametrize("exit_code", [0, 1, 3, 130, -2, 3221225786, -1073741510])
+def test_shutdown_requires_confirmed_normal_exit(
+    tmp_path: Path, already_exited: bool, exit_code: int
+) -> None:
+    child = Mock()
+    child.poll.return_value = exit_code if already_exited else None
+    child.wait.return_value = exit_code
+    running = local_processes.RunningService(
+        Service("ui", (), tmp_path, 8765), child, tmp_path / "ui.log"
+    )
+    interrupt_codes = {130, 3221225786, -1073741510} if os.name == "nt" else {130, -2}
+    expected = exit_code == 0 or (not already_exited and exit_code in interrupt_codes)
+    assert local_processes.stop_children([running]) is expected
+    child.kill.assert_not_called()
+
+
+@pytest.mark.parametrize("uvicorn_server", [False, True])
+def test_real_supervisor_stops_in_reverse_order_and_preserves_saved_files(
+    tmp_path: Path,
+    uvicorn_server: bool,
+) -> None:
     root = Path(__file__).resolve().parents[2]
     names = ["phoenix", "mcp", "agent", "ui"]
     ports = []
@@ -171,11 +213,41 @@ finally:
     server.server_close()
     with open(sys.argv[2], 'a') as output: output.write(sys.argv[3] + '\\n')
 """
+    commands = [
+        (sys.executable, "-u", "-c", child_code, str(port), str(journal), name)
+        for name, port in zip(names, ports, strict=True)
+    ]
+    if uvicorn_server:
+        (tmp_path / "test_server.py").write_text(
+            "import sys, uvicorn\n"
+            "async def app(scope, receive, send):\n"
+            "    if scope['type'] == 'lifespan':\n"
+            "        await receive()\n"
+            "        await send({'type': 'lifespan.startup.complete'})\n"
+            "        await receive()\n"
+            "        with open(sys.argv[2], 'a') as f: f.write(sys.argv[3] + '\\n')\n"
+            "        await send({'type': 'lifespan.shutdown.complete'})\n"
+            "    else:\n"
+            "        await send({'type': 'http.response.start', 'status': 200, 'headers': []})\n"
+            "        await send({'type': 'http.response.body', 'body': b'OK'})\n"
+            "uvicorn.run(app, host='127.0.0.1', port=int(sys.argv[1]), ws='none')\n"
+        )
+        commands = [
+            (
+                sys.executable,
+                "-u",
+                str(root / "tools/local_service.py"),
+                "test_server",
+                str(port),
+                str(journal),
+                name,
+            )
+            for name, port in zip(names, ports, strict=True)
+        ]
     code = (
         "from pathlib import Path\nfrom tools.local_processes import Service, serve\n"
-        f"services=[Service(name, ({sys.executable!r}, '-u', '-c', {child_code!r}, str(port), "
-        f"{str(journal)!r}, name), Path({str(tmp_path)!r}), port) "
-        f"for name,port in {list(zip(names, ports, strict=True))!r}]\n"
+        f"services=[Service(name, command, Path({str(tmp_path)!r}), port) "
+        f"for name,port,command in {list(zip(names, ports, commands, strict=True))!r}]\n"
         f"serve(services, Path({str(logs)!r}))\n"
     )
     options: dict[str, Any] = {}

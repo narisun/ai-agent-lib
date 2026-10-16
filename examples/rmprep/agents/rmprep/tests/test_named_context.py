@@ -12,6 +12,7 @@ from ai_agent_lib_core.pipeline import bind_request_context
 from ai_agent_lib_core.pipeline.guardrails import frame_untrusted
 from ai_agent_lib_core.testing import FakeChatModelProvider, Fakes
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage
+from langchain_core.runnables import RunnableLambda
 from langchain_core.tools import tool
 
 from rmprep.clients import client_names, resolved_clients
@@ -20,6 +21,7 @@ from rmprep.graph import APPLICATION, answer, build_graph
 from rmprep.response_review import tool_payload
 from rmprep.router import router
 from rmprep.selection import select_context
+from rmprep.specialist import build_specialist
 from rmprep.state import State
 
 CLIENT = "CANA-0010"
@@ -128,6 +130,53 @@ def assert_wallet_context(messages: list[AnyMessage]) -> None:
                 if isinstance(prior, AIMessage)
                 for call in prior.tool_calls
             )
+
+
+async def test_multi_topic_memo_followup_keeps_required_evidence_and_needs_one_model_call() -> None:
+    history = saved_memo()
+    payload = evidence_payload()
+    for section in ("covenants", "credit_exceptions", "working_capital"):
+        payload["sections"][section] = {
+            "records": [{"source_ref": f"{section}[uen={CLIENT};id=1]"}],
+            "evidence_limits": {"methodology": "not_supplied"},
+        }
+    payload["review_findings"] = [
+        {"source_refs": [f"credit_exceptions[uen={CLIENT};id=1]"]},
+        {"source_refs": [f"clients[uen={CLIENT}]"]},
+    ]
+    history[4] = history[4].model_copy(
+        update={"content": frame_untrusted("rmprep-data.get_memo_evidence", json.dumps(payload))}
+    )
+    original = deepcopy(history)
+    state: State = {
+        "messages": [
+            *history,
+            HumanMessage(
+                "Explain the covenant breaches and the change in cash conversion cycle in that memo. "
+                "Also, how was its wallet share calculated? Use the saved evidence."
+            ),
+        ]
+    }
+    state = cast(State, {**state, **router(state)})
+    calls = []
+
+    async def model(messages: list[AnyMessage]) -> AIMessage:
+        calls.append(messages)
+        page = tool_payload(next(m for m in messages if m.id == "evidence-result"))
+        assert set(page["sections"]) == {
+            "relationship",
+            "covenants",
+            "credit_exceptions",
+            "working_capital",
+        }
+        assert page["sections"]["working_capital"] == payload["sections"]["working_capital"]
+        assert page["review_findings"] == payload["review_findings"][:1]
+        return AIMessage(EXPLANATION)
+
+    result = await build_specialist(RunnableLambda(model), [], "Use evidence.").ainvoke(state)
+    assert len(calls) == 1
+    assert result["messages"][-1].content == EXPLANATION
+    assert history == original
 
 
 def test_successful_lookup_remembers_search_and_canonical_name() -> None:
@@ -261,6 +310,133 @@ def test_unknown_client_excludes_the_saved_canada_goose_memo() -> None:
     built = ContextBuilder().build(repaired, "System", selection)
     assert len(built.messages) == 2
     assert MEMO not in str(built.messages)
+
+
+@pytest.mark.parametrize("name", ["Jones Dairy Farm", "Acme", "jones dairy farm"])
+@pytest.mark.parametrize("command", ["Prepare a memo for", "Show financials for", "memo:"])
+def test_unfamiliar_client_in_explicit_subject_does_not_inherit_prior_client(
+    name: str, command: str
+) -> None:
+    from rmprep.context_tools import tool_context_issues
+
+    state: State = {"messages": [*saved_memo(), HumanMessage(f"{command} {name} as of 2026-08-03")]}
+    repaired = cast(State, {**state, **router(state)})
+    selection = repaired["selection"]
+    assert selection["uen"] == ""
+    assert selection["memo_ids"] == []
+    assert selection["client_uens"] == []
+    assert selection["mode"] == "new"
+    assert MEMO not in str(ContextBuilder().build(repaired, "System", selection).messages)
+    lookup = AIMessage(
+        "",
+        tool_calls=[
+            {"name": "rmprep-data_find_clients", "args": {"search": name}, "id": "resolve"}
+        ],
+    )
+    assert not tool_context_issues(lookup, selection, [], "2026-08-03")
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "What about Cash Flow?",
+        "Explain Total Debt",
+        "Show financials for this client",
+        "Prepare a memo for the same client",
+        "Prepare a memo for 2026-08-03",
+        "memo: Prepare a new memo",
+        "memo: refresh this memo",
+        "Explain the memo for October 2026",
+    ],
+)
+def test_topic_and_referential_followups_keep_the_client(question: str) -> None:
+    state: State = {"messages": [*saved_memo(), HumanMessage(question)]}
+    selection = cast(dict[str, Any], router(state)["selection"])
+    assert selection["uen"] == CLIENT
+
+
+async def test_new_unfamiliar_name_resolves_before_evidence_and_persists_new_focus() -> None:
+    target, name, date = "JONE-0022", "Jones Dairy Farm", "2026-08-03"
+    calls: list[tuple[str, str]] = []
+
+    @tool("rmprep-data_find_clients")
+    async def find(search: str) -> str:
+        """Resolve a client name in the governed registry."""
+        calls.append(("lookup", search))
+        return frame_untrusted(
+            "rmprep-data.find_clients",
+            json.dumps(
+                {
+                    "status": "resolved",
+                    "truncated": False,
+                    "resolved_uen": target,
+                    "matches": [{"uen": target, "name": name}],
+                }
+            ),
+        )
+
+    @tool("rmprep-data_get_memo_evidence")
+    async def retrieve(uen: str, meeting_date: str) -> str:
+        """Retrieve a dated evidence pack."""
+        calls.append((uen, meeting_date))
+        payload = json.loads(
+            json.dumps(evidence_payload()).replace(CLIENT, target).replace(NAME, name)
+        )
+        payload["meeting_date"] = meeting_date
+        return frame_untrusted("rmprep-data.get_memo_evidence", json.dumps(payload))
+
+    memo = f"Jones Dairy Farm wallet share: 22.55%. Source: relationship[uen={target}]."
+    explanation = f"The recorded wallet share is 22.55% [relationship[uen={target}]]."
+    kit = Fakes(
+        model=FakeChatModelProvider(
+            [
+                AIMessage(
+                    "",
+                    tool_calls=[{"name": find.name, "args": {"search": name}, "id": "new-lookup"}],
+                ),
+                AIMessage(
+                    "",
+                    tool_calls=[
+                        {
+                            "name": retrieve.name,
+                            "args": {"uen": target, "meeting_date": date},
+                            "id": "new-evidence",
+                        }
+                    ],
+                ),
+                memo,
+                explanation,
+            ]
+        )
+    )
+    caller = RequestContext(
+        principal=Principal(subject="developer", tenant="bank"),
+        application=APPLICATION,
+        request_id="switch",
+        thread_id="switch-client",
+    )
+    async with kit.container() as services:
+        graph = build_graph(services, [find, retrieve])
+        with bind_request_context(caller):
+            await graph.aupdate_state(
+                services.invocation(caller)["config"],
+                {"messages": saved_memo()},
+                as_node="qnaagent",
+            )
+        assert memo in await answer(
+            graph, services, caller, f"Prepare a memo for {name} as of {date}"
+        )
+        assert await answer(graph, services, caller, "Explain that wallet share") == explanation
+        with bind_request_context(caller):
+            saved = await graph.aget_state(services.invocation(caller)["config"])
+    assert calls == [("lookup", name), (target, date)]
+    assert saved.values["focus"]["client_uens"] == [target]
+    assert saved.values["active_client"] == target
+    assert saved.values["active_client_uens"] == [target]
+    assert saved.values["focus"]["memo_ids"] == [saved.values["active_memo_id"]]
+    assert len(saved.values["memos"]) == 2  # The earlier Canada memo is preserved.
+    for prompt in kit.model.models[0].calls:
+        assert MEMO not in [message.content for message in prompt]
 
 
 @tool("rmprep-data_find_clients")

@@ -1,14 +1,15 @@
 """Opt-in Phoenix tracing settings, separate from service and operational telemetry."""
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
 from urllib.parse import urlsplit
 
 from ai_agent_lib_core.config.sources import (
     DotenvConfigSource,
     EnvironConfigSource,
-    LayeredConfigSource,
     MappingConfigSource,
 )
 from ai_agent_lib_core.contracts import ConfigSource, ConfigurationError
@@ -76,32 +77,78 @@ def load_phoenix_settings(
     ``os.environ``. ``source`` supplies a complete configuration and bypasses
     file layering; supply only one of these overrides.
     """
+    return resolve_phoenix_settings(dotenv_path, source=source, environment=environment).settings
+
+
+@dataclass(frozen=True)
+class PhoenixResolution:
+    """Validated optional settings and a credential-masked explanation of origins."""
+
+    settings: PhoenixSettings | None
+    shown: Mapping[str, str]
+    origins: Mapping[str, str]
+
+
+def resolve_phoenix_settings(
+    dotenv_path: Path | None = Path(".env"),
+    *,
+    source: ConfigSource | None = None,
+    environment: ConfigSource | None = None,
+    working_dir: Path | None = None,
+) -> PhoenixResolution:
+    """Resolve the runtime settings for diagnostics or a planned child process."""
     if source is not None and environment is not None:
         raise ValueError("Supply either source or environment to load_phoenix_settings")
     if source is None:
         environment = environment if environment is not None else EnvironConfigSource()
         service = DotenvConfigSource(dotenv_path) if dotenv_path else MappingConfigSource({})
-        layers: list[ConfigSource] = [environment]
+        layers: list[tuple[str, ConfigSource]] = [("process environment", environment)]
         if (environment.get("EAP_PHOENIX_ENABLED") or "").lower() != "false":
             extra = environment.get("EAP_PHOENIX_ENV_FILE")
+            if extra and working_dir is not None:
+                extra = str(working_dir / extra)
             if not extra and (extra := service.get("EAP_PHOENIX_ENV_FILE")):
                 extra = str((dotenv_path.parent if dotenv_path else Path.cwd()) / extra)
             if extra:
-                layers.append(DotenvConfigSource(Path(extra), required=True))
-        layers.append(service)
-        source = LayeredConfigSource(*layers)
+                layers.append(
+                    (str(Path(extra).resolve()), DotenvConfigSource(Path(extra), required=True))
+                )
+        layers.append((str(dotenv_path.resolve()) if dotenv_path else "service settings", service))
+    else:
+        layers = [("injected source", source)]
+    defaults = {
+        "EAP_PHOENIX_ENABLED": "false",
+        "EAP_PHOENIX_CAPTURE_CONTENT": "false",
+        "PHOENIX_COLLECTOR_ENDPOINT": "http://127.0.0.1:6006",
+        "PHOENIX_PROJECT_NAME": "agent-lab",
+    }
+    values, origins = {}, {}
+    for name in PHOENIX_VARIABLES:
+        found = next(
+            (
+                (value, f"{label}: {name}")
+                for label, layer in layers
+                if (value := layer.get(name)) is not None
+            ),
+            None,
+        )
+        values[name], origins[name] = found or (defaults.get(name, ""), "default")
 
     def flag(name: str) -> bool:
-        value = source.get(name) or "false"
+        value = values[name] or "false"
         if value.lower() not in {"true", "false"}:
             raise ConfigurationError(f"{name} must be true or false")
         return value.lower() == "true"
 
-    if not flag("EAP_PHOENIX_ENABLED"):
-        return None
-    return PhoenixSettings(
-        base_url=source.get("PHOENIX_COLLECTOR_ENDPOINT") or "http://127.0.0.1:6006",
-        project_name=source.get("PHOENIX_PROJECT_NAME") or "agent-lab",
-        capture_content=flag("EAP_PHOENIX_CAPTURE_CONTENT"),
-        api_key=source.get("PHOENIX_API_KEY") or "",
+    settings = (
+        PhoenixSettings(
+            base_url=values["PHOENIX_COLLECTOR_ENDPOINT"] or defaults["PHOENIX_COLLECTOR_ENDPOINT"],
+            project_name=values["PHOENIX_PROJECT_NAME"] or defaults["PHOENIX_PROJECT_NAME"],
+            capture_content=flag("EAP_PHOENIX_CAPTURE_CONTENT"),
+            api_key=values["PHOENIX_API_KEY"],
+        )
+        if flag("EAP_PHOENIX_ENABLED")
+        else None
     )
+    shown = {**values, "PHOENIX_API_KEY": "********" if values["PHOENIX_API_KEY"] else ""}
+    return PhoenixResolution(settings, MappingProxyType(shown), MappingProxyType(origins))

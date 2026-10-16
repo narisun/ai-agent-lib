@@ -44,6 +44,9 @@
       const version = versions.get(select.value);
       if (!version || selected === version.id) return;
       article.replaceChildren(); meta.textContent = ""; status.textContent = "Loading memo…";
+      // selected describes rendered content, not the last completed fetch. A
+      // cancelled A -> B -> A switch must fetch A again after clearing it.
+      selected = ""; details.hidden = true; details.open = false;
       const html = await read(`/api/threads/${encodeURIComponent(thread)}/documents/${encodeURIComponent(version.id)}`, signal, true);
       if (signal.aborted) return;
       // This endpoint renders Markdown with HTML and images disabled. Model text

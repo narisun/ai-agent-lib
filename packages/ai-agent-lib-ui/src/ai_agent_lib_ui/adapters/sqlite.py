@@ -490,18 +490,20 @@ class SqliteThreads:
         return await asyncio.to_thread(read)
 
     def recover(self) -> None:
-        """Hold admission for interrupted runs; call only under the server process lock."""
+        """Recover interrupted runs under the process lock without replaying requests."""
         with self.connection() as db:
             db.execute("BEGIN IMMEDIATE")
             for run_id, record in db.execute(
                 "SELECT id,record FROM runs WHERE state IN ('accepted','running')"
             ).fetchall():
-                run = RunRecord.model_validate_json(record).model_copy(
-                    update={"state": "unknown", "updated_at": now()}
-                )
+                previous = RunRecord.model_validate_json(record)
+                # Dispatch starts only after the durable transition to running.
+                # An accepted run is therefore safe to fail and release.
+                state = "failed" if previous.state == "accepted" else "unknown"
+                run = previous.model_copy(update={"state": state, "updated_at": now()})
                 db.execute(
-                    "UPDATE runs SET state='unknown',record=? WHERE id=?",
-                    (run.model_dump_json(), run_id),
+                    "UPDATE runs SET state=?,record=? WHERE id=?",
+                    (state, run.model_dump_json(), run_id),
                 )
 
     def new_session(self, identity: str) -> str:

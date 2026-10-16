@@ -2,7 +2,7 @@
 
 import pytest
 
-from ai_agent_lib_ui.integrations.answer_format import format_answer
+from ai_agent_lib_ui.integrations.answer_format import format_answer, present_answer
 
 CANADA = (
     "financial_facts[uen=CANA-0010;concept=Revenues;period_end=2025-12-31;"
@@ -94,3 +94,18 @@ def test_source_values_are_quoted_without_interpreting_markup() -> None:
     result = format_answer("Evidence records[id=<script>alert(1)</script>;value=one`two|three].")
     assert "Id: ` <script>alert(1)</script> `" in result
     assert "Value: `` one`two|three ``" in result
+
+
+@pytest.mark.parametrize("separator", [", ", ",", "; ", " "])
+def test_separators_between_citations_do_not_become_stray_punctuation(separator: str) -> None:
+    refs = separator.join([f"[{CANADA}]", f"[{SLEEP}]", CANADA])
+    view = present_answer(f"Revenue USD 919,811,320.76 {refs}. Other values: 1, 2, 3.")
+    assert view.body == "Revenue USD 919,811,320.76. Other values: 1, 2, 3."
+    assert view.references.count("**Financial facts**") == 2
+
+
+def test_evidence_limit_annotations_remain_readable_caveats() -> None:
+    annotation = "[evidence_limits: ratio_methodology=not_supplied]"
+    view = present_answer(f"Ratio 1.08 {annotation}. Example: `{annotation}`.")
+    assert view.body == (f"Ratio 1.08 (Ratio methodology: not supplied). Example: `{annotation}`.")
+    assert not view.references

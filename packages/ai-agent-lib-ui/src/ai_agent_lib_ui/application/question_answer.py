@@ -59,7 +59,7 @@ class QuestionAnswerAdapter:
     ) -> AcceptedAnswer:
         """Accept a successful terminal envelope; malformed optional artifacts degrade.
 
-        The future transport must bound bytes while reading, before this projection.
+        The HTTP adapter bounds bytes while reading, before this projection.
         Graph progress updates and raw model responses must never call this method.
         """
         self.request(view, turn)

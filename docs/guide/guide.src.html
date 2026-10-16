@@ -907,10 +907,11 @@ EAP_MODEL_PROVIDER=fake</code></pre>
   secrets. <code>options</code> lists accepted keys and defaults. <code>doctor</code>
   tries to build and validate the configured services; with cloud adapters, this can
   contact those services.</p>
-  <p>For optional Langfuse tracing, <code>explain</code> also shows the source file
-  or process variable for each setting and masks both API keys. <code>doctor</code>
-  checks these settings with the same resolver as startup. Its Langfuse check
-  validates configuration without contacting the tracing server.</p>
+  <p>For optional Phoenix or Langfuse tracing, <code>explain</code> also shows the
+  source file or process variable for each setting and masks API keys.
+  <code>doctor</code> uses the same resolver as startup, checks the destination
+  and capture settings, and rejects enabling both backends together. These tracing
+  checks validate configuration without contacting the tracing server.</p>
   <h3>Optional: use a hosted model</h3>
   <p>Continue using the fake model while learning and testing. Follow these steps
   when your team has approved a model endpoint and supplied account access:</p>
@@ -1251,7 +1252,7 @@ messages = [static_system_prompt(SYSTEM_INSTRUCTIONS, request_context), *convers
 reply = await services.model().ainvoke(messages)</code></pre>
   <p>In rmprep, prompt resources live under
   <code>src/rmprep/prompts/&lt;agent&gt;/&lt;type&gt;.v&lt;version&gt;.md</code>.
-  The loader pins <code>rmprep/common.v3.md</code>, <code>memoagent/system.v2.md</code>
+  The loader pins <code>rmprep/common.v5.md</code>, <code>memoagent/system.v2.md</code>
   and <code>qnaagent/system.v3.md</code>. Dates, client selection and output budgets
   stay in request context. The router uses Python rules and needs no model prompt.
   Add a new version and update the loader explicitly when changing instructions.</p>

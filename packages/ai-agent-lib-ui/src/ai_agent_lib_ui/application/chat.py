@@ -45,6 +45,7 @@ class ChatService:
         self.store, self.catalog, self.dispatcher = store, catalog, dispatcher
         self.tasks: dict[str, asyncio.Task[RunRecord]] = {}
         self.progress: dict[str, ProgressFeed] = {}
+        self.admissions: set[asyncio.Task[tuple[RunRecord, asyncio.Task[RunRecord] | None]]] = set()
         self.closing = False
 
     async def create(
@@ -77,13 +78,14 @@ class ChatService:
             scope=view.scope, thread_id=thread_id, idempotency_key=key, question=question
         )
         QuestionAnswerAdapter(conversation.binding.manifest).request(view, turn)
-        run = await self.store.admit(view, turn)
-        task = self.tasks.get(run.run_id)
-        if run.state == "accepted" and task is None:
-            self.progress[run.run_id] = ProgressFeed()
-            task = asyncio.create_task(self._execute(view, conversation, turn, run))
-            self.tasks[run.run_id] = task
-            task.add_done_callback(lambda finished: self._forget(run.run_id, finished))
+        if self.closing:
+            raise ContractError(ErrorCode.UNAVAILABLE)
+        # SQLite's worker can commit after the browser is cancelled. Own both
+        # admission and the handoff to execution, without a cancellable gap.
+        admission = asyncio.create_task(self._admit_and_start(view, conversation, turn))
+        self.admissions.add(admission)
+        admission.add_done_callback(self._forget_admission)
+        run, task = await asyncio.shield(admission)
         if task is not None:
             # Closing a tab, pressing Stop or cancelling a browser handler cannot
             # cancel an HTTP request whose outcome the application must record.
@@ -95,6 +97,25 @@ class ChatService:
                     logger.warning("Live display stopped; the admitted request continues")
             return await asyncio.shield(task)
         return run
+
+    async def _admit_and_start(
+        self, view: ViewContext, conversation: Conversation, turn: TurnAdmission
+    ) -> tuple[RunRecord, asyncio.Task[RunRecord] | None]:
+        run = await self.store.admit(view, turn)
+        task = self.tasks.get(run.run_id)
+        if run.state == "accepted" and task is None:
+            self.progress[run.run_id] = ProgressFeed()
+            task = asyncio.create_task(self._execute(view, conversation, turn, run))
+            self.tasks[run.run_id] = task
+            task.add_done_callback(lambda finished: self._forget(run.run_id, finished))
+        return run, task
+
+    def _forget_admission(
+        self, task: asyncio.Task[tuple[RunRecord, asyncio.Task[RunRecord] | None]]
+    ) -> None:
+        self.admissions.discard(task)
+        if not task.cancelled() and task.exception() is not None:
+            logger.warning("UI admission failed; no request was dispatched by this admission")
 
     def _forget(self, run_id: str, task: asyncio.Task[RunRecord]) -> None:
         self.tasks.pop(run_id, None)
@@ -182,5 +203,7 @@ class ChatService:
     async def close(self) -> None:
         """Drain already admitted requests; dispatchers provide finite timeouts."""
         self.closing = True
+        if self.admissions:
+            await asyncio.gather(*tuple(self.admissions), return_exceptions=True)
         if self.tasks:
             await asyncio.gather(*tuple(self.tasks.values()), return_exceptions=True)

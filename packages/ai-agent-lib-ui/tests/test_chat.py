@@ -6,8 +6,10 @@ import os
 import sqlite3
 import subprocess
 import sys
+import threading
 import tomllib
 from collections.abc import AsyncIterator
+from datetime import datetime
 from importlib.resources import files
 from pathlib import Path
 from unittest.mock import patch
@@ -24,8 +26,9 @@ from ai_agent_lib_ui.application.chat import ChatService, view_for
 from ai_agent_lib_ui.application.progress import Draft
 from ai_agent_lib_ui.config import shell
 from ai_agent_lib_ui.config.settings import LocalIdentity, Settings, agent_environment
-from ai_agent_lib_ui.contracts.conversations import TurnAdmission
+from ai_agent_lib_ui.contracts.conversations import RunRecord, ThreadRecord, TurnAdmission
 from ai_agent_lib_ui.contracts.queries import (
+    Availability,
     ContractError,
     ErrorCode,
     PageRequest,
@@ -106,6 +109,11 @@ class ScriptedAgent:
                 "thread_id": body["thread_id"],
                 "request_id": request.headers["x-request-id"],
                 "output": {"answer": f"answer {len(self.calls)}"},
+                **(
+                    {"output": {"answer": "Saved answer", "artifacts": [{}]}}
+                    if self.mode == "bad_artifact"
+                    else {}
+                ),
             },
         )
 
@@ -178,6 +186,47 @@ async def test_enabling_optional_artifacts_keeps_existing_chats_usable(
     assert len(agent.calls) == 1
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")  # Chainlit's transitive imports.
+async def test_invalid_document_warning_survives_dispatch_and_restart(
+    chat: tuple[ChatService, ScriptedAgent, SqliteThreads],
+    settings: Settings,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CHAINLIT_APP_ROOT", str(tmp_path))
+    from ai_agent_lib_ui.integrations.data_layer import outcome_text
+
+    service, agent, store = chat
+    bindings = tuple(
+        binding.model_copy(
+            update={
+                "manifest": binding.manifest.model_copy(update={"capabilities": ("artifacts",)})
+            }
+        )
+        for binding in settings.bindings
+    )
+    settings = settings.model_copy(update={"bindings": bindings})
+    service.catalog = FileCatalog(settings, LocalAccess(settings))
+    principal = settings.identity.principal()
+    thread = (await service.create(principal, "memo")).thread.thread_id
+    agent.mode = "bad_artifact"
+    saved = await service.submit(principal, thread, "one", "Generate a memo")
+    restarted = SqliteThreads(store.path, LocalAccess(settings), b"test-cursor-secret")
+    restored = (await restarted.history(view_for(principal, "memo"), thread))[0].run
+    assert restored == saved
+    assert restored.answer == "Saved answer"
+    assert restored.state == "completed"
+    assert restored.artifact_status == Availability.UNAVAILABLE
+    assert restored.artifact_warning == "invalid_artifacts"
+    assert "invalid document" in outcome_text(restored)
+    # Pre-upgrade records still load without migration or transcript changes.
+    legacy = RunRecord.model_validate(
+        saved.model_dump(exclude={"artifact_status", "artifact_warning"})
+    )
+    assert legacy.answer == saved.answer
+    assert legacy.artifact_warning is None
+
+
 async def test_duplicate_disconnect_and_same_thread_race(
     chat: tuple[ChatService, ScriptedAgent, SqliteThreads], settings: Settings
 ) -> None:
@@ -202,6 +251,58 @@ async def test_duplicate_disconnect_and_same_thread_race(
     assert saved.state == "completed"
     assert len(agent.calls) == 1
     assert len(await store.history(view_for(principal, "memo"), thread)) == 1
+
+
+async def test_disconnect_during_commit_still_dispatches_and_shutdown_drains(
+    chat: tuple[ChatService, ScriptedAgent, SqliteThreads], settings: Settings
+) -> None:
+    service, agent, store = chat
+    principal = settings.identity.principal()
+    thread = (await service.create(principal, "memo")).thread.thread_id
+    entered, release = threading.Event(), threading.Event()
+    touch = store._touch
+
+    def hold_commit(db: sqlite3.Connection, thread_record: ThreadRecord, stamp: datetime) -> None:
+        touch(db, thread_record, stamp)
+        entered.set()
+        assert release.wait(5)
+
+    with patch.object(store, "_touch", side_effect=hold_commit):
+        browser = asyncio.create_task(service.submit(principal, thread, "one", "hello"))
+        try:
+            assert await asyncio.to_thread(entered.wait, 3)
+            browser.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await browser
+            closing = asyncio.create_task(service.close())
+            await asyncio.sleep(0)
+            assert not closing.done()
+        finally:
+            release.set()
+        await asyncio.wait_for(closing, 5)
+    history = await store.history(view_for(principal, "memo"), thread)
+    assert history[0].run.state == "completed"
+    assert len(agent.calls) == 1
+    assert not service.admissions
+    assert not service.tasks
+
+
+async def test_restart_releases_accepted_run_without_replaying_it(
+    chat: tuple[ChatService, ScriptedAgent, SqliteThreads], settings: Settings
+) -> None:
+    service, agent, store = chat
+    principal = settings.identity.principal()
+    thread = (await service.create(principal, "memo")).thread.thread_id
+    view = view_for(principal, "memo")
+    await store.admit(
+        view,
+        TurnAdmission(scope=view.scope, thread_id=thread, idempotency_key="old", question="hi"),
+    )
+    store.recover()
+    assert (await service.submit(principal, thread, "old", "hi")).state == "failed"
+    assert not agent.calls
+    assert (await service.submit(principal, thread, "new", "hello")).state == "completed"
+    assert len(agent.calls) == 1
 
 
 @pytest.mark.parametrize("mode", ["timeout", "invalid", "large", "redirect", "gateway"])

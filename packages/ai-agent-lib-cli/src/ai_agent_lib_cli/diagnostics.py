@@ -20,6 +20,8 @@ from ai_agent_lib_core.adapters import (
 )
 from ai_agent_lib_core.config import DEFAULT_BINDINGS, load_service_config, service_resolver
 from ai_agent_lib_core.config.langfuse import resolve_langfuse_settings
+from ai_agent_lib_core.config.phoenix import resolve_phoenix_settings
+from ai_agent_lib_core.config.tracing import TracingResolution, resolve_tracing_settings
 from ai_agent_lib_core.contracts import AgentLibError, CheckResult
 from ai_agent_lib_core.di import diagnose
 from ai_agent_lib_core.observability import redact
@@ -68,7 +70,7 @@ async def check_service(folder: Path) -> tuple[CheckResult, ...]:
     except AgentLibError as problem:
         return (CheckResult.failed("settings", problem),)
     try:
-        tracing = resolve_langfuse_settings(dotenv)
+        langfuse_resolution = resolve_langfuse_settings(dotenv)
     except AgentLibError as problem:
         langfuse = CheckResult.failed("langfuse", problem)
     else:
@@ -76,10 +78,28 @@ async def check_service(folder: Path) -> tuple[CheckResult, ...]:
             "langfuse",
             ok=True,
             detail="disabled"
-            if tracing.settings is None
+            if langfuse_resolution.settings is None
             else "configuration valid (connectivity not checked)",
         )
-    return (CheckResult("settings", ok=True, detail="resolved"), langfuse, *await diagnose(config))
+    try:
+        phoenix_resolution = resolve_phoenix_settings(dotenv)
+    except AgentLibError as problem:
+        phoenix = CheckResult.failed("phoenix", problem)
+    else:
+        phoenix = CheckResult(
+            "phoenix",
+            ok=True,
+            detail="disabled"
+            if phoenix_resolution.settings is None
+            else "configuration valid (connectivity not checked)",
+        )
+    checks = [CheckResult("settings", ok=True, detail="resolved"), langfuse, phoenix]
+    if langfuse.ok and phoenix.ok:
+        try:
+            TracingResolution(langfuse_resolution, phoenix_resolution).validate()
+        except AgentLibError as problem:
+            checks.append(CheckResult.failed("tracing", problem))
+    return (*checks, *await diagnose(config))
 
 
 def _pins(
@@ -181,7 +201,7 @@ def explain_service(folder: Path) -> tuple[Sequence[Setting], Sequence[str]]:
     """
     try:
         resolution = service_resolver(folder / _ENV).explain()
-        tracing = resolve_langfuse_settings(folder / _ENV)
+        tracing = resolve_tracing_settings(folder / _ENV)
     except AgentLibError as problem:
         raise CliError.from_error(problem) from None
     by_key = {binding.key: binding.name for binding in DEFAULT_BINDINGS}
@@ -205,7 +225,8 @@ def explain_service(folder: Path) -> tuple[Sequence[Setting], Sequence[str]]:
         if key not in by_key
     ]
     settings += [
-        Setting(variable=name, value=redact(value)[:_MAX_VALUE], origin=tracing.origins[name])
-        for name, value in tracing.shown.items()
+        Setting(variable=name, value=redact(value)[:_MAX_VALUE], origin=backend.origins[name])
+        for backend in (tracing.langfuse, tracing.phoenix)
+        for name, value in backend.shown.items()
     ]
     return settings, resolution.warnings

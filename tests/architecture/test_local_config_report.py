@@ -1,11 +1,64 @@
 """Startup output identifies winning settings without exposing credentials."""
 
 import json
+from pathlib import Path
 
 import pytest
 from tools.local_config_report import report_environment
 
 from ai_agent_lib_core.config import ConfigResolver, LayeredConfigSource, MappingConfigSource
+
+
+@pytest.mark.parametrize("backend", ["PHOENIX", "LANGFUSE"])
+@pytest.mark.parametrize("from_launcher", [False, True])
+def test_startup_uses_separate_tracing_file_and_child_working_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    backend: str,
+    from_launcher: bool,
+) -> None:
+    from tools.local_environment import agent_environment
+
+    from ai_agent_lib_core.config.tracing import resolve_tracing_settings
+
+    monkeypatch.setattr("os.environ", {})
+    folder = tmp_path / "agent"
+    folder.mkdir()
+    service, launcher = folder / ".env", tmp_path / ".env"
+    trace_file = (tmp_path if from_launcher else folder) / "tracing.env"
+    endpoint = "PHOENIX_COLLECTOR_ENDPOINT" if backend == "PHOENIX" else "LANGFUSE_BASE_URL"
+    service.write_text(
+        f"EAP_{backend}_ENABLED=true\nEAP_{backend}_CAPTURE_CONTENT=false\n"
+        f"{endpoint}=http://127.0.0.1:6006\n"
+        + ("" if from_launcher else f"EAP_{backend}_ENV_FILE=tracing.env\n"),
+        encoding="utf-8",
+    )
+    launcher.write_text(
+        f"EAP_{backend}_ENV_FILE=tracing.env\n" if from_launcher else "", encoding="utf-8"
+    )
+    trace_file.write_text(
+        f"EAP_{backend}_CAPTURE_CONTENT=true\n{endpoint}=http://127.0.0.1:6007\n"
+        "PHOENIX_API_KEY=phoenix-private\nLANGFUSE_PROJECT_ID=trial\n"
+        "LANGFUSE_PUBLIC_KEY=langfuse-public-private\nLANGFUSE_SECRET_KEY=langfuse-private\n",
+        encoding="utf-8",
+    )
+    environment = agent_environment(service, launcher, required=True, working_dir=tmp_path)
+    resolved = resolve_tracing_settings(
+        service, environment=MappingConfigSource(environment), working_dir=tmp_path
+    )
+    settings = getattr(resolved, backend.lower()).settings
+    assert settings.capture_content
+    assert settings.base_url == "http://127.0.0.1:6007"
+    output = capsys.readouterr().out
+    assert f'{endpoint}="http://127.0.0.1:6007"  [{trace_file}' in output
+    assert f'EAP_{backend}_CAPTURE_CONTENT="true"  [{trace_file}' in output
+    assert "http://127.0.0.1:6006" not in next(
+        line for line in output.splitlines() if f"{endpoint}=" in line
+    )
+    assert "phoenix-private" not in output
+    assert "langfuse-private" not in output
+    assert "langfuse-public-private" not in output
 
 
 def show(shell: dict[str, str], launcher: dict[str, str], service: dict[str, str]) -> None:

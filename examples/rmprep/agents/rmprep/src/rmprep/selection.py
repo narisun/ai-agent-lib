@@ -223,6 +223,32 @@ def _names_new_client(question: str, known_clients: set[str]) -> bool:
     # Capitalization is not evidence of a company: "Cash Flow" and "Total Debt"
     # are ordinary topics. An explicitly quoted name can request a fresh lookup.
     quoted_name = re.match(r"""["']\S.+["']""", name)
+    # A subject in an explicit client slot need not have a corporate suffix or
+    # have appeared in this conversation. Keep pronouns, dates and topic-only
+    # follow-ups attached to their accepted context.
+    client_slot = re.search(
+        r"\b(?:memo|rm\s*prep|financials?|financial statements|wallet share|"
+        r"revenues?|deposits?|payments?|transactions?|credit|relationship)\s+for\s+(.+)",
+        question,
+        re.IGNORECASE,
+    ) or re.match(r"^memo:\s*(.+)", question, re.IGNORECASE)
+    if client_slot:
+        target = re.split(r"\s+(?:as of|on|in|dated)\s+", client_slot[1], flags=re.IGNORECASE)[0]
+        if re.fullmatch(
+            r"(?:" + "|".join(_MONTHS) + r")(?:\s+\d{4})?[.!?]?",
+            target.strip(),
+            re.IGNORECASE,
+        ):
+            return False
+        inherited = re.match(
+            r"(?:the|this|that|these|those|same|it|them|us|me|our|my|today|tomorrow|"
+            r"yesterday|next|last|prepare|create|generate|refresh|update|write|"
+            r"explain|compare|show|please|a|an|\d+|cash flow|total debt)\b",
+            target.strip(),
+            re.IGNORECASE,
+        )
+        if target.strip() and not inherited:
+            return True
     return bool(explicit or quoted_name)
 
 
@@ -373,7 +399,12 @@ def _select_context(
         )
     else:
         if _names_new_client(question, clients):
-            return _choice(mode="new", reason="resolve the newly named client with find_clients")
+            dates = re.findall(r"\b\d{4}-\d{2}-\d{2}\b", question)
+            return _choice(
+                mode="new",
+                reason="resolve the newly named client with find_clients",
+                meeting_date=dates[-1] if dates else "",
+            )
         dates = re.findall(r"\b\d{4}-\d{2}-\d{2}\b", question)
         if dates and not refreshing:
             return _choice(

@@ -23,7 +23,6 @@ from ai_agent_lib_ui.application.chat import view_for
 from ai_agent_lib_ui.contracts.conversations import RunRecord
 from ai_agent_lib_ui.contracts.queries import ContractError, ErrorCode, PageRequest
 from ai_agent_lib_ui.integrations.answer_format import present_answer
-from ai_agent_lib_ui.integrations.inspection import inspector_url
 from ai_agent_lib_ui.integrations.runtime import runtime
 from ai_agent_lib_ui.integrations.security import current_principal
 
@@ -54,50 +53,16 @@ def outcome_text(run: RunRecord) -> str:
     return _outcome(run) + "\n\n---\n\n" + metrics
 
 
-def reference_step(run: RunRecord) -> StepDict | None:
-    """Derive one closed, stable source disclosure for an accepted answer."""
-    if run.state != "completed":
-        return None
-    references = present_answer(run.answer or "").references
-    if not references:
-        return None
-    return {
-        "id": str(uuid5(NAMESPACE_URL, "agentlib:references:" + run.run_id)),
-        "threadId": run.thread_id,
-        "parentId": answer_id(run),
-        "name": "References",
-        "type": "tool",
-        "output": references,
-        "createdAt": run.updated_at.isoformat(),
-        "defaultOpen": False,
-        "showInput": False,
-        "metadata": {"run_id": run.run_id},
-    }
-
-
-def inspector_step(run: RunRecord) -> StepDict:
-    """Keep diagnostics closed and load their content only through the authorized page."""
-    return {
-        "id": str(uuid5(NAMESPACE_URL, "agentlib:inspector:" + run.run_id)),
-        "threadId": run.thread_id,
-        "parentId": answer_id(run),
-        "name": "Turn inspector",
-        "type": "tool",
-        "output": (
-            f"[Open LLM input/output, MCP calls and checkpoints]({inspector_url(run)})\n\n"
-            f"Request: `{run.request_id}`. Opening the inspector does not rerun the agent."
-        ),
-        "createdAt": run.updated_at.isoformat(),
-        "defaultOpen": False,
-        "showInput": False,
-        "metadata": {"run_id": run.run_id},
-    }
-
-
 def _outcome(run: RunRecord) -> str:
     """Explain incomplete outcomes without presenting a draft as an accepted answer."""
     if run.state == "completed":
-        return present_answer(run.answer or "").body
+        body = present_answer(run.answer or "").body
+        if run.artifact_warning == "invalid_artifacts":
+            body += (
+                "\n\nThe answer was saved, but the agent returned an invalid document. "
+                "Check the agent logs before requesting another memo."
+            )
+        return body
     if run.state == "failed":
         if run.failure_code == "invalid":
             return (
@@ -271,7 +236,7 @@ class DataLayer(BaseDataLayer):
     async def delete_thread(self, thread_id: str) -> None:
         """Keep destructive framework deletion disabled; provide explicit archiving."""
         await runtime().store.get(current_principal(), thread_id)
-        raise HTTPException(409, "Use Conversations to archive this thread")
+        raise HTTPException(409, "Use Logs to archive this thread")
 
     async def delete_step(self, step_id: str) -> None:
         """Keep the accepted transcript immutable."""
@@ -279,7 +244,7 @@ class DataLayer(BaseDataLayer):
         raise HTTPException(404, "Message operation unavailable")
 
     async def create_element(self, element: Element) -> None:
-        """Reject document storage until its scoped adapter is implemented."""
+        """Keep documents in scoped artifacts, outside Chainlit's element storage."""
         current_principal()
         raise HTTPException(404, "Document elements are not enabled")
 
@@ -289,7 +254,7 @@ class DataLayer(BaseDataLayer):
         return None
 
     async def delete_element(self, element_id: str, thread_id: str | None = None) -> None:
-        """Reject document mutations in the local chat phase."""
+        """Keep saved document versions immutable; Chainlit elements are unsupported."""
         current_principal()
         raise HTTPException(404, "Document elements are not enabled")
 
@@ -309,7 +274,7 @@ class DataLayer(BaseDataLayer):
         return []
 
     async def build_debug_url(self) -> str:
-        """Link to the local conversation management page."""
+        """Link to Logs for saved turns and their diagnostics."""
         current_principal()
         return "/logs"
 

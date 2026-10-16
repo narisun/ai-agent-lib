@@ -211,6 +211,7 @@ def test_supervisor_cleans_up_after_readiness_failure_or_stop(
         if failure == "spawn" and children:
             raise OSError("cannot start agent")
         child = Mock()
+        child.wait.return_value = 0
         child.poll.return_value = None
         name = services[len(children)].name
         child.send_signal.side_effect = lambda event: stopped.append(name)
@@ -407,6 +408,7 @@ def test_supervisor_supplies_the_child_environment(
     environment = {"ANTHROPIC_API_KEY": "private-test-key", "PATH": "inherited-path"}
     service = Service("agent", (sys.executable,), tmp_path, 8000, environment=environment)
     child = Mock()
+    child.wait.return_value = 0
     child.poll.return_value = None
     spawn = Mock(return_value=child)
     monkeypatch.setattr(local_processes, "check_ports", Mock())

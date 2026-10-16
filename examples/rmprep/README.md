@@ -20,9 +20,11 @@ LangGraph manages routing and messages. The library injects model access, MCP,
 identity, policy, audit and checkpoint providers. The MCP service retrieves
 evidence and calculates review findings; the model turns that evidence into prose.
 
-For a trace timeline, follow the [Langfuse walkthrough](../../docs/langfuse-trial.md).
-The adapter is shared library code, also included in newly generated agents.
-It runs as a separate service and adds a trace link to each Agent Lab response,
+For a local trace timeline with Python and pip, follow the
+[Phoenix walkthrough](../../docs/phoenix-trial.md). Teams with a container host
+can use the [Langfuse walkthrough](../../docs/langfuse-trial.md).
+Both adapters are shared library code, also included in newly generated agents.
+The selected backend runs as a separate service and adds a trace link to each Agent Lab response,
 with model attempts, MCP calls and checkpoint references grouped by thread.
 
 ## 1. Install with Python and pip
@@ -174,8 +176,10 @@ expiry date does not establish that a waiver was executed. Payment summaries
 show the requested window and the last observed transaction date.
 
 To set an answer length, include `Keep it within 450 words.` in your question.
-The defaults are 1,000 words for a memo and 350 for Q&A. Counts include headings,
-tables and citations. Before saving an answer, the agent checks its length and
+The defaults are 1,000 words for a memo and 350 for Q&A. Counts include heading text,
+figures, tables and full citations. Markdown heading/list markers and divider-only
+lines do not count; code is counted literally. The answer stays unchanged when it
+passes these checks. Before saving an answer, the agent checks its length and
 checks that each citation matches a source reference returned by MCP. It also
 rejects citation placeholders and wording that assigns an unsupported fiscal
 year to an audited-statement requirement. Common financial comparisons must

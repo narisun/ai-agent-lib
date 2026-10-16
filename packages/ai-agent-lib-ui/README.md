@@ -40,6 +40,13 @@ environments: Chainlit requires MCP 1.x, while the library's MCP extra requires
 MCP 2.x. They communicate over HTTP. `python tools\install_dev.py` continues to
 install only the agent development environment.
 
+Agent profiles share the same chat appearance and shell settings. The pinned
+Chainlit release needs a small session-configuration adapter to read those
+settings without trying to run an asynchronous profile lookup inside the active
+WebSocket loop. Profile listing still uses the authenticated registry catalog;
+per-profile shell overrides are not supported. Socket regression tests cover
+this adapter when upgrading Chainlit.
+
 Pip uses your existing enterprise index and certificate configuration. If your
 desktop requires wheels, ask your platform team to provide approved wheels.
 The Phase 0 installation needed Python-built wheels for `literalai==0.1.201`,
@@ -240,6 +247,10 @@ cannot be overwritten; conflicting declarations keep the first saved version.
 Opaque content references need a future storage reader. Older text-only replies
 remain in chat; generate a new memo to publish a panel version.
 
+If an agent returns an invalid document, Agent Lab keeps the accepted answer and
+shows a document warning. The warning survives refreshes and restarts; check the
+agent logs to fix the artifact before requesting another memo.
+
 ## Live responses and metrics
 
 Restart the agent and UI after updating this checkout. The batch launcher and new
@@ -296,7 +307,9 @@ Other deployments can inject an `OutcomeJournal` into `agent_app`; a shared
 journal is needed when requests can reach multiple service instances.
 
 Normal shutdown waits for active calls within the request deadline. After a forced
-stop, unfinished records become unknown on restart. One process may own a state
+stop, requests that reached dispatch become unknown on restart. Requests saved
+before dispatch are marked failed and release the thread without being resent.
+One process may own a state
 folder at a time. This admission guard does not coordinate direct agent API callers
 or a different UI state folder.
 
@@ -372,6 +385,10 @@ follow-ups, restart/reconnect, ownership, duplicate/concurrent sends, registry
 changes, failed writes and unknown outcomes. The wheel check repeats real-server
 tests using installed packages. `--profile ui` separately checks the lightweight
 contracts installation without the `chat` extra.
+
+When Node is already available, pytest also runs a small browser-script regression
+for rapid memo-version switching. This optional check uses Node's built-in tools;
+it skips on Python-only desktops and needs no npm packages.
 
 For changes to the chat layout, also check the rendered page in Chrome. Open
 **New chat**, then reopen a saved empty thread. Repeat with the sidebar and Memos

@@ -17,6 +17,17 @@ class ConversationFocus(TypedDict):
     message_ids: list[str]
 
 
+def focus_update(focus: ConversationFocus) -> dict[str, object]:
+    """Project accepted focus into the legacy checkpoint keys for compatibility."""
+    clients, memos = focus["client_uens"], focus["memo_ids"]
+    return {
+        "focus": focus,
+        "active_client_uens": list(clients),
+        "active_client": clients[0] if len(clients) == 1 else "",
+        "active_memo_id": memos[0] if len(memos) == 1 else "",
+    }
+
+
 def conversation_focus(state: State) -> ConversationFocus:
     """Normalize older checkpoints once at the routing boundary, without rewriting history."""
     if "focus" in state:

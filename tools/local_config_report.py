@@ -12,6 +12,7 @@ from tools.local_processes import report
 
 if TYPE_CHECKING:
     from ai_agent_lib_core.config import Resolution
+    from ai_agent_lib_core.config.tracing import TracingResolution
     from ai_agent_lib_core.contracts import ConfigSource
 
 # Application and tracing controls outside the core binding table. Everything
@@ -66,7 +67,12 @@ def _display(value: str, *, visible: bool) -> str:
     return json.dumps(clean, ensure_ascii=True)
 
 
-def report_environment(resolution: Resolution, layers: Sequence[tuple[str, ConfigSource]]) -> None:
+def report_environment(
+    resolution: Resolution,
+    layers: Sequence[tuple[str, ConfigSource]],
+    *,
+    tracing: TracingResolution | None = None,
+) -> None:
     """Print effective agent variables and their winning layer, with safe defaults.
 
     The first layer is the shell, followed by the launcher and service files.
@@ -110,6 +116,19 @@ def report_environment(resolution: Resolution, layers: Sequence[tuple[str, Confi
             if (extra_value := source.get(name)) is not None:
                 rows[name] = (_display(extra_value, visible=name in _VISIBLE_EXTRAS), label)
                 break
+    if tracing is not None:
+        # Raw launcher/service layers cannot explain a separate tracing file.
+        # Replace those rows with the same resolution used by agent startup.
+        for backend in (tracing.langfuse, tracing.phoenix):
+            for name, value in backend.shown.items():
+                origin = backend.origins[name]
+                if origin.startswith("process environment: "):
+                    variable = origin.removeprefix("process environment: ")
+                    origin = next(
+                        (label for label, source in layers[:2] if source.get(variable) is not None),
+                        origin,
+                    )
+                rows[name] = (_display(value, visible=name in _VISIBLE_EXTRAS), origin)
     report(
         "Agent configuration (credentials, sensitive fields and unrecognized variables are masked):"
     )

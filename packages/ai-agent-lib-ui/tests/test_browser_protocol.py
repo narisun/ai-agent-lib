@@ -277,6 +277,7 @@ def server(tmp_path_factory: pytest.TempPathFactory) -> Iterator[LocalServer]:
         yield value
     finally:
         value.close()
+        assert "was never awaited" not in (value.path / "server.log").read_text(encoding="utf-8")
 
 
 async def connect(

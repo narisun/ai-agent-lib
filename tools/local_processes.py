@@ -86,20 +86,32 @@ def stop_children(children: Sequence[RunningService]) -> bool:
     """Stop only our children, in reverse dependency order, with a bounded grace period."""
     graceful = True
     for child in reversed(children):
-        if child.process.poll() is not None:
-            continue
-        report(f"Stopping {child.service.name}...")
         try:
-            event = signal.CTRL_BREAK_EVENT if os.name == "nt" else signal.SIGINT
-            child.process.send_signal(event)
-            # Core services allow up to 20 seconds for requests in flight, then
-            # close their adapters. Leave time for both before forcing a stop.
-            child.process.wait(timeout=30)
+            code = child.process.poll()
+            signalled = code is None
+            if code is None:
+                report(f"Stopping {child.service.name}...")
+                event = signal.CTRL_BREAK_EVENT if os.name == "nt" else signal.SIGINT
+                child.process.send_signal(event)
+                # Core services allow up to 20 seconds for requests in flight,
+                # then close their adapters. Leave time for both.
+                code = child.process.wait(timeout=30)
+            # Uvicorn re-raises a handled shutdown signal after its lifespan
+            # closes. Accept that platform exit only when we requested it;
+            # unrelated failures (including exit 1) remain failures.
+            interrupt_codes = {130, 3221225786, -1073741510} if os.name == "nt" else {130, -2}
+            if code != 0 and not (signalled and code in interrupt_codes):
+                graceful = False
+                report(f"{child.service.name} exited with code {code}; check {child.log}")
         except (OSError, subprocess.TimeoutExpired):
             graceful = False
             report(f"Forcing {child.service.name} to stop after graceful shutdown was unavailable.")
-            child.process.kill()
-            child.process.wait(timeout=5)
+            try:
+                child.process.kill()
+                child.process.wait(timeout=5)
+            except (OSError, subprocess.TimeoutExpired):
+                # Cleanup of one child must never strand the remaining services.
+                report(f"Could not confirm {child.service.name} stopped; check {child.log}")
     return graceful
 
 
@@ -177,4 +189,4 @@ def _serve(
             except BaseException:
                 control.update("shutdown_failed")
                 raise
-            control.update("stopped" if graceful else "forced")
+            control.update("stopped" if graceful else "shutdown_failed")

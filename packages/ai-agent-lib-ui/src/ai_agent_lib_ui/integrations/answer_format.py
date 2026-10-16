@@ -12,12 +12,15 @@ _REFERENCE_TEXT = r"[a-z][a-z_0-9]*\[[a-z][a-z_0-9]*=[^\[\]\n;]+(?:;[a-z][a-z_0-
 _REFERENCE = re.compile(_REFERENCE_TEXT)
 _BREAK = r"(?i:<br\s*/?>)"
 _CITATION = rf"(?:\[{_REFERENCE_TEXT}(?:[ \t]*[,;][ \t]*{_REFERENCE_TEXT})*\]|{_REFERENCE_TEXT})"
+_CITATION_RUN = rf"{_CITATION}(?:[ \t]*[,;]?[ \t]*{_CITATION})*"
+_LIMIT_FIELDS = r"[a-z_][a-z_0-9]*=[a-z_][a-z_0-9]*(?:;[ \t]*[a-z_][a-z_0-9]*=[a-z_][a-z_0-9]*)*"
 _INLINE = re.compile(
     # Keep inline code, links (including images), and autolinks out of the formatter.
     r"(?P<literal>(?P<ticks>`+).*?(?P=ticks)(?!`)"
     r"|[ \t]*!?\[(?:[^\[\]\n]|\[[^\]\n]*\])*\](?:\([^\n]*?\)|\[[^\]\n]*\])"
     r"|<https?://[^>\n]+>|https?://[^\s<>]+)"
-    rf"|(?P<citation>[ \t]*(?:{_BREAK}[ \t]*)?{_CITATION})"
+    rf"|(?P<citation>[ \t]*(?:{_BREAK}[ \t]*)?{_CITATION_RUN})"
+    rf"|(?P<limits>\[evidence_limits:[ \t]*(?P<fields>{_LIMIT_FIELDS})\])"
     rf"|(?P<break>{_BREAK})"
 )
 _FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
@@ -89,6 +92,14 @@ def _replace_inline(match: re.Match[str], references: dict[str, None]) -> str:
         for reference in _REFERENCE.findall(match[0]):
             references.setdefault(reference, None)
         return ""
+    if match.group("limits"):
+        # Evidence limits are meaningful caveats, not source citations. Retain
+        # them in readable prose instead of hiding them with the references.
+        fields = []
+        for field in match.group("fields").split(";"):
+            key, value = field.strip().split("=", 1)
+            fields.append(f"{key.replace('_', ' ').capitalize()}: {value.replace('_', ' ')}")
+        return "(" + "; ".join(fields) + ")"
     return " · "
 
 

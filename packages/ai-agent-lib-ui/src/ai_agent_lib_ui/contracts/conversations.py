@@ -12,7 +12,7 @@ from ai_agent_lib_core.contracts.diagnostics import (
     TokenUsage,
 )
 from ai_agent_lib_ui.contracts.artifacts import ScopedArtifact
-from ai_agent_lib_ui.contracts.queries import ContractError, ErrorCode
+from ai_agent_lib_ui.contracts.queries import Availability, ContractError, ErrorCode
 from ai_agent_lib_ui.contracts.traces import TraceLink
 
 RunState = Literal["accepted", "running", "completed", "failed", "unknown"]
@@ -62,6 +62,8 @@ class RunRecord(RequestRecord):
     updated_at: AwareDatetime
     answer: str | None = None
     artifacts: Annotated[tuple[ScopedArtifact, ...], Field(max_length=20)] = ()
+    artifact_status: Availability = Availability.UNSUPPORTED
+    artifact_warning: Annotated[str, Field(max_length=128)] | None = None
     elapsed_ms: Annotated[float, Field(ge=0, allow_inf_nan=False)] | None = None
     usage: TokenUsage = Field(default_factory=TokenUsage)
     model_calls: Annotated[int, Field(strict=True, ge=0)] | None = None

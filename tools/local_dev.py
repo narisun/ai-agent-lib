@@ -182,7 +182,15 @@ def services_for(
         services.append(
             Service(
                 "ui",
-                (ui_python, "-u", "-m", "ai_agent_lib_ui", "serve", "--config", str(config)),
+                (
+                    ui_python,
+                    "-u",
+                    str(root / "tools/local_service.py"),
+                    "ai_agent_lib_ui",
+                    "serve",
+                    "--config",
+                    str(config),
+                ),
                 root,
                 ui_port,
                 "/healthz",
@@ -258,6 +266,7 @@ def main(argv: Sequence[str] | None = None, *, root: Path = ROOT) -> int:
                 (root / AGENT_ENV).resolve(),
                 (args.env_file if args.env_file is not None else root / ".env").resolve(),
                 required=args.env_file is not None,
+                working_dir=root / WORKSPACE,
             )
             phoenix = configured_service(
                 root, (root / AGENT_ENV).resolve(), agent_env, agent_cwd=root / WORKSPACE

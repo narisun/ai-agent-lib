@@ -32,7 +32,7 @@ async def authenticate(headers: Headers) -> cl.User:
 
 @cl.data_layer
 def data_layer() -> DataLayer:
-    """Supply a supported adapter without patching framework internals."""
+    """Supply the application-owned persistence adapter."""
     return DataLayer()
 
 

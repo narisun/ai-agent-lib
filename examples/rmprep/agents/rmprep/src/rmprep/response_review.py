@@ -19,12 +19,19 @@ _WORD_LIMIT = re.compile(
     re.IGNORECASE,
 )
 _REFERENCE = re.compile(r"\b[a-z_][a-z_0-9]*\[[^\]\n]+\]")
+_MARKDOWN_PREFIX = re.compile(r"^ {0,3}(?:#{1,6}|[-+*]|\d{1,9}[.)])(?:[ \t]+|$)")
+_MARKDOWN_DIVIDER = re.compile(r"^ {0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$")
+_MARKDOWN_FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
 _REFERENCE_PLACEHOLDER = re.compile(
     r"\b(?:corresponding|same table|all source)\b[^.\n]{0,100}\b(?:references?|refs?|source_refs?|groups)\b",
     re.IGNORECASE,
 )
 _DATED_AUDITED_STATEMENTS = re.compile(
-    r"\b(?:audited\s+(?:FY\s*)?\d{4}|(?:FY\s*)?\d{4}\s+audited)\s+(?:financial\s+)?statements\b",
+    r"\b(?:"
+    r"(?:audited\s+(?:FY\s*)?\d{4}|(?:FY\s*)?\d{4}\s+audited)\s+(?:financial\s+)?statements"
+    r"|audited\s+(?:financial\s+)?statements\s+(?:(?:for|of|covering|from)\s+)?"
+    r"(?:the\s+)?(?:(?:fiscal|financial)\s+year\s+|FY\s*)?\d{4}"
+    r")\b",
     re.IGNORECASE,
 )
 # Business names used in temporal comparisons. A point-in-time comparison of
@@ -74,6 +81,34 @@ def word_limit(messages: Sequence[AnyMessage], default: int) -> int:
         for kind, amount in _WORD_LIMIT.findall(question)
     ]
     return max(1, min(limits)) if limits else default
+
+
+def _word_count(text: str) -> int:
+    """Count content and citations without charging for Markdown block markers.
+
+    Only heading/list prefixes and divider-only lines are discounted. Keep other
+    syntax, source references and code literal rather than guessing what renders
+    as content. This is a counting view; the saved answer is never rewritten.
+    """
+    count = 0
+    fence = ""
+    for line in text.splitlines():
+        marker = _MARKDOWN_FENCE.match(line)
+        if fence:
+            count += len(line.split())
+            if (
+                marker
+                and marker[1][0] == fence[0]
+                and len(marker[1]) >= len(fence)
+                and not marker[2].strip()
+            ):
+                fence = ""
+        elif marker:
+            fence = marker[1]
+            count += len(line.split())
+        elif not _MARKDOWN_DIVIDER.fullmatch(line):
+            count += len(_MARKDOWN_PREFIX.sub("", line, count=1).split())
+    return count
 
 
 def _page_references(payload: dict[str, Any]) -> set[str]:
@@ -205,7 +240,7 @@ def response_issues(reply: AIMessage, messages: Sequence[AnyMessage], limit: int
         return []
     text = text_content(reply)
     issues = []
-    count = len(text.split())
+    count = _word_count(text)
     if not text.strip():
         issues.append("The final answer is empty.")
     if count > limit:

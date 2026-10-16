@@ -17,7 +17,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from rmprep.clients import client_names, lookup_in_turn, recent_client_lookup, resolved_clients
 from rmprep.context import ContextBuilder
 from rmprep.context_tools import tool_context_issues
-from rmprep.focus import ConversationFocus, conversation_focus
+from rmprep.focus import ConversationFocus, conversation_focus, focus_update
 from rmprep.memos import MemoVersion, memo_draft, memo_from_turn, turns
 from rmprep.response_review import response_advisories, response_issues, tool_payload, word_limit
 from rmprep.selection import ContextSelection, select_context
@@ -51,8 +51,6 @@ def _accepted_update(
         if not clients:
             # An unresolved lookup or clarification must not destroy prior focus.
             return update
-        update["active_client_uens"] = clients
-        update["active_client"] = clients[0] if len(clients) == 1 else ""
         previous = conversation_focus(state)
         evidence_date = selection["retrieval_date"] or selection["meeting_date"]
         memo_ids = selection["memo_ids"] if selection["mode"] == "snapshot" else []
@@ -65,22 +63,22 @@ def _accepted_update(
                 and previous["memo_ids"] == memo_ids
                 else []
             )
-        update["focus"] = ConversationFocus(
+        focus = ConversationFocus(
             client_uens=list(clients),
             memo_ids=list(memo_ids),
             evidence_date=evidence_date,
             message_ids=evidence_ids,
         )
-        update["active_memo_id"] = memo_ids[0] if len(memo_ids) == 1 else ""
+        update.update(focus_update(focus))
     if memo is not None:
-        update.update(memos=[memo], active_memo_id=memo["memo_id"], active_client=memo["uen"])
-        update["active_client_uens"] = [memo["uen"]]
-        update["focus"] = ConversationFocus(
+        update["memos"] = [memo]
+        focus = ConversationFocus(
             client_uens=[memo["uen"]],
             memo_ids=[memo["memo_id"]],
             evidence_date=memo["meeting_date"],
             message_ids=list(memo["message_ids"]),
         )
+        update.update(focus_update(focus))
     return update
 
 
@@ -138,7 +136,7 @@ def build_specialist(
         )
         body_limit = max(1, limit - footer_reserve)
         output_budget = json.dumps(
-            {"output_budget_words": body_limit, "target_words": int(body_limit * 0.7)}
+            {"output_budget_words": body_limit, "target_words": int(body_limit * 0.6)}
         )
         assembled = contexts.build(state, prompt, selection, output_budget=output_budget)
         conversation = list(assembled.messages)

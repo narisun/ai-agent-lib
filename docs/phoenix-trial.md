@@ -176,6 +176,13 @@ for confirmed failed turns; the live conversation above had no failed turns.
 
 ## Settings
 
+From your agent workspace, run `python -m ai_agent_lib_cli config explain rmprep`
+to see effective Phoenix settings and their source files, with API keys masked.
+Run `python -m ai_agent_lib_cli doctor rmprep` to validate them before startup.
+These tracing checks do not contact Phoenix. They also reject enabling Phoenix
+and Langfuse together. The batch launcher's summary includes the same resolved
+settings, including a separate `EAP_PHOENIX_ENV_FILE` when configured.
+
 | Variable | Purpose | Default |
 | --- | --- | --- |
 | `EAP_PHOENIX_ENABLED` | Enable tracing; `start-local.bat` also starts the local server | `false` |

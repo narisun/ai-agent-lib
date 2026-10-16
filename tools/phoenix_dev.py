@@ -69,7 +69,7 @@ def service(root: Path) -> Service:
         (
             str(python),
             "-u",
-            "-m",
+            str(root / "tools/local_service.py"),
             "tools.phoenix_server",
             "serve",
             "--host",

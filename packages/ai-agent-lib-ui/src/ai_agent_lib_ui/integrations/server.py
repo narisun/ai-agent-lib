@@ -102,6 +102,10 @@ def create_app(resources: Runtime) -> FastAPI:
     """Build routes after writable shell configuration has been prepared."""
     from chainlit.utils import mount_chainlit
 
+    from ai_agent_lib_ui.integrations.chainlit_compat import use_shared_profile_config
+
+    use_shared_profile_config()
+
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         try:

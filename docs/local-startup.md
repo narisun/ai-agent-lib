@@ -101,8 +101,13 @@ Top-level credentials, including Anthropic, Langfuse and AWS keys, stay masked.
 Unrecognized file-defined variables are masked too. Output stays on one line per
 variable, with long text values shortened after masking. Unrelated shell variables
 are omitted. This is a startup summary of the
-agent's environment and core settings; settings in referenced files are read by
-their respective providers.
+agent's environment and core settings. Phoenix and Langfuse rows also include
+values from a separate tracing file, showing that file's path as the source.
+For tracing, precedence is **shell → launcher file → separate tracing file →
+service file → defaults**. An `EAP_PHOENIX_ENV_FILE` or `EAP_LANGFUSE_ENV_FILE`
+path in the service file is relative to that file. When supplied by the shell
+or launcher file, a relative path uses the agent's working directory,
+`examples\rmprep`. Use an absolute path when sharing a tracing file between agents.
 
 The root file is found beside the batch file even when you launch from another
 folder. An explicit relative `--env-file` path uses your current Command Prompt
@@ -235,9 +240,16 @@ install packages, or identify processes by their names or ports.
 
 Wait for **Stopped gracefully**, then run `start-local.bat` again. The stop command
 waits up to 150 seconds. The launcher allows 30 seconds per service for cleanup;
-if a service requires a forced stop, the command reports that graceful shutdown
-was not confirmed and exits with an error. Read the service logs before restarting.
+if a service requires a forced stop, exits with an error, or cannot be confirmed
+stopped, the command reports that graceful shutdown was not confirmed and exits
+with an error. Cleanup continues for the other services. Read the named service
+logs before restarting.
 A repeated stop is harmless when no managed launchers are running.
+
+On Windows, the launcher gives Agent Lab and Phoenix a cooperative interrupt
+handler before starting their servers. This lets their normal shutdown finish
+without Windows turning the replayed interrupt into an error. Actual application
+errors still produce a failed shutdown status.
 
 **Ctrl+C in the original launcher window** also stops its stack. If Command Prompt
 asks whether to terminate the batch job, answer `Y`. Use Ctrl+C before closing

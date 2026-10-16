@@ -1,6 +1,7 @@
 """Invalid citations and oversized drafts must not become accepted answers."""
 
 import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -10,6 +11,7 @@ from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMes
 from langchain_core.runnables import RunnableLambda
 
 from rmprep.response_review import (
+    _word_count,
     evidence_references,
     response_advisories,
     response_issues,
@@ -99,6 +101,10 @@ def reporting_conversation() -> list[AnyMessage]:
         "Obtain audited FY2025 statements.",
         "Confirm whether audited FY2025 statements were delivered.",
         "Deliver 2025 audited financial statements.",
+        "Were audited statements for FY2025 delivered?",
+        "Obtain audited financial statements covering fiscal year 2025.",
+        "Confirm delivery of audited statements for the financial year 2025.",
+        "Were audited statements for 2025 delivered?",
     ],
 )
 def test_reporting_actions_cannot_invent_the_missing_fiscal_year(claim: str) -> None:
@@ -295,6 +301,134 @@ async def test_word_budget_repair_is_bounded_and_fails_without_accepting_the_bad
     with pytest.raises(ValidationFailed, match="two revisions"):
         await graph.ainvoke({"messages": conversation()})
     assert calls == 3
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("## Covenant breaches\n\n- DSCR 1.08\n- FCC 0.96\n\n---", 6),
+        ("### Dates\n1. March 31\n2) June 30\n***\n_ _ _", 5),
+        ("   - Ratio 0.96\n  ## Test date", 4),
+        ("Revenue - costs = income.\nC++ and C#", 8),
+        ("#hashtag -0.17 1.08 2026-09-28", 4),
+        ("    - literal indented code", 4),
+        ("`## literal heading`", 3),
+        ("```text\n## literal heading\n- literal bullet\n---\n```", 9),
+        ("~~~~\n## code\n~~~\n- still code\n~~~~\n- prose", 9),
+        ("```\n~~~\n## code\n```\n- prose", 6),
+        ("- " + REF, 3),
+        ("- records[name=First - Second;unit=USD million]", 4),
+        ("| Metric | Value |\n| --- | --- |\n| DSCR | 1.08 |", 15),
+    ],
+)
+def test_word_count_discounts_only_recognized_block_formatting(text: str, expected: int) -> None:
+    assert _word_count(text) == expected
+
+
+def test_formatting_does_not_relax_an_explicit_word_limit() -> None:
+    answer = AIMessage("## Recorded covenant\n\n- Value 0.96. " + REF + "\n\n---")
+    assert response_issues(answer, conversation(), 7) == []
+    assert any("maximum is 6" in issue for issue in response_issues(answer, conversation(), 6))
+
+
+@pytest.fixture
+def formatted_followup() -> str:
+    # The first live Jones draft was rejected at 357 whitespace-separated words, although ten
+    # were Markdown markers. Retain every detail and citation in this regression.
+    return (Path(__file__).parent / "fixtures/formatted_followup.md").read_text(encoding="utf-8")
+
+
+def followup_evidence() -> list[AnyMessage]:
+    refs = [
+        "covenants[facility_id=FAC000000130;name=DSCR]",
+        REF,
+        "credit_exceptions[exception_id=CE-JONE-001]",
+        "working_capital[uen=JONE-0022;period_end=2026-03-31]",
+        "working_capital[uen=JONE-0022;period_end=2026-06-30]",
+        "relationship[uen=JONE-0022]",
+    ]
+    return [
+        HumanMessage("Explain the covenant breaches, cash conversion cycle and wallet share."),
+        AIMessage(
+            "",
+            tool_calls=[
+                {
+                    "name": "rmprep-data_get_memo_evidence",
+                    "args": {"uen": "JONE-0022"},
+                    "id": "saved-evidence",
+                }
+            ],
+        ),
+        ToolMessage(
+            name="rmprep-data_get_memo_evidence",
+            tool_call_id="saved-evidence",
+            content=frame_untrusted(
+                "rmprep-data.get_memo_evidence",
+                json.dumps({"uen": "JONE-0022", "records": [{"source_ref": ref} for ref in refs]}),
+            ),
+        ),
+        AIMessage("The cited evidence is saved."),
+        HumanMessage(
+            "Explain the covenant breaches, cash conversion cycle change and wallet share "
+            "from the saved evidence. Keep it within 350 words."
+        ),
+    ]
+
+
+async def test_formatted_live_draft_is_saved_unchanged_with_one_model_call(
+    formatted_followup: str,
+) -> None:
+    calls = 0
+
+    async def model(messages: Any) -> AIMessage:
+        nonlocal calls
+        calls += 1
+        return AIMessage(formatted_followup)
+
+    assert len(formatted_followup.split()) == 357
+    assert _word_count(formatted_followup) == 347
+    messages = followup_evidence()
+    graph = build_specialist(RunnableLambda(model), [], "Use evidence.")
+    result = await graph.ainvoke({"messages": messages, "active_client": "JONE-0022"})
+    assert calls == 1
+    assert result["messages"][-1].content == formatted_followup
+    assert len(result["messages"]) == len(messages) + 1
+    assert any(
+        "maximum is 346" in issue
+        for issue in response_issues(AIMessage(formatted_followup), messages, 346)
+    )
+
+
+async def test_formatted_draft_still_requires_repair_for_an_invalid_citation(
+    formatted_followup: str,
+) -> None:
+    invalid = formatted_followup.replace(REF, "covenants[facility_id=unknown]")
+    replies = iter([AIMessage(invalid), AIMessage(formatted_followup)])
+    seen: list[list[AnyMessage]] = []
+
+    async def model(messages: list[AnyMessage]) -> AIMessage:
+        seen.append(list(messages))
+        return next(replies)
+
+    result = await build_specialist(RunnableLambda(model), [], "Use evidence.").ainvoke(
+        {"messages": followup_evidence(), "active_client": "JONE-0022"}
+    )
+    assert len(seen) == 2
+    assert "do not exactly match" in str(seen[1][-1].content)
+    assert result["messages"][-1].content == formatted_followup
+    assert all(message.content != invalid for message in result["messages"])
+
+
+def test_formatting_does_not_bypass_missing_citations_or_unknown_reporting_year() -> None:
+    assert response_issues(AIMessage("## Covenant\n- Value 0.96.\n---"), conversation(), 20)
+    answer = AIMessage(
+        "## Verify\n- Obtain audited statements for FY2025.\n"
+        "credit_exceptions[exception_id=example]\n---"
+    )
+    assert any(
+        "does not identify a fiscal year" in issue
+        for issue in response_issues(answer, reporting_conversation(), 20)
+    )
 
 
 def test_tool_requests_are_allowed_to_continue_the_react_loop() -> None:

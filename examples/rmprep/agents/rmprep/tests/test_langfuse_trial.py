@@ -90,7 +90,13 @@ async def test_service_closes_exporter_when_container_construction_fails(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     trial = Mock()
-    monkeypatch.setattr(langfuse, "load_langfuse_settings", Mock(return_value=settings()))
+    monkeypatch.setenv("EAP_PHOENIX_ENABLED", "false")
+    monkeypatch.setenv("EAP_LANGFUSE_ENABLED", "true")
+    monkeypatch.setenv("EAP_LANGFUSE_ENV_FILE", "")
+    monkeypatch.setenv("LANGFUSE_BASE_URL", settings().base_url)
+    monkeypatch.setenv("LANGFUSE_PROJECT_ID", settings().project_id)
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", settings().public_key)
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", settings().secret_key)
     monkeypatch.setattr(langfuse, "LangfuseTracing", Mock(return_value=trial))
     monkeypatch.setattr(
         service, "ServiceContainer", Mock(side_effect=RuntimeError("invalid adapter"))

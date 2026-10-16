@@ -156,6 +156,8 @@ def resolve_langfuse_settings(
     *,
     source: ConfigSource | None = None,
     legacy_prefix: str | None = None,
+    environment: ConfigSource | None = None,
+    working_dir: Path | None = None,
 ) -> LangfuseResolution:
     """Resolve exactly as startup does, exposing file/process origins and masked keys.
 
@@ -163,20 +165,28 @@ def resolve_langfuse_settings(
     table ``[tool.ai-agent-lib.langfuse]``. An explicit argument takes precedence.
     Disabled tracing does not validate inactive credentials or contact a server.
     """
+    if source is not None and environment is not None:
+        raise ValueError("Supply either source or environment to resolve_langfuse_settings")
     prefix = legacy_prefix
     if source is None:
         if prefix is None:
             prefix = _project_prefix(dotenv_path)
-        environment = _Layer(EnvironConfigSource(), "process environment", prefix)
+        process = _Layer(
+            environment if environment is not None else EnvironConfigSource(),
+            "process environment",
+            prefix,
+        )
         service = _Layer(
             DotenvConfigSource(dotenv_path) if dotenv_path else MappingConfigSource({}),
             str(dotenv_path.resolve()) if dotenv_path else "service settings",
             prefix,
         )
-        layers = [environment]
+        layers = [process]
         # An explicit process disable must also bypass a missing separate file.
-        if environment.value("enabled").lower() != "false":
-            extra = environment.value("env_file")
+        if process.value("enabled").lower() != "false":
+            extra = process.value("env_file")
+            if extra and working_dir is not None:
+                extra = str(working_dir / extra)
             if not extra and (extra := service.value("env_file")):
                 extra = str((dotenv_path.parent if dotenv_path else Path.cwd()) / extra)
             if extra:

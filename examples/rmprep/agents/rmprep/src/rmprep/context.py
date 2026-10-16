@@ -80,7 +80,16 @@ def _relevant_evidence(message: AnyMessage, question: str) -> AnyMessage:
     aliases = {
         "relationship": ("wallet share", "wallet-share", "relationship"),
         "covenants": ("covenant", "dscr", "waiver"),
-        "working_capital": ("working capital", "dso", "dio", "dpo"),
+        "credit_exceptions": ("covenant", "waiver", "credit exception", "audited statement"),
+        "working_capital": (
+            "working capital",
+            "cash conversion",
+            "cash cycle",
+            "ccc",
+            "dso",
+            "dio",
+            "dpo",
+        ),
         "financials": ("financial", "revenue", "profit", "income"),
         "facilities": ("facility", "facilities", "maturity"),
         "payment_totals": ("payment", "transaction"),
@@ -98,6 +107,20 @@ def _relevant_evidence(message: AnyMessage, question: str) -> AnyMessage:
     # This is a projection for one model call. The original payload stays in the checkpoint.
     projected = dict(payload)
     projected["sections"] = {key: value for key, value in sections.items() if key in selected}
+    # Findings must not refer to records removed by this projection. Otherwise
+    # the model sees a claim but lacks the exact evidence needed to explain it.
+    references = {
+        record["source_ref"]
+        for page in projected["sections"].values()
+        for record in page.get("records", [])
+        if "source_ref" in record
+    }
+    if "review_findings" in projected:
+        projected["review_findings"] = [
+            finding
+            for finding in projected["review_findings"]
+            if set(finding.get("source_refs", [])) <= references
+        ]
     projected["context_omitted_sections"] = sorted(set(sections) - selected)
     return message.model_copy(
         update={

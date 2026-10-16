@@ -118,8 +118,8 @@ Check these relationships:
   output. Adding the three input categories gives Agent Lab's input token total.
   Counts are reported by the model provider; absent usage is not invented.
 - Root metadata contains checkpoint IDs and parent IDs for exactly that request,
-  plus any newly created artifact IDs. Expand Agent Lab's **Turn inspector** to read
-  those checkpoints through the authorized agent endpoint. Full checkpoint
+  plus any newly created artifact IDs. Open Agent Lab's **Logs**, select the
+  conversation and turn, and read its checkpoints through the authorized agent endpoint. Full checkpoint
   contents are not copied to Langfuse.
 
 Reopen the chat and confirm its trace links remain attached to the original
