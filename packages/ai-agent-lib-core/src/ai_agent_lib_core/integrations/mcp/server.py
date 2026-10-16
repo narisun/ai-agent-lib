@@ -251,7 +251,9 @@ class GovernedToolsMiddleware:
 
     Each call is one ``mcp.tool_call`` span and one ``tool_call`` log line with
     the tool's name, how the call ended and how long it took. Neither holds an
-    argument or a result.
+    argument or a result. Governed data sources also emit ``data_query`` lines
+    with the same request ID, query name and record statistics. Local detail
+    logging includes bounded, masked query parameters on those lines.
 
     Args:
         server: The server's ID in the tool registry.

@@ -14,10 +14,12 @@ from langgraph.graph import START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
+from rmprep.clients import client_names, lookup_in_turn, recent_client_lookup, resolved_clients
 from rmprep.context import ContextBuilder
 from rmprep.context_tools import tool_context_issues
-from rmprep.memos import MemoVersion, memo_from_turn, turns
-from rmprep.response_review import response_issues, tool_payload, word_limit
+from rmprep.focus import ConversationFocus, conversation_focus
+from rmprep.memos import MemoVersion, memo_draft, memo_from_turn, turns
+from rmprep.response_review import response_advisories, response_issues, tool_payload, word_limit
 from rmprep.selection import ContextSelection, select_context
 from rmprep.state import State
 
@@ -37,13 +39,48 @@ def _accepted_update(
         "selection": selection,
     }
     if not reply.tool_calls:
-        update["active_client"] = selection["uen"] or state.get("active_client", "")
-        if len(selection["memo_ids"]) == 1:
-            update["active_memo_id"] = selection["memo_ids"][0]
-        elif selection["uen"] != state.get("active_client", ""):
-            update["active_memo_id"] = ""
+        clients = selection.get("client_uens", []) or (
+            [selection["uen"]] if selection["uen"] else []
+        )
+        current = turns(state["messages"])[-1]
+        lookup = lookup_in_turn(current)
+        if lookup is not None and not resolved_clients(current):
+            # A discovery answer establishes a group for the next question, not a
+            # single-client alias for the broad search term.
+            clients = list(lookup.clients) if lookup.complete else []
+        if not clients:
+            # An unresolved lookup or clarification must not destroy prior focus.
+            return update
+        update["active_client_uens"] = clients
+        update["active_client"] = clients[0] if len(clients) == 1 else ""
+        previous = conversation_focus(state)
+        evidence_date = selection["retrieval_date"] or selection["meeting_date"]
+        memo_ids = selection["memo_ids"] if selection["mode"] == "snapshot" else []
+        evidence_ids = [str(message.id) for message in [*current, reply] if message.id]
+        if not any(tool_payload(message) for message in current):
+            evidence_ids = (
+                previous["message_ids"]
+                if set(previous["client_uens"]) == set(clients)
+                and previous["evidence_date"] == evidence_date
+                and previous["memo_ids"] == memo_ids
+                else []
+            )
+        update["focus"] = ConversationFocus(
+            client_uens=list(clients),
+            memo_ids=list(memo_ids),
+            evidence_date=evidence_date,
+            message_ids=evidence_ids,
+        )
+        update["active_memo_id"] = memo_ids[0] if len(memo_ids) == 1 else ""
     if memo is not None:
         update.update(memos=[memo], active_memo_id=memo["memo_id"], active_client=memo["uen"])
+        update["active_client_uens"] = [memo["uen"]]
+        update["focus"] = ConversationFocus(
+            client_uens=[memo["uen"]],
+            memo_ids=[memo["memo_id"]],
+            evidence_date=memo["meeting_date"],
+            message_ids=list(memo["message_ids"]),
+        )
     return update
 
 
@@ -68,6 +105,10 @@ def build_specialist(
             state.get("active_memo_id", ""),
             state.get("active_client", ""),
             creating_memo=creating,
+            known_names=client_names(state["messages"], state.get("memos", [])),
+            recent_lookup=recent_client_lookup(state["messages"][: -len(current)]),
+            active_clients=state.get("active_client_uens", []),
+            focus=conversation_focus(state),
         )
         if selection["clarification"]:
             return {
@@ -76,16 +117,17 @@ def build_specialist(
             }
         # A name lookup can resolve a new client during the tool loop. Only
         # successful MCP payloads establish that identity, never assistant prose.
-        clients = {
-            str(tool_payload(message)["uen"])
-            for message in current
-            if "uen" in tool_payload(message) and tool_payload(message).get("status") != "not_found"
-        }
-        if not selection["uen"] and len(clients) == 1 and not selection["memo_ids"]:
-            selection = {**selection, "uen": next(iter(clients))}
+        clients = resolved_clients(current)
+        if (
+            not selection["uen"]
+            and len(clients) == 1
+            and not selection["memo_ids"]
+            and len(selection.get("client_uens", [])) < 2
+        ):
+            selection = {**selection, "uen": next(iter(clients)), "client_uens": sorted(clients)}
         selection = {
             **selection,
-            "retrieval_date": now().date().isoformat()
+            "retrieval_date": (selection["retrieval_date"] or now().date().isoformat())
             if selection["mode"] == "refresh"
             else selection["meeting_date"],
         }
@@ -95,17 +137,18 @@ def build_specialist(
             12 if creating and any(tool.name.endswith("get_memo_evidence") for tool in tools) else 0
         )
         body_limit = max(1, limit - footer_reserve)
-        instructions = (
-            f"\nOutput budget: at most {body_limit} whitespace-separated words INCLUDING headings, tables "
-            f"and citations. Aim for {int(body_limit * 0.8)} words to leave room for source references. "
-            "Copy complete source_ref strings exactly; never shorten them."
+        output_budget = json.dumps(
+            {"output_budget_words": body_limit, "target_words": int(body_limit * 0.7)}
         )
-        assembled = contexts.build(state, prompt + instructions, selection)
+        assembled = contexts.build(state, prompt, selection, output_budget=output_budget)
         conversation = list(assembled.messages)
         for attempt in range(3):
             contexts.check_size(conversation)
             reply = await model.ainvoke(conversation)
             reply = reply.model_copy(update={"id": reply.id or str(uuid4())})
+            if creating:
+                reply = memo_draft(reply)
+            draft = reply
             memo = (
                 memo_from_turn([*current, reply], state.get("memos", []), now().isoformat())
                 if creating
@@ -150,6 +193,9 @@ def build_specialist(
                     "Retrieve current evidence before describing what has changed; otherwise state that current evidence is unavailable."
                 )
             if not issues:
+                assembled.diagnostics["review_advisories"] = response_advisories(
+                    reply, assembled.messages[1:]
+                )
                 return _accepted_update(state, reply, memo, selection, assembled.diagnostics)
             if attempt < 2:
                 # Drafts remain visible in model tracing but are never saved as
@@ -162,12 +208,15 @@ def build_specialist(
                             "Proposed tool calls (not executed): " + json.dumps(reply.tool_calls)
                         )
                         if reply.tool_calls
-                        else reply,
+                        else draft,
                         HumanMessage(
                             "Revise the draft to pass these output checks: "
                             + " ".join(issues)
                             + " Return a corrected tool call or answer. Preserve evidence limits; "
-                            "do not add unsupported claims while shortening."
+                            "do not add unsupported claims while shortening. "
+                            f"Aim for at most {max(1, int(body_limit * 0.6))} words. "
+                            "Remove secondary figures and repeated explanations before shortening "
+                            "source references or omitting evidence limits."
                         ),
                     ]
                 )

@@ -1,13 +1,26 @@
-# ai-agent-lib-ui
+# Agent Lab
 
-Chat with registered HTTP agents and keep your conversation history. Phase 2
-provides agent selection, saved threads, rename, title search, archive, restore,
-and resume. The UI sends each new question to the selected agent; the agent
-manages its own conversation checkpoints.
+<img src="src/ai_agent_lib_ui/assets/agent-lab.svg" alt="Agent Lab logo: a flask with three connected nodes" width="72" height="72">
 
-This is a local development preview in this checkout. Document panels, token/cache
-metrics and the diagnostic inspector follow in later phases. The existing agent
-HTTP API and Phase 1 contracts remain compatible.
+Agent Lab is a local workspace for testing registered agents through chat and
+inspecting how each response was produced. It uses Chainlit for chat and
+connects to agents over HTTP.
+Install it with the Python package `ai-agent-lib-ui`; commands continue to use
+`python -m ai_agent_lib_ui`.
+
+To start Agent Lab together with the rmprep agent and its MCP server, run
+`setup-local.bat`, then `start-local.bat` from the repository root in Command
+Prompt. The [local startup guide](../../docs/local-startup.md) covers login,
+model setup, logs, and other scenarios. The manual instructions below let you
+configure a UI for your own agents.
+
+Use steps 1–4 below to connect your own agents. After your first chat, see
+[responses and inspection](#responses-and-inspection), [memos](#memos-beside-chat),
+and [interrupted requests](#interrupted-requests). For code changes, start with
+[how the code fits together](#how-the-code-fits-together).
+
+This checkout supports a local developer with a configured static identity.
+Enterprise SSO and shared hosting remain separate deployment work.
 
 ## 1. Prepare a separate UI environment
 
@@ -51,25 +64,24 @@ environments. The agent must accept `POST /invoke` with `input.question` and
 return `output.answer`, `thread_id`, and `request_id`.
 
 For [rmprep](../../examples/rmprep/README.md), complete its Python/pip setup first.
-From `examples\rmprep`, use its environment to start the MCP service:
+In a fresh Command Prompt at the repository root, start the MCP service with
+the agent environment's Python:
 
 ```bat
-.venv\Scripts\activate.bat
-python -m rmprep_data
+.venv\Scripts\python.exe -m rmprep_data
 ```
 
-In another Command Prompt at `examples\rmprep`, start the HTTP agent:
+In another Command Prompt at the repository root, start the HTTP agent:
 
 ```bat
-.venv\Scripts\activate.bat
-python -m rmprep.service --host 127.0.0.1 --port 8000
+.venv\Scripts\python.exe -m rmprep.service --host 127.0.0.1 --port 8000
 ```
 
-Add this property to the existing `rmprep` entry in
-`examples\rmprep\registry\agents.yaml`, at the same indentation as `owner`:
+The checked-in `rmprep` entry in `examples\rmprep\registry\agents.yaml` includes
+this address. For another agent, add its address at the same indentation as `owner`:
 
 ```yaml
-    url: http://127.0.0.1:8000
+  url: http://127.0.0.1:8000
 ```
 
 Keep its other properties. The registry identifies the service; the UI's explicit
@@ -83,12 +95,12 @@ Return to the Command Prompt with the **UI environment** active, at the reposito
 root. Run the first command as one line:
 
 ```bat
-python -m ai_agent_lib_ui init --env-file examples\rmprep\agents\rmprep\.env --agent rmprep --allow-url http://127.0.0.1:8000
+python -m ai_agent_lib_ui init --env-file examples\rmprep\agents\rmprep\.env --agent rmprep --artifacts-agent rmprep --allow-url http://127.0.0.1:8000
 python -m ai_agent_lib_ui check
 ```
 
 `init` reads `EAP_REGISTRY_OPTIONS` and `EAP_IDENTITY_OPTIONS` from that agent's
-`.env`. Relative registry paths resolve from the file's directory. This phase
+`.env`. Relative registry paths resolve from the file's directory. Local setup
 uses `EAP_PROFILE=local`, the `file` registry and `static` identity providers. Model API
 keys and shell overrides are not imported. Confirm the file matches the running
 service's settings.
@@ -117,20 +129,144 @@ python -m ai_agent_lib_ui serve
 Copy the displayed code and open [the local UI](http://127.0.0.1:8765). Enter the
 code to sign in. Use the exact `127.0.0.1` address. Keep the server window open.
 
-1. Select **rmprep** in the agent menu and start a conversation.
+1. Select **Choose agent**, then **Start chat with rmprep**. The chat identifies
+   the selected agent. This works even when only one agent is configured.
 2. With a configured business model, ask: **memo: Prepare a memo for JONE-0022 as
    of 2026-08-03.** Follow your team's data-sharing rules for the selected model.
 3. In the same conversation, ask: **qna: Explain the covenant findings and their
    sources.** Only this new question is sent, with the same thread ID.
-4. Refresh and open the saved conversation from the left sidebar.
-5. Open **Conversations** at the top to rename, search titles, archive or restore.
-   Chainlit's separate Delete action is disabled; use Archive here.
+4. Select **Memos** to view the saved memo. Generate another memo in the same chat,
+   then switch between versions with the **Memo version** selector.
+5. Select **Logs**, choose the chat, and open a turn to see its LLM input/output,
+   MCP calls, and checkpoints. Chat history remains in the left sidebar.
+   **Logs → Manage chat history** provides rename, search, archive and restore.
 6. Stop with **Ctrl+C**, run `serve` again, and reopen your conversation. The
    completed messages and selected agent remain.
 
 A conversation keeps its original agent. Start a new conversation to change
-agents. **Catalog** also lists MCP services referenced by your selected agents;
+agents. **Choose agent** also lists MCP services referenced by your selected agents;
 MCP execution stays inside the agent service.
+
+Reopening a long conversation loads the latest 50 turns, or fewer when the page
+reaches 2 MiB. One large turn is always included so it remains accessible. Use
+**View older messages** to browse earlier pages. This changes only UI loading;
+the agent retains its checkpoints and applies its own model context budget.
+
+## Responses and inspection
+
+Chat with registered HTTP agents and keep your conversation history. Agent Lab
+provides agent selection, saved threads, rename, title search, archive, restore,
+and resume. The UI sends each new question to the selected agent; the agent
+manages its own conversation checkpoints.
+
+A new chat shows a short introduction below the Agent Lab logo and above the
+message box. It names the selected agent and links to **Choose agent**. The
+introduction disappears once you send a question and is not part of the saved
+conversation or model input.
+
+Chat, Choose agent, Logs, the turn inspector, and Memos share the same colors,
+controls, and light/dark preference. Use the theme control in the page header.
+Content wraps to fit the window; long documents and diagnostic records scroll
+only when they need more room.
+
+Replies display a live draft as approved model text becomes available. When the agent finishes its
+checks and saves the outcome, the temporary draft panel disappears and the final
+answer or failure message appears.
+The draft label shows the model call number so tool steps and revisions are visible.
+Each response shows input tokens, output tokens, elapsed time, the cache-hit
+ratio, and cache read/write counts when reported. These metrics remain visible
+when you reopen a conversation. A warming request can write the cache with 0% hits.
+
+Chat shows the answer, usage, elapsed time and an **Open trace in Agent Lab** (or
+**Open trace in Langfuse**) link when tracing is enabled. The Agent Lab link opens
+the configured Phoenix trace. Comparison tables show values without
+repeating long references in each cell. Chat no longer adds References or Turn
+inspector panels, including when you reopen earlier conversations. The saved
+answer still contains its original references; memo documents retain their sources.
+
+Use the per-response trace link to inspect model input/output, MCP tool arguments
+and results, timing, usage and checkpoint references. Enable content capture for
+approved test data to see messages and tool results. See the
+[Phoenix setup](../../docs/phoenix-trial.md) or [Langfuse setup](../../docs/langfuse.md).
+Agent Lab uses a transparent grey logo in light mode and a soft white logo in dark
+mode so the artwork stays in the background.
+
+The **Logs** page and authorized diagnostic endpoints remain available for local
+file-based diagnostics and saved checkpoint state. They load only when opened;
+inspection never reruns the agent or calls an MCP tool.
+
+The local rmprep service supplies the diagnostic reader. Set
+`EAP_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl` in the agent's `.env`, then
+restart with `start-local.bat rmprep` to capture model exchanges for new turns.
+Tracing captures conversation content; use the same private storage and retention
+rules as the agent's checkpoints. The inspector reads the agent's configured trace
+file, so retain that file to inspect earlier turns. Capture is not retroactive.
+Each section has a 64 KiB preview with an explicit truncation notice. Missing,
+disabled and unsupported capture are labelled; they do not mean no calls occurred.
+The local file reader scans up to 64 MiB per configured file and 200 matching records.
+
+The UI verifies ownership and current registry bindings before reading diagnostics.
+Set `"inspector_enabled": false` in its configuration to disable diagnostic access
+while retaining chat. The agent separately authorizes `diagnostic.read`; the rmprep
+example grants it to its analyst and manager roles. Other agents can inject a
+`TurnInspector` into `agent_app(inspector=...)`. Without one, chat works and the
+inspector reports unsupported. Deployments need their own authorized reader;
+the UI never opens an agent checkpoint database.
+
+## Memos beside chat
+
+Select **Memos** in the chat header to open the optional right panel. Choose a
+**Memo version** to read it alongside the conversation. The panel starts closed;
+use the close button or Escape to return to full-width chat. On small screens it overlays
+chat. Long tables and text scroll inside the panel.
+
+Accepted memo versions are saved with their originating turn and survive a UI
+restart. Q&A replies keep the selected memo intact. New versions appear in the
+selector while the panel is open; **Refresh versions** checks immediately, and
+**Older versions** loads earlier entries. Viewing a version does not change the
+agent's active checkpoint context. To ask about an older memo, include its memo
+reference or client and date in your question. Expand **Memo details** to find
+the memo reference and its originating request.
+
+rmprep publishes newly accepted memos as optional `output.artifacts`, alongside
+the unchanged `output.answer`. Enable this capability at UI setup with
+`--artifacts-agent rmprep`. For an existing configuration, add `"artifacts"` to
+that binding's `manifest.capabilities` array, then restart the UI. Existing chats
+remain usable. The batch setup enables it when creating a new configuration.
+
+The local panel supports inline Markdown and plain text, limited by the manifest
+and HTTP response size. Images and raw HTML are not rendered. An existing version
+cannot be overwritten; conflicting declarations keep the first saved version.
+Opaque content references need a future storage reader. Older text-only replies
+remain in chat; generate a new memo to publish a panel version.
+
+## Live responses and metrics
+
+Restart the agent and UI after updating this checkout. The batch launcher and new
+CLI-generated agents enable live responses automatically. For an existing agent,
+add `live_updates=True` to its `agent_app(...)` call in `service.py`.
+
+The UI requests a live response from `POST /invoke`. Agents that support it return
+draft events followed by one accepted result. Older agents return their usual
+JSON answer using the same request; the UI does not resend a question to switch
+transports. Providers that do not support token streaming deliver a complete draft.
+
+The expandable draft can change during a tool loop or business-validation revision.
+The default pattern guardrails check the growing text against the output-size
+limit before releasing each chunk. PII findings are recorded when the full reply
+arrives. Blocking PII checks, guardrail providers without incremental support,
+and structured-output schemas buffer text until their complete-response checks pass. Drafts contain public response text; reasoning blocks
+and tool arguments are excluded. Only the final accepted answer is saved in chat
+history. Keep `live_updates=False` if application-specific checks must finish
+before any draft is shown.
+
+Token totals cover every governed model attempt in that response, including
+revisions and tool selection. Input counts include cache reads/writes once;
+cache hit is cache-read tokens divided by input tokens. Time measures the UI
+server's complete agent request, including model and tool work. Missing usage is
+shown as **unavailable**, and fake-model counts are marked **simulated**. Existing
+saved conversations retain the metrics captured when they ran; missing old counts
+are not reconstructed from transcript text.
 
 ## Interrupted requests
 
@@ -140,11 +276,24 @@ question return the original outcome. A browser disconnect or Stop action stops
 waiting in that browser; the backend continues admitted work. Reopen the thread
 to see its saved result.
 
-A timeout, invalid response, server/gateway failure, failed result commit, or
+A confirmed agent validation failure is saved as **failed**, with reported token
+usage and elapsed time. Its provisional drafts do not become accepted answers.
+You can send a new question in the same thread; the original request is not resent.
+
+A timeout, malformed response, server/gateway failure, failed result commit, or
 server interruption can leave the outcome **unknown**. The agent may already have
-run tools. The UI holds that thread and never resends automatically. Inspect the
-agent logs and start a new conversation when appropriate. Automatic reconciliation
-needs the agent outcome journal planned for Phase 4.
+run tools. Reopen the thread to check the agent's saved outcome. The UI makes a
+read-only status request; it never resends the question. A matching confirmed
+answer or failure is saved with its metrics, and the thread can accept new
+questions. The UI database records the reconciliation in the same transaction.
+If the agent has no confirmed outcome, the thread stays held.
+
+The local rmprep launcher and newly generated local agents keep a journal in
+`<agent folder>\.agentlib\outcomes.sqlite`. Restart updated services to enable
+it. Requests made before the journal was enabled cannot be recovered through it.
+Treat this file like the checkpoint database: it contains accepted answers.
+Other deployments can inject an `OutcomeJournal` into `agent_app`; a shared
+journal is needed when requests can reach multiple service instances.
 
 Normal shutdown waits for active calls within the request deadline. After a forced
 stop, unfinished records become unknown on restart. One process may own a state
@@ -160,7 +309,7 @@ to that file. Stop the UI before editing settings or refreshing pins.
 | --- | --- |
 | `agents_path`, `tools_path` | Existing agent and MCP registry files. |
 | `identity.subject`, `identity.tenant`, `identity.roles` | Static identity copied from the agent `.env`; must match all selected agents. |
-| `bindings` | Generated manifests pinned to registry revision, agent version and URL. |
+| `bindings` | Approved agent manifests and URLs. Each run records the current registry revision. |
 | `allowed_urls` | Exact loopback agent base URLs approved during initialization. |
 | `port` | UI port, default `8765`; initialize with `--port` to change it. |
 | `timeout_seconds` | Total HTTP deadline, default `180`, maximum `600`. A timeout means unknown. |
@@ -173,11 +322,11 @@ The server always binds to `127.0.0.1`.
 | --- | --- |
 | Agent has no URL | Add its running loopback address to the registry entry, then initialize. |
 | `destination_denied` | Match the registry URL and `--allow-url`, including port and path. |
-| `stale_binding` | Review the registry change. Stop the UI and repeat `init` with `--overwrite`, then run `check`. Old threads retain their pins; start a new thread after a binding change. |
+| `stale_binding` | Review the registry change. Stop the UI and repeat `init` with `--overwrite`, then run `check`. Unrelated registry revisions are accepted automatically. Start a new thread after an actual agent version, URL or authority change. |
 | `not_found` | Check the allowed, active agent ID and your local identity/state folder. |
 | `conflict` | Reopen the thread. It may have an active/unknown request or be archived. |
 | Another server owns the folder | Stop that server; keep its lock in place while it runs. |
-| Sign-in expires | Sign in again. Sessions last one hour; signing out revokes the current session. |
+| Sign-in expires | Reload the page and sign in again. The login form returns you to the conversation or page you opened. Sessions last one hour; signing out revokes the current session. |
 | UI rejects `LITERAL_API_KEY` | Keep model/content-capture credentials in the agent environment. The UI does not need them. |
 
 `--overwrite` replaces configuration pins, keeping the database and secrets.
@@ -224,6 +373,26 @@ changes, failed writes and unknown outcomes. The wheel check repeats real-server
 tests using installed packages. `--profile ui` separately checks the lightweight
 contracts installation without the `chat` extra.
 
+For changes to the chat layout, also check the rendered page in Chrome. Open
+**New chat**, then reopen a saved empty thread. Repeat with the sidebar and Memos
+panel open and closed at mobile and desktop widths. Run the read-only
+[browser layout check](tests/browser_layout.js) in the page's developer console;
+it throws if a welcome-screen ancestor has a horizontal scrollbar or a chat
+control extends past the viewport. This checks the nested chat scrollers as well
+as the page itself. Confirm that a wide response table or code block still scrolls
+inside its own container. Restart the UI and reload the tab after changing assets.
+
 The UI has its own Windows/Linux CI job. Browser and enterprise release gates from
 the [Phase 0 review](../../docs/frontend-phase0-review.md) remain tracked separately;
 this local preview does not imply approval for shared production hosting.
+
+## Local Phoenix tracing
+
+The [Phoenix trial](../../docs/phoenix-trial.md) uses a separate Python environment and SQLite.
+Run `start-phoenix.bat setup` once from the library repository root, then follow
+the guide to enable Phoenix in the root `.env`. `start-local.bat` starts the local
+Phoenix server before rmprep and Agent Lab, using `.agentlib\phoenix\.venv`.
+`stop-local.bat` in another Command Prompt stops the stack and keeps saved
+conversations, traces, and checkpoints. **Ctrl+C** in the launcher window also works.
+Each response links to its Phoenix trace using **Open trace in Agent Lab**.
+The **Logs** page provides local diagnostic inspection.

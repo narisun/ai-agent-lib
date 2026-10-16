@@ -306,3 +306,53 @@ async def test_rules_csv_and_jsonl_work_together_with_no_server(tmp_path: Path) 
     assert denied["outcome"] == "denied"
     assert denied["attributes"]["reason_code"] == "no_matching_rule"
     assert denied["attributes"]["policy_decision_id"] != allowed["attributes"]["policy_decision_id"]
+
+
+async def test_query_log_contains_parameters_and_record_stats_without_rows(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    import logging
+
+    from ai_agent_lib_core.observability.logs import JsonLogFormatter
+
+    fakes, _ = governed(Obligations(max_rows=1))
+    with caplog.at_level(logging.INFO, logger="ai_agent_lib_core.pipeline.data"):
+        async with fakes.container() as services:
+            result = await services.data_source("accounts").query(
+                "accounts_by_region", {"region": "west", "min_balance": "1.5"}, context=caller()
+            )
+    (record,) = [item for item in caplog.records if item.msg == "data_query"]
+    local = json.loads(JsonLogFormatter("test", details=True).format(record))
+    deployed = json.loads(JsonLogFormatter("test").format(record))
+    assert local["query"] == "accounts_by_region"
+    assert local["parameters"] == {"region": "west", "min_balance": "1.5"}
+    assert local["rows"] == len(result.rows)
+    assert local["columns"] == len(result.columns)
+    assert local["truncated"] == result.truncated
+    assert local["duration_ms"] >= 0
+    assert local["request_id"] == "r-1"
+    assert local["outcome"] == "success"
+    assert "parameters" not in deployed
+    assert "Eve" not in json.dumps(local)
+
+
+async def test_failed_query_logs_no_fabricated_record_count(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    import logging
+
+    from ai_agent_lib_core.observability.logs import JsonLogFormatter
+
+    fakes, _ = governed()
+    with caplog.at_level(logging.INFO, logger="ai_agent_lib_core.pipeline.data"):
+        async with fakes.container() as services:
+            with pytest.raises(ValidationFailed):
+                await services.data_source("accounts").query(
+                    "accounts_by_region", {"password": "do-not-print"}, context=caller()
+                )
+    (record,) = [item for item in caplog.records if item.msg == "data_query"]
+    local = json.loads(JsonLogFormatter("test", details=True).format(record))
+    assert local["parameters"] == {"password": "[redacted]"}
+    assert local["outcome"] == "failed"
+    assert local["rows"] is None
+    assert "do-not-print" not in str(record.__dict__)

@@ -9,6 +9,13 @@
 # changes or removes a rule that is here.
 schema: agentlib.rules/v1
 rules:
+  # The local developer inspector reads only this user's scoped agent turn.
+  - id: rmprep-staff-inspect-turns
+    actions: [diagnostic.read]
+    applications: [rmprep]
+    roles: [analyst, manager]
+    resources: [rmprep]
+
   # rmprep-data: who may call its tools, and what each role sees of the data.
   # Analysts and managers may read the supplied snapshot. Each query caps pages
   # at 50 rows; the analyst policy also enforces that limit.

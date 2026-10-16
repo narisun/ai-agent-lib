@@ -2,15 +2,17 @@
 
 import json
 from collections.abc import Mapping
+from contextlib import suppress
 from typing import Annotated
 
 from pydantic import Field, ValidationError
 
-from ai_agent_lib_core.contracts.diagnostics import DiagnosticValue, Identifier
+from ai_agent_lib_core.contracts.diagnostics import DiagnosticValue, Identifier, TokenUsage
 from ai_agent_lib_ui.contracts.artifacts import Artifact, ScopedArtifact
 from ai_agent_lib_ui.contracts.catalog import PresentationManifest
 from ai_agent_lib_ui.contracts.conversations import TurnAdmission
 from ai_agent_lib_ui.contracts.queries import Availability, ContractError, ErrorCode, ViewContext
+from ai_agent_lib_ui.contracts.traces import TraceLink
 
 
 class AcceptedAnswer(DiagnosticValue):
@@ -19,9 +21,12 @@ class AcceptedAnswer(DiagnosticValue):
     answer: str
     thread_id: Identifier
     request_id: Identifier
+    usage: TokenUsage = Field(default_factory=TokenUsage)
+    model_calls: Annotated[int, Field(strict=True, ge=0)] | None = None
     artifacts: tuple[ScopedArtifact, ...] = ()
     artifact_status: Availability = Availability.UNSUPPORTED
     artifact_warning: Annotated[str, Field(max_length=128)] | None = None
+    trace: TraceLink | None = None
 
 
 class QuestionAnswerAdapter:
@@ -50,6 +55,7 @@ class QuestionAnswerAdapter:
         body: bytes,
         *,
         status_code: int = 200,
+        request_id: str | None = None,
     ) -> AcceptedAnswer:
         """Accept a successful terminal envelope; malformed optional artifacts degrade.
 
@@ -63,6 +69,8 @@ class QuestionAnswerAdapter:
             value = json.loads(body)
             if not isinstance(value, dict) or value.get("thread_id") != turn.thread_id:
                 raise ValueError("invalid envelope")
+            if request_id is not None and value.get("request_id") != request_id:
+                raise ValueError("uncorrelated response")
             output = value.get("output")
             if not isinstance(output, dict) or not isinstance(output.get("answer"), str):
                 raise ValueError("missing answer")
@@ -73,6 +81,20 @@ class QuestionAnswerAdapter:
             )
         except (ValueError, KeyError, TypeError, RecursionError) as error:
             raise ContractError(ErrorCode.INVALID_RESPONSE) from error
+        # Usage is optional: malformed metrics cannot replace an accepted answer.
+        with suppress(ValidationError):
+            answer = AcceptedAnswer(
+                **answer.model_dump(exclude={"usage", "model_calls"}),
+                usage=TokenUsage.model_validate(value.get("usage", {})),
+                model_calls=value.get("model_calls"),
+            )
+        # Trace links are service metadata, never extracted from model answer text.
+        # Optional malformed diagnostics must not discard an accepted answer.
+        if output.get("trace") is not None:
+            with suppress(ValidationError, ValueError):
+                answer = answer.model_copy(
+                    update={"trace": TraceLink.model_validate(output["trace"])}
+                )
         return self._artifacts(view, output, answer)
 
     def _artifacts(

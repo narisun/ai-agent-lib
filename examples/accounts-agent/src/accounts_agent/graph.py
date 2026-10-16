@@ -81,4 +81,4 @@ async def ask(services: ServiceContainer, context: RequestContext, question: str
         {"messages": [HumanMessage(question)]},
         **services.invocation(context),  # touchpoint 5
     )
-    return str(result["messages"][-1].content)
+    return str(result["messages"][-1].text)

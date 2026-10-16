@@ -1,0 +1,73 @@
+# View {{ name }} traces in Langfuse
+
+The generated HTTP service already uses the library's optional tracing adapter.
+Your graph stays ordinary LangGraph. Each accepted response can link to its model
+calls, tool calls and checkpoint references in a separate Langfuse service.
+
+## 1. Get your project settings
+
+Ask the platform team for a Langfuse HTTPS URL, project ID, public key and secret
+key. For a local backend, use its loopback URL, such as `http://localhost:3000`.
+The project ID is the value after `/project/` in its browser URL.
+
+Create a private file, for example `F:\work\langfuse\agent.env`:
+
+```dotenv
+{{ var.langfuse_enabled }}=true
+{{ var.langfuse_base_url }}=http://localhost:3000
+{{ var.langfuse_project_id }}=your-project-id
+{{ var.langfuse_public_key }}=your-project-public-key
+{{ var.langfuse_secret_key }}=your-project-secret-key
+{{ var.langfuse_capture_content }}=false
+```
+
+Set `{{ var.langfuse_capture_content }}=true` when using approved test data to
+inspect model messages and tool arguments/results. With `false`, traces contain
+metadata, token counts and checkpoint IDs. Keep real keys and captured content
+out of source control. The browser receives a private trace link, never API keys.
+
+## 2. Start the agent
+
+Open Command Prompt at the workspace root and select Python as described in the
+[workspace README](../../../README.md#select-python). The generated dependencies
+include the core `otel` extra; the installer uses Python and pip.
+
+```bat
+"%PYTHON%" -m ai_agent_lib_cli install
+set "{{ var.langfuse_env_file }}=F:\work\langfuse\agent.env"
+"%PYTHON%" -m ai_agent_lib_cli config explain {{ name }}
+"%PYTHON%" -m ai_agent_lib_cli doctor {{ name }}
+"%PYTHON%" -m {{ package }}.service --port {{ port }}
+```
+
+Use your file's actual path. Process variables override that file, which overrides
+`agents/{{ name }}/.env`. Restart the agent after changing settings.
+`config explain` identifies each setting's source and masks both API keys.
+`doctor` validates the same settings as startup; this configuration check does
+not contact Langfuse or export content.
+
+The backend runs separately. A developer connecting to a shared backend needs
+Python, pip and network access to it. No Langfuse server runs inside the agent or
+Agent Lab process. Operational telemetry keeps its existing destination.
+
+## 3. Inspect a conversation
+
+Select **{{ name }}** in Agent Lab. Ask `My name is Ada. Please greet me.` and
+then `What is my name?` in the same chat. Use a real model to exercise tool choices;
+the default fake model echoes input, while the tests script its tool calls.
+
+Open **Open trace in Langfuse** beneath either answer and sign in to Langfuse.
+Each question has its own trace and request ID. The two traces share a session
+scoped to the caller, tenant, agent and thread. After a tool runs, a later model
+input shows its result. A follow-up's model input shows the saved conversation.
+Checkpoint IDs appear in root metadata; the checkpoint database stays with the
+agent. Token/cache counts remain visible in Agent Lab and survive a chat reload.
+
+Tracing covers `POST /invoke`, including Agent Lab's live response mode. The
+standalone CLI and `/invoke/stream` graph-step endpoint keep their existing
+behavior. Export happens in the background; a link may appear before ingestion
+finishes. An exporter outage does not retry a business request or discard its
+answer. To disable export, set `{{ var.langfuse_enabled }}=false` and restart.
+Checkpoint reference collection has a one-second deadline and a 64-reference
+limit. Missing or truncated references are marked in trace metadata; a slow
+diagnostic lookup does not indefinitely delay the accepted answer.

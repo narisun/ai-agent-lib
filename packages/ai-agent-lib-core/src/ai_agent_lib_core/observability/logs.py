@@ -1,11 +1,12 @@
-"""Operational logs: one JSON object per line on standard output, metadata only.
+"""Operational logs: one JSON object per line, with optional local query detail.
 
 The audit log says who did what and whether it was allowed. These logs are for
 the people who run the service: that it started, that a request took so long
-and ended so, that something it depends on failed. Neither holds what a caller
-asked or what a model answered.
+and ended so, that something it depends on failed. Model answers and returned
+data rows belong in diagnostic traces, not these logs.
 
-The library keeps content out of its own log lines by never writing any. Other
+Local detail logging also includes bounded, masked named-query parameters;
+result rows and model messages remain outside operational logs. Other
 libraries write what they like, so three more things apply to every line:
 loggers outside the library are quiet below WARNING, anything shaped like a
 credential is replaced, and an error is logged by its type and where it was
@@ -67,11 +68,12 @@ class JsonLogFormatter(logging.Formatter):
     (``error_in_your_code``). The library's own errors also add their message,
     ``error_expected``, ``error_actual`` and ``error_fix``, which never hold
     caller content. An ``extra`` called ``detail`` may hold caller content and
-    is written only when ``details`` is on.
+    is written only when ``details`` is on. Named-query ``parameters`` are likewise
+    local-only, bounded and masked recursively.
 
     Args:
         service: The name of the service, written on every line.
-        details: Also write what may hold caller content: an error's
+        details: Also write bounded, masked query parameters, an error's
             ``detail`` and the messages of other libraries' errors. For a
             developer's machine; leave it off where logs are kept.
     """
@@ -97,7 +99,12 @@ class JsonLogFormatter(logging.Formatter):
         for key, value in record.__dict__.items():
             if key in _STANDARD or key.startswith("_"):
                 continue
-            if key == _DETAIL and not self._details:
+            if key in {_DETAIL, "parameters"} and not self._details:
+                continue
+            if key == "parameters" and isinstance(value, dict):
+                from ai_agent_lib_core.observability.query_logs import query_parameters
+
+                line.setdefault(key, query_parameters(value))
                 continue
             line.setdefault(key, _scalar(value) if key != _DETAIL else _detail(value))
         error = record.exc_info[1] if record.exc_info else None
@@ -125,8 +132,8 @@ def configure_logging(
             it is higher.
         stream: Where the lines go. Standard output by default: on a container
             platform that is the log.
-        details: Also log what may hold caller content, such as the message
-            of an unexpected error in a tool. Turn it on only on a developer's
+        details: Also log masked query parameters and caller content such as
+            the message of an unexpected tool error. Use only on a developer's
             machine: ``details=config.deployment_env is DeploymentEnv.LOCAL``.
 
     Returns:

@@ -10,6 +10,8 @@ from architecture.containment import find_violations
 
 from ai_agent_lib_core.config import DEFAULT_BINDINGS
 from ai_agent_lib_core.config.bindings import PREFIX, SECRET_VARIABLE_PREFIX, secret_name
+from ai_agent_lib_core.config.langfuse import LANGFUSE_VARIABLES
+from ai_agent_lib_core.config.phoenix import PHOENIX_VARIABLES
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PACKAGES = (
@@ -113,6 +115,8 @@ def _templates() -> list[Path]:
 
 def test_every_variable_a_document_names_exists() -> None:
     known = {name for binding in DEFAULT_BINDINGS for name in binding.all_names}
+    known.update(LANGFUSE_VARIABLES.values())
+    known.update(PHOENIX_VARIABLES)
     documents = _documents()
     assert any(path.name == "getting-started.md" for path in documents)
     unknown = sorted(

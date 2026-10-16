@@ -5,6 +5,16 @@ matrix defines the current release and resolves its contradictions using the
 [decision records](adr/README.md). Future concerns in that document are not
 claims that this release implements them.
 
+For the current local developer workflow, use the [documentation map](README.md).
+Agent Lab adds saved chat, response inspection, and memo views in a separate UI
+package. The agent HTTP layer can keep a local terminal-outcome journal for
+read-only recovery; this is narrower than distributed business-operation
+idempotency. Optional [Langfuse tracing](langfuse.md) is shared through core.
+The [October code review](design/code-structure-review-2026-10-13.md) records the
+three reliability fixes and further suggested improvements. HTTP
+[thread admission](http-thread-admission.md) protects one application instance;
+multiple workers require injected shared coordination.
+
 | Review priority | Current decision and implementation | Regression evidence |
 | --- | --- | --- |
 | 1. Image contents (§16) | A Dockerfile-specific allowlist admits only the selected service's source, queries, registries, policies and dependency lock. Environment files, caches, audit logs and databases are excluded even inside admitted directories. | CLI `test_cli_deploy.py`: generated allowlist checks and an opt-in Docker test inspecting the filtered build context and scanning image layers for planted secret sentinels. |

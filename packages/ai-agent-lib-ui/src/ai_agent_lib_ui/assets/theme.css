@@ -1,0 +1,84 @@
+/* Match the pinned Chainlit theme. Chat inherits its native tokens; standalone
+   pages define the same palette so memo and page controls share one style. */
+.light { color-scheme: light; }
+.dark { color-scheme: dark; }
+.agent-lab-page {
+  --background: 0 0% 100%; --foreground: 0 0% 5%;
+  --muted: 0 0% 96%; --muted-foreground: 0 0% 36%;
+  --border: 0 0% 90%; --primary: 340 92% 52%; --primary-foreground: 0 0% 100%;
+  --radius: .75rem;
+  margin: 0; background: hsl(var(--background)); color: hsl(var(--foreground));
+  font: 14px/1.6 system-ui, sans-serif;
+}
+.dark .agent-lab-page {
+  --background: 0 0% 13%; --foreground: 0 0% 93%;
+  --muted: 0 1% 26%; --muted-foreground: 0 0% 71%; --border: 0 1% 26%;
+  color-scheme: dark;
+}
+.agent-lab-page *, .agent-lab-surface * { box-sizing: border-box; }
+.agent-lab-page [hidden], .agent-lab-surface [hidden] { display: none !important; }
+.agent-lab-page main { max-width: 80rem; margin: auto; padding: clamp(1rem, 3vw, 2.5rem); }
+.agent-lab-page main, .agent-lab-page article, .agent-lab-page details,
+.agent-lab-page form, .agent-lab-page label { min-width: 0; }
+.agent-lab-page h1 { font-size: 1.75rem; line-height: 1.3; letter-spacing: -.025em; margin: 0 0 1rem; }
+.agent-lab-page h2 { font-size: 1.125rem; line-height: 1.4; margin: 0 0 .5rem; }
+.agent-lab-page h3 { font-size: 1rem; margin: 0 0 .5rem; }
+.agent-lab-page p { margin: .75rem 0; }
+.agent-lab-page a, .agent-lab-surface a { color: hsl(var(--primary)); text-underline-offset: .2em; }
+.agent-lab-page :is(h1, h2, h3, p, small, code, label, summary),
+.agent-lab-surface { overflow-wrap: anywhere; }
+.agent-lab-page small, .agent-lab-surface small, .agent-lab-page .muted { color: hsl(var(--muted-foreground)); }
+.lab-header {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  gap: .5rem 1rem; min-height: 60px; padding: .5rem 1.5rem;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.lab-header .brand {
+  display: inline-flex; align-items: center; gap: .6rem; flex-shrink: 0;
+  font-weight: 600; text-decoration: none; color: inherit;
+}
+.lab-header nav { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem; min-width: 0; }
+.lab-header nav a { padding: .45rem .75rem; border-radius: .5rem; text-decoration: none; color: inherit; }
+.lab-header nav a:hover, .lab-header nav a[aria-current='page'] { background: hsl(var(--muted)); }
+.agent-lab-page article { border: 1px solid hsl(var(--border)); border-radius: var(--radius); padding: 1.25rem; margin: 1rem 0; }
+.agent-lab-page .agent-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: 1rem; margin: 1.5rem 0 2rem; }
+.agent-lab-page .agent-grid article { display: flex; flex-direction: column; align-items: flex-start; margin: 0; }
+.agent-lab-page .agent-grid form { margin-top: auto; padding-top: .75rem; }
+.agent-lab-page form { display: flex; align-items: end; flex-wrap: wrap; gap: .75rem; }
+.agent-lab-page label { display: flex; flex-direction: column; gap: .3rem; max-width: 100%; }
+.agent-lab-page input, .agent-lab-page select, .agent-lab-surface select {
+  font: inherit; min-width: 0; max-width: 100%; padding: .5rem .75rem;
+  border: 1px solid hsl(var(--border)); border-radius: .5rem;
+  background: hsl(var(--background)); color: inherit;
+}
+.agent-lab-page button, .agent-lab-surface button {
+  display: inline-flex; align-items: center; justify-content: center;
+  font: inherit; font-weight: 500; padding: .5rem 1rem; cursor: pointer;
+  max-width: 100%; white-space: normal; border: 1px solid hsl(var(--border));
+  border-radius: .5rem; background: hsl(var(--background)); color: inherit;
+}
+.agent-lab-page button:hover, .agent-lab-surface button:hover { background: hsl(var(--muted)); }
+.agent-lab-page button.primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); border-color: transparent; }
+.agent-lab-page button.primary:hover { opacity: .9; }
+.agent-lab-page :focus-visible, .agent-lab-surface :focus-visible { outline: 2px solid hsl(var(--primary)); outline-offset: 3px; }
+.agent-lab-page pre, .agent-lab-surface pre {
+  max-width: 100%; max-height: 65vh; overflow: auto; padding: 1rem;
+  background: hsl(var(--muted)); border-radius: .5rem;
+}
+.agent-lab-page summary, .agent-lab-surface summary { cursor: pointer; font-weight: 500; }
+.agent-lab-page [data-form-status]:empty { display: none; }
+.theme-picker { width: auto; }
+@media (max-width: 640px) {
+  .lab-header { padding: .75rem 1rem; }
+  .lab-header nav { width: 100%; }
+  .lab-header nav a { padding: .4rem .6rem; }
+}
+
+/* Transparent monochrome artwork follows the app theme, including a manual
+   theme choice that differs from the browser/OS preference. */
+img[src*="/ui/agent-lab.svg"], img[src*="/logo?theme="] {
+  filter: brightness(0); opacity: .5;
+}
+.dark img[src*="/ui/agent-lab.svg"], .dark img[src*="/logo?theme="] {
+  filter: brightness(0) invert(1); opacity: .65;
+}

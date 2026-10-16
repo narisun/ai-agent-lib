@@ -41,6 +41,7 @@ class PolicyAction(enum.StrEnum):
     SKILL_ACTIVATE = "skill.activate"
     MEMORY_READ = "memory.read"
     MEMORY_WRITE = "memory.write"
+    DIAGNOSTIC_READ = "diagnostic.read"
 
 
 @dataclass(frozen=True, slots=True)

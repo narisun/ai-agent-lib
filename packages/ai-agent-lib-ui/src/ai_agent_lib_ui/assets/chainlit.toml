@@ -18,19 +18,39 @@ enabled = false
 enabled = false
 
 [UI]
-name = "Agent workspace"
-description = "Local conversations with registered agents"
+name = "Agent Lab"
+description = "Test registered agents, explore conversations, and inspect each response"
 layout = "wide"
 default_sidebar_state = "open"
 default_theme = "light"
-cot = "hidden"
+cot = "full"
 confirm_new_chat = false
 custom_css = "/public/chat.css"
+custom_js = "/public/memos.js"
+default_avatar_file_url = "/ui/agent-lab.svg"
 [[UI.header_links]]
-name = "Conversations"
-display_name = "Conversations"
+name = "Agent Lab"
+display_name = "Agent Lab"
+icon_url = "/ui/agent-lab.svg"
+url = "/chat/"
+target = "_self"
+[[UI.header_links]]
+name = "Choose agent"
+display_name = "Choose agent"
 icon_url = "/chat/public/conversations.svg"
-url = "/conversations"
+url = "/catalog"
+target = "_self"
+[[UI.header_links]]
+name = "Memos"
+display_name = "Memos"
+icon_url = "/chat/public/conversations.svg"
+url = "#memos"
+target = "_self"
+[[UI.header_links]]
+name = "Logs"
+display_name = "Logs"
+icon_url = "/chat/public/conversations.svg"
+url = "/logs"
 target = "_self"
 
 [meta]

@@ -15,6 +15,7 @@ from ai_agent_lib_core.integrations.langgraph.model import (
     GovernedChatModel,
     describe_model_response,
 )
+from ai_agent_lib_core.integrations.langgraph.prompts import static_system_prompt
 from ai_agent_lib_core.integrations.langgraph.providers import LangGraphModelProvider
 from ai_agent_lib_core.integrations.langgraph.tools import GovernedTool, govern_tools
 
@@ -33,4 +34,5 @@ __all__ = [
     "describe_model_response",
     "govern_tools",
     "scoped_thread_id",
+    "static_system_prompt",
 ]

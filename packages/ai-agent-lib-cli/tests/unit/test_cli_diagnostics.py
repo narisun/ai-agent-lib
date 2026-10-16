@@ -182,6 +182,133 @@ def test_config_explain_shows_each_setting_its_origin_and_no_secret(
     assert "got: 'mars'" in err
 
 
+_LANGFUSE_VALID = (
+    "EAP_LANGFUSE_ENABLED=true\nLANGFUSE_BASE_URL=http://localhost:3000\n"
+    "LANGFUSE_PROJECT_ID=project\nLANGFUSE_PUBLIC_KEY=public-test-secret\n"
+    "LANGFUSE_SECRET_KEY=private-test-secret\n"
+)
+
+
+@pytest.mark.parametrize(
+    ("broken", "expected"),
+    [
+        ("LANGFUSE_BASE_URL=https://user:private-test-secret@trace.test\n", "HTTPS origin"),
+        ("LANGFUSE_PROJECT_ID=private-test-secret?\n", "project ID"),
+        ("LANGFUSE_SECRET_KEY=\n", "project keys"),
+        ("EAP_LANGFUSE_ENABLED=private-test-secret\n", "true or false"),
+        ("EAP_LANGFUSE_CAPTURE_CONTENT=private-test-secret\n", "true or false"),
+        ("EAP_LANGFUSE_ENV_FILE=missing-traces.env\n", "configuration file not found"),
+    ],
+)
+def test_langfuse_configuration_errors_fail_both_commands_without_exposing_keys(
+    workspace: Path,
+    capsys: pytest.CaptureFixture[str],
+    broken: str,
+    expected: str,
+) -> None:
+    env = workspace / "agents/hello-agent/.env"
+    env.write_text(env.read_text(encoding="utf-8") + _LANGFUSE_VALID + broken, encoding="utf-8")
+    capsys.readouterr()
+    assert run("doctor", "hello-agent", "--workspace", workspace) == 1
+    doctor = capsys.readouterr()
+    assert "FAIL  langfuse:" in doctor.out
+    assert expected in doctor.out
+    assert run("config", "explain", "hello-agent", "--workspace", workspace) == 1
+    explain = capsys.readouterr()
+    assert expected in explain.err
+    for result in (doctor, explain):
+        assert "public-test-secret" not in result.out + result.err
+        assert "private-test-secret" not in result.out + result.err
+
+
+def test_langfuse_explanation_uses_startup_precedence_origins_and_masks_keys(
+    workspace: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from ai_agent_lib_cli.diagnostics import explain_service
+    from ai_agent_lib_core.config.langfuse import load_langfuse_settings
+
+    folder = workspace / "agents/hello-agent"
+    env = folder / ".env"
+    env.write_text(
+        env.read_text(encoding="utf-8")
+        + "EAP_LANGFUSE_ENV_FILE=traces.env\n"
+        + "LANGFUSE_PROJECT_ID=lower-priority\n",
+        encoding="utf-8",
+    )
+    (folder / "traces.env").write_text(_LANGFUSE_VALID, encoding="utf-8")
+    monkeypatch.setenv("LANGFUSE_PROJECT_ID", "from-process")
+    monkeypatch.chdir(workspace.parent)
+    actual = load_langfuse_settings(env)
+    assert actual is not None
+    assert actual.project_id == "from-process"
+    entries = {entry.variable: entry for entry in explain_service(folder)[0]}
+    assert entries["LANGFUSE_PROJECT_ID"].value == actual.project_id
+    assert "process environment" in entries["LANGFUSE_PROJECT_ID"].origin
+    assert str(folder / "traces.env") in entries["LANGFUSE_BASE_URL"].origin
+    assert str(env) in entries["EAP_LANGFUSE_ENV_FILE"].origin
+    assert entries["LANGFUSE_SECRET_KEY"].value == "********"
+    assert entries["LANGFUSE_PUBLIC_KEY"].value == "********"
+    capsys.readouterr()
+    assert run("doctor", "hello-agent", "--workspace", workspace) == 0
+    assert "configuration valid (connectivity not checked)" in capsys.readouterr().out
+    assert run("config", "explain", "hello-agent", "--workspace", workspace) == 0
+    out = capsys.readouterr().out
+    assert "public-test-secret" not in out
+    assert "private-test-secret" not in out
+
+
+def test_langfuse_disabled_override_skips_extra_file_and_diagnostics_show_disabled(
+    workspace: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    env = workspace / "agents/hello-agent/.env"
+    env.write_text(
+        env.read_text(encoding="utf-8") + _LANGFUSE_VALID + "EAP_LANGFUSE_ENV_FILE=missing.env\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("EAP_LANGFUSE_ENABLED", "false")
+    capsys.readouterr()
+    assert run("doctor", "hello-agent", "--workspace", workspace) == 0
+    assert "langfuse: disabled" in capsys.readouterr().out
+    assert run("config", "explain", "hello-agent", "--workspace", workspace) == 0
+    assert "EAP_LANGFUSE_ENABLED" in capsys.readouterr().out
+
+
+def test_langfuse_legacy_aliases_are_declared_once_for_startup_and_diagnostics(
+    workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from ai_agent_lib_cli.diagnostics import explain_service
+    from ai_agent_lib_core.config.langfuse import load_langfuse_settings
+
+    folder = workspace / "agents/hello-agent"
+    project = folder / "pyproject.toml"
+    project.write_text(
+        project.read_text(encoding="utf-8")
+        + '\n[tool.ai-agent-lib.langfuse]\nlegacy-prefix = "RMPREP"\n',
+        encoding="utf-8",
+    )
+    env = folder / ".env"
+    env.write_text(
+        env.read_text(encoding="utf-8")
+        + _LANGFUSE_VALID.replace("EAP_LANGFUSE_ENABLED=true", "RMPREP_LANGFUSE_ENABLED=true"),
+        encoding="utf-8",
+    )
+    assert load_langfuse_settings(env) is not None
+    monkeypatch.setenv("RMPREP_LANGFUSE_ENABLED", "false")
+    assert load_langfuse_settings(env) is None
+    entries = {entry.variable: entry for entry in explain_service(folder)[0]}
+    assert entries["EAP_LANGFUSE_ENABLED"].value == "false"
+    assert entries["EAP_LANGFUSE_ENABLED"].origin == "process environment: RMPREP_LANGFUSE_ENABLED"
+    monkeypatch.setenv("EAP_LANGFUSE_ENABLED", "true")
+    assert load_langfuse_settings(env) is not None
+    entries = {entry.variable: entry for entry in explain_service(folder)[0]}
+    assert entries["EAP_LANGFUSE_ENABLED"].origin == "process environment: EAP_LANGFUSE_ENABLED"
+
+
 # ------------------------------------------------------------------- policy test
 
 

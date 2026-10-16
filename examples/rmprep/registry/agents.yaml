@@ -3,6 +3,7 @@
 schema: agentlib.registry/v1
 agents:
 - id: rmprep
+  url: http://127.0.0.1:8000
   owner: commercial-banking
   version: 0.1.0
   description: Prepare relationship manager client meeting memos and answer follow-up questions

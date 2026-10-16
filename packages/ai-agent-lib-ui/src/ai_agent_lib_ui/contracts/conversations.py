@@ -5,8 +5,15 @@ from typing import Annotated, Literal, Self
 from pydantic import AwareDatetime, Field, model_validator
 
 from ai_agent_lib_core.contracts import Scope
-from ai_agent_lib_core.contracts.diagnostics import DiagnosticValue, Identifier, RequestRecord
+from ai_agent_lib_core.contracts.diagnostics import (
+    DiagnosticValue,
+    Identifier,
+    RequestRecord,
+    TokenUsage,
+)
+from ai_agent_lib_ui.contracts.artifacts import ScopedArtifact
 from ai_agent_lib_ui.contracts.queries import ContractError, ErrorCode
+from ai_agent_lib_ui.contracts.traces import TraceLink
 
 RunState = Literal["accepted", "running", "completed", "failed", "unknown"]
 
@@ -54,13 +61,29 @@ class RunRecord(RequestRecord):
     accepted_at: AwareDatetime
     updated_at: AwareDatetime
     answer: str | None = None
+    artifacts: Annotated[tuple[ScopedArtifact, ...], Field(max_length=20)] = ()
     elapsed_ms: Annotated[float, Field(ge=0, allow_inf_nan=False)] | None = None
+    usage: TokenUsage = Field(default_factory=TokenUsage)
+    model_calls: Annotated[int, Field(strict=True, ge=0)] | None = None
+    trace: TraceLink | None = None
+    failure_code: (
+        Literal["invalid", "denied", "unauthorized", "budget_exceeded", "paused"] | None
+    ) = None
+    registry_revision: Identifier | None = None
 
     @model_validator(mode="after")
     def check_answer(self) -> Self:
         """Only terminal accepted answers become chat messages."""
         if self.answer is not None and self.state != "completed":
             raise ValueError("only completed runs have an accepted answer")
+        for item in self.artifacts:
+            if (
+                self.state != "completed"
+                or item.scope != self.scope
+                or item.artifact.thread_id != self.thread_id
+                or item.artifact.request_id != self.request_id
+            ):
+                raise ValueError("artifacts must belong to this completed invocation")
         return self
 
 

@@ -17,3 +17,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS one_active_turn ON runs(thread)
 CREATE TABLE IF NOT EXISTS sessions (
     digest TEXT PRIMARY KEY, identity TEXT NOT NULL, expires REAL NOT NULL
 );
+-- Additive index of immutable inline documents, saved in the answer transaction.
+CREATE TABLE IF NOT EXISTS artifacts (
+    thread TEXT NOT NULL REFERENCES threads(id), id TEXT NOT NULL,
+    document TEXT NOT NULL, version INTEGER NOT NULL, run TEXT NOT NULL REFERENCES runs(id),
+    record TEXT NOT NULL, PRIMARY KEY(thread, id), UNIQUE(thread, document, version)
+);

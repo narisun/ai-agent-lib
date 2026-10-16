@@ -1,5 +1,9 @@
 # Getting started
 
+To test the included rmprep agent in Agent Lab, follow [local startup](local-startup.md).
+This tutorial creates your own agent. Use the [documentation map](README.md)
+to find configuration, tracing, and contributor instructions.
+
 Build an agent named `helper`, add a tool, and test its behavior and
 permissions. Then add shared tools through an MCP server. This walkthrough
 uses the same `tutorial/` workspace as the [developer guide](developer-guide.html).
@@ -715,6 +719,7 @@ reporting a bug, and remove credentials and sensitive data from reports.
 | Concepts, architecture, testing, and reference tables | [Developer guide](developer-guide.html) |
 | All CLI commands and flags | [CLI reference](developer-guide.html#cli) |
 | Repository layout and contributing | [README](../README.md) |
+| Test rmprep in Agent Lab with its MCP server, using Command Prompt batch files | [Local startup scenarios](local-startup.md) |
 | Environment variables | [Configuration reference](variables.md) |
 | User identity and service delegation | [Identity guide](identity.md) |
 | AWS adapters and dependencies | [AWS package](../packages/ai-agent-lib-aws/README.md) |

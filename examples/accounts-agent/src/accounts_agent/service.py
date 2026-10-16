@@ -13,6 +13,7 @@ from accounts_agent.graph import APPLICATION, build_graph, registered_mcp_tools
 from ai_agent_lib_core import RequestContext, ServiceConfig, ServiceContainer, ValidationFailed
 from ai_agent_lib_core.config import load_service_config
 from ai_agent_lib_core.integrations.http import ServiceLifecycle, agent_app, serve
+from ai_agent_lib_core.integrations.langgraph.langfuse import LangfuseTracing, langfuse_tracing
 from ai_agent_lib_core.observability import (
     configure_logging,
     report_error,
@@ -23,7 +24,12 @@ from ai_agent_lib_core.observability import (
 __all__ = ["build_app", "main"]
 
 
-async def build_app(services: ServiceContainer, lifecycle: ServiceLifecycle) -> Any:
+async def build_app(
+    services: ServiceContainer,
+    lifecycle: ServiceLifecycle,
+    *,
+    tracing: LangfuseTracing | None = None,
+) -> Any:
     """Build the agent's HTTP application.
 
     The graph is prepared once after the listener starts and before readiness.
@@ -34,6 +40,7 @@ async def build_app(services: ServiceContainer, lifecycle: ServiceLifecycle) -> 
         services: The container used by request handlers. The lifecycle startup
             callback must start and validate it before graph preparation runs.
         lifecycle: Receives deferred preparation before serving starts.
+        tracing: Optional library tracing, owned by the entry point.
     """
     graph: Any = None
 
@@ -44,11 +51,19 @@ async def build_app(services: ServiceContainer, lifecycle: ServiceLifecycle) -> 
 
     lifecycle.prepare(prepare)
 
-    async def run(context: RequestContext, given: Any) -> dict[str, str]:
-        result = await graph.ainvoke(
-            {"messages": [HumanMessage(_question(given))]}, **services.invocation(context)
+    async def respond(
+        current_graph: Any, container: ServiceContainer, context: RequestContext, question: str
+    ) -> dict[str, Any]:
+        result = await current_graph.ainvoke(
+            {"messages": [HumanMessage(question)]}, **container.invocation(context)
         )
         return {"answer": str(result["messages"][-1].content)}
+
+    async def run(context: RequestContext, given: Any) -> dict[str, Any]:
+        question = _question(given)
+        if tracing is not None:
+            return await tracing.run(graph, services, context, question, respond=respond)
+        return await respond(graph, services, context, question)
 
     async def stream(context: RequestContext, given: Any) -> AsyncIterator[dict[str, Any]]:
         # POST /invoke/stream sends each graph step as a server-sent event.
@@ -66,7 +81,14 @@ async def build_app(services: ServiceContainer, lifecycle: ServiceLifecycle) -> 
                     ],
                 }
 
-    return agent_app(services, run, application=APPLICATION, lifecycle=lifecycle, stream=stream)
+    return agent_app(
+        services,
+        run,
+        application=APPLICATION,
+        lifecycle=lifecycle,
+        stream=stream,
+        live_updates=True,
+    )
 
 
 def _question(given: Any) -> str:
@@ -81,18 +103,24 @@ def _question(given: Any) -> str:
 
 
 async def _serve(config: ServiceConfig, host: str, port: int) -> None:
-    services = ServiceContainer(config)
+    async with langfuse_tracing(APPLICATION, config) as tracing:
+        services = ServiceContainer(config, model_trace=tracing)
 
-    async def start() -> None:
-        await services.start()
-        await services.validate()
+        async def start() -> None:
+            await services.start()
+            await services.validate()
 
-    lifecycle = ServiceLifecycle(start)
-    try:
-        # The listener is available during adapter startup and graph preparation.
-        await serve(await build_app(services, lifecycle), lifecycle, host=host, port=port)
-    finally:
-        await services.aclose()
+        lifecycle = ServiceLifecycle(start)
+        try:
+            # The listener is available during adapter startup and graph preparation.
+            await serve(
+                await build_app(services, lifecycle, tracing=tracing),
+                lifecycle,
+                host=host,
+                port=port,
+            )
+        finally:
+            await services.aclose()
 
 
 def main(argv: Sequence[str] | None = None) -> int:

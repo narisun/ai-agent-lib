@@ -44,6 +44,8 @@ from ai_agent_lib_core.config.bindings import (
     options_key,
     provider_key,
 )
+from ai_agent_lib_core.config.langfuse import LANGFUSE_VARIABLES
+from ai_agent_lib_core.config.phoenix import PHOENIX_VARIABLES
 from ai_agent_lib_core.config.profiles import PROFILE_DEFAULTS
 from ai_agent_lib_core.config.reference import default_text
 from ai_agent_lib_core.contracts import NoOptions, OptionsModel, Profile, Section
@@ -72,11 +74,6 @@ PORTS: tuple[str, ...] = (MODEL_PORT, *(section.value for section in Section), D
 """The ports, in the order the guide lists them."""
 
 NO_OPTIONS_NOTES: Mapping[tuple[str, str], str] = {
-    (MODEL_PORT, "anthropic"): (
-        "No options. The key is the secret <code>anthropic_api_key</code>: "
-        "<code>ANTHROPIC_API_KEY</code> with the env secrets adapter, Secrets Manager when "
-        "deployed. Uses <code>HTTPS_PROXY</code>. Needs the <code>anthropic</code> extra."
-    ),
     (MODEL_PORT, "bedrock"): (
         "No options. Uses the AWS session settings (<code>AWS_PROFILE</code>, "
         "<code>AWS_REGION</code>) and <code>EAP_TLS_CA_BUNDLE</code>."
@@ -249,8 +246,133 @@ def configuration_variables() -> str:
         ]
     )
     rows.extend(_otel_variable_rows())
+    rows.extend(_langfuse_variable_rows())
+    rows.extend(_phoenix_variable_rows())
     rows.extend(_desktop_variable_rows())
+    rows.extend(_rmprep_variable_rows())
     return _table(("Variable name", "Purpose", "Local", "AWS", "Notes"), rows, "vars environments")
+
+
+def _langfuse_variable_rows() -> list[list[str]]:
+    settings = {
+        "enabled": ("Enable the agent's Langfuse exporter.", "false", "true when provisioned"),
+        "capture_content": (
+            "Export model messages and tool inputs/results.",
+            "false; true for approved test data",
+            "false unless approved",
+        ),
+        "env_file": (
+            "Optional private settings file.",
+            "Absolute path to langfuse/agent.env",
+            "Unset; inject task environment settings",
+        ),
+        "base_url": ("Langfuse origin.", "http://localhost:3000", "Internal HTTPS service URL"),
+        "project_id": (
+            "Project ID from the Langfuse browser URL.",
+            "rmprep-trial for the sample backend",
+            "Team's project ID",
+        ),
+        "public_key": (
+            "Project public API key.",
+            "From private agent.env",
+            "Inject project key into the agent task",
+        ),
+        "secret_key": (
+            "Project secret API key; never sent to the browser.",
+            "From private agent.env",
+            "Inject from Secrets Manager into the agent task",
+        ),
+    }
+    return [
+        [
+            f'<span class="var" id="var-{LANGFUSE_VARIABLES[label].lower()}">'
+            f"{_e(LANGFUSE_VARIABLES[label])}</span>",
+            _e(purpose),
+            _e(local),
+            _e(aws),
+            "Read by the optional library tracing adapter. Process overrides the separate file, "
+            "then the service .env. Requires the core otel extra. The backend is a separate "
+            "service with PostgreSQL, ClickHouse, Redis and object storage (S3 on AWS); "
+            "operational telemetry keeps its destination. "
+            '<a href="langfuse.md">Setup and access/retention notes</a>.',
+        ]
+        for label, (purpose, local, aws) in settings.items()
+    ]
+
+
+def _phoenix_variable_rows() -> list[list[str]]:
+    settings = (
+        (
+            "Enable Phoenix tracing; start-local.bat also starts the local server.",
+            "false; true for this trial",
+            "false until provisioned",
+        ),
+        (
+            "Capture model and tool input/output.",
+            "false; true for approved test data",
+            "false unless approved",
+        ),
+        (
+            "Optional private agent tracing settings file.",
+            "Unset; use the root .env or an absolute file path",
+            "Unset; inject task environment settings",
+        ),
+        (
+            "Phoenix HTTP origin, without /v1/traces.",
+            "http://127.0.0.1:6006",
+            "Team-managed authenticated HTTPS origin",
+        ),
+        (
+            "Project for this agent's traces.",
+            "agent-lab; rmprep-trial in the walkthrough",
+            "Team project",
+        ),
+        (
+            "Optional API key; never included in trace links.",
+            "Unset for the local trial",
+            "Secrets Manager",
+        ),
+    )
+    return [
+        [
+            f'<span class="var" id="var-{name.lower()}">{_e(name)}</span>',
+            _e(purpose),
+            _e(local),
+            _e(aws),
+            "Process settings override the separate tracing file, then the service .env. "
+            "Enable one agent tracing backend at a time. This desktop trial stores traces "
+            "in SQLite and runs in its own Python environment. A shared deployment needs "
+            "separate platform provisioning; it is outside this trial. "
+            '<a href="phoenix-trial.md">Phoenix setup and verified example</a>.',
+        ]
+        for name, (purpose, local, aws) in zip(PHOENIX_VARIABLES, settings, strict=True)
+    ]
+
+
+def _rmprep_variable_rows() -> list[list[str]]:
+    settings = (
+        ("INPUT", "128000", "Total estimated model input, including tool definitions."),
+        (
+            "RECENT",
+            "96000",
+            "Recent complete exchanges for the selected clients or memos, within the input limit.",
+        ),
+        ("QUESTION", "16000", "Maximum estimated size of the current question."),
+        ("TOOL_SCHEMA", "4000", "Input space reserved for the bound tool definitions."),
+    )
+    return [
+        [
+            _code(f"RMPREP_CONTEXT_{name}_TOKENS"),
+            _e(purpose),
+            f"rmprep default: {_code(default)}. Set in its .env.",
+            f"Set on the rmprep Fargate task; same default {_code(default)}.",
+            "Specific to rmprep. Restart after changes. Process variables override .env. "
+            "Keep input below the deployed model window with room for output; question and recent "
+            'limits must each fit after the tool allowance. See <a href="#rmprep-context-budget">'
+            "context budgets</a>.",
+        ]
+        for name, default, purpose in settings
+    ]
 
 
 def _otel_variable_rows() -> list[list[str]]:
@@ -369,12 +491,12 @@ def introductory_profiles() -> str:
     }
     local, aws = PROFILE_DEFAULTS[Profile.LOCAL], PROFILE_DEFAULTS[Profile.AWS]
     rows = [
-        [f"{label} — {_code(contract)}", _code(local.sections[port]), _code(aws.sections[port])]
+        [f"{label} â€” {_code(contract)}", _code(local.sections[port]), _code(aws.sections[port])]
         for port, (label, contract) in labels.items()
     ]
     rows.append(
         [
-            f"Model creation — {_code('ChatModelProvider')}",
+            f"Model creation â€” {_code('ChatModelProvider')}",
             _code(local.model_provider),
             _code(aws.model_provider),
         ]
@@ -438,7 +560,7 @@ def options() -> str:
             spec = registry.lookup(port, name)
             guard = ' <span class="tag warn">local only</span>' if spec.local_only else ""
             title = (
-                f'<h4 id="{_anchor(port, name)}"><code>{_e(port)}</code> · '
+                f'<h4 id="{_anchor(port, name)}"><code>{_e(port)}</code> Â· '
                 f"<code>{_e(name)}</code>{guard}</h4>"
             )
             model = spec.options
@@ -606,6 +728,7 @@ API_MODULES: tuple[str, ...] = (
     "ai_agent_lib_core.di",
     "ai_agent_lib_core.observability",
     "ai_agent_lib_core.integrations.langgraph",
+    "ai_agent_lib_core.integrations.langgraph.langfuse",
     "ai_agent_lib_core.integrations.mcp",
     "ai_agent_lib_core.integrations.http",
     "ai_agent_lib_core.testing",
@@ -651,6 +774,7 @@ def walkthrough_files() -> dict[Path, str]:
         {
             "name": "helper",
             "package": "helper",
+            "port": 8000,
             "model_provider": "fake",
             "library": LibrarySource.from_path(HERE.parents[1]),
             "var": variable_names(),
@@ -662,7 +786,13 @@ def walkthrough_files() -> dict[Path, str]:
     reader = renderer.render("workspace/examples", {})
     return {
         **{HERE.parent / path: content for path, content in shared.items()},
-        **{HERE.parent / path: content for path, content in agent.items()},
+        # The repository has a general integration guide; generated agents get
+        # their own Langfuse instructions with service-specific paths and commands.
+        **{
+            HERE.parent / path: content
+            for path, content in agent.items()
+            if path != PurePosixPath("langfuse.md")
+        },
         **{HERE.parent / "examples" / path: content for path, content in reader.items()},
     }
 

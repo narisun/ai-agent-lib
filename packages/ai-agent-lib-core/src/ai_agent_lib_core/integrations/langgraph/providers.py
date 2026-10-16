@@ -1,8 +1,9 @@
 """The model type required by the LangGraph integration, outside core contracts."""
 
-from typing import Protocol
+from typing import Any, Protocol, runtime_checkable
 
 from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import BaseMessage
 
 from ai_agent_lib_core.contracts import ChatModelProvider
 
@@ -14,6 +15,21 @@ class LangGraphModelProvider(ChatModelProvider, Protocol):
 
     def create(self, model_id: str) -> BaseChatModel:
         """Return a native chat model supporting the provider's declared capabilities."""
+        ...
+
+
+@runtime_checkable
+class ModelRequestPreparer(Protocol):
+    """Optional provider hook for request formatting before tracing and dispatch.
+
+    Implementations must preserve message text, return copies, and perform no
+    I/O. Existing providers need not implement this hook.
+    """
+
+    def prepare_request(
+        self, messages: list[BaseMessage], options: dict[str, Any]
+    ) -> tuple[list[BaseMessage], dict[str, Any]]:
+        """Apply provider-specific transport settings to an already governed request."""
         ...
 
 

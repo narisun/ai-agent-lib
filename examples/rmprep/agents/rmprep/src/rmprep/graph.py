@@ -11,6 +11,7 @@ from langchain_core.tools import BaseTool
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
+from rmprep.artifacts import memo_artifacts
 from rmprep.context import ContextBuilder
 from rmprep.prompts import MEMO_PROMPT, QNA_PROMPT
 from rmprep.router import destination, router
@@ -24,6 +25,7 @@ __all__ = [
     "ask",
     "build_graph",
     "registered_mcp_tools",
+    "response",
     "steps",
 ]
 
@@ -63,7 +65,7 @@ def build_graph(
             model,
             mcp_tools,
             MEMO_PROMPT,
-            default_word_limit=600,
+            default_word_limit=1000,
             now=services.clock.now,
             context_builder=context_builder,
         ),
@@ -89,11 +91,24 @@ async def answer(
     question: str,
 ) -> str:
     """Run a built graph for one question on behalf of ``context``."""
+    return str((await response(graph, services, context, question))["answer"])
+
+
+async def response(
+    graph: CompiledStateGraph[Any, Any, Any, Any],
+    services: ServiceContainer,
+    context: RequestContext,
+    question: str,
+) -> dict[str, Any]:
+    """Return the accepted answer and any memo produced by this invocation."""
     result = await graph.ainvoke(
         {"messages": [HumanMessage(question)]},
         **services.invocation(context),
     )
-    return str(result["messages"][-1].content)
+    output: dict[str, Any] = {"answer": str(result["messages"][-1].text)}
+    if artifacts := memo_artifacts(result, context):
+        output["artifacts"] = artifacts
+    return output
 
 
 async def steps(
@@ -134,11 +149,19 @@ async def steps(
             }
 
 
-async def ask(services: ServiceContainer, context: RequestContext, question: str) -> str:
+async def ask(
+    services: ServiceContainer,
+    context: RequestContext,
+    question: str,
+    *,
+    context_builder: ContextBuilder | None = None,
+) -> str:
     """Build the graph, with the tools of its MCP servers, and ask one question.
 
     The command line uses this. A service builds the graph once and calls
     :func:`answer` for every request.
     """
-    graph = build_graph(services, await registered_mcp_tools(services))
+    graph = build_graph(
+        services, await registered_mcp_tools(services), context_builder=context_builder
+    )
     return await answer(graph, services, context, question)

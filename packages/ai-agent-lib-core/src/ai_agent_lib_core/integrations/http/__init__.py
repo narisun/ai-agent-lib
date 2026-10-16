@@ -4,6 +4,7 @@ An agent's entry point, health and readiness routes for agents and MCP
 servers, and a server loop that stops in order when the platform asks.
 """
 
+from ai_agent_lib_core.integrations.http.admission import InMemoryThreadAdmission, ThreadAdmission
 from ai_agent_lib_core.integrations.http.agent import (
     HEALTH_PATH,
     INVOKE_PATH,
@@ -18,6 +19,7 @@ from ai_agent_lib_core.integrations.http.agent import (
     health_routes,
 )
 from ai_agent_lib_core.integrations.http.lifecycle import ServiceLifecycle, ServiceState
+from ai_agent_lib_core.integrations.http.outcomes import OutcomeJournal, SqliteOutcomeJournal
 from ai_agent_lib_core.integrations.http.serving import serve
 
 __all__ = [
@@ -26,11 +28,15 @@ __all__ = [
     "READY_PATH",
     "STREAM_PATH",
     "AgentServices",
+    "InMemoryThreadAdmission",
+    "OutcomeJournal",
     "Run",
     "ServiceLifecycle",
     "ServiceState",
+    "SqliteOutcomeJournal",
     "Stream",
     "SupportsCustomRoutes",
+    "ThreadAdmission",
     "add_health_routes",
     "agent_app",
     "health_routes",

@@ -5,6 +5,7 @@ from typing import Annotated, Literal, NotRequired, TypedDict
 from langchain_core.messages import AnyMessage
 from langgraph.graph.message import add_messages
 
+from rmprep.focus import ConversationFocus
 from rmprep.memos import MemoVersion, merge_memos
 from rmprep.selection import ContextSelection
 
@@ -19,6 +20,8 @@ class State(TypedDict):
     memos: NotRequired[Annotated[list[MemoVersion], merge_memos]]
     active_memo_id: NotRequired[str]
     active_client: NotRequired[str]
+    active_client_uens: NotRequired[list[str]]
     selection: NotRequired[ContextSelection]
     context_diagnostics: NotRequired[dict[str, object]]
     context_version: NotRequired[int]
+    focus: NotRequired[ConversationFocus]

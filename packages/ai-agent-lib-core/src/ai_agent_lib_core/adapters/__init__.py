@@ -18,7 +18,10 @@ from ai_agent_lib_core.adapters.identity_jwt import (
     resolve_jwt_options,
 )
 from ai_agent_lib_core.adapters.identity_static import StaticIdentityOptions, StaticIdentityVerifier
-from ai_agent_lib_core.adapters.model_anthropic import AnthropicChatModelProvider
+from ai_agent_lib_core.adapters.model_anthropic import (
+    AnthropicChatModelProvider,
+    AnthropicModelOptions,
+)
 from ai_agent_lib_core.adapters.model_fake import (
     FakeChatModel,
     FakeChatModelProvider,
@@ -35,6 +38,7 @@ from ai_agent_lib_core.adapters.token_exchange import OAuthTokenExchanger
 
 __all__ = [
     "AnthropicChatModelProvider",
+    "AnthropicModelOptions",
     "CachingPolicyDecisionPoint",
     "DuckDbCsvDataSource",
     "DuckDbCsvOptions",

@@ -19,6 +19,7 @@ from ai_agent_lib_core.config import (
     secret_key,
     variable_for,
 )
+from ai_agent_lib_core.config.langfuse import LANGFUSE_VARIABLES, langfuse_env_example
 from ai_agent_lib_core.contracts import Section
 
 __all__ = ["DEV_ROLE", "agent_env", "mcp_env", "variable_names"]
@@ -111,7 +112,9 @@ def agent_env(agent: AgentAnswers) -> str:
         *_shared(),
         _identity({}),
     ]
-    return render_env_file(settings, header=_HEADER.format(name=agent.name))
+    return (
+        render_env_file(settings, header=_HEADER.format(name=agent.name)) + langfuse_env_example()
+    )
 
 
 def mcp_env(server: McpAnswers) -> str:
@@ -138,6 +141,7 @@ def mcp_env(server: McpAnswers) -> str:
 def variable_names() -> dict[str, str]:
     """Return the variable names used by generated docs and examples, by a short label."""
     return {
+        **{f"langfuse_{label}": name for label, name in LANGFUSE_VARIABLES.items()},
         "model_provider": variable_for(Key.MODEL_PROVIDER),
         "model_id": variable_for(Key.MODEL_ID),
         "model_aliases": variable_for(Key.MODEL_ALIASES),

@@ -18,6 +18,8 @@ from ai_agent_lib_core.config.bindings import (
     Key,
     ValueKind,
 )
+from ai_agent_lib_core.config.langfuse import LANGFUSE_VARIABLES, langfuse_env_example
+from ai_agent_lib_core.config.phoenix import PHOENIX_VARIABLES
 
 __all__ = [
     "EnvSetting",
@@ -111,6 +113,25 @@ def render_reference(bindings: Sequence[Binding] = DEFAULT_BINDINGS) -> str:
         *_table(external),
         "",
     ]
+    if bindings is DEFAULT_BINDINGS:
+        lines += [
+            "## Optional Langfuse integration",
+            "",
+            "These settings are resolved by `load_langfuse_settings` at the service boundary, "
+            "separately from `ServiceConfig`. See [Langfuse setup](langfuse.md) for purposes, "
+            "defaults and precedence.",
+            "",
+            *[f"- `{name}`" for name in LANGFUSE_VARIABLES.values()],
+            "",
+            "## Optional Phoenix integration",
+            "",
+            "These settings are resolved by `load_phoenix_settings` separately from "
+            "`ServiceConfig`. See the [local Phoenix trial](phoenix-trial.md) for "
+            "purposes, defaults, precedence and the separate SQLite server setup.",
+            "",
+            *[f"- `{name}`" for name in PHOENIX_VARIABLES],
+            "",
+        ]
     return "\n".join(lines)
 
 
@@ -127,7 +148,7 @@ def render_env_example(bindings: Sequence[Binding] = DEFAULT_BINDINGS) -> str:
         lines.append(f"# {binding.name}={binding.example}")
         lines.append("")
     lines += [f"# {_SECRET_PURPOSE.replace('`', '')}", f"# {_SECRET_PATTERN}=", ""]
-    return "\n".join(lines)
+    return "\n".join(lines) + (langfuse_env_example() if bindings is DEFAULT_BINDINGS else "")
 
 
 @dataclass(frozen=True, slots=True)

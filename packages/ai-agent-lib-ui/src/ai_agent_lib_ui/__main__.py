@@ -30,6 +30,12 @@ def arguments() -> argparse.Namespace:
             )
             command.add_argument("--port", type=int, default=8765)
             command.add_argument(
+                "--artifacts-agent",
+                action="append",
+                default=[],
+                help="selected agent that returns versioned inline documents; repeat as needed",
+            )
+            command.add_argument(
                 "--overwrite",
                 action="store_true",
                 help="replace configuration pins; keep conversations and secrets",
@@ -61,11 +67,18 @@ def main() -> int:
             agents_path, tools_path, identity = agent_environment(args.env_file.resolve())
             agents, _ = read_registries(agents_path, tools_path)
             allowed = frozenset(args.allow_url)
+            if not set(args.artifacts_agent) <= set(args.agent):
+                raise ValueError("--artifacts-agent must also be selected with --agent")
             settings = Settings(
                 agents_path=agents_path,
                 tools_path=tools_path,
                 identity=identity,
-                bindings=pin_bindings(agents, tuple(args.agent), allowed),
+                bindings=pin_bindings(
+                    agents,
+                    tuple(args.agent),
+                    allowed,
+                    artifact_agent_ids=frozenset(args.artifacts_agent),
+                ),
                 allowed_urls=allowed,
                 port=args.port,
             )

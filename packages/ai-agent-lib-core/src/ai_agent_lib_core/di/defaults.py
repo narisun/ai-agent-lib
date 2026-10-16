@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from ai_agent_lib_core.adapters import (
     AnthropicChatModelProvider,
+    AnthropicModelOptions,
     CachingPolicyDecisionPoint,
     DuckDbCsvDataSource,
     DuckDbCsvOptions,
@@ -125,7 +126,12 @@ async def _anthropic_model(context: BuildContext) -> AnthropicChatModelProvider:
     api_key = await secrets.get_secret("anthropic_api_key")
     # The model pipeline's resilience stage owns retries, so the vendor client makes
     # one attempt each: otherwise two pipeline retries become nine HTTP calls.
-    return AnthropicChatModelProvider(api_key, proxy=context.external.https_proxy, max_retries=0)
+    return AnthropicChatModelProvider(
+        api_key,
+        proxy=context.external.https_proxy,
+        max_retries=0,
+        options=context.selection.parse_options(AnthropicModelOptions),
+    )
 
 
 async def _sqlite_checkpoint(context: BuildContext) -> CheckpointBackend:
@@ -210,7 +216,7 @@ def register_local_adapters(providers: ServiceProviders) -> None:
         "anthropic",
         _anthropic_model,
         dependencies=(SECRETS,),
-        options=NoOptions,
+        options=AnthropicModelOptions,
         extra="anthropic",
     )
     register(SECRETS, "env", _env_secrets, options=NoOptions)

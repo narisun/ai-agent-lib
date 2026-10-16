@@ -1,9 +1,14 @@
-# Default agent frontend: implementation plan
+# Agent Lab: frontend implementation plan
 
-Status: Phase 2 implemented for local development, 11 October 2026. This plan implements the
+Status: Phase 2 implemented for local development, updated 13 October 2026. This plan implements the
 [frontend specification](frontend-specification.md). The optional package now
 contains contracts, registry-backed chat, SQLite history and local runtime commands.
-Document panels, metrics, diagnostics and shared deployment remain later phases.
+Live drafts, response metrics and per-response trace links are available.
+The temporary draft disappears when the saved outcome is ready. Local turn
+inspection remains available from Logs. The optional memo panel stores inline versions
+and offers version selection. Shared deployment remains a later phase.
+The package and CLI module names stay `ai-agent-lib-ui` and
+`ai_agent_lib_ui`.
 
 ## Delivery approach
 
@@ -144,6 +149,13 @@ Exit: an engineer can install the wheel, select a registered agent, chat, restar
 the UI, and continue the same conversation using documented Command Prompt steps.
 
 ## Phase 3: documents and response metrics
+
+Local inline documents, the optional memo panel, version selection, and response
+metrics are implemented. rmprep emits accepted memo artifacts without changing
+`output.answer`. The panel uses Chainlit's supported `custom_js` entry point,
+owns its DOM outside the chat root, and reads authorized application routes.
+It does not access Chainlit's internal React state or require a JavaScript build.
+Downloads and external content-reference readers remain future work.
 
 Add immutable artifacts and local content storage. Extend rmprep with an optional
 artifact emission path for accepted memos while preserving `output.answer`.

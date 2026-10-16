@@ -31,9 +31,14 @@ from ai_agent_lib_core.integrations.langgraph.context import (
     current_diagnostic_links,
     current_request_context,
 )
+from ai_agent_lib_core.integrations.langgraph.live import publish_reply, stream_reply
 from ai_agent_lib_core.integrations.langgraph.model_trace import ModelTrace, TraceCall
-from ai_agent_lib_core.integrations.langgraph.providers import create_chat_model
+from ai_agent_lib_core.integrations.langgraph.providers import (
+    ModelRequestPreparer,
+    create_chat_model,
+)
 from ai_agent_lib_core.observability.diagnostics import Diagnostics
+from ai_agent_lib_core.observability.live import live_run
 from ai_agent_lib_core.observability.usage import normalize_usage
 from ai_agent_lib_core.pipeline import Handler, ModelCall, ModelStage, Pipeline
 
@@ -57,11 +62,13 @@ class _Invocation:
     returned_attempt: int | None = None
     links: DiagnosticLinks = field(default_factory=DiagnosticLinks)
     provider_reply: AIMessage | None = None
+    buffered_live_call: int | None = None
 
     def reset_response(self) -> None:
         """Clear the previous attempt before dispatching a retry."""
         self.returned_attempt = None
         self.provider_reply = None
+        self.buffered_live_call = None
 
 
 def describe_model_response(message: AIMessage) -> Mapping[str, AuditValue]:
@@ -398,6 +405,7 @@ class GovernedChatModel(BaseChatModel):
             )
         reply: AIMessage | None = None
         outcome: Literal["returned", "failed", "cancelled"] = "failed"
+        live = live_run(call.context)
         try:
             reply = await self._request_provider(call, invocation)
             outcome = "returned"
@@ -409,6 +417,14 @@ class GovernedChatModel(BaseChatModel):
         finally:
             # Tracing may be cancelled after the SDK has already returned usage.
             reply = invocation.provider_reply
+            if live is not None:
+                live.usages.append(
+                    normalize_usage(
+                        reply.usage_metadata if reply is not None else None,
+                        source="langchain",
+                        kind="simulated" if self.provider_name == "fake" else "reported",
+                    )
+                )
             if recorder is not None and call.context is not None and invocation.trace is not None:
                 await recorder.record_attempt(
                     call.context,
@@ -439,12 +455,15 @@ class GovernedChatModel(BaseChatModel):
         extra = dict(invocation.kwargs)
         if invocation.stop is not None:
             extra["stop"] = invocation.stop
+        messages = invocation.messages
+        if isinstance(self._provider, ModelRequestPreparer):
+            messages, extra = self._provider.prepare_request(messages, extra)
         await self._trace_event(
             "model.request",
             call,
             invocation,
             lambda: {
-                "messages": [message.model_dump() for message in invocation.messages],
+                "messages": [message.model_dump() for message in messages],
                 "tools": [convert_to_openai_tool(tool) for tool in self._trace_tools],
                 "binding_options": dict(self._trace_options),
                 "invocation_options": extra,
@@ -453,7 +472,27 @@ class GovernedChatModel(BaseChatModel):
         try:
             # No config is passed: the underlying call inherits callbacks and
             # tracing from the surrounding run through LangChain's own context.
-            reply = await self._target.ainvoke(invocation.messages, **extra)
+            live = live_run(call.context)
+            if live is None:
+                reply = await self._target.ainvoke(messages, **extra)
+            else:
+                number = await live.begin()
+                from ai_agent_lib_core.pipeline.guardrails import output_preview_check
+
+                preview = output_preview_check()
+                buffered = self._output is not None or (
+                    ModelStage.OUTPUT_GUARDRAILS in self._pipeline.stages and preview is None
+                )
+                invocation.buffered_live_call = number if buffered else None
+                reply = await stream_reply(
+                    self._target,
+                    messages,
+                    extra,
+                    live,
+                    number,
+                    deliver=not buffered,
+                    check_prefix=preview,
+                )
         except asyncio.CancelledError as error:
             error_type = type(error).__name__
             await self._trace_event(
@@ -514,6 +553,9 @@ class GovernedChatModel(BaseChatModel):
             await self._decision(call, invocation, passed=False, reason="pipeline_failed")
             raise
         await self._decision(call, invocation, passed=True, reason="pipeline_passed")
+        live = live_run(call.context)
+        if live is not None and invocation.buffered_live_call is not None:
+            await publish_reply(live, invocation.buffered_live_call, reply.content)
         return reply
 
     async def _trace_event(

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
+from contextvars import ContextVar
 from typing import Generic, Protocol, TypeVar, cast
 
 from ai_agent_lib_core.contracts import (
@@ -14,6 +15,7 @@ from ai_agent_lib_core.contracts import (
     PolicyDenied,
     RequestContext,
 )
+from ai_agent_lib_core.contracts.guardrails import StreamingGuardrailCheck
 from ai_agent_lib_core.pipeline.calls import Evidence, ToolCall
 from ai_agent_lib_core.pipeline.interceptor import Handler
 
@@ -37,6 +39,14 @@ class _Checked(Protocol):
 
 CallT = TypeVar("CallT", bound=_Checked)
 ResponseT = TypeVar("ResponseT")
+
+OutputPreviewCheck = Callable[[str], Awaitable[None]]
+_OUTPUT_PREVIEW: ContextVar[OutputPreviewCheck | None] = ContextVar("output_preview", default=None)
+
+
+def output_preview_check() -> OutputPreviewCheck | None:
+    """The active output stage's prefix check, scoped to this invocation."""
+    return _OUTPUT_PREVIEW.get()
 
 
 def _enforce(point: GuardrailPoint, verdict: GuardrailVerdict, evidence: Evidence) -> None:
@@ -92,7 +102,25 @@ class OutputGuardrailInterceptor(Generic[CallT, ResponseT]):
 
     async def __call__(self, request: CallT, call_next: Handler[CallT, ResponseT]) -> ResponseT:
         """Return the response only if no check blocks it."""
-        response = await call_next(request)
+        check = self._check
+        preview: OutputPreviewCheck | None = None
+        if (
+            self._point == GuardrailPoint.MODEL_OUTPUT
+            and isinstance(check, StreamingGuardrailCheck)
+            and check.supports_streaming_output
+        ):
+
+            async def check_prefix(text: str) -> None:
+                verdict = await check.check_output_prefix(text, request.context)
+                _enforce(self._point, verdict, request.evidence)
+
+            preview = check_prefix
+
+        token = _OUTPUT_PREVIEW.set(preview)
+        try:
+            response = await call_next(request)
+        finally:
+            _OUTPUT_PREVIEW.reset(token)
         verdict = await self._check.check(self._point, self._text_of(response), request.context)
         _enforce(self._point, verdict, request.evidence)
         return response

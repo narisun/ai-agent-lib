@@ -1,14 +1,20 @@
 """Thin supported Chainlit hooks over the framework-independent chat service."""
 
 import logging
+from datetime import UTC, datetime
 
 import chainlit as cl
 from chainlit.types import ThreadDict
 from fastapi import Request, Response
 from starlette.datastructures import Headers
 
+from ai_agent_lib_ui.application.progress import Draft
 from ai_agent_lib_ui.contracts.queries import ContractError, PageRequest
-from ai_agent_lib_ui.integrations.data_layer import DataLayer, answer_id, outcome_text
+from ai_agent_lib_ui.integrations.data_layer import (
+    DataLayer,
+    answer_id,
+    outcome_text,
+)
 from ai_agent_lib_ui.integrations.runtime import runtime
 from ai_agent_lib_ui.integrations.security import current_principal, session_token
 
@@ -50,7 +56,15 @@ async def profiles(
     return [
         cl.ChatProfile(
             name=binding.manifest.agent_id,
-            markdown_description=f"Chat with {binding.manifest.title}",
+            icon="/ui/agent-lab.svg",
+            markdown_description=(
+                "## Welcome to Agent Lab\n\n"
+                "Test your agents, explore their answers, and inspect how they work.\n\n"
+                f"Selected agent: **{binding.manifest.title}**. "
+                "Type a question below, or [choose another agent](/catalog) to start a new chat. "
+                "Open **Memos** for saved documents and **Logs** for model input/output, "
+                "MCP calls, and checkpoints."
+            ),
             default=i == 0,
         )
         for i, binding in enumerate(page.items)
@@ -78,14 +92,49 @@ async def resume(thread: ThreadDict) -> None:
 
 @cl.on_message
 async def respond(message: cl.Message) -> None:
-    """Only the new question crosses the existing /invoke boundary."""
+    """Display provisional text, then remove it when the saved outcome is ready."""
     principal = current_principal()
+    draft_step: cl.Step | None = None
+    displayed_call = 0
+
+    async def show_draft(draft: Draft) -> None:
+        nonlocal draft_step, displayed_call
+        current_principal()
+        if draft_step is None:
+            draft_step = cl.Step(
+                name=f"Live draft (model call {draft.call}; provisional)",
+                type="tool",
+                default_open=True,
+                auto_collapse=True,
+                parent_id=message.id,
+            )
+            draft_step.start = datetime.now(UTC).isoformat()
+            draft_step.output = "Waiting for model text…"
+            await draft_step.send()
+        elif draft.call != displayed_call:
+            draft_step.name = f"Live draft (model call {draft.call}; provisional)"
+            draft_step.output = "Waiting for model text…"
+            await draft_step.update()
+        displayed_call = draft.call
+        await draft_step.stream_token(draft.text or "Waiting for model text…", is_sequence=True)
+
+    async def remove_draft() -> None:
+        if draft_step is not None:
+            current_principal()
+            # This step exists only in the browser. Delete its presentation
+            # through Chainlit's emitter, not the immutable transcript API.
+            await cl.context.emitter.delete_step(draft_step.to_dict())
+
     try:
         if message.thread_id != cl.context.session.thread_id:
             await cl.Message(content="This message belongs to another thread.").send()
             return
         run = await runtime().chat.submit(
-            principal, cl.context.session.thread_id, message.id, message.content
+            principal,
+            cl.context.session.thread_id,
+            message.id,
+            message.content,
+            on_progress=show_draft,
         )
     except ContractError as error:
         await cl.Message(
@@ -100,5 +149,7 @@ async def respond(message: cl.Message) -> None:
             "to check its state before sending another question."
         ).send()
         return
+    finally:
+        await remove_draft()
     current_principal()
     await cl.Message(id=answer_id(run), content=outcome_text(run)).send()

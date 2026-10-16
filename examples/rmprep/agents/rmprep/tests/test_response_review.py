@@ -9,7 +9,12 @@ from ai_agent_lib_core.pipeline.guardrails import frame_untrusted
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda
 
-from rmprep.response_review import evidence_references, response_issues, word_limit
+from rmprep.response_review import (
+    evidence_references,
+    response_advisories,
+    response_issues,
+    word_limit,
+)
 from rmprep.specialist import build_specialist
 
 REF = "covenants[facility_id=FAC000000130;name=Fixed Charge Coverage]"
@@ -110,7 +115,7 @@ def test_unknown_reporting_year_does_not_prohibit_financial_fact_periods() -> No
     assert response_issues(answer, reporting_conversation(), 100) == []
 
 
-def test_each_named_financial_comparison_requires_its_own_two_sources() -> None:
+def test_missing_comparison_sources_are_advisory() -> None:
     revenue = "financial_facts[concept=Revenues;period_end=2025-12-31]"
     previous = "financial_facts[concept=GrossProfit;period_end=2024-12-31]"
     current = "financial_facts[concept=GrossProfit;period_end=2025-12-31]"
@@ -127,7 +132,7 @@ def test_each_named_financial_comparison_requires_its_own_two_sources() -> None:
         )
     ]
     for citations in (revenue, current, revenue + " " + current):
-        issues = response_issues(AIMessage("Gross profit fell 31.48%. " + citations), messages, 100)
+        issues = response_advisories(AIMessage("Gross profit fell 31.48%. " + citations), messages)
         assert any("GrossProfit comparison needs its own" in issue for issue in issues)
     assert (
         response_issues(
@@ -135,6 +140,109 @@ def test_each_named_financial_comparison_requires_its_own_two_sources() -> None:
         )
         == []
     )
+
+
+def financial_history() -> list[AnyMessage]:
+    messages: list[AnyMessage] = [HumanMessage("Compare these two clients' financials.")]
+    messages.append(
+        AIMessage(
+            "",
+            tool_calls=[
+                {"name": "rmprep-data_get_client_records", "args": {"uen": uen}, "id": uen}
+                for uen in ("CANA-0010", "SLEE-0041")
+            ],
+        )
+    )
+    for uen in ("CANA-0010", "SLEE-0041"):
+        refs = [financial_ref(uen, year) for year in (2024, 2025)]
+        payload = {
+            "uen": uen,
+            "section": "financials",
+            "records": [{"source_ref": ref} for ref in refs],
+            "comparisons": [{"metric": "Revenues", "source_refs": refs}],
+        }
+        messages.append(
+            ToolMessage(
+                name="rmprep-data_get_client_records",
+                tool_call_id=uen,
+                content=frame_untrusted("rmprep-data.get_client_records", json.dumps(payload)),
+            )
+        )
+    messages.extend([AIMessage("Comparison saved."), HumanMessage("Which one is bigger?")])
+    return messages
+
+
+def financial_ref(uen: str, year: int) -> str:
+    return f"financial_facts[uen={uen};concept=Revenues;period_end={year}-12-31]"
+
+
+@pytest.mark.parametrize(
+    "claim",
+    [
+        "FY2025 revenue is higher for Canada Goose than Sleep Country.",
+        "Revenue comparison: Canada Goose is 25% bigger than Sleep Country in FY2025.",
+        "Canada Goose's FY2025 revenue is USD 919.8M versus Sleep Country's USD 732.4M.",
+        "| Revenue | Canada Goose FY2025 | Sleep Country FY2025 |",
+    ],
+)
+def test_same_period_company_comparison_does_not_require_previous_year(claim: str) -> None:
+    reply = AIMessage(
+        claim + " " + financial_ref("CANA-0010", 2025) + " " + financial_ref("SLEE-0041", 2025)
+    )
+    assert response_issues(reply, financial_history(), 350) == []
+
+
+@pytest.mark.parametrize(
+    "claim",
+    [
+        "Revenue grew 1.97%.",
+        "FY2025 revenue is higher than FY2024.",
+        "### Year-over-year changes\nRevenue: +1.97%.",
+        "| Metric | FY2024 | FY2025 |\n| Revenue | 902 | 920 |",
+    ],
+)
+def test_temporal_claim_records_advisory_for_the_cited_client(claim: str) -> None:
+    reply = AIMessage(claim + " " + financial_ref("CANA-0010", 2025))
+    assert not response_issues(reply, financial_history(), 350)
+    issues = response_advisories(reply, financial_history())
+    assert len(issues) == 1
+    assert financial_ref("CANA-0010", 2024) in issues[0]
+    assert "SLEE-0041" not in issues[0]
+
+
+def test_a_trend_for_one_client_does_not_force_previous_year_for_another() -> None:
+    reply = AIMessage(
+        "Canada Goose revenue grew 1.97%. "
+        + financial_ref("CANA-0010", 2024)
+        + " "
+        + financial_ref("CANA-0010", 2025)
+        + "\nSleep Country FY2025 revenue is USD 732.4M. "
+        + financial_ref("SLEE-0041", 2025)
+    )
+    assert response_issues(reply, financial_history(), 350) == []
+
+
+async def test_bigger_company_followup_accepts_first_answer_without_revisions() -> None:
+    calls = 0
+    reply = AIMessage(
+        "Canada Goose is bigger by FY2025 revenue. "
+        + financial_ref("CANA-0010", 2025)
+        + " "
+        + financial_ref("SLEE-0041", 2025)
+    )
+
+    async def model(messages: Any) -> AIMessage:
+        nonlocal calls
+        calls += 1
+        return reply
+
+    history = financial_history()
+    result = await build_specialist(RunnableLambda(model), [], "Use evidence.").ainvoke(
+        {"messages": history, "active_client_uens": ["CANA-0010", "SLEE-0041"]}
+    )
+    assert calls == 1
+    assert result["messages"][-1].content == reply.content
+    assert len(result["messages"]) == len(history) + 1
 
 
 def test_citations_survive_a_followup_but_denials_are_not_evidence() -> None:
@@ -201,3 +309,58 @@ def test_tool_requests_are_allowed_to_continue_the_react_loop() -> None:
         ],
     )
     assert response_issues(reply, conversation(), 20) == []
+
+
+@pytest.mark.parametrize("separator", [" ", "\n", "\n\n"])
+def test_mixed_temporal_and_snapshot_claims_never_trigger_repairs(separator: str) -> None:
+    claim = (
+        "Canada Goose revenue grew 1.97%. "
+        + financial_ref("CANA-0010", 2024)
+        + " "
+        + financial_ref("CANA-0010", 2025)
+        + separator
+        + "Sleep Country FY2025 revenue was USD 732.4M. "
+        + financial_ref("SLEE-0041", 2025)
+    )
+    assert not response_issues(AIMessage(claim), financial_history(), 350)
+
+
+@pytest.mark.parametrize("packed", [False, True])
+@pytest.mark.parametrize(
+    "claim,rejected",
+    [
+        ("Sweep account deployed Oct-25.", True),
+        ("Sweep implementation completed in October 2025.", True),
+        ("Lockbox launched in May 2026; sweep deployed Oct-25.", True),
+        ("Sweep deployed Oct-25. Implementation is unverified.", True),
+        ("Sweep was not deployed according to these records.", False),
+        ("Confirm whether the sweep was deployed in October 2025.", False),
+        ("Was sweep deployed in October 2025?", False),
+        ("Sweep Closed Won Oct-25; implementation unverified.", False),
+        ("The records do not prove that sweep was deployed.", False),
+    ],
+)
+def test_status_only_records_do_not_establish_implementation(
+    claim: str, rejected: bool, packed: bool
+) -> None:
+    ref = "opportunities[opportunity_id=OPP-9536]"
+    page = {
+        "records": [{"source_ref": ref}],
+        "evidence_limits": {"implementation_outcome": "not_supplied_closed_won_is_a_sales_stage"},
+    }
+    payload = {"sections": {"opportunities": page}} if packed else page
+    messages = [
+        ToolMessage(
+            name="rmprep-data_get_memo_evidence",
+            tool_call_id="tool",
+            content=frame_untrusted("rmprep-data.get_memo_evidence", json.dumps(payload)),
+        )
+    ]
+    issues = response_issues(AIMessage(claim + " " + ref), messages, 1000)
+    assert bool(issues) is rejected
+    assert not any(
+        "do not establish implementation" in issue
+        for issue in response_issues(
+            AIMessage(claim + " " + ref), [HumanMessage(str(payload))], 1000
+        )
+    )

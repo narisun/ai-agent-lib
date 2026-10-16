@@ -58,12 +58,17 @@ class _Stop:
 
 @contextlib.contextmanager
 def _signals(stop: _Stop) -> Iterator[None]:
-    """Turn SIGTERM into a graceful stop and SIGINT into an immediate one."""
+    """Drain on SIGTERM; skip the drain wait for keyboard and Windows group stops."""
     loop = asyncio.get_running_loop()
     handlers: dict[signal.Signals, Callable[[], None]] = {
         signal.SIGTERM: stop.gracefully,
         signal.SIGINT: stop.now,
     }
+    # Windows launchers target one child process group with CTRL_BREAK_EVENT.
+    # Its default action terminates Python before the container can close.
+    windows_break = getattr(signal, "SIGBREAK", None)
+    if windows_break is not None:
+        handlers[windows_break] = stop.now
     installed: list[signal.Signals] = []
     previous: dict[signal.Signals, Any] = {}
     for number, handler in handlers.items():
@@ -186,8 +191,8 @@ async def serve(
     liveness can answer while readiness still says no. On SIGTERM it
     reports not ready for ``drain_seconds`` while it still takes requests,
     then stops listening and gives the requests it has ``grace_seconds`` to
-    finish. SIGINT skips the drain wait. Keep the two times together below the time
-    the platform allows a task to stop.
+    finish. SIGINT and Windows SIGBREAK skip the drain wait. Keep the two times
+    together below the time the platform allows a task to stop.
 
     Callback exceptions propagate after server cleanup. The caller still owns
     container cleanup; this function does not close adapters.

@@ -224,6 +224,13 @@ def configuration_examples() -> dict[str, EnvironmentExample]:
             "Each alias accepts a model ID string or an object with `model_id` and optional "
             '`provider`. Code can request `services.model("fast")`.',
         ),
+        Key.MODEL_OPTIONS: EnvironmentExample(
+            '`{"anthropic":{"prompt_caching":true,"cache_ttl":"5m"}}` for Anthropic',
+            "`{}` for Bedrock; use the local value only for direct Anthropic",
+            "Options are keyed by provider, and apply to all its aliases. Anthropic caching "
+            "defaults to off; TTL accepts `5m` or `1h`. Keep static instructions before "
+            "request context. This option does not configure Bedrock caching.",
+        ),
         Key.DATA_SOURCES: EnvironmentExample(
             _json(LOCAL_DATA),
             _json(AWS_DATA),

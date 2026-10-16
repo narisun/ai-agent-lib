@@ -2,6 +2,7 @@
 
 import contextvars
 from http.cookies import CookieError, SimpleCookie
+from urllib.parse import urlencode
 
 import jwt
 from fastapi import HTTPException
@@ -10,6 +11,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from ai_agent_lib_core.contracts import Principal
 from ai_agent_lib_ui.contracts.queries import ContractError
+from ai_agent_lib_ui.integrations.navigation import is_page_path, login_destination
 from ai_agent_lib_ui.integrations.runtime import Runtime, runtime
 
 session_token: contextvars.ContextVar[str] = contextvars.ContextVar("ui_session", default="")
@@ -47,7 +49,15 @@ class SessionBoundary:
             mutating = scope.get("method", "GET") not in {"GET", "HEAD", "OPTIONS"}
             if (is_socket or mutating) and headers.get(b"origin", b"").decode("latin1") != origin:
                 raise HTTPException(403, "Same-origin request required")
-            if path in {"/login", "/healthz", "/ui/forms.js"}:
+            if path in {
+                "/login",
+                "/healthz",
+                "/ui/forms.js",
+                "/ui/agent-lab.svg",
+                "/favicon",
+                "/ui/theme.css",
+                "/ui/theme.js",
+            }:
                 await self.app(scope, receive, send)
                 return
             cookie = SimpleCookie()
@@ -84,11 +94,19 @@ class SessionBoundary:
         if is_socket:
             await send({"type": "websocket.close", "code": 4403})
             return
-        response = (
-            RedirectResponse("/login", status_code=303)
-            if error.status_code == 401 and path in {"/", "/chat", "/chat/", "/conversations"}
-            else JSONResponse({"detail": error.detail}, status_code=error.status_code)
-        )
+        response: JSONResponse | RedirectResponse
+        if (
+            error.status_code == 401
+            and scope.get("method") in {"GET", "HEAD"}
+            and is_page_path(path)
+        ):
+            query = scope.get("query_string", b"").decode("latin1")
+            destination = login_destination(path + ("?" + query if query else ""))
+            response = RedirectResponse(
+                "/login?" + urlencode({"next": destination}), status_code=303
+            )
+        else:
+            response = JSONResponse({"detail": error.detail}, status_code=error.status_code)
         await response(scope, receive, send)
 
 

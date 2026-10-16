@@ -17,7 +17,7 @@ from langchain_core.runnables import RunnableLambda
 from langchain_core.tools import tool
 
 from rmprep.context import ContextBudget, ContextBuilder, estimate_tokens
-from rmprep.graph import APPLICATION, answer, build_graph
+from rmprep.graph import APPLICATION, answer, build_graph, response
 from rmprep.memos import MemoVersion, memo_from_turn, merge_memos
 from rmprep.router import router
 from rmprep.selection import select_context
@@ -288,6 +288,36 @@ async def test_multiple_memos_are_immutable_and_historical_selection_survives_la
         merge_memos(frozen, [{**frozen[0], "content": "changed"}])
 
 
+async def test_memo_output_publishes_only_new_accepted_versions_and_preserves_answer_api() -> None:
+    kit = Fakes(
+        model=FakeChatModelProvider(
+            [
+                call(JONES, "2026-07-03"),
+                "July memo. covenants[uen=JONE-0022;date=2026-07-03]",
+                "A follow-up answer.",
+                call(JONES, "2026-08-03"),
+                "August memo. covenants[uen=JONE-0022;date=2026-08-03]",
+                call(SHIN, "2026-08-03"),
+                "Shin memo. covenants[uen=SHIN-0039;date=2026-08-03]",
+            ]
+        )
+    )
+    async with kit.container() as services:
+        graph = build_graph(services, [memo_tool])
+        first = await response(graph, services, caller(), f"memo: {JONES} as of 2026-07-03")
+        assert first["artifacts"][0]["content"] == first["answer"]
+        assert first["artifacts"][0]["thread_id"] == caller().thread_id
+        assert first["artifacts"][0]["request_id"] == caller().request_id
+        followup = await response(graph, services, caller(), "Explain this memo.")
+        assert followup == {"answer": "A follow-up answer."}
+        second = await response(graph, services, caller(), f"memo: {JONES} as of 2026-08-03")
+        assert [first["artifacts"][0]["version"], second["artifacts"][0]["version"]] == [1, 2]
+        assert first["artifacts"][0]["document_id"] == second["artifacts"][0]["document_id"]
+        # Existing callers of answer() still receive a string.
+        third = await answer(graph, services, caller(), f"memo: {SHIN} as of 2026-08-03")
+        assert "Shin memo" in third
+
+
 async def test_ambiguous_reference_does_not_call_model_or_change_active_memo() -> None:
     messages, memos = catalog()
     graph = build_specialist(
@@ -536,10 +566,90 @@ def test_older_checkpoints_are_indexed_without_rewriting_messages_or_inventing_d
     }
     original = deepcopy(state["messages"])
     routed = router(state)
-    assert routed["context_version"] == 1
+    assert routed["context_version"] == 2
     assert state["messages"] == original
     adopted: Any = routed["memos"]
     assert len(adopted) == 3
     assert all(memo["generated_at"] == "unknown (legacy checkpoint)" for memo in adopted)
     assert [memo["version"] for memo in adopted] == [1, 2, 1]
     assert routed["selection"]["memo_ids"] == [adopted[0]["memo_id"]]  # type: ignore[index]
+
+
+@pytest.mark.parametrize("event_date", ["October 2025", "2025-10-20", "last month"])
+@pytest.mark.parametrize("multiple", [False, True])
+def test_dates_in_memo_contents_do_not_select_a_historical_document(
+    event_date: str, multiple: bool
+) -> None:
+    _, memos = catalog()
+    active = memos[1]
+    selection = select_context(
+        f"Recheck the memo's statement that the sweep was deployed in {event_date}.",
+        memos if multiple else [active],
+        active["memo_id"],
+        JONES,
+        creating_memo=False,
+    )
+    assert selection["memo_ids"] == [active["memo_id"]]
+    assert selection["meeting_date"] == "2026-08-03"
+    assert not selection["clarification"]
+
+
+@pytest.mark.parametrize(
+    "question", ["Explain the July 2025 memo.", "Explain the memo from July 2025."]
+)
+def test_month_and_year_select_the_document_in_the_correct_year(question: str) -> None:
+    _, older = snapshot(JONES, "2025-07-03", 1)
+    _, newer = snapshot(JONES, "2026-07-03", 2)
+    selection = select_context(
+        question, [older, newer], newer["memo_id"], JONES, creating_memo=False
+    )
+    assert selection["memo_ids"] == [older["memo_id"]]
+    assert not selection["clarification"]
+
+
+@pytest.mark.parametrize("explicit_limit", [False, True])
+async def test_broad_memo_has_room_for_sections_but_explicit_limit_still_applies(
+    explicit_limit: bool,
+) -> None:
+    draft = "Supported detail " * 370 + "covenants[uen=JONE-0022;date=2026-08-03]"
+    short = "Concise memo. covenants[uen=JONE-0022;date=2026-08-03]"
+    kit = Fakes(model=FakeChatModelProvider([call(JONES, "2026-08-03"), draft, short]))
+    async with kit.container() as services:
+        graph = build_graph(services, [memo_tool])
+        output = await response(
+            graph,
+            services,
+            caller(),
+            "memo: JONE-0022 as of 2026-08-03" + (" within 600 words" if explicit_limit else ""),
+        )
+    assert output["answer"].startswith(short if explicit_limit else draft)
+    assert len(kit.model.models[0].calls) == (3 if explicit_limit else 2)
+    assert output["artifacts"][0]["content"] == output["answer"]
+
+
+async def test_revised_memo_has_one_application_owned_reference() -> None:
+    messages, _ = snapshot(JONES, "2026-08-03", 1)
+    fake_footer = "Memo reference: memo-aaaaaaaaaaaa | version 1 | JONE-0022 | 2026-08-03"
+    replies = iter(
+        [
+            AIMessage("Invalid citation covenants[uen=wrong]"),
+            AIMessage("Accepted memo. covenants[uen=JONE-0022;date=2026-08-03]\n\n" + fake_footer),
+        ]
+    )
+    seen: list[list[AnyMessage]] = []
+
+    def model(items: list[AnyMessage]) -> AIMessage:
+        seen.append(items)
+        return next(replies)
+
+    graph = build_specialist(
+        RunnableLambda(model), [memo_tool], "Use evidence.", default_word_limit=1000
+    )
+    result = await graph.ainvoke({"messages": messages[:-1], "route": "memoagent"})
+    accepted = result["messages"][-1].text
+    assert accepted.count("Memo reference:") == 1
+    assert "memo-aaaaaaaaaaaa" not in accepted
+    assert result["memos"][0]["memo_id"] in accepted
+    assert result["memos"][0]["content"] == accepted
+    assert len(result["memos"]) == 1
+    assert "Memo reference:" not in seen[1][-2].text

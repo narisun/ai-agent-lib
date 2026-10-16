@@ -10,6 +10,23 @@ from ai_agent_lib_ui.contracts.catalog import AgentBinding, PresentationManifest
 from ai_agent_lib_ui.contracts.queries import ContractError, ErrorCode
 
 
+def same_agent_binding(saved: AgentBinding, current: AgentBinding) -> bool:
+    """Registry revisions and optional display features do not change agent authority."""
+    return (
+        saved.model_copy(
+            update={
+                "manifest": saved.manifest.model_copy(
+                    update={
+                        "registry_revision": current.manifest.registry_revision,
+                        "capabilities": current.manifest.capabilities,
+                    }
+                )
+            }
+        )
+        == current
+    )
+
+
 def read_manifest(value: Mapping[str, object]) -> PresentationManifest:
     """Reject unsupported schema versions with a stable, content-free error."""
     if value.get("schema") != "agentlib.presentation/v1":

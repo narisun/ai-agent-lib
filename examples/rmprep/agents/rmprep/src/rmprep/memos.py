@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Sequence
 from hashlib import sha256
 from typing import TypedDict
@@ -9,6 +10,19 @@ from typing import TypedDict
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage
 
 from rmprep.response_review import evidence_references, text_content, tool_payload
+
+_MEMO_FOOTER = re.compile(
+    r"^Memo reference: memo-[a-z0-9]{12}\s*\|\s*version \d+\s*\|\s*"
+    r"[^|\n]+\s*\|\s*\d{4}-\d{2}-\d{2}\s*$",
+    re.MULTILINE,
+)
+
+
+def memo_draft(reply: AIMessage) -> AIMessage:
+    """Remove copied application footers before assigning this answer its own identity."""
+    if reply.tool_calls:
+        return reply
+    return reply.model_copy(update={"content": _MEMO_FOOTER.sub("", text_content(reply)).rstrip()})
 
 
 class MemoVersion(TypedDict):

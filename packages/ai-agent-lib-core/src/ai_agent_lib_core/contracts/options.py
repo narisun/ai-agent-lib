@@ -357,11 +357,13 @@ class ModelSection:
         provider: The provider used when an alias does not name one.
         model_id: The model behind the ``default`` alias, if configured.
         aliases: Further aliases such as ``fast`` or ``judge``.
+        options: Options keyed by provider name, shared by that provider's aliases.
     """
 
     provider: str
     model_id: str | None = None
     aliases: Mapping[str, ModelRef] = field(default_factory=dict)
+    options: Mapping[str, Mapping[str, object]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         require_identifier("provider", self.provider)
@@ -372,6 +374,13 @@ class ModelSection:
             if not isinstance(ref, ModelRef):
                 raise TypeError(f"alias {alias!r} must map to a ModelRef")
         object.__setattr__(self, "aliases", MappingProxyType(dict(self.aliases)))
+        for provider, options in self.options.items():
+            ProviderSelection(provider, options)
+        object.__setattr__(self, "options", _freeze(self.options))
+
+    def selection(self, provider: str) -> ProviderSelection:
+        """Return the options belonging to one model provider, including aliases."""
+        return ProviderSelection(provider, self.options.get(provider, {}))
 
     def resolve(self, alias: str = DEFAULT_MODEL_ALIAS) -> ModelRef:
         """Return the concrete model behind ``alias``.

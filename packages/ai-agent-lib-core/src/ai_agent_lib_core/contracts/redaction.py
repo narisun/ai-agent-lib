@@ -21,8 +21,11 @@ _CREDENTIALS = (
     # An AWS access key ID.
     re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),
     # key=value and "key": "value" where the key names a credential.
+    # Start at a key boundary so long non-credential words are not scanned again
+    # from every character (quadratic work for large model/tool output).
     re.compile(
-        r"(?i)([\"']?[A-Za-z0-9_-]*(?:password|passwd|secret|token|api[_-]?key|authorization)"
+        r"(?i)(?<![A-Za-z0-9_-])"
+        r"([\"']?[A-Za-z0-9_-]*(?:password|passwd|secret|token|api[_-]?key|authorization)"
         r"[A-Za-z0-9_-]*[\"']?\s*[=:]\s*)(\"[^\"]*\"|'[^']*'|[^\s,;&]+)"
     ),
     # Credentials inside a URL: scheme://user:password@host

@@ -19,6 +19,7 @@ from ai_agent_lib_core.adapters import (
     UuidGenerator,
 )
 from ai_agent_lib_core.config import DEFAULT_BINDINGS, load_service_config, service_resolver
+from ai_agent_lib_core.config.langfuse import resolve_langfuse_settings
 from ai_agent_lib_core.contracts import AgentLibError, CheckResult
 from ai_agent_lib_core.di import diagnose
 from ai_agent_lib_core.observability import redact
@@ -66,7 +67,19 @@ async def check_service(folder: Path) -> tuple[CheckResult, ...]:
         config = load_service_config(dotenv)
     except AgentLibError as problem:
         return (CheckResult.failed("settings", problem),)
-    return (CheckResult("settings", ok=True, detail="resolved"), *await diagnose(config))
+    try:
+        tracing = resolve_langfuse_settings(dotenv)
+    except AgentLibError as problem:
+        langfuse = CheckResult.failed("langfuse", problem)
+    else:
+        langfuse = CheckResult(
+            "langfuse",
+            ok=True,
+            detail="disabled"
+            if tracing.settings is None
+            else "configuration valid (connectivity not checked)",
+        )
+    return (CheckResult("settings", ok=True, detail="resolved"), langfuse, *await diagnose(config))
 
 
 def _pins(
@@ -168,6 +181,7 @@ def explain_service(folder: Path) -> tuple[Sequence[Setting], Sequence[str]]:
     """
     try:
         resolution = service_resolver(folder / _ENV).explain()
+        tracing = resolve_langfuse_settings(folder / _ENV)
     except AgentLibError as problem:
         raise CliError.from_error(problem) from None
     by_key = {binding.key: binding.name for binding in DEFAULT_BINDINGS}
@@ -189,5 +203,9 @@ def explain_service(folder: Path) -> tuple[Sequence[Setting], Sequence[str]]:
         )
         for key, value in sorted(resolution.shown.items())
         if key not in by_key
+    ]
+    settings += [
+        Setting(variable=name, value=redact(value)[:_MAX_VALUE], origin=tracing.origins[name])
+        for name, value in tracing.shown.items()
     ]
     return settings, resolution.warnings

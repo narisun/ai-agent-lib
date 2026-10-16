@@ -189,6 +189,7 @@ async def test_an_alias_resolves_to_its_provider_and_model() -> None:
         provider="fake",
         model_id="fake-default",
         aliases={"judge": ModelRef(provider="anthropic", model_id="claude-judge")},
+        options={"anthropic": {"prompt_caching": True, "cache_ttl": "1h"}},
     )
     config = _config(model, secrets={"anthropic_api_key": SecretStr("sk-test-key")})
     async with ServiceContainer(config, _registry()) as services:
@@ -199,6 +200,12 @@ async def test_an_alias_resolves_to_its_provider_and_model() -> None:
         ref, provider = services.resolve_model("judge")
         assert ref == ModelRef(provider="anthropic", model_id="claude-judge")
         assert isinstance(provider, AnthropicChatModelProvider)
+        native = provider.create(ref.model_id)
+        assert isinstance(native, ChatAnthropic)
+        assert native._get_request_payload([HumanMessage("q")])["cache_control"] == {
+            "type": "ephemeral",
+            "ttl": "1h",
+        }
 
 
 async def test_the_anthropic_provider_fails_at_startup_without_its_secret() -> None:

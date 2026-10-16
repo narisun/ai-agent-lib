@@ -1,6 +1,6 @@
 """Ports used by local chat, independent of its HTTP and browser frameworks."""
 
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from ai_agent_lib_core.contracts import Principal
 from ai_agent_lib_core.contracts.diagnostics import DiagnosticValue
@@ -49,6 +49,16 @@ class ThreadRepository(ConversationStore, Protocol):
         """Read this scoped thread's admitted questions and outcomes."""
         ...
 
+    async def history_page(
+        self, view: ViewContext, thread_id: str, page: PageRequest
+    ) -> Page[StoredTurn]:
+        """Read a bounded page, oldest first within the page, with a cursor for older turns."""
+        ...
+
+    async def reconcile(self, view: ViewContext, run: RunRecord, *, expected: RunRecord) -> bool:
+        """Record an authoritative terminal outcome for an unknown run, with an audit entry."""
+        ...
+
     async def list_owned(
         self, principal: Principal, page: PageRequest, *, search: str = "", archived: bool = False
     ) -> Page[ThreadRecord]:
@@ -74,4 +84,15 @@ class TurnDispatcher(Protocol):
         self, view: ViewContext, binding: AgentBinding, turn: TurnAdmission, run: RunRecord
     ) -> RunRecord:
         """Return a terminal or unknown outcome; persist it through the repository."""
+        ...
+
+
+@runtime_checkable
+class OutcomeReader(Protocol):
+    """Optional read-only recovery; a missing outcome never permits a resend."""
+
+    async def outcome(
+        self, view: ViewContext, binding: AgentBinding, stored: StoredTurn
+    ) -> RunRecord | None:
+        """Return a correlated, confirmed outcome, or None when still unknown."""
         ...

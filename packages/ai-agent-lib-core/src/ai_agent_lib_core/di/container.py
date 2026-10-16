@@ -827,7 +827,7 @@ class ServiceContainer:
     def _selection_for(self, key: _Key) -> ProviderSelection:
         port, name, instance = key
         if port == MODEL_PORT:
-            return ProviderSelection(provider=name)
+            return self._config.model.selection(name)
         if port == DATA_PORT:
             return self._config.data_sources[instance]
         return self._config.section(Section(port))
@@ -889,7 +889,12 @@ class ServiceContainer:
         listed, rather than after a database or a stream has been reached.
         """
         problems: list[ConfigurationError] = []
-        for key in selected:
+        # Validate named model options even when that provider is not active;
+        # misspellings must not silently leave caching disabled.
+        keys = dict.fromkeys(
+            [*selected, *((MODEL_PORT, name, "") for name in self._config.model.options)]
+        )
+        for key in keys:
             port, name, _ = key
             model = self._providers.lookup(port, name).options
             if model is None:
@@ -914,7 +919,10 @@ class ServiceContainer:
         port, name, instance = key
         if port == MODEL_PORT:
             chosen = f"{variable_for(Key.MODEL_PROVIDER)} or {variable_for(Key.MODEL_ALIASES)}"
-            return f"while building the model provider {name!r}, chosen by {chosen}"
+            return (
+                f"while building the model provider {name!r}, chosen by {chosen}; "
+                f"options from {variable_for(Key.MODEL_OPTIONS)}"
+            )
         if port == DATA_PORT:
             return (
                 f"while building the data source {instance!r} of kind {name!r}, "

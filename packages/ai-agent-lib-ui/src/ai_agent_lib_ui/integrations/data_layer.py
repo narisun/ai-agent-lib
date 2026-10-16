@@ -1,6 +1,7 @@
 """Map Chainlit history onto admitted turns; never persist a second transcript."""
 
 from typing import Any
+from urllib.parse import urlencode
 from uuid import NAMESPACE_URL, uuid5
 
 from chainlit.data.base import BaseDataLayer
@@ -21,6 +22,8 @@ from ai_agent_lib_ui.adapters.sqlite import now
 from ai_agent_lib_ui.application.chat import view_for
 from ai_agent_lib_ui.contracts.conversations import RunRecord
 from ai_agent_lib_ui.contracts.queries import ContractError, ErrorCode, PageRequest
+from ai_agent_lib_ui.integrations.answer_format import present_answer
+from ai_agent_lib_ui.integrations.inspection import inspector_url
 from ai_agent_lib_ui.integrations.runtime import runtime
 from ai_agent_lib_ui.integrations.security import current_principal
 
@@ -31,19 +34,86 @@ def answer_id(run: RunRecord) -> str:
 
 
 def outcome_text(run: RunRecord) -> str:
+    """Show the answer, usage and trace link; keep evidence in the saved outcome."""
+    usage = run.usage
+    incoming = f"{usage.input_tokens:,}" if usage.input_tokens is not None else "unavailable"
+    outgoing = f"{usage.output_tokens:,}" if usage.output_tokens is not None else "unavailable"
+    elapsed = f"{run.elapsed_ms / 1000:.2f} s" if run.elapsed_ms is not None else "unavailable"
+    metrics = f"Input tokens: {incoming} · Output tokens: {outgoing} · Time: {elapsed}"
+    if usage.cache_read_tokens is not None and usage.input_tokens:
+        metrics += f" · Cache hit: {usage.cache_read_tokens / usage.input_tokens:.1%}"
+    if usage.cache_read_tokens is not None:
+        metrics += f" · Cache read: {usage.cache_read_tokens:,}"
+    if usage.cache_write_tokens is not None:
+        metrics += f" · Cache write: {usage.cache_write_tokens:,}"
+    if usage.kind in {"simulated", "estimated"}:
+        metrics += f" · {usage.kind.capitalize()} usage"
+    if run.trace is not None:
+        label = "Agent Lab" if run.trace.provider == "phoenix" else run.trace.label
+        metrics += f"\n\n[Open trace in {label}]({run.trace.url})"
+    return _outcome(run) + "\n\n---\n\n" + metrics
+
+
+def reference_step(run: RunRecord) -> StepDict | None:
+    """Derive one closed, stable source disclosure for an accepted answer."""
+    if run.state != "completed":
+        return None
+    references = present_answer(run.answer or "").references
+    if not references:
+        return None
+    return {
+        "id": str(uuid5(NAMESPACE_URL, "agentlib:references:" + run.run_id)),
+        "threadId": run.thread_id,
+        "parentId": answer_id(run),
+        "name": "References",
+        "type": "tool",
+        "output": references,
+        "createdAt": run.updated_at.isoformat(),
+        "defaultOpen": False,
+        "showInput": False,
+        "metadata": {"run_id": run.run_id},
+    }
+
+
+def inspector_step(run: RunRecord) -> StepDict:
+    """Keep diagnostics closed and load their content only through the authorized page."""
+    return {
+        "id": str(uuid5(NAMESPACE_URL, "agentlib:inspector:" + run.run_id)),
+        "threadId": run.thread_id,
+        "parentId": answer_id(run),
+        "name": "Turn inspector",
+        "type": "tool",
+        "output": (
+            f"[Open LLM input/output, MCP calls and checkpoints]({inspector_url(run)})\n\n"
+            f"Request: `{run.request_id}`. Opening the inspector does not rerun the agent."
+        ),
+        "createdAt": run.updated_at.isoformat(),
+        "defaultOpen": False,
+        "showInput": False,
+        "metadata": {"run_id": run.run_id},
+    }
+
+
+def _outcome(run: RunRecord) -> str:
     """Explain incomplete outcomes without presenting a draft as an accepted answer."""
     if run.state == "completed":
-        return run.answer or ""
+        return present_answer(run.answer or "").body
     if run.state == "failed":
+        if run.failure_code == "invalid":
+            return (
+                "The agent could not accept this request or produce a response that passed "
+                "its checks. You can send a new question in this thread."
+            )
         return (
-            "This request failed. Check the agent and UI configuration "
-            "before sending a new question."
+            "This request failed. Check the agent logs for the cause. "
+            "You can send a new question in this thread."
         )
     if run.state == "unknown":
         return (
             "The request outcome is unknown. It may have reached the agent. "
-            "This thread is held to prevent duplicate work. Check the agent logs; "
-            "start a new thread when you are ready. Reopening this thread does not resend it."
+            "This thread is held to prevent duplicate work. Reopen it to check the agent's "
+            "saved outcome. Reopening never resends the question. If the agent has no "
+            "confirmed outcome, the thread stays held; check the agent logs."
         )
     return "The request is still running. Reopen this thread to see its saved outcome."
 
@@ -80,7 +150,24 @@ class DataLayer(BaseDataLayer):
         thread = conversation.thread
         view = view_for(principal, thread.scope.application)
         steps: list[StepDict] = []
-        for stored in await runtime().store.history(view, thread_id):
+        history = await runtime().store.history_page(view, thread_id, PageRequest())
+        if history.next_cursor:
+            query = urlencode({"cursor": history.next_cursor})
+            steps.append(
+                {
+                    "id": str(uuid5(NAMESPACE_URL, "agentlib:older:" + thread_id)),
+                    "threadId": thread_id,
+                    "name": "History",
+                    "type": "system_message",
+                    "output": (
+                        "Showing recent messages. [View older messages]"
+                        f"(/conversations/{thread_id}/history?{query})."
+                    ),
+                    "createdAt": thread.created_at.isoformat(),
+                    "parentId": None,
+                }
+            )
+        for stored in history.items:
             run = stored.run
             steps.append(
                 {
@@ -224,7 +311,7 @@ class DataLayer(BaseDataLayer):
     async def build_debug_url(self) -> str:
         """Link to the local conversation management page."""
         current_principal()
-        return "/conversations"
+        return "/logs"
 
     async def close(self) -> None:
         # Connections are short-lived; server resources close in the parent lifespan.

@@ -42,6 +42,7 @@ class Settings(BaseModel):
     allowed_urls: frozenset[str]
     port: Annotated[int, Field(ge=1024, le=65535)] = 8765
     timeout_seconds: Annotated[float, Field(gt=0, le=600)] = 180
+    inspector_enabled: bool = True
 
     @property
     def origin(self) -> str:

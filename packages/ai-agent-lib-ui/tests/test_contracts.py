@@ -195,6 +195,23 @@ def test_deeply_nested_json_is_a_safe_invalid_response() -> None:
         QuestionAnswerAdapter(manifest()).response(VIEW, TURN, b"[" * 2000 + b"]" * 2000)
 
 
+@pytest.mark.parametrize(
+    "usage",
+    [
+        {"input_tokens": -1},
+        {"input_tokens": True},
+        {"input_tokens": 2, "cache_read_tokens": 3},
+        "invalid",
+    ],
+)
+def test_invalid_optional_usage_preserves_the_accepted_answer(usage: object) -> None:
+    body = envelope()
+    body["usage"] = usage
+    answer = QuestionAnswerAdapter(manifest()).response(VIEW, TURN, json.dumps(body).encode())
+    assert answer.answer == body["output"]["answer"]
+    assert answer.usage.input_tokens is None
+
+
 def test_bounds_and_explicit_unknown_state() -> None:
     assert PageRequest().limit == 50
     with pytest.raises(ValidationError):

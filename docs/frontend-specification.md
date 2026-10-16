@@ -1,20 +1,29 @@
-# Default agent frontend: specification
+# Agent Lab: frontend specification
 
-Status: staged implementation; reviewed against the repository on 11 October 2026.
+Status: staged implementation; updated on 13 October 2026.
 The [Phase 1 contracts](frontend-contracts.md) and [Phase 2 local chat package](../packages/ai-agent-lib-ui/README.md)
 are implemented in this checkout. Local `init`, `check`, `serve`, registry selection
-and SQLite conversation history are available as a development preview. Document
-panels, metrics, the inspector and shared deployment remain design proposals.
+and SQLite conversation history are available as a development preview. Live
+drafts, response metrics and per-response trace links are also implemented.
+The temporary draft disappears when the saved outcome is ready. Chat omits
+reference and inspector panels; local inspection remains available from Logs. An optional memo panel now supports immutable inline documents and
+version selection. Choose agent has explicit Start chat buttons, and Logs provides
+the turn-inspection entry point. Shared deployment remains a design proposal.
 The package has not been released.
 See the [implementation plan](frontend-implementation-plan.md) for delivery order.
 The existing [release scope](release-scope.md) remains authoritative for today's library.
 
 ## 1. Purpose and recommendation
 
-Add `ai-agent-lib-ui`, a separately installable Python package that lets people
+**Agent Lab** is the application name; `ai-agent-lib-ui` is its separately
+installable Python package. It lets people
 use registered agents and lets authorized engineers inspect how an answer was
 produced. An engineer should be able to install it with Python and pip, start it
-from Windows Command Prompt, and open it in their existing browser.
+from Windows Command Prompt, and open it in their existing browser. Its
+[flask logo](../packages/ai-agent-lib-ui/src/ai_agent_lib_ui/assets/agent-lab.svg)
+connects three nodes representing an agent, its tools, and saved state. Use the
+name and icon on chat, sign-in, and supporting pages, including browser titles
+and the favicon.
 
 Use **Chainlit for the chat interface, mounted in a FastAPI application**. Keep
 agent invocation, identity, persistence, and diagnostics behind Python interfaces.

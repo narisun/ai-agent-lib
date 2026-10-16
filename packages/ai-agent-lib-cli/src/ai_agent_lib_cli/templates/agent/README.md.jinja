@@ -6,6 +6,10 @@ This LangGraph agent has a model node and a tool node. The library supplies
 model and tool wrappers that apply permissions, limits, and audit recording,
 along with conversation storage and request context.
 
+Read this page in order to test and run the agent. For a real-model walkthrough,
+see [Anthropic](docs/anthropic-example.md); for centralized model/tool traces,
+see [Langfuse](docs/langfuse.md). Those are optional after the local tests pass.
+
 ## Before you start
 
 Run all commands from the **workspace root**, where `agentlib.toml` lives.
@@ -89,6 +93,19 @@ Open another terminal at the workspace root and select Python again:
 Leave it running. Wait for the `ready` log event. The server listens at
 `http://127.0.0.1:{{ port }}`. `/healthz` reports liveness; `/readyz` becomes
 successful after startup validation and graph/tool preparation finish.
+
+The generated service enables live replies for the library's chat UI. Model text
+appears in a provisional draft while the agent works. The draft collapses when
+the final answer is saved; each reply shows input/output token usage and elapsed
+time. Missing counts display as unavailable; fake-model counts are simulated.
+For per-response model/tool timelines and checkpoint references, follow
+[Connect Langfuse](docs/langfuse.md). The generated service includes the shared
+library adapter; tracing is disabled until you configure it.
+The UI requests `POST /invoke` with `Accept: text/event-stream`. Regular JSON
+requests keep their accepted-answer envelope. Model output guardrails and schema
+checks buffer text until they pass. To also wait for all application-specific
+checks before showing any draft, set `live_updates=False` in
+`src/{{ package }}/service.py`.
 
 ### 4. Send a request from another terminal
 
@@ -282,3 +299,22 @@ settings and add the provider dependencies reported by the CLI to the service's
 files. Follow its README to build images and apply infrastructure on a build
 machine or CI runner with a container engine, Terraform, and the required
 registry and AWS permissions.
+
+
+### Recover an interrupted UI request
+
+Reopen the conversation to check its saved outcome. The UI only reads status; it
+never repeats the question. The generated local service keeps confirmed outcomes
+in `.agentlib\outcomes.sqlite`. Protect this file like the checkpoint database.
+If no confirmed outcome exists, the UI keeps the thread held.
+
+The HTTP service accepts one active turn per caller and thread. A second request
+receives `409 thread_busy` before execution. Wait for the first turn to finish
+before submitting again. The default guard covers one application instance;
+multiple workers or replicas sharing checkpoints need a shared `ThreadAdmission`
+implementation passed to `agent_app(admission=...)`. Use a single worker until
+that coordination is configured.
+
+When model output guardrails or a structured-output schema are configured, draft
+text is buffered until those checks pass. Without those checks, tokens can appear
+immediately. Application-specific validation may still revise a provisional draft.

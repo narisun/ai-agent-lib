@@ -8,22 +8,51 @@ from collections.abc import AsyncIterator, Sequence
 from typing import Any
 
 from ai_agent_lib_core import RequestContext, ServiceConfig, ServiceContainer, ValidationFailed
+from ai_agent_lib_core.adapters.audit_jsonl import JsonlAuditOptions
 from ai_agent_lib_core.config import load_service_config
-from ai_agent_lib_core.integrations.http import ServiceLifecycle, agent_app, serve
+from ai_agent_lib_core.contracts import (
+    PolicyAction,
+    PolicyDenied,
+    PolicyRequest,
+    PolicyResource,
+    Section,
+)
+from ai_agent_lib_core.contracts.inspection import TurnInspector
+from ai_agent_lib_core.integrations.http import (
+    OutcomeJournal,
+    ServiceLifecycle,
+    SqliteOutcomeJournal,
+    agent_app,
+    serve,
+)
+from ai_agent_lib_core.integrations.langgraph.inspection import GraphCheckpointPreview
+from ai_agent_lib_core.integrations.langgraph.langfuse import LangfuseTracing
+from ai_agent_lib_core.integrations.langgraph.phoenix import PhoenixTracing
+from ai_agent_lib_core.integrations.langgraph.tracing import agent_tracing
 from ai_agent_lib_core.observability import (
     configure_logging,
     report_error,
     shows_details,
     start_telemetry,
 )
+from ai_agent_lib_core.observability.inspection import LocalTurnInspector
 
-from rmprep.graph import APPLICATION, answer, build_graph, registered_mcp_tools, steps
-from rmprep.settings import ENV_FILE
+from rmprep.context import ContextBuilder
+from rmprep.graph import APPLICATION, build_graph, registered_mcp_tools, response, steps
+from rmprep.settings import ENV_FILE, load_context_budget
 
 __all__ = ["build_app", "main"]
 
 
-async def build_app(services: ServiceContainer, lifecycle: ServiceLifecycle) -> Any:
+async def build_app(
+    services: ServiceContainer,
+    lifecycle: ServiceLifecycle,
+    *,
+    context_builder: ContextBuilder | None = None,
+    outcomes: OutcomeJournal | None = None,
+    inspector: TurnInspector | None = None,
+    tracing: LangfuseTracing | PhoenixTracing | None = None,
+) -> Any:
     """Build the agent's HTTP application.
 
     The graph is prepared once after the listener starts and before readiness.
@@ -34,25 +63,67 @@ async def build_app(services: ServiceContainer, lifecycle: ServiceLifecycle) -> 
         services: The container used by request handlers. The lifecycle startup
             callback must start and validate it before graph preparation runs.
         lifecycle: Receives deferred preparation before serving starts.
+        context_builder: Optional context policy, shared by normal and streamed requests.
+        inspector: Optional diagnostic reader; local services otherwise use their configured
+            trace/audit files and graph. Deployed services must inject an authorized reader.
+        tracing: Optional library tracing adapter, owned by the entry point.
     """
     graph: Any = None
 
     async def prepare() -> None:
         # Admission stays closed until discovery and graph compilation succeed.
         nonlocal graph
-        graph = build_graph(services, await registered_mcp_tools(services))
+        graph = build_graph(
+            services, await registered_mcp_tools(services), context_builder=context_builder
+        )
 
     lifecycle.prepare(prepare)
 
-    async def run(context: RequestContext, given: Any) -> dict[str, str]:
-        return {"answer": await answer(graph, services, context, _question(given))}
+    async def run(context: RequestContext, given: Any) -> dict[str, Any]:
+        if tracing is not None:
+            return await tracing.run(graph, services, context, _question(given), respond=response)
+        return await response(graph, services, context, _question(given))
 
     async def stream(context: RequestContext, given: Any) -> AsyncIterator[dict[str, Any]]:
         # POST /invoke/stream sends each step as a server-sent event.
         async for step in steps(graph, services, context, _question(given)):
             yield step
 
-    return agent_app(services, run, application=APPLICATION, lifecycle=lifecycle, stream=stream)
+    async def authorize_inspection(context: RequestContext) -> None:
+        decision = await services.policy.decide(
+            PolicyRequest(
+                principal=context.principal,
+                action=PolicyAction.DIAGNOSTIC_READ,
+                resource=PolicyResource(kind="diagnostics", name=APPLICATION),
+                application=APPLICATION,
+                environment=services.config.deployment_env.value,
+            )
+        )
+        if not decision.allow:
+            raise PolicyDenied("diagnostic access denied", reason_code="diagnostic_denied")
+
+    if inspector is None and services.config.deployment_env == "local":
+        trace = services.config.model_trace_path
+        audit = services.config.section(Section.AUDIT)
+        inspector = LocalTurnInspector(
+            authorize=authorize_inspection,
+            model_paths=(trace,) if trace else (),
+            audit_paths=(audit.parse_options(JsonlAuditOptions).path,)
+            if audit.provider == "jsonl"
+            else (),
+            checkpoints=GraphCheckpointPreview(lambda: graph, services.invocation),
+        )
+
+    return agent_app(
+        services,
+        run,
+        application=APPLICATION,
+        lifecycle=lifecycle,
+        stream=stream,
+        live_updates=True,
+        outcomes=outcomes,
+        inspector=inspector,
+    )
 
 
 def _question(given: Any) -> str:
@@ -66,19 +137,35 @@ def _question(given: Any) -> str:
     return question
 
 
-async def _serve(config: ServiceConfig, host: str, port: int) -> None:
-    services = ServiceContainer(config)
+async def _serve(config: ServiceConfig, host: str, port: int, contexts: ContextBuilder) -> None:
+    async with agent_tracing(
+        APPLICATION, config, dotenv_path=ENV_FILE, legacy_prefix="RMPREP"
+    ) as tracing:
+        services = ServiceContainer(config, model_trace=tracing)
 
-    async def start() -> None:
-        await services.start()
-        await services.validate()
+        async def start() -> None:
+            await services.start()
+            await services.validate()
 
-    lifecycle = ServiceLifecycle(start)
-    try:
-        # The listener is available during adapter startup and graph preparation.
-        await serve(await build_app(services, lifecycle), lifecycle, host=host, port=port)
-    finally:
-        await services.aclose()
+        lifecycle = ServiceLifecycle(start)
+        try:
+            # The listener is available during adapter startup and graph preparation.
+            await serve(
+                await build_app(
+                    services,
+                    lifecycle,
+                    context_builder=contexts,
+                    tracing=tracing,
+                    outcomes=SqliteOutcomeJournal(ENV_FILE.parent / ".agentlib" / "outcomes.sqlite")
+                    if config.deployment_env == "local"
+                    else None,
+                ),
+                lifecycle,
+                host=host,
+                port=port,
+            )
+        finally:
+            await services.aclose()
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -90,13 +177,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     config: ServiceConfig | None = None
     try:
         config = load_service_config(ENV_FILE)
+        contexts = ContextBuilder(load_context_budget(ENV_FILE))
         # One line of JSON per event on standard output. On a developer's
         # machine a line about an error also says what the error said.
         configure_logging(APPLICATION, details=shows_details(config))
         # Traces and metrics go to the collector when the settings turn them on.
         stop_telemetry = start_telemetry(APPLICATION, config)
         try:
-            asyncio.run(_serve(config, arguments.host, arguments.port))
+            asyncio.run(_serve(config, arguments.host, arguments.port, contexts))
         finally:
             stop_telemetry()  # the last spans and metrics are flushed
     except Exception as error:

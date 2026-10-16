@@ -1,6 +1,7 @@
-# Frontend contracts: Phase 1
+# Agent Lab contracts: Phase 1
 
-Phase 1 provides the `ai-agent-lib-ui` package and the contracts shared by future
+Agent Lab is the application supplied by the `ai-agent-lib-ui` package. Phase 1
+provides the contracts shared by future
 chat, document and inspector screens. Phase 2 adds the local browser server,
 HTTP dispatcher, SQLite history and `init`, `check`, `serve` commands. Start with the
 [package setup](../packages/ai-agent-lib-ui/README.md) to install and run its checks
@@ -96,8 +97,13 @@ number, title, media type, timestamp, thread and request. It contains exactly on
 of inline content or an opaque content reference. A reference cannot be a local
 path or a URL. The verified invocation supplies tenant, subject and agent scope.
 Malformed optional artifacts produce `unavailable` and an `invalid_artifacts`
-warning while preserving the accepted answer. A renderer and immutable storage
-adapter will be implemented in Phase 3.
+warning while preserving the accepted answer. The local UI stores inline versions
+atomically with completed turns and renders Markdown/plain text in its optional
+memo panel. Content reads enforce thread ownership and `ui.artifact.read`. An
+existing ID or document/version pair keeps its first saved content. External
+content references are not resolved by the local panel. Optional presentation
+capability changes preserve existing chat bindings; endpoint, version, adapter,
+audience and scope changes still require a new binding.
 
 See the executable synthetic [manifest](../packages/ai-agent-lib-ui/tests/fixtures/presentation.json)
 and [memo response](../packages/ai-agent-lib-ui/tests/fixtures/invoke.json) fixtures.
@@ -130,6 +136,25 @@ parent sessions. Additive ports in `contracts/chat.py` preserve the original
 interfaces and keep the application independent of the browser integration.
 Checkpoint ports expose a scoped agent diagnostic API, never an unrestricted
 checkpoint database connection or an object deserializer.
+
+The local per-response inspector uses the additive `TurnInspector` port and
+`agentlib.turn-inspection/v1` envelope. An agent opts in with
+`agent_app(inspector=...)`, exposing `GET /requests/{id}/inspection?thread_id=...`.
+The reader authorizes diagnostic content independently of agent invocation. The UI
+resolves the stored run's request and thread IDs after checking ownership, then
+checks the returned tenant, subject, application, thread, request and schema.
+It disables redirects, bounds responses to 512 KiB and limits reads to ten seconds.
+The four sections are LLM inputs, LLM outputs, MCP call audit records and decoded
+parent-graph checkpoint snapshots. Each carries availability, record count and an
+explicit truncation flag, with at most 64 KiB of text. Diagnostic content is escaped.
+
+`LocalTurnInspector` reads explicitly configured private JSONL files using all
+five correlation fields. It does not infer actual MCP execution from a model's
+proposed tool call. `GraphCheckpointPreview` uses the agent's scoped graph API
+and filters `agentlib_request_id` metadata added by `services.invocation()`.
+Historical checkpoints without that metadata remain unavailable per turn. This
+preview does not enumerate subgraph checkpoint namespaces. No checkpoint state is
+deserialized in the UI, and diagnostic reads never invoke/resume the graph.
 
 ## Capture usage without storing prompts
 
@@ -231,7 +256,14 @@ admission and can move to a terminal state only after authoritative reconciliati
 from checkpoints, and Phase 1 does not claim atomic checkpoint/journal commits or
 durable agent recovery. Phase 2 implements UI admission storage and conservative
 unknown-outcome recovery; the agent's
-diagnostic and reconciliation endpoints belong to Phase 4.
+full diagnostic inspector belongs to Phase 4. Local agents can now inject an
+`OutcomeJournal`: `GET /requests/{request_id}?thread_id=...` returns the confirmed
+terminal envelope to the same authenticated authority, or `{"state":"unknown"}`.
+The UI only reconciles a matching terminal result and audits that transition;
+missing status never permits replay. JSON and SSE answers both validate the
+original request and thread IDs. Thread history has bounded pages with signed,
+owner- and thread-bound cursors. Unrelated registry revisions do not invalidate
+an otherwise identical approved agent binding.
 
 ## Checks and remaining work
 

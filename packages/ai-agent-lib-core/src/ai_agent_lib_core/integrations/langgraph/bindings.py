@@ -192,4 +192,10 @@ class LangGraphBindings:
         if not isinstance(context, RequestContext):
             raise TypeError("context must be a RequestContext")
         thread_id = scoped_thread_id(context.scope, context.thread_id)
-        return {"config": {"configurable": {"thread_id": thread_id}}, "context": context}
+        return {
+            "config": {
+                "configurable": {"thread_id": thread_id},
+                "metadata": {"agentlib_request_id": context.request_id},
+            },
+            "context": context,
+        }

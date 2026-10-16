@@ -15,6 +15,7 @@ from configuration_examples import AWS_DATA, LOCAL_DATA, configuration_examples
 
 from ai_agent_lib_core.config import DEFAULT_BINDINGS, render_env_example, render_reference
 from ai_agent_lib_core.config.bindings import options_key, provider_key
+from ai_agent_lib_core.config.langfuse import LANGFUSE_VARIABLES
 from ai_agent_lib_core.contracts import NoOptions, Section
 from ai_agent_lib_core.di import ServiceProviders
 
@@ -99,6 +100,8 @@ def test_configuration_table_covers_every_binding_and_accepted_name_once() -> No
         assert len(matching) == 1, binding.name
         for name in binding.all_names:
             assert name in html.unescape(" ".join(matching[0]))
+    for name in LANGFUSE_VARIABLES.values():
+        assert sum(f">{name}</span>" in cells[0] for cells in rows[1:]) == 1
 
 
 @pytest.mark.parametrize("environment", ["local", "aws"])

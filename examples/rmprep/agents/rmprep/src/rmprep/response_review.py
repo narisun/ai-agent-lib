@@ -27,8 +27,8 @@ _DATED_AUDITED_STATEMENTS = re.compile(
     r"\b(?:audited\s+(?:FY\s*)?\d{4}|(?:FY\s*)?\d{4}\s+audited)\s+(?:financial\s+)?statements\b",
     re.IGNORECASE,
 )
-# Business names used in the memo. Require both comparison sources when a
-# financial page is cited; a revenue citation cannot also support gross profit.
+# Business names used in temporal comparisons. A point-in-time comparison of
+# two companies does not require either company's previous-year records.
 _FINANCIAL_NAMES = {
     "Revenues": r"\brevenues?\b",
     "GrossProfit": r"\bgross profit\b",
@@ -37,6 +37,13 @@ _FINANCIAL_NAMES = {
     "DebtLongtermAndShorttermCombinedAmount": r"\btotal debt\b",
     "CashAndCashEquivalentsAtCarryingValue": r"\bcash (?:balance|and cash equivalents)\b",
 }
+_TEMPORAL_CHANGE = re.compile(
+    r"\b(?:grew|grown|growth|fell|fallen|rose|risen|increas\w*|decreas\w*|"
+    r"declin\w*|improv\w*|deteriorat\w*|chang\w*|yoy|year[- ]over[- ]year)\b",
+    re.IGNORECASE,
+)
+_PERIOD = re.compile(r"\b(?:FY\s*)?(?:19|20)\d{2}\b", re.IGNORECASE)
+_PERIOD_COMPARISON = re.compile(r"\b(?:from|to|vs\.?|versus|than|higher|lower)\b", re.IGNORECASE)
 _MCP_TOOLS = {
     f"rmprep-data{separator}{name}"
     for separator in (".", "_")
@@ -79,11 +86,16 @@ def _page_references(payload: dict[str, Any]) -> set[str]:
     }
 
 
-def tool_payload(message: AnyMessage) -> dict[str, Any]:
+def tool_payload(message: AnyMessage, *, include_lookup: bool = False) -> dict[str, Any]:
     """Parse evidence only from recognized, framed MCP results."""
     if (
         not isinstance(message, ToolMessage)
-        or message.name not in _MCP_TOOLS
+        or message.name
+        not in (
+            _MCP_TOOLS | {"rmprep-data.find_clients", "rmprep-data_find_clients"}
+            if include_lookup
+            else _MCP_TOOLS
+        )
         or not isinstance(message.content, str)
         or not message.content.startswith("<untrusted_tool_result")
     ):
@@ -112,6 +124,7 @@ def _comparison_citation_issues(
     text: str, cited: set[str], messages: Sequence[AnyMessage]
 ) -> list[str]:
     issues: set[str] = set()
+    claims = _temporal_claims(text)
     for message in messages:
         payload = tool_payload(message)
         pages = payload.get("sections", {}).values() if "sections" in payload else [payload]
@@ -123,16 +136,50 @@ def _comparison_citation_issues(
             for comparison in page.get("comparisons", []):
                 metric = comparison["metric"]
                 pattern = _FINANCIAL_NAMES.get(metric)
-                if pattern is None or not re.search(pattern, text, re.IGNORECASE):
+                if pattern is None:
                     continue
-                missing = set(comparison["source_refs"]) - cited
-                if missing:
-                    issues.add(
-                        f"The {metric} comparison needs its own complete references: "
-                        + ", ".join(sorted(missing))
-                        + ". Include them or remove that secondary metric."
-                    )
+                for claim in claims:
+                    claim_refs = set(_REFERENCE.findall(claim))
+                    prose = _REFERENCE.sub("", claim)
+                    if not re.search(pattern, prose, re.IGNORECASE) or not claim_refs.intersection(
+                        _page_references(page)
+                    ):
+                        continue
+                    missing = set(comparison["source_refs"]) - cited
+                    if missing:
+                        issues.add(
+                            f"The {metric} comparison needs its own complete references: "
+                            + ", ".join(sorted(missing))
+                            + ". Include them or remove that secondary metric."
+                        )
     return sorted(issues)
+
+
+def _temporal_claims(text: str) -> list[str]:
+    """Find trend statements and temporal tables without reading dates inside citations.
+
+    This is a conservative format check, not a semantic judge. A same-year
+    company comparison must not be rewritten merely because its evidence page
+    also contains calculated year-over-year changes.
+    """
+    claims = []
+    temporal_section = False
+    temporal_table = False
+    for line in text.splitlines():
+        prose = _REFERENCE.sub("", line).strip()
+        trend = bool(_TEMPORAL_CHANGE.search(prose))
+        periods = {period.lower().replace("fy", "").strip() for period in _PERIOD.findall(prose)}
+        table = prose.startswith("|")
+        period_pair = len(periods) > 1 and (table or bool(_PERIOD_COMPARISON.search(prose)))
+        if prose.startswith("#"):
+            temporal_section = trend or period_pair
+        if table:
+            temporal_table |= trend or period_pair
+        else:
+            temporal_table = False
+        if trend or period_pair or temporal_section or temporal_table:
+            claims.append(line)
+    return claims
 
 
 def evidence_references(messages: Sequence[AnyMessage]) -> tuple[set[str], bool]:
@@ -185,5 +232,59 @@ def response_issues(reply: AIMessage, messages: Sequence[AnyMessage], limit: int
             "from audited-statement requirements, actions and questions. Ask which year applies; "
             "keep the known financial-fact periods separate from the delivery requirement."
         )
-    issues.extend(_comparison_citation_issues(text, cited, messages))
+    issues.extend(_implementation_issues(text, messages))
     return issues
+
+
+def _implementation_issues(text: str, messages: Sequence[AnyMessage]) -> list[str]:
+    """Reject explicit deployment claims cited only to status-only evidence.
+
+    This narrow safeguard complements the prompt; it is not a general semantic
+    validator. Questions and qualified statements about missing proof are allowed.
+    """
+    limited: set[str] = set()
+    for message in messages:
+        payload = tool_payload(message)
+        pages = payload.get("sections", {}).values() if "sections" in payload else [payload]
+        for page in pages:
+            if page.get("evidence_limits", {}).get("implementation_outcome") in {
+                "not_supplied_closed_won_is_a_sales_stage",
+                "not_established_by_closed_request_status",
+            }:
+                limited.update(_page_references(page))
+    for line in text.splitlines():
+        refs = set(_REFERENCE.findall(line))
+        if not refs or not refs <= limited:
+            continue
+        for clause in re.split(r"[.;]", _REFERENCE.sub("", line)):
+            claim = re.search(
+                r"\b(?:deployed|implemented|launched|activated|went live|"
+                r"(?:implementation|deployment|activation)\s+(?:was\s+)?(?:completed|confirmed))\b",
+                clause,
+                re.IGNORECASE,
+            )
+            qualified = re.search(
+                r"\b(?:not|no|never|unverified|unknown|unconfirmed|whether|if|"
+                r"confirm|verify|check|prove|proof|evidence|pending)\b|\?",
+                clause,
+                re.IGNORECASE,
+            )
+            if claim and not qualified:
+                return [
+                    "Closed Won opportunities and closed service requests do not establish "
+                    "implementation. Replace the deployment claim with the exact recorded "
+                    "sales/service status and date; state that implementation is unverified."
+                ]
+    return []
+
+
+def response_advisories(reply: AIMessage, messages: Sequence[AnyMessage]) -> list[str]:
+    """Record uncertain prose interpretations for inspection, never as retry triggers.
+
+    Exact citation existence remains a blocking check. Semantic association of
+    metrics, companies and periods requires business evaluation, not a regex proof.
+    """
+    if reply.tool_calls:
+        return []
+    text = text_content(reply)
+    return _comparison_citation_issues(text, set(_REFERENCE.findall(text)), messages)

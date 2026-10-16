@@ -8,6 +8,8 @@ caller cannot supply or relax an obligation.
 
 from __future__ import annotations
 
+import logging
+import time
 from collections.abc import Mapping
 from dataclasses import replace
 from typing import Generic, TypeVar
@@ -29,6 +31,7 @@ from ai_agent_lib_core.contracts import (
     Telemetry,
     ValidationFailed,
 )
+from ai_agent_lib_core.observability.query_logs import query_parameters
 from ai_agent_lib_core.pipeline.audit import AuditInterceptor
 from ai_agent_lib_core.pipeline.calls import DataCall
 from ai_agent_lib_core.pipeline.context import bound_request_context
@@ -199,7 +202,31 @@ class GovernedDataSource:
         )
 
     async def _run(self, call: DataCall) -> QueryResult:
-        return await self._source.query(call.query, call.parameters, obligations=call.obligations)
+        started = time.perf_counter()
+        result: QueryResult | None = None
+        try:
+            result = await self._source.query(
+                call.query, call.parameters, obligations=call.obligations
+            )
+            return result
+        finally:
+            # Only admitted, named queries reach here. Audit remains content-free;
+            # the standard formatter shows parameter values only in local mode.
+            logging.getLogger(__name__).info(
+                "data_query",
+                extra={
+                    "data_source": call.source,
+                    "query": call.query,
+                    "parameters": query_parameters(call.parameters),
+                    "request_id": call.context.request_id if call.context else None,
+                    "outcome": "success" if result is not None else "failed",
+                    "rows": len(result.rows) if result is not None else None,
+                    "columns": len(result.columns) if result is not None else None,
+                    "truncated": result.truncated if result is not None else None,
+                    "masked_columns": ",".join(sorted(result.masked_columns)) if result else "",
+                    "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+                },
+            )
 
     @staticmethod
     async def _unknown(call: DataCall) -> QueryResult:  # noqa: ARG004 - refused whatever it is

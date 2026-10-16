@@ -8,11 +8,70 @@ An **agent** uses a language model to answer questions and choose tools. A
 **tool** is a function it can call. LangGraph runs the agent's steps; MCP
 (Model Context Protocol) lets a separate server expose tools to several agents.
 
-Start with the [getting-started tutorial](docs/getting-started.md). The
-[developer guide](docs/developer-guide.html) starts with
-[the design principles](docs/developer-guide.html#principles): interfaces,
-dependency injection, and how providers keep cross-cutting concerns separate
-from the LangGraph workflow. It also covers troubleshooting and configuration.
+Choose the path that matches your task:
+
+| I want to… | Start here | What I will have |
+| --- | --- | --- |
+| Test an existing agent in a browser | [Run Agent Lab](#run-agent-lab) | rmprep, its MCP server, chat, memo versions, and response inspection |
+| Build my first agent | [Run your first agent](#run-your-first-agent), then the [tutorial](docs/getting-started.md) | A generated Python workspace with runnable code and tests |
+| Understand the design | [Developer guide: principles](docs/developer-guide.html#principles) | How LangGraph, interfaces, dependency injection, and environment providers fit together |
+| Change the library or simulator | [Working on the library](#working-on-the-library) and the [code map](docs/README.md#find-the-code) | The right package, environment, and checks for a change |
+
+The [documentation index](docs/README.md) separates setup instructions, reference
+material, and design proposals. The current checkout includes Agent Lab as a local
+development preview; use the [release scope](docs/release-scope.md) for support boundaries.
+
+## Run Agent Lab
+
+Agent Lab is the browser simulator for testing agents. You need your team's
+Python 3.11+ and pip setup, access to the approved package index, and a writable
+copy of this repository. In **Command Prompt**, from the repository root:
+
+```bat
+setup-local.bat
+start-local.bat
+```
+
+Wait for **All selected services are ready**, then open
+[Agent Lab](http://127.0.0.1:8765). In a second Command Prompt at the repository root:
+
+```bat
+type .agentlib\ui-rmprep\access-code
+```
+
+Enter that code, select **Choose agent → Start chat with rmprep**, and send a
+question. The launcher loads the repository-root `.env` for rmprep, including your
+model provider and API key. To use another file, run
+`start-local.bat --env-file "F:\path to settings\.env"`. Startup prints the selected
+provider and model. Without model overrides, the default fake model echoes your
+question. See the [local startup guide](docs/local-startup.md) for Anthropic setup
+and configuration precedence. The launcher also lists configuration variables
+with their sources, showing JSON options while masking credentials and sensitive fields.
+
+Replies stream while the agent works, then show the final answer with token usage
+and response time. The temporary draft panel disappears when the outcome is ready.
+**Memos** opens saved document versions; **Logs** shows available model input/output,
+MCP calls, and checkpoints. Optional
+[Langfuse tracing](docs/langfuse.md) adds a trace link to each response.
+For a local Python/pip observability server with SQLite, follow the
+[Phoenix trial](docs/phoenix-trial.md). Run `start-phoenix.bat setup` once, then set
+`EAP_PHOENIX_ENABLED=true` in the root `.env` (and disable Langfuse). With the
+default local endpoint, `start-local.bat` starts Phoenix first in its separate
+environment and stops it with the rest of the stack.
+To stop, run this in a second Command Prompt from the repository root:
+
+```bat
+stop-local.bat
+```
+
+It asks this checkout's launchers to stop Agent Lab, rmprep, MCP, and local Phoenix
+in reverse order, preserving conversations, traces, and checkpoints. Then run
+`start-local.bat` again. **Ctrl+C** in the launcher window also works.
+Phoenix trace links are labelled **Open trace in Agent Lab**.
+
+Setup keeps agent/MCP dependencies in `.venv` and UI dependencies in
+`packages\ai-agent-lib-ui\.venv`. The launcher selects the correct interpreter.
+To connect your own agent, follow the [Agent Lab package guide](packages/ai-agent-lib-ui/README.md).
 
 ## Run your first agent
 
@@ -128,8 +187,10 @@ before running commands.
 The [HTTP example](docs/getting-started.md#6-optional-call-the-agent-over-http)
 uses Python's standard library to send a request. The service exposes
 `/healthz` for liveness and `/readyz` for readiness. Readiness waits for
-service validation and graph/MCP preparation. Streaming sends graph-step
-updates, not individual model tokens.
+service validation and graph/MCP preparation. Generated agents support live
+model drafts through `POST /invoke` with `Accept: text/event-stream`, followed
+by one accepted result. The separate `/invoke/stream` route sends graph-step
+updates for debugging. See [live responses and metrics](packages/ai-agent-lib-ui/README.md#live-responses-and-metrics).
 
 ## Inspect model input, output, and conversation history
 
@@ -267,22 +328,7 @@ The [release scope](docs/release-scope.md) records supported behavior and
 operational limits. The [architecture decisions](docs/adr/README.md) explain
 the design choices.
 
-The proposed [default frontend specification](docs/frontend-specification.md)
-and [implementation plan](docs/frontend-implementation-plan.md) cover a separate
-Python package for agent chat, documents, response metrics, and authorized
-checkpoint, model trace, and log inspection. The frontend package is not released yet.
-
-Phase 2 adds [local agent chat](packages/ai-agent-lib-ui/README.md) with registry-based
-selection and SQLite history. Create, rename, search, archive, restore and resume
-threads using Command Prompt, Python and pip in the separate UI environment.
-Read the [contract guide](docs/frontend-contracts.md)
-for presentation manifests, scoped conversations, artifact references and optional
-agent diagnostic metadata. Local `init`, `check`, and `serve` commands are available;
-the agent HTTP API remains unchanged. Document panels, metrics and the inspector
-follow in later phases.
-
-Try the [Phase 0 chat experiment](experiments/chainlit-phase0/README.md) with
-Command Prompt, Python and pip. It demonstrates saved conversations, memos,
-response metrics and an inspector using synthetic data. The
-[validation report](docs/frontend-phase0-review.md) records passing checks and
-the remaining enterprise readiness decisions.
+For Agent Lab's current setup and features, use its
+[package guide](packages/ai-agent-lib-ui/README.md). The
+[documentation index](docs/README.md#current-behavior-and-design-material) links
+the frontend design, implementation plan, and original Chainlit trial separately.

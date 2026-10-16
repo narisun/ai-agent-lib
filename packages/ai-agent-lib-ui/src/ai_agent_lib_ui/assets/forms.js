@@ -20,6 +20,17 @@ for (const form of document.querySelectorAll("form")) {
         method: "POST", credentials: "same-origin", body: parameters,
       });
       if (response.ok) {
+        if (target.pathname === "/login") {
+          // Establish the mounted chat session before opening a saved thread.
+          // Otherwise the chat shell's first-login navigation opens a new chat.
+          const chatSession = await fetch("/chat/auth/header", {
+            method: "POST", credentials: "same-origin",
+          });
+          if (!chatSession.ok) {
+            status.textContent = "Could not open the chat session. Reload this page and sign in again.";
+            return;
+          }
+        }
         window.location.assign(response.url);
       } else {
         status.textContent = response.status === 401

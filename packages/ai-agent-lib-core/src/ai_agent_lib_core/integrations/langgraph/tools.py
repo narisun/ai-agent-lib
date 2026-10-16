@@ -34,6 +34,14 @@ _LOG = logging.getLogger(__name__)
 # hands it to a tool only through an injected argument, so it is kept here for
 # the step that calls the wrapped tool.
 _TOOL_CALL_ID: ContextVar[str | None] = ContextVar("agentlib_tool_call_id", default=None)
+_NATIVE_TOOL_WRAPPER: ContextVar[str | None] = ContextVar(
+    "agentlib_native_tool_wrapper", default=None
+)
+
+
+def current_native_tool_wrapper() -> str | None:
+    """Identify a native tool execution already observed through its governed wrapper."""
+    return _NATIVE_TOOL_WRAPPER.get()
 
 
 def _tool_call_id(tool_input: object) -> str | None:
@@ -176,6 +184,7 @@ class GovernedTool(BaseTool):
         if not isinstance(invocation, _Invocation):
             raise TypeError("the tool call payload was replaced inside the pipeline")
         arguments = dict(invocation.arguments)
+        token = _NATIVE_TOOL_WRAPPER.set(self.name)
         try:
             if invocation.tool_call_id is None:
                 return await self._inner.ainvoke(arguments, invocation.config)
@@ -201,6 +210,8 @@ class GovernedTool(BaseTool):
                 extra={"tool": self.name},
             )
             raise
+        finally:
+            _NATIVE_TOOL_WRAPPER.reset(token)
         if isinstance(reply, ToolMessage):
             # The pipeline checks and frames the content; the message is rebuilt after it.
             invocation.reply = reply

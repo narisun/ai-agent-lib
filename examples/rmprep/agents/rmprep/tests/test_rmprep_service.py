@@ -6,13 +6,42 @@ import json
 from typing import Any
 
 import httpx
+import pytest
 from ai_agent_lib_core import Principal
 from ai_agent_lib_core.integrations.http import ServiceLifecycle
 from ai_agent_lib_core.testing import FakeChatModelProvider, FakeIdentityVerifier, Fakes
+from langchain_core.messages import AIMessage
 
 from rmprep.service import build_app
 
 ADA = {"authorization": "Bearer ada-token"}
+
+
+async def test_inspector_can_be_composed_before_container_startup() -> None:
+    kit = fakes("Hello there.")
+    services = kit.container()
+
+    async def start() -> None:
+        await services.start()
+        await services.validate()
+
+    lifecycle = ServiceLifecycle(start)
+    try:
+        app = await build_app(services, lifecycle)
+        await lifecycle.start()
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://agent.test"
+        ) as client:
+            answer = await client.post("/invoke", json=question("Hello?"), headers=ADA)
+            request_id = answer.json()["request_id"]
+            inspected = await client.get(
+                f"/requests/{request_id}/inspection?thread_id=th-1", headers=ADA
+            )
+            assert inspected.status_code == 200
+            assert inspected.json()["checkpoints"]["record_count"] > 0
+            assert inspected.json()["model_inputs"]["availability"] == "disabled"
+    finally:
+        await services.aclose()
 
 
 def fakes(*replies: Any) -> Fakes:
@@ -79,3 +108,30 @@ async def test_a_caller_without_a_valid_token_is_refused_and_nothing_runs() -> N
     assert no_token.status_code == 401
     assert (malformed.status_code, malformed.json()["error"]) == (400, "invalid")
     assert all(not model.calls for model in kit.model.models)
+
+
+@pytest.mark.parametrize("live", [False, True])
+async def test_text_blocks_render_as_prose_and_json_envelope_stays_compatible(live: bool) -> None:
+    kit = fakes(AIMessage(content=[{"type": "text", "text": "A readable answer."}]))
+    async with kit.container() as services:
+        lifecycle = ServiceLifecycle(services.validate)
+        app = await build_app(services, lifecycle)
+        await lifecycle.start()
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://agent.test"
+        ) as http:
+            response = await http.post(
+                "/invoke",
+                json=question("Hello?"),
+                headers={**ADA, "accept": "text/event-stream" if live else "application/json"},
+            )
+    if live:
+        frame = next(
+            frame for frame in response.text.split("\n\n") if frame.startswith("event: result")
+        )
+        body = json.loads(frame.split("data: ")[1])
+        assert body["usage"]["kind"] == "simulated"
+    else:
+        body = response.json()
+        assert set(body) == {"output", "thread_id", "request_id"}
+    assert body["output"]["answer"] == "A readable answer."

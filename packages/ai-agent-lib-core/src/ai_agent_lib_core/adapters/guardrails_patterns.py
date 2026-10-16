@@ -134,6 +134,23 @@ class PatternGuardrails:
             GuardrailPoint.TOOL_RESULT: self._options.max_tool_result_chars,
         }
 
+    @property
+    def supports_streaming_output(self) -> bool:
+        """Blocking PII checks require the whole reply, including chunk boundaries."""
+        return self._options.pii != "block"
+
+    async def check_output_prefix(
+        self,
+        text: str,
+        context: RequestContext | None,  # noqa: ARG002 - limits are shared by all callers
+    ) -> GuardrailVerdict:
+        """Enforce the size limit before publishing; final checks record PII flags."""
+        if not self.supports_streaming_output:
+            raise RuntimeError("this guardrail configuration requires a complete response")
+        if len(text) > self._options.max_model_output_chars:
+            return GuardrailVerdict((GuardrailFinding("size", blocked=True),))
+        return GuardrailVerdict()
+
     async def check(
         self,
         point: GuardrailPoint,

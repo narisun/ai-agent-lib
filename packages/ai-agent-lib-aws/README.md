@@ -1,16 +1,23 @@
 # ai-agent-lib-aws
 
 AWS adapters for the Enterprise Agentic Platform library. Installing this
-package also installs `ai-agent-lib-core`, and is all it takes to make the
-adapters below selectable: core loads them when it finds the package. A
+package also installs `ai-agent-lib-core`. Core discovers the adapters when
+the package is installed; some adapters need an extra listed below. A
 service moves from a local adapter to an AWS one by changing configuration,
 never code.
 
-```bash
-pip install ai-agent-lib-aws                 # secrets, audit, registry, Redshift
-pip install "ai-agent-lib-aws[bedrock]"      # plus the Bedrock model provider
-pip install "ai-agent-lib-aws[postgres]"     # plus the PostgreSQL checkpoint store
+From the repository root in **Command Prompt**, with your agent environment
+active, install the checkout using Python and pip:
+
+```bat
+python -m pip install -e packages/ai-agent-lib-aws
 ```
+
+For Bedrock add `-e "packages/ai-agent-lib-aws[bedrock]"` instead; for PostgreSQL
+use `-e "packages/ai-agent-lib-aws[postgres]"`. Combine both as `[bedrock,postgres]`
+when needed. Pip uses your team's configured package index. The selected AWS
+services also need provisioned resources, network access, and credentials.
+See the [configuration table](../../docs/developer-guide.html#variables).
 
 ## The adapters
 

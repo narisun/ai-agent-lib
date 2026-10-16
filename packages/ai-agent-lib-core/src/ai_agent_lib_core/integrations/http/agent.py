@@ -17,10 +17,12 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from anyio import CancelScope
 from starlette.applications import Starlette
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import JSONResponse, Response, StreamingResponse
 from starlette.routing import Route
+from starlette.types import Receive, Scope, Send
 
 from ai_agent_lib_core.contracts import (
     AgentLibError,
@@ -32,9 +34,16 @@ from ai_agent_lib_core.contracts import (
     TransientError,
     ValidationFailed,
 )
+from ai_agent_lib_core.contracts.inspection import TurnInspector
+from ai_agent_lib_core.integrations.http.admission import InMemoryThreadAdmission, ThreadAdmission
 from ai_agent_lib_core.integrations.http.lifecycle import ServiceLifecycle
+from ai_agent_lib_core.integrations.http.live import live_response
+from ai_agent_lib_core.integrations.http.outcomes import OutcomeJournal
+from ai_agent_lib_core.integrations.http.streaming import ClosingStreamingResponse
 from ai_agent_lib_core.integrations.spans import content_free_span
 from ai_agent_lib_core.observability.diagnostics import Diagnostics
+from ai_agent_lib_core.observability.live import live_run
+from ai_agent_lib_core.observability.trace_links import capture_trace
 from ai_agent_lib_core.pipeline.context import bind_request_context
 
 __all__ = [
@@ -213,6 +222,30 @@ class _Asked:
     thread_id: str
 
 
+class _ThreadResponse(Response):
+    """Hold admission in the ASGI task until execution and stream cleanup finish."""
+
+    def __init__(
+        self,
+        admission: ThreadAdmission,
+        context: RequestContext,
+        respond: Callable[[], Awaitable[Response]],
+    ) -> None:
+        super().__init__()
+        self.admission, self.context, self.respond = admission, context, respond
+        self.observe: Callable[[Response], None] = lambda _response: None
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        async with self.admission.hold(self.context) as acquired:
+            response = (
+                await self.respond()
+                if acquired
+                else _error(409, "thread_busy", request_id=self.context.request_id)
+            )
+            self.observe(response)
+            await response(scope, receive, send)
+
+
 class _Invoke:
     """The route that runs the agent for one request."""
 
@@ -224,6 +257,10 @@ class _Invoke:
         lifecycle: ServiceLifecycle,
         max_body_bytes: int,
         route: str = INVOKE_PATH,
+        live_updates: bool = False,
+        outcomes: OutcomeJournal | None = None,
+        inspector: TurnInspector | None = None,
+        admission: ThreadAdmission | None = None,
     ) -> None:
         self._services = services
         self._route = route
@@ -231,11 +268,22 @@ class _Invoke:
         self._application = application
         self._lifecycle = lifecycle
         self._max_body_bytes = max_body_bytes
+        self._live_updates = live_updates
+        self._outcomes = outcomes
+        self._inspector = inspector
+        self._admission = admission if admission is not None else InMemoryThreadAdmission()
 
     async def handle(self, request: Request) -> Response:
         """Run the agent for one request, describe the outcome and log one line about it."""
         started = time.perf_counter()
         response = await self._respond(request)
+        if isinstance(response, _ThreadResponse):
+            response.observe = lambda reply: self._report(reply, started)
+        else:
+            self._report(response, started)
+        return response
+
+    def _report(self, response: Response, started: float) -> None:
         _LOG.log(
             logging.ERROR if response.status_code >= _SERVER_ERROR else logging.INFO,
             "request",
@@ -246,7 +294,6 @@ class _Invoke:
                 "request_id": response.headers.get(REQUEST_ID_HEADER),
             },
         )
-        return response
 
     async def _respond(self, request: Request) -> Response:
         """Read the request, find out who is asking, then run the agent for them."""
@@ -258,7 +305,99 @@ class _Invoke:
         context = await self._caller(request, asked.thread_id)
         if isinstance(context, Response):
             return context
-        return await self._answer(context, asked.given)
+        return _ThreadResponse(
+            self._admission,
+            context,
+            lambda: self._admitted_answer(
+                context, asked.given, live="text/event-stream" in request.headers.get("accept", "")
+            ),
+        )
+
+    async def _admitted_answer(
+        self, context: RequestContext, given: object, *, live: bool
+    ) -> Response:
+        """Reserve the request only after acquiring exclusive thread execution."""
+        if self._outcomes is not None and not await self._outcomes.begin(context):
+            return _error(503, "outcome_unknown", request_id=context.request_id)
+        if self._live_updates and live:
+            return live_response(context, lambda: self._recorded_answer(context, given))
+        return await self._recorded_answer(context, given)
+
+    async def status(self, request: Request) -> Response:
+        """Read an authoritative outcome without running the graph or any tools."""
+        thread_id = request.query_params.get("thread_id", "")
+        request_id = request.path_params["request_id"]
+        if not _SAFE_ID.fullmatch(thread_id) or not _SAFE_ID.fullmatch(request_id):
+            return _error(400, "invalid")
+        context = await self._caller(request, thread_id)
+        if isinstance(context, Response):
+            return context
+        body = await self._outcomes.read(context, request_id) if self._outcomes else None
+        return JSONResponse(
+            body if body is not None else {"state": "unknown"},
+            headers={"cache-control": "no-store"},
+        )
+
+    async def _recorded_answer(self, context: RequestContext, given: object) -> Response:
+        started = time.perf_counter()
+        with capture_trace(context) as trace:
+            response = await self._answer(context, given)
+        if isinstance(response, StreamingResponse):
+            return response
+        body = json.loads(bytes(response.body))
+        body.update(thread_id=context.thread_id, request_id=context.request_id)
+        if "error" in body and trace.link is not None:
+            body["trace"] = trace.link
+        live = live_run(context)
+        if live is not None:
+            body.update(usage=live.usage().model_dump(), model_calls=live.model_calls)
+        body["elapsed_ms"] = (time.perf_counter() - started) * 1000
+        if self._outcomes is not None and (
+            response.status_code == 200
+            or body.get("error")
+            in {
+                "invalid",
+                "denied",
+                "unauthorized",
+                "budget_exceeded",
+                "paused",
+            }
+        ):
+            await self._outcomes.finish(context, body)
+        _LOG.info(
+            "invocation finished",
+            extra={
+                "request_id": context.request_id,
+                "status": response.status_code,
+                "duration_ms": round(body["elapsed_ms"]),
+            },
+        )
+        if self._outcomes is None and live is None and trace.link is None:
+            return response
+        headers = {key: value for key, value in response.headers.items() if key != "content-length"}
+        return JSONResponse(body, status_code=response.status_code, headers=headers)
+
+    async def inspect(self, request: Request) -> Response:
+        """Read diagnostics for the authenticated owner; never run or resume the graph."""
+        thread_id = request.query_params.get("thread_id", "")
+        request_id = request.path_params["request_id"]
+        if not _SAFE_ID.fullmatch(thread_id) or not _SAFE_ID.fullmatch(request_id):
+            return _error(400, "invalid")
+        context = await self._caller(request, thread_id)
+        if isinstance(context, Response):
+            return context
+        if self._inspector is None:
+            return _error(404, "not_found")
+        try:
+            with bind_request_context(context):
+                result = await self._inspector.read(context, request_id)
+        except PolicyDenied:
+            return _error(404, "not_found")
+        except Exception:  # noqa: BLE001 - never return raw diagnostic exceptions
+            return _error(503, "unavailable")
+        return JSONResponse(
+            result.model_dump(mode="json", by_alias=True), headers={"cache-control": "no-store"}
+        )
 
     async def _read(self, request: Request) -> _Asked | Response:
         """Return what was asked, or the reply to a request that cannot be read."""
@@ -359,14 +498,23 @@ class _StreamRoute(_Invoke):
         application: str,
         lifecycle: ServiceLifecycle,
         max_body_bytes: int,
+        admission: ThreadAdmission,
+        outcomes: OutcomeJournal | None,
     ) -> None:
         super().__init__(
-            services, _unused_run, application, lifecycle, max_body_bytes, route=STREAM_PATH
+            services,
+            _unused_run,
+            application,
+            lifecycle,
+            max_body_bytes,
+            route=STREAM_PATH,
+            admission=admission,
+            outcomes=outcomes,
         )
         self._stream = stream
 
     async def _answer(self, context: RequestContext, given: object) -> Response:
-        return StreamingResponse(
+        return ClosingStreamingResponse(
             self._events(context, given),
             media_type="text/event-stream",
             headers={REQUEST_ID_HEADER: context.request_id, "cache-control": "no-cache"},
@@ -386,8 +534,15 @@ class _StreamRoute(_Invoke):
                 bind_request_context(context),
                 content_free_span(_INSTRUMENTATION, "agent.stream", attributes=attributes),
             ):
-                async for item in self._stream(context, given):
-                    yield _event("update", item)
+                iterator = self._stream(context, given)
+                try:
+                    async for item in iterator:
+                        yield _event("update", item)
+                finally:
+                    close = getattr(iterator, "aclose", None)
+                    if close is not None:
+                        with CancelScope(shield=True):
+                            await close()
         except AgentLibError as error:
             _LOG.log(
                 _level_of(error),
@@ -425,6 +580,10 @@ def agent_app(
     max_body_bytes: int = 1_000_000,
     stream: Stream | None = None,
     diagnostics: Diagnostics | None = None,
+    live_updates: bool = False,
+    outcomes: OutcomeJournal | None = None,
+    inspector: TurnInspector | None = None,
+    admission: ThreadAdmission | None = None,
 ) -> Starlette:
     """Build the HTTP application of an agent.
 
@@ -447,13 +606,45 @@ def agent_app(
         diagnostics: Optional recorder shared with the container. Adds metadata
             summaries to /invoke without changing its response. Streaming has
             no accepted-answer envelope and is not summarized by this option.
+        live_updates: Allow /invoke clients to request text/event-stream. Configured
+            model output checks finish before text is delivered; application
+            validation can still revise the draft.
+            The result event carries the ordinary envelope plus aggregate usage.
+            JSON clients and /invoke/stream keep their existing behavior.
+        outcomes: Optional durable journal. Adds owner-scoped GET /requests/{id}
+            for reconciliation; reading status never re-executes a request.
+        inspector: Optional authorized diagnostic reader. Adds read-only
+            GET /requests/{id}/inspection?thread_id=... without changing invocation.
+        admission: Optional exclusive thread coordinator. Defaults to an in-memory
+            guard shared by this app's invocation routes. Overlap returns 409
+            thread_busy before execution or request reservation. Multiple instances
+            sharing checkpoints must inject a shared coordinator. Stream ownership
+            lasts through graph cancellation and cleanup. A journal also deduplicates
+            legacy stream request IDs, but that route has no recoverable final answer.
     """
     if diagnostics is not None:
         run = _observed_run(run, diagnostics)
-    invoke = _Invoke(services, run, application, lifecycle, max_body_bytes)
+    admission = admission if admission is not None else InMemoryThreadAdmission()
+    invoke = _Invoke(
+        services,
+        run,
+        application,
+        lifecycle,
+        max_body_bytes,
+        live_updates=live_updates,
+        outcomes=outcomes,
+        inspector=inspector,
+        admission=admission,
+    )
     routes = [Route(INVOKE_PATH, invoke.handle, methods=["POST"])]
+    if outcomes is not None:
+        routes.append(Route("/requests/{request_id}", invoke.status, methods=["GET"]))
+    if inspector is not None:
+        routes.append(Route("/requests/{request_id}/inspection", invoke.inspect, methods=["GET"]))
     if stream is not None:
-        streaming = _StreamRoute(services, stream, application, lifecycle, max_body_bytes)
+        streaming = _StreamRoute(
+            services, stream, application, lifecycle, max_body_bytes, admission, outcomes
+        )
         routes.append(Route(STREAM_PATH, streaming.handle, methods=["POST"]))
     return Starlette(routes=[*routes, *health_routes(lifecycle)])
 

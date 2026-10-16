@@ -20,7 +20,27 @@ LangGraph manages routing and messages. The library injects model access, MCP,
 identity, policy, audit and checkpoint providers. The MCP service retrieves
 evidence and calculates review findings; the model turns that evidence into prose.
 
+For a trace timeline, follow the [Langfuse walkthrough](../../docs/langfuse-trial.md).
+The adapter is shared library code, also included in newly generated agents.
+It runs as a separate service and adds a trace link to each Agent Lab response,
+with model attempts, MCP calls and checkpoint references grouped by thread.
+
 ## 1. Install with Python and pip
+
+For browser testing, run `setup-local.bat`, then `start-local.bat` from the library
+repository root in **Command Prompt**. This starts the MCP service, HTTP agent,
+and chat UI together. Follow the [local startup guide](../../docs/local-startup.md)
+for login, model setup, logs, and stopping the stack. The steps below explain
+manual setup and the command-line walkthroughs.
+
+In Agent Lab, select **Choose agent → Start chat with rmprep**, then send a memo
+request. Select **Memos** to view it beside chat and switch saved versions. New
+batch configurations enable the `artifacts` capability. Existing configurations
+can add `"artifacts"` to the rmprep binding's `manifest.capabilities` array before
+restarting. Old text-only answers stay in chat; newly generated memos publish
+panel versions. **Logs** opens the LLM input/output, MCP calls and checkpoints for
+each turn. Selecting an old version only changes the viewer; name its memo
+reference in your follow-up to ask the agent about it.
 
 Open **Command Prompt** in the library repository. Use Python 3.11 or newer and
 your team's existing pip configuration, including its enterprise package index.
@@ -121,7 +141,13 @@ notepad agents\rmprep\.env
 ```
 
 Set `EAP_MODEL_PROVIDER=anthropic`, your available `EAP_MODEL_ID`, and
-`ANTHROPIC_API_KEY`. Keep the registry, policy and identity settings. The
+`ANTHROPIC_API_KEY`. Enable prompt caching in the same file:
+
+```dotenv
+EAP_MODEL_OPTIONS={"anthropic":{"prompt_caching":true,"cache_ttl":"5m"}}
+```
+
+Restart the agent after changing this setting. Keep the registry, policy and identity settings. The
 [model setup guide](../../docs/anthropic-example.md) explains these settings;
 use the `rmprep` commands below for this business example. A model run sends
 the selected evidence and conversation to the configured provider.
@@ -148,7 +174,7 @@ expiry date does not establish that a waiver was executed. Payment summaries
 show the requested window and the last observed transaction date.
 
 To set an answer length, include `Keep it within 450 words.` in your question.
-The defaults are 600 words for a memo and 350 for Q&A. Counts include headings,
+The defaults are 1,000 words for a memo and 350 for Q&A. Counts include headings,
 tables and citations. Before saving an answer, the agent checks its length and
 checks that each citation matches a source reference returned by MCP. It also
 rejects citation placeholders and wording that assigns an unsupported fiscal
@@ -186,11 +212,28 @@ as `qna: Explain version 1 for JONE-0022.` or `qna: Compare versions 1 and 2 for
 JONE-0022.` on the same thread. Read [memo context management](docs/context-management.md)
 for client switching, historical evidence, long conversations and trace inspection.
 
+You can also ask `prepare rm prep for Canada Goose`, then ask `How did you
+calculate wallet share for Canada Goose?` in the same thread. A successful client
+lookup connects the search name to the client's UEN. The follow-up receives the
+saved memo and the relationship evidence that supports its wallet-share figure.
+
+To compare clients, ask `Do we have a client containing canada?`, then
+`Compare these two clients' financials.` in the same thread. The supplied search
+returns `CANA-0010` and `SLEE-0041`. Both remain selected while the agent retrieves
+their financials. The trace should contain the original search result and a
+financial result for each client. See the [comparison walkthrough](docs/context-management.md#compare-clients-returned-by-a-search).
+
+For long conversations, the agent now allows 96,000 estimated tokens of recent
+history within a 128,000-token total input budget. This keeps larger financial
+exchanges available for follow-ups. Configure `RMPREP_CONTEXT_*` in the agent's
+`.env` and restart; see [context budgets](docs/context-management.md#keep-long-conversations-usable).
+Older history remains in checkpoints even when it no longer fits in model input.
+
 ## 4. Explore the evidence
 
 | MCP tool | What it does |
 | --- | --- |
-| `find_clients(search)` | Resolve a UEN, exact name or name fragment. Ambiguous matches require a choice. |
+| `find_clients(search)` | Find clients by UEN, exact name or name fragment. Choose one for a memo, or select the returned group for a comparison. |
 | `get_memo_evidence(uen, meeting_date)` | Collect a bounded evidence pack, sourced review findings and gaps. |
 | `get_client_records(uen, section, start_date, end_date, offset)` | Retrieve client details, date ranges and further pages for Q&A. |
 | `get_reference_data(section, search, end_date, offset)` | Retrieve product catalog, market snapshots, dictionary or vocabulary entries. |
@@ -218,9 +261,10 @@ currency caveats and the example review thresholds. Read the
 | File | Responsibility |
 | --- | --- |
 | `agents/rmprep/src/rmprep/graph.py` | Compose the three business nodes and inject library services. |
-| `router.py`, `prompts.py`, `specialist.py` in that package | Select the workflow, specify evidence requirements, and run the model/tool loop. |
+| `router.py`, `prompts/`, `specialist.py` in that package | Select the workflow, load versioned instructions, and run the model/tool loop. |
 | `response_review.py` in that package | Check answer length and exact source references before saving a reply. |
 | `memos.py`, `selection.py` in that package | Preserve immutable memo versions and resolve document references within a scoped thread. |
+| `clients.py` in that package | Remember client names from successful MCP lookups so follow-ups can use the same name. |
 | `context.py`, `context_tools.py` in that package | Assemble bounded model input and check tool arguments against the selected client and date. |
 | `mcp-servers/rmprep-data/src/rmprep_data/server.py` | Declare four MCP interfaces and inject governed query access. |
 | `evidence.py` in that package | Compose pages and memo packs with provenance and gaps. |
@@ -230,7 +274,7 @@ currency caveats and the example review thresholds. Read the
 | `data` | Supplied CSV snapshot, read in place. |
 | `registry` and `policies` | Declare tools, pin schemas and authorize access. |
 
-The router recognizes `memo:` and memo creation requests, including polite
+The router recognizes `memo:`, `prepare rm prep`, and memo creation requests, including polite
 requests after an introductory clause. Other requests use Q&A. Use `memo:` or
 `qna:` when you want to make the workflow explicit.
 
@@ -260,3 +304,13 @@ with your configured model and business reviewers as a separate step.
 Context tests also cover multiple versions, client switching, historical
 references, comparisons, long histories, tool argument drift and older checkpoints.
 
+
+## Local Phoenix tracing
+
+The [Phoenix trial](../../docs/phoenix-trial.md) uses a separate Python environment and SQLite.
+Run `start-phoenix.bat setup` once from the library repository root, then follow
+the guide to enable Phoenix in the root `.env`. `start-local.bat` starts the local
+Phoenix server before rmprep and Agent Lab, using `.agentlib\phoenix\.venv`.
+`stop-local.bat` in another Command Prompt stops the stack and preserves
+conversations, traces, and checkpoints. **Ctrl+C** in the original launcher also works.
+Each response links to its Phoenix trace; the existing turn inspector remains available.

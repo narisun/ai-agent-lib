@@ -5,7 +5,7 @@ from pathlib import Path
 
 from ai_agent_lib_core.contracts import AgentSnapshot, Principal, ToolSnapshot
 from ai_agent_lib_core.kit import RegistryDocument, load_registries
-from ai_agent_lib_ui.application.catalog import bind_agent
+from ai_agent_lib_ui.application.catalog import bind_agent, same_agent_binding
 from ai_agent_lib_ui.config.settings import Settings
 from ai_agent_lib_ui.contracts.catalog import AgentBinding, McpSummary, PresentationManifest
 from ai_agent_lib_ui.contracts.queries import (
@@ -32,7 +32,11 @@ def read_registries(agents_path: Path, tools_path: Path) -> tuple[AgentSnapshot,
 
 
 def pin_bindings(
-    agents: AgentSnapshot, agent_ids: tuple[str, ...], allowed_urls: frozenset[str]
+    agents: AgentSnapshot,
+    agent_ids: tuple[str, ...],
+    allowed_urls: frozenset[str],
+    *,
+    artifact_agent_ids: frozenset[str] = frozenset(),
 ) -> tuple[AgentBinding, ...]:
     """Explicit operator selection establishes supported question-answer bindings."""
     result: list[AgentBinding] = []
@@ -48,6 +52,7 @@ def pin_bindings(
             registry_revision=agents.revision,
             title=entry.id,
             api_audience=entry.id,
+            capabilities=("artifacts",) if agent_id in artifact_agent_ids else (),
         )
         result.append(
             bind_agent(
@@ -65,12 +70,13 @@ class LocalAccess:
     """A configured local identity can use only explicitly selected agent IDs.
 
     This UI permission check supplements the agent's own policy enforcement. It
-    grants no diagnostics access and cannot be changed through browser headers.
+    grants scoped diagnostics only when enabled in server settings, never by headers.
     """
 
     def __init__(self, settings: Settings) -> None:
         self.principal = settings.identity.principal()
         self.agent_ids = frozenset(binding.manifest.agent_id for binding in settings.bindings)
+        self.inspector_enabled = settings.inspector_enabled
 
     def owns(self, principal: Principal) -> None:
         """Require the configured tenant, subject and roles."""
@@ -84,12 +90,16 @@ class LocalAccess:
     async def require(self, view: ViewContext, action: Permission) -> None:
         """Fail closed for other identities, agents and unsupported permissions."""
         self.owns(view.principal)
-        if view.scope.application not in self.agent_ids or action not in {
+        allowed = {
             Permission.CATALOG_READ,
             Permission.AGENT_INVOKE,
             Permission.CONVERSATION_READ,
             Permission.CONVERSATION_WRITE,
-        }:
+            Permission.ARTIFACT_READ,
+        }
+        if self.inspector_enabled:
+            allowed.update({Permission.DIAGNOSTIC_METADATA, Permission.DIAGNOSTIC_CONTENT})
+        if view.scope.application not in self.agent_ids or action not in allowed:
             raise ContractError(ErrorCode.NOT_FOUND)
 
 
@@ -100,7 +110,7 @@ class FileCatalog:
         self.settings, self.access = settings, access
 
     async def resolve(self, principal: Principal, agent_id: str) -> AgentBinding:
-        """Resolve a pinned entry, rejecting registry revisions changed since init."""
+        """Allow unrelated registry edits while retaining the selected agent's pin."""
         self.access.owns(principal)
         pinned = next((b for b in self.settings.bindings if b.manifest.agent_id == agent_id), None)
         if pinned is None:
@@ -112,13 +122,13 @@ class FileCatalog:
         if entry is None:
             raise ContractError(ErrorCode.NOT_FOUND)
         current = bind_agent(
-            pinned.manifest,
+            pinned.manifest.model_copy(update={"registry_revision": agents.revision}),
             entry,
             registry_revision=agents.revision,
             allowed_urls=self.settings.allowed_urls,
             local=True,
         )
-        if current != pinned:
+        if not same_agent_binding(pinned, current):
             raise ContractError(ErrorCode.STALE_BINDING)
         return current
 

@@ -25,6 +25,11 @@ def context(subject: str = "u-1", thread: str = "meeting-1") -> RequestContext:
     ("question", "expected"),
     [
         ("Prepare a meeting memo for JONE-0022.", "memoagent"),
+        ("prepare rm prep for canada goose", "memoagent"),
+        ("Please prepare RMPREP for Canada Goose.", "memoagent"),
+        ("Create a relationship manager preparation for Canada Goose.", "memoagent"),
+        ("What does 'prepare rm prep' mean?", "qnaagent"),
+        ("qna: how do I prepare rm prep?", "qnaagent"),
         ("Please refresh the memo for JONE-0022.", "memoagent"),
         ("  MEMO: JONE-0022", "memoagent"),
         ("qna: How do I prepare a memo?", "qnaagent"),
@@ -55,7 +60,7 @@ async def test_three_nodes_share_history_and_apply_the_specialists_prompt() -> N
 
     prompts = fakes.model.models[0].calls
     assert all(
-        str(call[0].content).startswith(expected)
+        call[0].content[0] == {"type": "text", "text": expected}
         for call, expected in zip(prompts, [MEMO_PROMPT, QNA_PROMPT, MEMO_PROMPT], strict=True)
     )
     assert [message.content for message in prompts[1][1:]] == [

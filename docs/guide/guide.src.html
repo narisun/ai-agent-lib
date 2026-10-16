@@ -181,7 +181,7 @@ kbd { font-family: var(--font-mono); font-size: .85em; border: 1px solid var(--l
 <a class="skip-link" href="#main">Skip to the guide</a>
 <div class="shell">
 <header class="masthead">
-  <p class="eyebrow">ai-agent-lib · Developer guide</p>
+  <p class="eyebrow">ai-agent-lib Â· Developer guide</p>
   <h1>Build and test agents with ai-agent-lib</h1>
   <p class="lede">Understand the design, build a local agent, and extend it with tested
   tools. Use interfaces and dependency injection to keep application logic separate
@@ -196,6 +196,9 @@ kbd { font-family: var(--font-mono); font-size: .85em; border: 1px solid var(--l
   working agent. Steps 2–3 explain the generated code and add a tested tool.
   Use the later sections when you need configuration, shared tools, model tracing,
   or deployment. The local walkthrough uses your normal Windows account.</p>
+  <p class="small">To test the included rmprep agent in a browser, follow
+  <a href="local-startup.md">Agent Lab startup</a>. To find a package, setup path,
+  or reference document, use the <a href="README.md">documentation map</a>.</p>
 </header>
 
 <nav class="toc" aria-label="Contents">
@@ -408,6 +411,26 @@ def test_expiry_uses_the_supplied_clock() -&gt; None:
   the integration checks their types and capabilities. This keeps LangGraph details
   out of the shared contracts, while the application graph itself remains LangGraph code.</p>
   </details>
+  <h3 id="library-and-simulator">How the library and Agent Lab fit together</h3>
+  <p>The library supplies the agent's services; <strong>Agent Lab</strong> is the
+  browser simulator used to test them. The UI sends a question to the selected
+  agent over HTTP. That agent restores its LangGraph state, selects model context,
+  calls its governed model and tools, and returns an answer. MCP servers own shared
+  tool execution. The UI presents the answer, metrics, documents, and diagnostic links.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Component</th><th>Owns</th><th>Local Python environment</th></tr></thead>
+    <tbody>
+      <tr><td>Agent and MCP services</td><td>Business workflow, evidence, policy enforcement, and graph checkpoints</td><td><code>.venv</code> in the library checkout</td></tr>
+      <tr><td>Agent Lab</td><td>Agent selection, displayed chat history, memo versions, and inspection pages</td><td><code>packages/ai-agent-lib-ui/.venv</code></td></tr>
+      <tr><td>Langfuse, when enabled</td><td>Model/tool observations and trace browsing</td><td>A separate service; the agent exports through its existing Python environment</td></tr>
+      <tr><td>Phoenix local trial, when enabled</td><td>Model/tool observations in a local SQLite database</td><td><code>.agentlib/phoenix/.venv</code>; included by <code>start-local.bat</code> when enabled</td></tr>
+    </tbody>
+  </table></div>
+  <p>A saved UI message, a graph checkpoint, and a model input are different things.
+  The checkpoint preserves state; the agent's context policy chooses what to send
+  on each model call. The UI sends only the new question with the thread ID.
+  See the <a href="README.md#know-which-state-you-are-looking-at">state ownership table</a>
+  and <a href="README.md#find-the-code">code map</a> when tracing a request.</p>
   <div class="note">
     <strong>Route external calls through the governed interfaces.</strong>
     <p>A graph node that constructs an SDK client and calls it directly bypasses
@@ -884,6 +907,10 @@ EAP_MODEL_PROVIDER=fake</code></pre>
   secrets. <code>options</code> lists accepted keys and defaults. <code>doctor</code>
   tries to build and validate the configured services; with cloud adapters, this can
   contact those services.</p>
+  <p>For optional Langfuse tracing, <code>explain</code> also shows the source file
+  or process variable for each setting and masks both API keys. <code>doctor</code>
+  checks these settings with the same resolver as startup. Its Langfuse check
+  validates configuration without contacting the tracing server.</p>
   <h3>Optional: use a hosted model</h3>
   <p>Continue using the fake model while learning and testing. Follow these steps
   when your team has approved a model endpoint and supplied account access:</p>
@@ -1026,6 +1053,36 @@ EAP_MODEL_PROVIDER=fake</code></pre>
 
 <section id="faq">
   <h2>8. Common questions and how-to recipes</h2>
+  <details id="local-startup">
+    <summary>How do I start Agent Lab, the agent, and the MCP server together?</summary>
+    <p><strong>Agent Lab</strong> is the local browser workspace for testing agents
+    and inspecting their responses. The <code>ai-agent-lib-ui</code> package supplies
+    the application. Its flask logo connects three nodes representing the agent,
+    its tools, and saved state.</p>
+    <p>Open Command Prompt in the library repository root and run
+    <code>setup-local.bat</code> once, then <code>start-local.bat</code>.
+    Setup uses your enterprise Python and pip configuration and keeps the UI in
+    its own virtual environment. The launcher starts the rmprep MCP server,
+    HTTP agent, and Agent Lab in order, waiting for readiness at each step.</p>
+    <p>In Agent Lab, select <strong>Choose agent</strong>, then <strong>Start chat</strong>.
+    Each chat identifies its selected agent. Open <strong>Memos</strong> for a memo
+    beside chat and select a saved version. Open <strong>Logs</strong>, choose a chat,
+    then a turn to inspect LLM input/output, MCP calls and checkpoints. Chat history
+    stays in the left sidebar; rename and archive are under
+    <strong>Logs → Manage chat history</strong>.</p>
+    <p>New rmprep batch configurations enable memo artifacts. For an existing UI
+    configuration, add <code>"artifacts"</code> to the rmprep binding's
+    <code>manifest.capabilities</code> array and restart. Generate a new memo to see
+    it in the panel; older text-only answers stay in chat. Viewing an old memo does
+    not change the agent's active context, so include its memo reference in a question.</p>
+    <p>Open <code>http://127.0.0.1:8765</code> when all services are ready.
+    Run <code>stop-local.bat</code> in a second Command Prompt to stop this
+    checkout's managed services, including local Phoenix. Saved conversations,
+    traces and checkpoints remain available on restart. Ctrl+C in the launcher
+    window also works; services started before this update need Ctrl+C once. Follow the <a href="local-startup.md">local
+    startup guide</a> for the login code, model setup, service logs, UI-only
+    startup, and the scripted trace walkthrough.</p>
+  </details>
   <p>Use these recipes when you want to explain an agent's behavior from the messages,
   tools, and state involved. Commands run from the <code>tutorial/</code> workspace
   using the Python interpreter selected during setup.</p>
@@ -1179,6 +1236,39 @@ Trace: .../agents/helper/.agentlib/react-demo.jsonl</code></pre>
   The scripted example's in-memory store lasts for one script run. Starting a new
   thread leaves the previous thread's history in its store.</p>
 
+  <h3>How do I enable Anthropic prompt caching?</h3>
+  <p>Add this line to the agent's <code>.env</code> and restart the agent. It applies
+  to the direct <code>anthropic</code> provider and all aliases using that provider:</p>
+<pre><code>EAP_MODEL_OPTIONS={"anthropic":{"prompt_caching":true,"cache_ttl":"5m"}}</code></pre>
+  <p>Keep reusable instructions first and per-request context afterwards. The
+  LangGraph helper <code>static_system_prompt(instructions, request_context)</code>
+  builds two text blocks. When caching is enabled, the Anthropic adapter marks
+  the static block with a cache breakpoint and enables automatic caching for the
+  growing conversation. Existing model-provider interfaces continue to work.</p>
+<pre><code class="language-python">from ai_agent_lib_core.integrations.langgraph import static_system_prompt
+
+messages = [static_system_prompt(SYSTEM_INSTRUCTIONS, request_context), *conversation]
+reply = await services.model().ainvoke(messages)</code></pre>
+  <p>In rmprep, prompt resources live under
+  <code>src/rmprep/prompts/&lt;agent&gt;/&lt;type&gt;.v&lt;version&gt;.md</code>.
+  The loader pins <code>rmprep/common.v3.md</code>, <code>memoagent/system.v2.md</code>
+  and <code>qnaagent/system.v3.md</code>. Dates, client selection and output budgets
+  stay in request context. The router uses Python rules and needs no model prompt.
+  Add a new version and update the loader explicitly when changing instructions.</p>
+  <p>Inspect <code>model.request.invocation_options.cache_control</code> and the
+  first system text block in the trace. A cold request can report zero cache reads
+  while writing a prefix; a later matching request within the TTL can read it.
+  The UI shows cache read/write counts and <code>cache reads / total input tokens</code>.
+  Totals include tool-loop calls and revisions. A prefix must meet the model's
+  minimum length; for Claude Sonnet 4.5 this is 1,024 tokens. Different prompts,
+  tools, selected history, or an expired cache can reduce the hit rate.</p>
+  <p>Use <code>"prompt_caching":false</code> to disable this setting.
+  <code>"cache_ttl":"1h"</code> is also supported and has a higher write cost.
+  This caches prompt processing at Anthropic; every question still runs policy,
+  guardrails, the model, and audit. Checkpoints continue to own conversation history.
+  Read the <a href="https://platform.claude.com/docs/en/build-with-claude/prompt-caching">Anthropic prompt caching guide</a>
+  for model limits and pricing. Bedrock caching requires its own provider implementation.</p>
+
   <h3>Why does the model miss earlier information or repeat tool calls?</h3>
   <p>Inspect the next <code>model.request.messages</code>. Confirm that the expected
   history and tool result are present, then check the following:</p>
@@ -1195,6 +1285,46 @@ Trace: .../agents/helper/.agentlib/react-demo.jsonl</code></pre>
   history; it does not automatically summarize or trim it to a model's context
   window. Add and test a context-selection or summarization step when your
   application needs one, then use the trace to verify the messages it selects.</p>
+  <p>Check every model request in a ReAct loop, including requests after tools and
+  validation corrections. For example, rmprep can search for <code>canada</code>,
+  then answer <code>Compare these two clients' financials.</code> on the same thread.
+  Its <code>selection.client_uens</code> keeps both returned clients selected, and
+  model input keeps the original search result plus each financial result. Retrieving
+  one client's data must not remove the other client from that group. The
+  <a href="../examples/rmprep/docs/context-management.md#compare-clients-returned-by-a-search">rmprep comparison walkthrough</a>
+  explains the expected trace and how to switch to another client.</p>
+
+  <p>rmprep saves conversation focus separately from the current action: selected
+  clients, memo references, evidence date and the latest accepted evidence exchange.
+  A follow-up such as "What about debt?" retains that focus. After a refresh,
+  "How did you calculate that?" uses the fresh answer; an explicit old memo
+  reference returns to that document's original snapshot. Existing checkpoints
+  are normalized on their next request.</p>
+
+  <h3 id="rmprep-context-budget">How much history can rmprep use in a long conversation?</h3>
+  <p>rmprep allows an estimated <strong>128,000 input tokens</strong> per model call,
+  with up to <strong>96,000 tokens of recent discussion</strong>. A question can use
+  up to 16,000 tokens, and 4,000 tokens are reserved for tool definitions. The recent
+  history, question, selected memo evidence, tool results and instructions share the
+  total input limit. The larger recent-history allowance retains the verified
+  two-client financial comparison for follow-up questions.</p>
+  <p>Set the <code>RMPREP_CONTEXT_*</code> variables in the agent's <code>.env</code>,
+  or on its Fargate task, and restart the agent. Their defaults and purposes appear
+  in the <a href="#variables">configuration table</a>. Process variables override
+  the file. Check the active settings with the Python environment where rmprep is installed:</p>
+<pre><code>python -c "from rmprep.settings import load_context_budget; print(load_context_budget())"</code></pre>
+  <p>The full conversation remains in the checkpoint. If it outgrows model input,
+  rmprep keeps selected memo/search exchanges and the newest complete discussion
+  that fits. Older topics have short extracts; those are not a full factual summary.
+  Select a memo reference for exact historical evidence. Q&amp;A reuses suitable
+  records already supplied and retrieves missing or explicitly refreshed records.</p>
+  <p>A larger budget supports longer conversations but cannot cover every possible
+  conversation. Keep it below the model's window with room for output, and check
+  actual usage in traces. Larger requests can cost more and take longer; cached
+  tokens still occupy context space. See
+  <a href="https://platform.claude.com/docs/en/build-with-claude/context-windows">Anthropic's context-window guide</a>
+  and the <a href="../examples/rmprep/docs/context-management.md#keep-long-conversations-usable">rmprep budget recipe</a>.
+  Checkpoint diagnostics show the selected budget, retained recent tokens and omitted turns.</p>
 
   <h3>Why is the trace empty or incomplete?</h3>
   <p>Run <code>"%PYTHON%" -m ai_agent_lib_cli config explain helper</code> to verify
@@ -1469,6 +1599,10 @@ async def classify(
   <p>On macOS/Linux, use <code>cd "$LIBRARY"</code> for the first line and
   <code>"$PYTHON"</code> for the Python commands. The installation helper uses pip.
   Import-linter checks that code respects the package dependency boundaries.</p>
+  <p>For changes to Agent Lab, use its separate Python environment and
+  <a href="../packages/ai-agent-lib-ui/README.md#run-the-checks-and-build-a-wheel">UI checks</a>.
+  The library's default test command does not replace that suite. The
+  <a href="README.md#find-the-code">code map</a> shows which package owns each responsibility.</p>
   <p>Keep a change in the layer that owns it. Put shared interfaces in contracts,
   provider-specific behavior in adapters, and LangGraph behavior in its integration.
   Add a regression test that fails before the fix. For a new adapter, run its contract
@@ -1569,7 +1703,7 @@ async def classify(
   <details class="lesson" id="variables" open>
     <summary>Configuration variables: local and AWS</summary>
     <p>This is the complete list of environment variables bound by ai-agent-lib,
-    followed by the OpenTelemetry settings and Python/pip setup variables used in
+    followed by OpenTelemetry, Python/pip setup and rmprep context settings used in
     this guide. <strong>Local</strong> means the Windows tutorial.
     <strong>AWS</strong> means the team's Fargate deployment. Values are examples
     unless labelled as defaults; replace service names, endpoints, IDs, and paths
@@ -1694,12 +1828,91 @@ async def classify(
         <tr><td><code>GET /healthz</code></td><td>Liveness: is the HTTP listener responding?</td></tr>
         <tr><td><code>GET /readyz</code></td><td>Readiness: are services and graph preparation complete?</td></tr>
         <tr><td><code>POST /invoke</code></td><td>Accepts <code>{"input":{"question":"..."},"thread_id":"..."}</code> for the generated agent. Returns <code>output</code>, <code>thread_id</code>, and <code>request_id</code>.</td></tr>
-        <tr><td><code>POST /invoke/stream</code></td><td>The same input, with graph-step updates as server-sent events. Each event reports a graph update, rather than an individual model token.</td></tr>
+        <tr><td><code>POST /invoke</code> with <code>Accept: text/event-stream</code></td><td>With <code>live_updates=True</code> in <code>agent_app</code>, streams provisional model text, then an accepted result with token usage. Enabled in newly generated agents and rmprep.</td></tr>
+        <tr><td><code>POST /invoke/stream</code></td><td>The same input, with graph-step updates as server-sent events. Each event reports a completed graph update.</td></tr>
       </tbody>
     </table></div>
     <p>For authenticated requests, send <code>Authorization: Bearer &lt;token&gt;</code>.
     An optional <code>x-request-id</code> correlates requests. The local static identity
     supplies the tutorial's configured development caller.</p>
+    <p><a href="../packages/ai-agent-lib-ui/README.md">Agent Lab</a> shows
+    a live draft while the model responds. It removes the temporary draft panel
+    once the final outcome is saved, then shows input/output tokens, elapsed time and cache-hit
+    ratio when reported. Usage includes model calls made for tool selection and
+    revisions. Missing counts display as unavailable; fake-model usage is marked
+    simulated. Reopening a conversation restores its saved answer and metrics.</p>
+    <p>The default pattern guardrails check the output size before each live text
+    update. Blocking PII checks and structured-output schemas wait for the complete
+    response before releasing text. Live drafts are provisional; only the accepted
+    final answer is saved. Chat keeps metrics and the Phoenix or Langfuse trace
+    link visible, with detailed evidence available through the trace and Logs page.</p>
+    <p>In the MCP console, each admitted named query writes a <code>data_query</code>
+    line: query name, duration, returned rows and columns, truncation and masked
+    columns. Local detail logging also shows bounded, credential-masked parameters
+    such as client UEN, date range and page offset. Returned records are not copied
+    into these log lines. Deployed logging omits parameter values; use the request
+    ID to connect queries with the MCP call and model trace.</p>
+    <p>The optional <a href="langfuse.md">library Langfuse integration</a> adds an
+    <strong>Open trace in Langfuse</strong> link to each accepted response. Langfuse
+    runs as a separate service; developers connect with the existing Python and pip
+    setup. Each request has its own trace, grouped with the thread's other requests.
+    Model attempts and MCP calls appear in its timeline. Checkpoint IDs link back
+    to saved state inspected through the agent. Content export is an explicit
+    setting; operational metrics retain their existing destination.</p>
+    <p>Checkpoint reference collection stops after one second or 64 references.
+    If the history read times out, the answer still returns and trace metadata
+    marks the references unavailable. The checkpoint database remains the source
+    of saved conversation state.</p>
+    <p>Newly generated agents include this integration in <code>service.py</code>.
+    The library owns export and shutdown; your response function owns what the
+    graph does. This is dependency injection: tests supply an in-memory exporter,
+    and deployed services use the same graph with the configured exporter.
+    Existing graph callbacks are preserved, and governed native tools appear once
+    in the trace. The adapter adds <code>output.trace</code> when enabled; existing
+    answer, streaming and checkpoint interfaces keep their behavior.</p>
+    <p>Get the project URL and keys from the platform team, then put them in a
+    private settings file. From Command Prompt, select the agent's Python environment
+    and follow its generated <code>docs/langfuse.md</code>:</p>
+    <pre><code class="language-bat">set "EAP_LANGFUSE_ENV_FILE=F:\work\langfuse\agent.env"
+python -m your_agent.service</code></pre>
+    <p>Replace the path and module name with your own values. The file sets
+    <code>EAP_LANGFUSE_ENABLED=true</code> and the project settings listed in the
+    <a href="#variables">configuration table</a>.
+    <code>EAP_LANGFUSE_CAPTURE_CONTENT=false</code> records metadata and usage;
+    set it to <code>true</code> for approved test data to inspect messages and results.
+    The generated dependencies include the <code>otel</code> extra and install
+    with Python and pip. For an older service, follow the
+    <a href="langfuse.md#add-tracing-to-an-existing-service">integration steps</a>.
+    The <a href="langfuse-trial.md">verified rmprep walkthrough</a> shows a memo
+    and follow-ups with their MCP calls, token counts and checkpoint references.</p>
+    <p>For a desktop trial using Python and pip, follow the
+    <a href="phoenix-trial.md">local Phoenix walkthrough</a>. Run
+    <code>start-phoenix.bat setup</code> once, then enable Phoenix in the root
+    <code>.env</code>. Run <code>start-local.bat</code> to start the local Phoenix server
+    before the MCP, agent, and UI services. It keeps its own Python environment;
+    <code>stop-local.bat</code> stops the stack and preserves SQLite traces. The agent
+    adds an <strong>Open trace in Agent Lab</strong> link to each response, opening the configured Phoenix trace. The walkthrough
+    lists the opt-in settings and a verified Anthropic conversation. Enable one
+    tracing backend at a time. Existing Langfuse integrations remain supported.</p>
+    <p>When model output guardrails or a structured-output schema are configured,
+    text is buffered until those checks pass. Otherwise provider tokens can appear
+    immediately. Drafts can still change during business validation; only the final
+    accepted answer enters chat history. Keep <code>live_updates=False</code> when
+    application-specific checks must finish before any draft is shown.</p>
+    <p>Long chats load recent messages first; use <strong>View older messages</strong>
+    to browse earlier pages. Reopening a held thread checks the agent's outcome journal
+    without resending its question. A confirmed outcome restores the answer or failure;
+    an unknown outcome keeps the thread held. Local rmprep and newly generated local
+    agents save this journal in <code>.agentlib/outcomes.sqlite</code> beside their
+    project file. It contains accepted answers, so protect it like checkpoints.
+    Restart the agent and UI after updating their code.</p>
+    <p>The agent HTTP service accepts one active request per caller and thread.
+    An overlapping request receives <code>409 thread_busy</code> before it runs.
+    Wait for the active turn to finish before submitting again. The default guard
+    covers one application instance. Multiple worker processes or replicas need
+    a shared admission provider; a shared checkpoint database alone does not
+    serialize turns. See <a href="http-thread-admission.md">thread admission</a>
+    for deployment and extension details.</p>
   </details>
   <details class="lesson" id="extras">
     <summary>Optional dependency groups (extras)</summary>

@@ -29,6 +29,7 @@
 | `EAP_POLICY_OPTIONS` | JSON options for the policy adapter.<br>Options of the selected policy adapter, as one JSON object. Unknown keys stop startup. `agentlib config options policy` lists each adapter's options. | `{}`: the adapter's defaults | JSON |
 | `EAP_GUARDRAILS_PROVIDER` | Adapter that serves the guardrails section.<br>Content checks on prompts, replies and tool results. | local: `patterns`, aws: `bedrock` |  |
 | `EAP_GUARDRAILS_OPTIONS` | JSON options for the guardrails adapter.<br>Options of the selected guardrails adapter, as one JSON object. Unknown keys stop startup. `agentlib config options guardrails` lists each adapter's options. | `{}`: the adapter's defaults | JSON |
+| `EAP_MODEL_OPTIONS` | JSON options keyed by model provider name.<br>For Anthropic prompt caching, use {"anthropic": {"prompt_caching": true, "cache_ttl": "5m"}}. Options apply to every alias using that provider. Unknown options stop startup. `agentlib config options model` lists options. | `{}`: each provider's defaults; Anthropic prompt caching is off | JSON |
 | `EAP_DATA_SOURCES` | JSON map of named data sources, e.g. {"accounts": {"kind": "duckdb_csv", "data_dir": "data", "queries_dir": "queries"}}.<br>Named data sources for MCP tools. Each entry names its adapter with `kind`; the other keys are that adapter's options. Code asks for `services.data_source("ledger")` and never sees the backend. | `{}`: no data sources | JSON |
 | `EAP_SECRET_<NAME>` | A named secret for the env secrets adapter. `EAP_SECRET_RATES_TOKEN` supplies the secret `rates_token`. | not set | sensitive |
 
@@ -45,3 +46,26 @@ These keep their own names. The library reads them and never renames them.
 | `HTTPS_PROXY` | Outbound proxy.<br>Outbound proxy. The AWS clients and the anthropic model use it; the jwt identity provider and rest data sources use it only when their `use_proxy` option is set. Masked wherever it is shown, since it can carry credentials. | not set | sensitive; also read from `https_proxy` |
 | `NO_PROXY` | Hosts that bypass the proxy.<br>Comma-separated hosts the AWS clients reach without the proxy. | not set | also read from `no_proxy` |
 | `ANTHROPIC_API_KEY` | API key for the anthropic model provider.<br>Supplies the secret `anthropic_api_key`, which the anthropic model provider asks the secrets port for. Masked wherever it is shown. | not set | sensitive |
+
+## Optional Langfuse integration
+
+These settings are resolved by `load_langfuse_settings` at the service boundary, separately from `ServiceConfig`. See [Langfuse setup](langfuse.md) for purposes, defaults and precedence.
+
+- `EAP_LANGFUSE_ENABLED`
+- `EAP_LANGFUSE_CAPTURE_CONTENT`
+- `EAP_LANGFUSE_ENV_FILE`
+- `LANGFUSE_BASE_URL`
+- `LANGFUSE_PROJECT_ID`
+- `LANGFUSE_PUBLIC_KEY`
+- `LANGFUSE_SECRET_KEY`
+
+## Optional Phoenix integration
+
+These settings are resolved by `load_phoenix_settings` separately from `ServiceConfig`. See the [local Phoenix trial](phoenix-trial.md) for purposes, defaults, precedence and the separate SQLite server setup.
+
+- `EAP_PHOENIX_ENABLED`
+- `EAP_PHOENIX_CAPTURE_CONTENT`
+- `EAP_PHOENIX_ENV_FILE`
+- `PHOENIX_COLLECTOR_ENDPOINT`
+- `PHOENIX_PROJECT_NAME`
+- `PHOENIX_API_KEY`

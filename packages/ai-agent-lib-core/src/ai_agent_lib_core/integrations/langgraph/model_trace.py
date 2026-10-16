@@ -36,7 +36,7 @@ _CREDENTIAL_KEYS = frozenset(
 )
 
 
-def _content(value: object) -> object:
+def diagnostic_content(value: object) -> object:
     """Keep JSON structure and full text, masking recognizable credentials.
 
     Unknown objects are identified by type, never by a repr that could expose a
@@ -54,11 +54,11 @@ def _content(value: object) -> object:
         return {
             str(key): REDACTED
             if str(key).lower().replace("-", "_") in _CREDENTIAL_KEYS
-            else _content(item)
+            else diagnostic_content(item)
             for key, item in value.items()
         }
     if isinstance(value, list | tuple):
-        return [_content(item) for item in value]
+        return [diagnostic_content(item) for item in value]
     return f"<{type(value).__name__}>"
 
 
@@ -115,7 +115,9 @@ class ModelTrace:
                 "model_id": call.model_id,
                 **payload(),
             }
-            await self._sink.write({key: _content(value) for key, value in record.items()})
+            await self._sink.write(
+                {key: diagnostic_content(value) for key, value in record.items()}
+            )
         except Exception as error:  # noqa: BLE001 - diagnostics must not fail model operations
             self._failed = True
             _LOG.warning(

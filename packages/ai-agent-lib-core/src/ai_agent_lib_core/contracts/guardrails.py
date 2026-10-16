@@ -4,12 +4,18 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from ai_agent_lib_core.contracts._validation import require_identifier
 from ai_agent_lib_core.contracts.identity import RequestContext
 
-__all__ = ["GuardrailCheck", "GuardrailFinding", "GuardrailPoint", "GuardrailVerdict"]
+__all__ = [
+    "GuardrailCheck",
+    "GuardrailFinding",
+    "GuardrailPoint",
+    "GuardrailVerdict",
+    "StreamingGuardrailCheck",
+]
 
 
 class GuardrailPoint(enum.StrEnum):
@@ -82,4 +88,25 @@ class GuardrailCheck(Protocol):
         self, point: GuardrailPoint, text: str, context: RequestContext | None
     ) -> GuardrailVerdict:
         """Return what the checks found in ``text``."""
+        ...
+
+
+@runtime_checkable
+class StreamingGuardrailCheck(Protocol):
+    """Optional capability for checking public text before each draft update.
+
+    Providers must opt in only when a prefix can be released safely. Checks
+    that need the complete response (such as blocking PII detection) buffer
+    instead. The ordinary final output check still runs in both cases.
+    """
+
+    @property
+    def supports_streaming_output(self) -> bool:
+        """Whether the current policy permits checked provisional text."""
+        ...
+
+    async def check_output_prefix(
+        self, text: str, context: RequestContext | None
+    ) -> GuardrailVerdict:
+        """Check the accumulated public text before its next chunk is released."""
         ...

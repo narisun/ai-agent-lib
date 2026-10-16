@@ -18,3 +18,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rmprep"]
+
+[tool.ai-agent-lib.langfuse]
+# Keep CLI diagnostics consistent with the original trial's environment aliases.
+legacy-prefix = "RMPREP"

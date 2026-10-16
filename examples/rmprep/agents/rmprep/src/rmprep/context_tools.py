@@ -16,15 +16,17 @@ def tool_context_issues(
 ) -> list[str]:
     """Reject a model's client/date drift before any tool executes."""
     selected = [memo for memo in memos if memo["memo_id"] in selection["memo_ids"]]
-    clients = {memo["uen"] for memo in selected}
+    clients = {memo["uen"] for memo in selected} | set(selection.get("client_uens", []))
     if selection["uen"]:
         clients.add(selection["uen"])
     issues: list[str] = []
     requested_clients = {
         str(call["args"]["uen"]).upper() for call in reply.tool_calls if "uen" in call["args"]
     }
-    if len(requested_clients) > 1 and len(selected) < 2:
-        issues.append("Retrieve evidence for one selected client at a time.")
+    if len(requested_clients) > 1 and len(clients) < 2:
+        issues.append(
+            "Retrieve evidence only for the selected client or an explicitly selected group."
+        )
     for call in reply.tool_calls:
         arguments = call["args"]
         uen = str(arguments.get("uen", "")).upper()
@@ -35,8 +37,10 @@ def tool_context_issues(
         dates = {memo["meeting_date"] for memo in selected if not uen or memo["uen"] == uen}
         if selection["meeting_date"]:
             dates.add(selection["meeting_date"])
+        if selection["retrieval_date"]:
+            dates = {selection["retrieval_date"]}
         if selection["mode"] == "refresh":
-            dates = {today}
+            dates = {selection["retrieval_date"] or today}
         key = "meeting_date" if call["name"].endswith("get_memo_evidence") else "end_date"
         if dates and str(arguments.get(key, "")) not in dates:
             issues.append(

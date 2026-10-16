@@ -188,7 +188,7 @@ kbd { font-family: var(--font-mono); font-size: .85em; border: 1px solid var(--l
 <a class="skip-link" href="#main">Skip to the guide</a>
 <div class="shell">
 <header class="masthead">
-  <p class="eyebrow">ai-agent-lib · Developer guide</p>
+  <p class="eyebrow">ai-agent-lib Â· Developer guide</p>
   <h1>Build and test agents with ai-agent-lib</h1>
   <p class="lede">Understand the design, build a local agent, and extend it with tested
   tools. Use interfaces and dependency injection to keep application logic separate
@@ -203,6 +203,9 @@ kbd { font-family: var(--font-mono); font-size: .85em; border: 1px solid var(--l
   working agent. Steps 2–3 explain the generated code and add a tested tool.
   Use the later sections when you need configuration, shared tools, model tracing,
   or deployment. The local walkthrough uses your normal Windows account.</p>
+  <p class="small">To test the included rmprep agent in a browser, follow
+  <a href="local-startup.md">Agent Lab startup</a>. To find a package, setup path,
+  or reference document, use the <a href="README.md">documentation map</a>.</p>
 </header>
 
 <nav class="toc" aria-label="Contents">
@@ -415,6 +418,26 @@ def test_expiry_uses_the_supplied_clock() -&gt; None:
   the integration checks their types and capabilities. This keeps LangGraph details
   out of the shared contracts, while the application graph itself remains LangGraph code.</p>
   </details>
+  <h3 id="library-and-simulator">How the library and Agent Lab fit together</h3>
+  <p>The library supplies the agent's services; <strong>Agent Lab</strong> is the
+  browser simulator used to test them. The UI sends a question to the selected
+  agent over HTTP. That agent restores its LangGraph state, selects model context,
+  calls its governed model and tools, and returns an answer. MCP servers own shared
+  tool execution. The UI presents the answer, metrics, documents, and diagnostic links.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Component</th><th>Owns</th><th>Local Python environment</th></tr></thead>
+    <tbody>
+      <tr><td>Agent and MCP services</td><td>Business workflow, evidence, policy enforcement, and graph checkpoints</td><td><code>.venv</code> in the library checkout</td></tr>
+      <tr><td>Agent Lab</td><td>Agent selection, displayed chat history, memo versions, and inspection pages</td><td><code>packages/ai-agent-lib-ui/.venv</code></td></tr>
+      <tr><td>Langfuse, when enabled</td><td>Model/tool observations and trace browsing</td><td>A separate service; the agent exports through its existing Python environment</td></tr>
+      <tr><td>Phoenix local trial, when enabled</td><td>Model/tool observations in a local SQLite database</td><td><code>.agentlib/phoenix/.venv</code>; included by <code>start-local.bat</code> when enabled</td></tr>
+    </tbody>
+  </table></div>
+  <p>A saved UI message, a graph checkpoint, and a model input are different things.
+  The checkpoint preserves state; the agent's context policy chooses what to send
+  on each model call. The UI sends only the new question with the thread ID.
+  See the <a href="README.md#know-which-state-you-are-looking-at">state ownership table</a>
+  and <a href="README.md#find-the-code">code map</a> when tracing a request.</p>
   <div class="note">
     <strong>Route external calls through the governed interfaces.</strong>
     <p>A graph node that constructs an SDK client and calls it directly bypasses
@@ -430,14 +453,14 @@ def test_expiry_uses_the_supplied_clock() -&gt; None:
 <div class="table-wrap"><table class="compact">
 <thead><tr><th>Concern and contract</th><th>Local profile</th><th>AWS profile</th></tr></thead>
 <tbody>
-<tr><td>Caller identity — <code>IdentityVerifier</code></td><td><code>static</code></td><td><code>jwt</code></td></tr>
-<tr><td>Permission decisions — <code>PolicyDecisionPoint</code></td><td><code>rules</code></td><td><code>opa</code></td></tr>
-<tr><td>Audit evidence — <code>AuditSink</code></td><td><code>jsonl</code></td><td><code>firehose</code></td></tr>
-<tr><td>Secrets — <code>SecretsProvider</code></td><td><code>env</code></td><td><code>secrets_manager</code></td></tr>
-<tr><td>Conversation state — <code>CheckpointBackend</code></td><td><code>sqlite</code></td><td><code>postgres</code></td></tr>
-<tr><td>Agent/tool registry — <code>RegistrySource</code></td><td><code>file</code></td><td><code>s3_file</code></td></tr>
-<tr><td>Content checks — <code>GuardrailCheck</code></td><td><code>patterns</code></td><td><code>bedrock</code></td></tr>
-<tr><td>Model creation — <code>ChatModelProvider</code></td><td><code>anthropic</code></td><td><code>bedrock</code></td></tr>
+<tr><td>Caller identity â€” <code>IdentityVerifier</code></td><td><code>static</code></td><td><code>jwt</code></td></tr>
+<tr><td>Permission decisions â€” <code>PolicyDecisionPoint</code></td><td><code>rules</code></td><td><code>opa</code></td></tr>
+<tr><td>Audit evidence â€” <code>AuditSink</code></td><td><code>jsonl</code></td><td><code>firehose</code></td></tr>
+<tr><td>Secrets â€” <code>SecretsProvider</code></td><td><code>env</code></td><td><code>secrets_manager</code></td></tr>
+<tr><td>Conversation state â€” <code>CheckpointBackend</code></td><td><code>sqlite</code></td><td><code>postgres</code></td></tr>
+<tr><td>Agent/tool registry â€” <code>RegistrySource</code></td><td><code>file</code></td><td><code>s3_file</code></td></tr>
+<tr><td>Content checks â€” <code>GuardrailCheck</code></td><td><code>patterns</code></td><td><code>bedrock</code></td></tr>
+<tr><td>Model creation â€” <code>ChatModelProvider</code></td><td><code>anthropic</code></td><td><code>bedrock</code></td></tr>
 </tbody></table></div>
   <p>Local adapters use a configured development identity, files, and a SQLite
   database. The AWS defaults use signed JWT tokens, an OPA policy service,
@@ -902,6 +925,10 @@ EAP_MODEL_PROVIDER=fake</code></pre>
   secrets. <code>options</code> lists accepted keys and defaults. <code>doctor</code>
   tries to build and validate the configured services; with cloud adapters, this can
   contact those services.</p>
+  <p>For optional Langfuse tracing, <code>explain</code> also shows the source file
+  or process variable for each setting and masks both API keys. <code>doctor</code>
+  checks these settings with the same resolver as startup. Its Langfuse check
+  validates configuration without contacting the tracing server.</p>
   <h3>Optional: use a hosted model</h3>
   <p>Continue using the fake model while learning and testing. Follow these steps
   when your team has approved a model endpoint and supplied account access:</p>
@@ -1044,6 +1071,36 @@ EAP_MODEL_PROVIDER=fake</code></pre>
 
 <section id="faq">
   <h2>8. Common questions and how-to recipes</h2>
+  <details id="local-startup">
+    <summary>How do I start Agent Lab, the agent, and the MCP server together?</summary>
+    <p><strong>Agent Lab</strong> is the local browser workspace for testing agents
+    and inspecting their responses. The <code>ai-agent-lib-ui</code> package supplies
+    the application. Its flask logo connects three nodes representing the agent,
+    its tools, and saved state.</p>
+    <p>Open Command Prompt in the library repository root and run
+    <code>setup-local.bat</code> once, then <code>start-local.bat</code>.
+    Setup uses your enterprise Python and pip configuration and keeps the UI in
+    its own virtual environment. The launcher starts the rmprep MCP server,
+    HTTP agent, and Agent Lab in order, waiting for readiness at each step.</p>
+    <p>In Agent Lab, select <strong>Choose agent</strong>, then <strong>Start chat</strong>.
+    Each chat identifies its selected agent. Open <strong>Memos</strong> for a memo
+    beside chat and select a saved version. Open <strong>Logs</strong>, choose a chat,
+    then a turn to inspect LLM input/output, MCP calls and checkpoints. Chat history
+    stays in the left sidebar; rename and archive are under
+    <strong>Logs → Manage chat history</strong>.</p>
+    <p>New rmprep batch configurations enable memo artifacts. For an existing UI
+    configuration, add <code>"artifacts"</code> to the rmprep binding's
+    <code>manifest.capabilities</code> array and restart. Generate a new memo to see
+    it in the panel; older text-only answers stay in chat. Viewing an old memo does
+    not change the agent's active context, so include its memo reference in a question.</p>
+    <p>Open <code>http://127.0.0.1:8765</code> when all services are ready.
+    Run <code>stop-local.bat</code> in a second Command Prompt to stop this
+    checkout's managed services, including local Phoenix. Saved conversations,
+    traces and checkpoints remain available on restart. Ctrl+C in the launcher
+    window also works; services started before this update need Ctrl+C once. Follow the <a href="local-startup.md">local
+    startup guide</a> for the login code, model setup, service logs, UI-only
+    startup, and the scripted trace walkthrough.</p>
+  </details>
   <p>Use these recipes when you want to explain an agent's behavior from the messages,
   tools, and state involved. Commands run from the <code>tutorial/</code> workspace
   using the Python interpreter selected during setup.</p>
@@ -1216,6 +1273,39 @@ Trace: .../agents/helper/.agentlib/react-demo.jsonl</code></pre>
   The scripted example's in-memory store lasts for one script run. Starting a new
   thread leaves the previous thread's history in its store.</p>
 
+  <h3>How do I enable Anthropic prompt caching?</h3>
+  <p>Add this line to the agent's <code>.env</code> and restart the agent. It applies
+  to the direct <code>anthropic</code> provider and all aliases using that provider:</p>
+<pre><code>EAP_MODEL_OPTIONS={"anthropic":{"prompt_caching":true,"cache_ttl":"5m"}}</code></pre>
+  <p>Keep reusable instructions first and per-request context afterwards. The
+  LangGraph helper <code>static_system_prompt(instructions, request_context)</code>
+  builds two text blocks. When caching is enabled, the Anthropic adapter marks
+  the static block with a cache breakpoint and enables automatic caching for the
+  growing conversation. Existing model-provider interfaces continue to work.</p>
+<pre><code class="language-python">from ai_agent_lib_core.integrations.langgraph import static_system_prompt
+
+messages = [static_system_prompt(SYSTEM_INSTRUCTIONS, request_context), *conversation]
+reply = await services.model().ainvoke(messages)</code></pre>
+  <p>In rmprep, prompt resources live under
+  <code>src/rmprep/prompts/&lt;agent&gt;/&lt;type&gt;.v&lt;version&gt;.md</code>.
+  The loader pins <code>rmprep/common.v3.md</code>, <code>memoagent/system.v2.md</code>
+  and <code>qnaagent/system.v3.md</code>. Dates, client selection and output budgets
+  stay in request context. The router uses Python rules and needs no model prompt.
+  Add a new version and update the loader explicitly when changing instructions.</p>
+  <p>Inspect <code>model.request.invocation_options.cache_control</code> and the
+  first system text block in the trace. A cold request can report zero cache reads
+  while writing a prefix; a later matching request within the TTL can read it.
+  The UI shows cache read/write counts and <code>cache reads / total input tokens</code>.
+  Totals include tool-loop calls and revisions. A prefix must meet the model's
+  minimum length; for Claude Sonnet 4.5 this is 1,024 tokens. Different prompts,
+  tools, selected history, or an expired cache can reduce the hit rate.</p>
+  <p>Use <code>"prompt_caching":false</code> to disable this setting.
+  <code>"cache_ttl":"1h"</code> is also supported and has a higher write cost.
+  This caches prompt processing at Anthropic; every question still runs policy,
+  guardrails, the model, and audit. Checkpoints continue to own conversation history.
+  Read the <a href="https://platform.claude.com/docs/en/build-with-claude/prompt-caching">Anthropic prompt caching guide</a>
+  for model limits and pricing. Bedrock caching requires its own provider implementation.</p>
+
   <h3>Why does the model miss earlier information or repeat tool calls?</h3>
   <p>Inspect the next <code>model.request.messages</code>. Confirm that the expected
   history and tool result are present, then check the following:</p>
@@ -1232,6 +1322,46 @@ Trace: .../agents/helper/.agentlib/react-demo.jsonl</code></pre>
   history; it does not automatically summarize or trim it to a model's context
   window. Add and test a context-selection or summarization step when your
   application needs one, then use the trace to verify the messages it selects.</p>
+  <p>Check every model request in a ReAct loop, including requests after tools and
+  validation corrections. For example, rmprep can search for <code>canada</code>,
+  then answer <code>Compare these two clients' financials.</code> on the same thread.
+  Its <code>selection.client_uens</code> keeps both returned clients selected, and
+  model input keeps the original search result plus each financial result. Retrieving
+  one client's data must not remove the other client from that group. The
+  <a href="../examples/rmprep/docs/context-management.md#compare-clients-returned-by-a-search">rmprep comparison walkthrough</a>
+  explains the expected trace and how to switch to another client.</p>
+
+  <p>rmprep saves conversation focus separately from the current action: selected
+  clients, memo references, evidence date and the latest accepted evidence exchange.
+  A follow-up such as "What about debt?" retains that focus. After a refresh,
+  "How did you calculate that?" uses the fresh answer; an explicit old memo
+  reference returns to that document's original snapshot. Existing checkpoints
+  are normalized on their next request.</p>
+
+  <h3 id="rmprep-context-budget">How much history can rmprep use in a long conversation?</h3>
+  <p>rmprep allows an estimated <strong>128,000 input tokens</strong> per model call,
+  with up to <strong>96,000 tokens of recent discussion</strong>. A question can use
+  up to 16,000 tokens, and 4,000 tokens are reserved for tool definitions. The recent
+  history, question, selected memo evidence, tool results and instructions share the
+  total input limit. The larger recent-history allowance retains the verified
+  two-client financial comparison for follow-up questions.</p>
+  <p>Set the <code>RMPREP_CONTEXT_*</code> variables in the agent's <code>.env</code>,
+  or on its Fargate task, and restart the agent. Their defaults and purposes appear
+  in the <a href="#variables">configuration table</a>. Process variables override
+  the file. Check the active settings with the Python environment where rmprep is installed:</p>
+<pre><code>python -c "from rmprep.settings import load_context_budget; print(load_context_budget())"</code></pre>
+  <p>The full conversation remains in the checkpoint. If it outgrows model input,
+  rmprep keeps selected memo/search exchanges and the newest complete discussion
+  that fits. Older topics have short extracts; those are not a full factual summary.
+  Select a memo reference for exact historical evidence. Q&amp;A reuses suitable
+  records already supplied and retrieves missing or explicitly refreshed records.</p>
+  <p>A larger budget supports longer conversations but cannot cover every possible
+  conversation. Keep it below the model's window with room for output, and check
+  actual usage in traces. Larger requests can cost more and take longer; cached
+  tokens still occupy context space. See
+  <a href="https://platform.claude.com/docs/en/build-with-claude/context-windows">Anthropic's context-window guide</a>
+  and the <a href="../examples/rmprep/docs/context-management.md#keep-long-conversations-usable">rmprep budget recipe</a>.
+  Checkpoint diagnostics show the selected budget, retained recent tokens and omitted turns.</p>
 
   <h3>Why is the trace empty or incomplete?</h3>
   <p>Run <code>"%PYTHON%" -m ai_agent_lib_cli config explain helper</code> to verify
@@ -1519,6 +1649,10 @@ async def classify(
   <p>On macOS/Linux, use <code>cd "$LIBRARY"</code> for the first line and
   <code>"$PYTHON"</code> for the Python commands. The installation helper uses pip.
   Import-linter checks that code respects the package dependency boundaries.</p>
+  <p>For changes to Agent Lab, use its separate Python environment and
+  <a href="../packages/ai-agent-lib-ui/README.md#run-the-checks-and-build-a-wheel">UI checks</a>.
+  The library's default test command does not replace that suite. The
+  <a href="README.md#find-the-code">code map</a> shows which package owns each responsibility.</p>
   <p>Keep a change in the layer that owns it. Put shared interfaces in contracts,
   provider-specific behavior in adapters, and LangGraph behavior in its integration.
   Add a regression test that fails before the fix. For a new adapter, run its contract
@@ -1619,7 +1753,7 @@ async def classify(
   <details class="lesson" id="variables" open>
     <summary>Configuration variables: local and AWS</summary>
     <p>This is the complete list of environment variables bound by ai-agent-lib,
-    followed by the OpenTelemetry settings and Python/pip setup variables used in
+    followed by OpenTelemetry, Python/pip setup and rmprep context settings used in
     this guide. <strong>Local</strong> means the Windows tutorial.
     <strong>AWS</strong> means the team's Fargate deployment. Values are examples
     unless labelled as defaults; replace service names, endpoints, IDs, and paths
@@ -1732,6 +1866,7 @@ async def classify(
 <tr><td><span class="var" id="var-eap_policy_options">EAP_POLICY_OPTIONS</span></td><td>JSON options for the policy adapter.<div class="more">Default: <code>{}</code>: the adapter&#x27;s defaults. <span class="tag">JSON</span></div></td><td><code>{&quot;path&quot;:&quot;../../policies/agentlib/rules/data.yaml&quot;}</code></td><td><code>{&quot;url&quot;:&quot;http://localhost:8181&quot;,&quot;package&quot;:&quot;agentlib/authz&quot;,&quot;rule&quot;:&quot;decision&quot;}</code></td><td>Localhost reaches an OPA sidecar in the same Fargate task. For a separate OPA service, use its HTTPS endpoint and, when needed, <code>ca_file</code> and <code>auth_secret</code>. Publish policy and mapping data as OPA bundles, or build a data integration; setting a PostgreSQL URL here will not load mappings.<div class="more">Adapters and options: <a href="#opt-policy-opa"><code>opa</code></a>, <a href="#opt-policy-rules"><code>rules</code></a>.</div></td></tr>
 <tr><td><span class="var" id="var-eap_guardrails_provider">EAP_GUARDRAILS_PROVIDER</span></td><td>Adapter that serves the guardrails section.<div class="more">Default: local: <code>patterns</code>, aws: <code>bedrock</code>. </div></td><td><code>patterns</code></td><td><code>bedrock</code></td><td>The AWS profile uses Bedrock Guardrails for content checks, separately from the model provider. <code>patterns</code> is the in-process alternative; choose it explicitly only if its checks meet the team&#x27;s requirements.<div class="more">Adapters and options: <a href="#opt-guardrails-bedrock"><code>bedrock</code></a>, <a href="#opt-guardrails-patterns"><code>patterns</code></a>.</div></td></tr>
 <tr><td><span class="var" id="var-eap_guardrails_options">EAP_GUARDRAILS_OPTIONS</span></td><td>JSON options for the guardrails adapter.<div class="more">Default: <code>{}</code>: the adapter&#x27;s defaults. <span class="tag">JSON</span></div></td><td><code>{}</code></td><td><code>{&quot;guardrail_id&quot;:&quot;abc123def456&quot;,&quot;guardrail_version&quot;:&quot;1&quot;}</code></td><td>Replace the example guardrail ID and published version. <code>DRAFT</code> is accepted only outside production. Additional options choose check points and size limits.<div class="more">Adapters and options: <a href="#opt-guardrails-bedrock"><code>bedrock</code></a>, <a href="#opt-guardrails-patterns"><code>patterns</code></a>.</div></td></tr>
+<tr><td><span class="var" id="var-eap_model_options">EAP_MODEL_OPTIONS</span></td><td>JSON options keyed by model provider name.<div class="more">Default: <code>{}</code>: each provider&#x27;s defaults; Anthropic prompt caching is off. <span class="tag">JSON</span></div></td><td><code>{&quot;anthropic&quot;:{&quot;prompt_caching&quot;:true,&quot;cache_ttl&quot;:&quot;5m&quot;}}</code> for Anthropic</td><td><code>{}</code> for Bedrock; use the local value only for direct Anthropic</td><td>Options are keyed by provider, and apply to all its aliases. Anthropic caching defaults to off; TTL accepts <code>5m</code> or <code>1h</code>. Keep static instructions before request context. This option does not configure Bedrock caching.</td></tr>
 <tr><td><span class="var" id="var-eap_data_sources">EAP_DATA_SOURCES</span></td><td>JSON map of named data sources, e.g. {&quot;accounts&quot;: {&quot;kind&quot;: &quot;duckdb_csv&quot;, &quot;data_dir&quot;: &quot;data&quot;, &quot;queries_dir&quot;: &quot;queries&quot;}}.<div class="more">Default: <code>{}</code>: no data sources. <span class="tag">JSON</span></div></td><td><code>{&quot;ledger&quot;:{&quot;kind&quot;:&quot;duckdb_csv&quot;,&quot;data_dir&quot;:&quot;data&quot;,&quot;queries_dir&quot;:&quot;queries&quot;}}</code></td><td><code>{&quot;ledger&quot;:{&quot;kind&quot;:&quot;redshift_data&quot;,&quot;database&quot;:&quot;curated&quot;,&quot;cluster_id&quot;:&quot;&lt;existing-cluster-id&gt;&quot;,&quot;db_user&quot;:&quot;agent_reader&quot;,&quot;queries_dir&quot;:&quot;queries&quot;}}</code></td><td>Set on the MCP that owns the queries. Query existing curated Redshift tables; the upstream data lake is outside this library&#x27;s scope. For Serverless, replace <code>cluster_id</code> and <code>db_user</code> with <code>workgroup</code>. <code>secret_arn</code> is an alternative credential source. Keep named SQL files in the image&#x27;s <code>queries_dir</code>; this is a directory path, not an S3 URI. The task role needs Data API permissions and the database user needs table grants. Entra users are authorized by policy; the adapter connects as the configured database identity.</td></tr>
 <tr><td><span class="var" id="var-aws_profile">AWS_PROFILE</span></td><td>AWS named profile, for example one signed in through SSO.<div class="more">Default: <span class="muted">not set</span>. </div></td><td>Unset for the tutorial; team profile for optional AWS work</td><td>Unset: use the ECS task role</td><td>A local profile requires your team&#x27;s approved AWS credential setup. Do not copy desktop credentials into a container. The task execution role pulls images; the task role grants application access to AWS services.</td></tr>
 <tr><td><span class="var" id="var-aws_region">AWS_REGION</span></td><td>AWS region.<div class="more">Default: <span class="muted">not set</span>. also <code>AWS_DEFAULT_REGION</code></div></td><td>Unset for the tutorial; target region for AWS work</td><td>The deployment region, e.g. <code>us-east-1</code></td><td>Use the region of the provisioned services. The Fargate template supplies it.</td></tr>
@@ -1752,11 +1887,28 @@ async def classify(
 <tr><td><span class="var" id="var-otel_traces_sampler">OTEL_TRACES_SAMPLER</span></td><td>OpenTelemetry SDK: Sampling. Use parentbased_traceidratio with OTEL_TRACES_SAMPLER_ARG for high volume.</td><td>Unset for the tutorial. SDK default: <code>parentbased_always_on</code>.</td><td>Default, or <code>parentbased_traceidratio</code> with the ratio below.</td><td>Set in the process environment; the SDK does not read the service's .env file.</td></tr>
 <tr><td><span class="var" id="var-otel_traces_sampler_arg">OTEL_TRACES_SAMPLER_ARG</span></td><td>OpenTelemetry SDK: Sampling ratio from 0 to 1 when using a ratio sampler, e.g. 0.1 for 10% of root traces.</td><td>Unset for the tutorial. SDK default: <code>not set</code>.</td><td>Optional ratio, e.g. <code>0.1</code>; agree the coverage with the team.</td><td>Set in the process environment; the SDK does not read the service's .env file.</td></tr>
 <tr><td><span class="var" id="var-otel_sdk_disabled">OTEL_SDK_DISABLED</span></td><td>OpenTelemetry SDK: Turns the SDK off without a code change.</td><td>Unset for the tutorial. SDK default: <code>false</code>.</td><td>Use the SDK default: <code>false</code>.</td><td>Set in the process environment; the SDK does not read the service's .env file. Disables telemetry only; audit and model diagnostic files are separate.</td></tr>
+<tr><td><span class="var" id="var-eap_langfuse_enabled">EAP_LANGFUSE_ENABLED</span></td><td>Enable the agent&#x27;s Langfuse exporter.</td><td>false</td><td>true when provisioned</td><td>Read by the optional library tracing adapter. Process overrides the separate file, then the service .env. Requires the core otel extra. The backend is a separate service with PostgreSQL, ClickHouse, Redis and object storage (S3 on AWS); operational telemetry keeps its destination. <a href="langfuse.md">Setup and access/retention notes</a>.</td></tr>
+<tr><td><span class="var" id="var-eap_langfuse_capture_content">EAP_LANGFUSE_CAPTURE_CONTENT</span></td><td>Export model messages and tool inputs/results.</td><td>false; true for approved test data</td><td>false unless approved</td><td>Read by the optional library tracing adapter. Process overrides the separate file, then the service .env. Requires the core otel extra. The backend is a separate service with PostgreSQL, ClickHouse, Redis and object storage (S3 on AWS); operational telemetry keeps its destination. <a href="langfuse.md">Setup and access/retention notes</a>.</td></tr>
+<tr><td><span class="var" id="var-eap_langfuse_env_file">EAP_LANGFUSE_ENV_FILE</span></td><td>Optional private settings file.</td><td>Absolute path to langfuse/agent.env</td><td>Unset; inject task environment settings</td><td>Read by the optional library tracing adapter. Process overrides the separate file, then the service .env. Requires the core otel extra. The backend is a separate service with PostgreSQL, ClickHouse, Redis and object storage (S3 on AWS); operational telemetry keeps its destination. <a href="langfuse.md">Setup and access/retention notes</a>.</td></tr>
+<tr><td><span class="var" id="var-langfuse_base_url">LANGFUSE_BASE_URL</span></td><td>Langfuse origin.</td><td>http://localhost:3000</td><td>Internal HTTPS service URL</td><td>Read by the optional library tracing adapter. Process overrides the separate file, then the service .env. Requires the core otel extra. The backend is a separate service with PostgreSQL, ClickHouse, Redis and object storage (S3 on AWS); operational telemetry keeps its destination. <a href="langfuse.md">Setup and access/retention notes</a>.</td></tr>
+<tr><td><span class="var" id="var-langfuse_project_id">LANGFUSE_PROJECT_ID</span></td><td>Project ID from the Langfuse browser URL.</td><td>rmprep-trial for the sample backend</td><td>Team&#x27;s project ID</td><td>Read by the optional library tracing adapter. Process overrides the separate file, then the service .env. Requires the core otel extra. The backend is a separate service with PostgreSQL, ClickHouse, Redis and object storage (S3 on AWS); operational telemetry keeps its destination. <a href="langfuse.md">Setup and access/retention notes</a>.</td></tr>
+<tr><td><span class="var" id="var-langfuse_public_key">LANGFUSE_PUBLIC_KEY</span></td><td>Project public API key.</td><td>From private agent.env</td><td>Inject project key into the agent task</td><td>Read by the optional library tracing adapter. Process overrides the separate file, then the service .env. Requires the core otel extra. The backend is a separate service with PostgreSQL, ClickHouse, Redis and object storage (S3 on AWS); operational telemetry keeps its destination. <a href="langfuse.md">Setup and access/retention notes</a>.</td></tr>
+<tr><td><span class="var" id="var-langfuse_secret_key">LANGFUSE_SECRET_KEY</span></td><td>Project secret API key; never sent to the browser.</td><td>From private agent.env</td><td>Inject from Secrets Manager into the agent task</td><td>Read by the optional library tracing adapter. Process overrides the separate file, then the service .env. Requires the core otel extra. The backend is a separate service with PostgreSQL, ClickHouse, Redis and object storage (S3 on AWS); operational telemetry keeps its destination. <a href="langfuse.md">Setup and access/retention notes</a>.</td></tr>
+<tr><td><span class="var" id="var-eap_phoenix_enabled">EAP_PHOENIX_ENABLED</span></td><td>Enable Phoenix tracing; start-local.bat also starts the local server.</td><td>false; true for this trial</td><td>false until provisioned</td><td>Process settings override the separate tracing file, then the service .env. Enable one agent tracing backend at a time. This desktop trial stores traces in SQLite and runs in its own Python environment. A shared deployment needs separate platform provisioning; it is outside this trial. <a href="phoenix-trial.md">Phoenix setup and verified example</a>.</td></tr>
+<tr><td><span class="var" id="var-eap_phoenix_capture_content">EAP_PHOENIX_CAPTURE_CONTENT</span></td><td>Capture model and tool input/output.</td><td>false; true for approved test data</td><td>false unless approved</td><td>Process settings override the separate tracing file, then the service .env. Enable one agent tracing backend at a time. This desktop trial stores traces in SQLite and runs in its own Python environment. A shared deployment needs separate platform provisioning; it is outside this trial. <a href="phoenix-trial.md">Phoenix setup and verified example</a>.</td></tr>
+<tr><td><span class="var" id="var-eap_phoenix_env_file">EAP_PHOENIX_ENV_FILE</span></td><td>Optional private agent tracing settings file.</td><td>Unset; use the root .env or an absolute file path</td><td>Unset; inject task environment settings</td><td>Process settings override the separate tracing file, then the service .env. Enable one agent tracing backend at a time. This desktop trial stores traces in SQLite and runs in its own Python environment. A shared deployment needs separate platform provisioning; it is outside this trial. <a href="phoenix-trial.md">Phoenix setup and verified example</a>.</td></tr>
+<tr><td><span class="var" id="var-phoenix_collector_endpoint">PHOENIX_COLLECTOR_ENDPOINT</span></td><td>Phoenix HTTP origin, without /v1/traces.</td><td>http://127.0.0.1:6006</td><td>Team-managed authenticated HTTPS origin</td><td>Process settings override the separate tracing file, then the service .env. Enable one agent tracing backend at a time. This desktop trial stores traces in SQLite and runs in its own Python environment. A shared deployment needs separate platform provisioning; it is outside this trial. <a href="phoenix-trial.md">Phoenix setup and verified example</a>.</td></tr>
+<tr><td><span class="var" id="var-phoenix_project_name">PHOENIX_PROJECT_NAME</span></td><td>Project for this agent&#x27;s traces.</td><td>agent-lab; rmprep-trial in the walkthrough</td><td>Team project</td><td>Process settings override the separate tracing file, then the service .env. Enable one agent tracing backend at a time. This desktop trial stores traces in SQLite and runs in its own Python environment. A shared deployment needs separate platform provisioning; it is outside this trial. <a href="phoenix-trial.md">Phoenix setup and verified example</a>.</td></tr>
+<tr><td><span class="var" id="var-phoenix_api_key">PHOENIX_API_KEY</span></td><td>Optional API key; never included in trace links.</td><td>Unset for the local trial</td><td>Secrets Manager</td><td>Process settings override the separate tracing file, then the service .env. Enable one agent tracing backend at a time. This desktop trial stores traces in SQLite and runs in its own Python environment. A shared deployment needs separate platform provisioning; it is outside this trial. <a href="phoenix-trial.md">Phoenix setup and verified example</a>.</td></tr>
 <tr><td><span class="var">LIBRARY</span></td><td>Command Prompt shortcut for the library checkout.</td><td>Example: <code>F:\work\ai-agent-lib</code></td><td>Not used by the service.</td><td>Defined by the setup commands; it is not an ai-agent-lib setting.</td></tr>
 <tr><td><span class="var">PYTHON</span></td><td>Command Prompt shortcut for the virtual environment&#x27;s Python.</td><td><code>%LIBRARY%\.venv\Scripts\python.exe</code></td><td>Not used by the service.</td><td>Run <code>&quot;%PYTHON%&quot; -m pip</code> to install into this environment. This is a guide shortcut, not Python&#x27;s PYTHONPATH setting.</td></tr>
 <tr><td><span class="var">PIP_CONFIG_FILE</span></td><td>Pip: selects the team&#x27;s approved configuration file.</td><td>Team-provided path, e.g. <code>C:\company\python\pip.ini</code></td><td>Build environment only, when the build team supplies it.</td><td>The enterprise setup may already configure pip; keep it unless the team tells you to select another file. Pip variables belong in the process environment.</td></tr>
 <tr><td><span class="var">PIP_INDEX_URL</span></td><td>Pip: package repository URL.</td><td>Normally supplied by enterprise setup or pip.ini.</td><td>Approved Artifactory endpoint in the image build environment.</td><td>Use the team&#x27;s repository and credential mechanism. Package installation happens during development/build, not service startup. Keep credentials out of images.</td></tr>
 <tr><td><span class="var">PIP_CERT</span></td><td>Pip: trusted certificate bundle for the package repository.</td><td>Team-provided CA file, if required.</td><td>Build environment CA file, if required.</td><td>Keep certificate verification enabled. This does not configure runtime AWS, HTTP or PostgreSQL clients.</td></tr>
+<tr><td><code>RMPREP_CONTEXT_INPUT_TOKENS</code></td><td>Total estimated model input, including tool definitions.</td><td>rmprep default: <code>128000</code>. Set in its .env.</td><td>Set on the rmprep Fargate task; same default <code>128000</code>.</td><td>Specific to rmprep. Restart after changes. Process variables override .env. Keep input below the deployed model window with room for output; question and recent limits must each fit after the tool allowance. See <a href="#rmprep-context-budget">context budgets</a>.</td></tr>
+<tr><td><code>RMPREP_CONTEXT_RECENT_TOKENS</code></td><td>Recent complete exchanges for the selected clients or memos, within the input limit.</td><td>rmprep default: <code>96000</code>. Set in its .env.</td><td>Set on the rmprep Fargate task; same default <code>96000</code>.</td><td>Specific to rmprep. Restart after changes. Process variables override .env. Keep input below the deployed model window with room for output; question and recent limits must each fit after the tool allowance. See <a href="#rmprep-context-budget">context budgets</a>.</td></tr>
+<tr><td><code>RMPREP_CONTEXT_QUESTION_TOKENS</code></td><td>Maximum estimated size of the current question.</td><td>rmprep default: <code>16000</code>. Set in its .env.</td><td>Set on the rmprep Fargate task; same default <code>16000</code>.</td><td>Specific to rmprep. Restart after changes. Process variables override .env. Keep input below the deployed model window with room for output; question and recent limits must each fit after the tool allowance. See <a href="#rmprep-context-budget">context budgets</a>.</td></tr>
+<tr><td><code>RMPREP_CONTEXT_TOOL_SCHEMA_TOKENS</code></td><td>Input space reserved for the bound tool definitions.</td><td>rmprep default: <code>4000</code>. Set in its .env.</td><td>Set on the rmprep Fargate task; same default <code>4000</code>.</td><td>Specific to rmprep. Restart after changes. Process variables override .env. Keep input below the deployed model window with room for output; question and recent limits must each fit after the tool allowance. See <a href="#rmprep-context-budget">context budgets</a>.</td></tr>
 </tbody></table></div>
   </details>
   <details class="lesson" id="profiles">
@@ -1782,7 +1934,7 @@ async def classify(
 <div class="table-wrap"><table class="compact">
 <thead><tr><th>Port</th><th>Adapter</th><th>Guard</th><th>Package</th><th>Options</th></tr></thead>
 <tbody>
-<tr><td><code>model</code></td><td><code>anthropic</code></td><td></td><td>ai-agent-lib-core</td><td><span class="muted">none</span></td></tr>
+<tr><td><code>model</code></td><td><code>anthropic</code></td><td></td><td>ai-agent-lib-core</td><td><a href="#opt-model-anthropic">AnthropicModelOptions</a></td></tr>
 <tr><td><code>model</code></td><td><code>bedrock</code></td><td></td><td>ai-agent-lib-aws</td><td><span class="muted">none</span></td></tr>
 <tr><td><code>model</code></td><td><code>fake</code></td><td><span class="tag warn">local only</span></td><td>ai-agent-lib-core</td><td><span class="muted">none</span></td></tr>
 <tr><td><code>secrets</code></td><td><code>env</code></td><td></td><td>ai-agent-lib-core</td><td><span class="muted">none</span></td></tr>
@@ -1809,15 +1961,21 @@ async def classify(
     <summary>Adapter options</summary>
     <p>Accepted keys for each adapter's JSON options. Data-source options sit beside
     <code>"kind"</code> in <code>EAP_DATA_SOURCES</code>. Unknown keys are rejected.</p>
-<h4 id="opt-model-anthropic"><code>model</code> · <code>anthropic</code></h4>
-<p class="small">No options. The key is the secret <code>anthropic_api_key</code>: <code>ANTHROPIC_API_KEY</code> with the env secrets adapter, Secrets Manager when deployed. Uses <code>HTTPS_PROXY</code>. Needs the <code>anthropic</code> extra.</p>
-<h4 id="opt-model-bedrock"><code>model</code> · <code>bedrock</code></h4>
+<h4 id="opt-model-anthropic"><code>model</code> Â· <code>anthropic</code></h4>
+<p class="small">Anthropic prompt caching; every call still runs the model pipeline. <span class="muted">(AnthropicModelOptions)</span></p>
+<div class="table-wrap"><table class="opts">
+<thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><span class="var">prompt_caching</span></td><td>true | false</td><td><code>false</code></td><td></td></tr>
+<tr><td><span class="var">cache_ttl</span></td><td>&quot;5m&quot; | &quot;1h&quot;</td><td><code>5m</code></td><td></td></tr>
+</tbody></table></div>
+<h4 id="opt-model-bedrock"><code>model</code> Â· <code>bedrock</code></h4>
 <p class="small">No options. Uses the AWS session settings (<code>AWS_PROFILE</code>, <code>AWS_REGION</code>) and <code>EAP_TLS_CA_BUNDLE</code>.</p>
-<h4 id="opt-model-fake"><code>model</code> · <code>fake</code> <span class="tag warn">local only</span></h4>
+<h4 id="opt-model-fake"><code>model</code> Â· <code>fake</code> <span class="tag warn">local only</span></h4>
 <p class="small">No options. Echoes the question as <code>fake: &lt;question&gt;</code>; tests script its replies.</p>
-<h4 id="opt-secrets-env"><code>secrets</code> · <code>env</code></h4>
+<h4 id="opt-secrets-env"><code>secrets</code> Â· <code>env</code></h4>
 <p class="small">No options. Serves each secret from a <code>EAP_SECRET_&lt;NAME&gt;</code> variable.</p>
-<h4 id="opt-secrets-secrets-manager"><code>secrets</code> · <code>secrets_manager</code></h4>
+<h4 id="opt-secrets-secrets-manager"><code>secrets</code> Â· <code>secrets_manager</code></h4>
 <p class="small">Options of the <code>secrets_manager</code> secrets provider. <span class="muted">(SecretsManagerOptions)</span></p>
 <div class="table-wrap"><table class="opts">
 <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
@@ -1825,7 +1983,7 @@ async def classify(
 <tr><td><span class="var">prefix</span></td><td>text</td><td><code>&quot;&quot;</code></td><td>Put before a secret&#x27;s name to form its ID in Secrets Manager, for example <code>eap/accounts-agent/</code>. It keeps one service&#x27;s secrets apart from another&#x27;s, and an IAM policy can be scoped to it.</td></tr>
 <tr><td><span class="var">cache_seconds</span></td><td>number</td><td><code>300.0</code></td><td>How long a secret is kept before it is read again, so that a rotated secret is picked up without a restart. <code>0</code> reads it every time.</td></tr>
 </tbody></table></div>
-<h4 id="opt-audit-firehose"><code>audit</code> · <code>firehose</code></h4>
+<h4 id="opt-audit-firehose"><code>audit</code> Â· <code>firehose</code></h4>
 <p class="small">Options of the <code>firehose</code> audit sink. <span class="muted">(FirehoseAuditOptions)</span></p>
 <div class="table-wrap"><table class="opts">
 <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
@@ -1833,7 +1991,7 @@ async def classify(
 <tr><td><span class="var">tracing</span></td><td>true | false</td><td><code>false</code></td><td>Also emit metadata-only OpenTelemetry events and metrics.</td></tr>
 <tr><td><span class="var">stream</span></td><td>text</td><td><span class="tag">required</span></td><td>The name of the Firehose stream that receives the records.</td></tr>
 </tbody></table></div>
-<h4 id="opt-audit-jsonl"><code>audit</code> · <code>jsonl</code> <span class="tag warn">local only</span></h4>
+<h4 id="opt-audit-jsonl"><code>audit</code> Â· <code>jsonl</code> <span class="tag warn">local only</span></h4>
 <p class="small">Options for the JSONL audit sink. <span class="muted">(JsonlAuditOptions)</span></p>
 <div class="table-wrap"><table class="opts">
 <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
@@ -1842,7 +2000,7 @@ async def classify(
 <tr><td><span class="var">path</span></td><td>path</td><td><code>.agentlib/audit.jsonl</code></td><td>The file to append to. Parent directories are created.</td></tr>
 <tr><td><span class="var">fsync</span></td><td>true | false</td><td><code>true</code></td><td>Force each record to disk before <code>write</code> returns.</td></tr>
 </tbody></table></div>
-<h4 id="opt-identity-jwt"><code>identity</code> · <code>jwt</code></h4>
+<h4 id="opt-identity-jwt"><code>identity</code> Â· <code>jwt</code></h4>
 <p class="small">Options of the <code>jwt</code> identity provider. <span class="muted">(JwtIdentityOptions)</span></p>
 <div class="table-wrap"><table class="opts">
 <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
@@ -1875,7 +2033,7 @@ async def classify(
 <tr><td><span class="var">exchange.scope</span></td><td>text</td><td><span class="muted">not set</span></td><td>The scope to ask for, where <code>{audience}</code> stands for the audience of the service being called.</td></tr>
 <tr><td><span class="var">exchange.timeout_seconds</span></td><td>number</td><td><code>10.0</code></td><td>How long one exchange may take.</td></tr>
 </tbody></table></div>
-<h4 id="opt-identity-static"><code>identity</code> · <code>static</code> <span class="tag warn">local only</span></h4>
+<h4 id="opt-identity-static"><code>identity</code> Â· <code>static</code> <span class="tag warn">local only</span></h4>
 <p class="small">Options for the static development identity. <span class="muted">(StaticIdentityOptions)</span></p>
 <div class="table-wrap"><table class="opts">
 <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
@@ -1886,9 +2044,9 @@ async def classify(
 <tr><td><span class="var">audience</span></td><td>text</td><td><span class="muted">not set</span></td><td>The name this service accepts development tokens for. Without it a token for any audience is accepted.</td></tr>
 <tr><td><span class="var">token_ttl_seconds</span></td><td>integer</td><td><code>300</code></td><td>How long a development token is valid.</td></tr>
 </tbody></table></div>
-<h4 id="opt-checkpoint-none"><code>checkpoint</code> · <code>none</code></h4>
+<h4 id="opt-checkpoint-none"><code>checkpoint</code> Â· <code>none</code></h4>
 <p class="small">No options. Keeps no graph state: for MCP servers and agents that compile no graph.</p>
-<h4 id="opt-checkpoint-postgres"><code>checkpoint</code> · <code>postgres</code></h4>
+<h4 id="opt-checkpoint-postgres"><code>checkpoint</code> Â· <code>postgres</code></h4>
 <p class="small">Options of the <code>postgres</code> checkpoint store. <span class="muted">(PostgresCheckpointOptions)</span></p>
 <div class="table-wrap"><table class="opts">
 <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
@@ -1902,14 +2060,14 @@ async def classify(
 <tr><td><span class="var">pool_max_size</span></td><td>integer</td><td><code>10</code></td><td>The most connections the service opens.</td></tr>
 <tr><td><span class="var">connect_timeout_seconds</span></td><td>number</td><td><code>10.0</code></td><td>How long to wait for a connection.</td></tr>
 </tbody></table></div>
-<h4 id="opt-checkpoint-sqlite"><code>checkpoint</code> · <code>sqlite</code> <span class="tag warn">local only</span></h4>
+<h4 id="opt-checkpoint-sqlite"><code>checkpoint</code> Â· <code>sqlite</code> <span class="tag warn">local only</span></h4>
 <p class="small">Options for the SQLite checkpoint backend. <span class="muted">(SqliteCheckpointOptions)</span></p>
 <div class="table-wrap"><table class="opts">
 <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
 <tbody>
 <tr><td><span class="var">path</span></td><td>path</td><td><code>.agentlib/checkpoints.sqlite</code></td><td>The database file. Parent directories are created.</td></tr>
 </tbody></table></div>
-<h4 id="opt-registry-file"><code>registry</code> · <code>file</code></h4>
+<h4 id="opt-registry-file"><code>registry</code> Â· <code>file</code></h4>
 <p class="small">Options of the <code>file</code> registry provider. <span class="muted">(FileRegistryOptions)</span></p>
 <div class="table-wrap"><table class="opts">
 <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
@@ -1917,7 +2075,7 @@ async def classify(
 <tr><td><span class="var">agents_path</span></td><td>path</td><td><code>registry/agents.yaml</code></td><td>The agent registry file.</td></tr>
 <tr><td><span class="var">tools_path</span></td><td>path</td><td><code>registry/mcp-tools.yaml</code></td><td>The MCP tool registry file.</td></tr>
 </tbody></table></div>
-<h4 id="opt-registry-s3-file"><code>registry</code> · <code>s3_file</code></h4>
+<h4 id="opt-registry-s3-file"><code>registry</code> Â· <code>s3_file</code></h4>
 <p class="small">Options of the <code>s3_file</code> registry provider. <span class="muted">(S3RegistryOptions)</span></p>
 <div class="table-wrap"><table class="opts">
 <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
@@ -1927,7 +2085,7 @@ async def classify(
 <tr><td><span class="var">tools_key</span></td><td>text</td><td><code>registry/mcp-tools.yaml</code></td><td>The key of the MCP tool registry document.</td></tr>
 <tr><td><span class="var">expected_bucket_owner</span></td><td>text</td><td><span class="muted">not set</span></td><td>The AWS account that must own the bucket. When set, a bucket of the same name in another account is refused.</td></tr>
 </tbody></table></div>
-<h4 id="opt-policy-opa"><code>policy</code> · <code>opa</code></h4>
+<h4 id="opt-policy-opa"><code>policy</code> Â· <code>opa</code></h4>
 <p class="small">Options of the <code>opa</code> policy provider. <span class="muted">(OpaPolicyOptions)</span></p>
 <div class="table-wrap"><table class="opts">
 <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
@@ -1942,7 +2100,7 @@ async def classify(
 <tr><td><span class="var">auth_secret</span></td><td>text</td><td><span class="muted">not set</span></td><td>The name of the secret that holds a bearer token for the server.</td></tr>
 <tr><td><span class="var">allow_http</span></td><td>true | false</td><td><code>false</code></td><td>Allow a <code>url</code> without TLS on a host other than this machine.</td></tr>
 </tbody></table></div>
-<h4 id="opt-policy-rules"><code>policy</code> · <code>rules</code> <span class="tag warn">local only</span></h4>
+<h4 id="opt-policy-rules"><code>policy</code> Â· <code>rules</code> <span class="tag warn">local only</span></h4>
 <p class="small">Options of the <code>rules</code> policy provider. <span class="muted">(RulesPolicyOptions)</span></p>
 <div class="table-wrap"><table class="opts">
 <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
@@ -1951,7 +2109,7 @@ async def classify(
 <tr><td><span class="var">cache_max_entries</span></td><td>integer</td><td><code>1024</code></td><td>The most decisions kept at once.</td></tr>
 <tr><td><span class="var">path</span></td><td>path</td><td><code>policies/agentlib/rules/data.yaml</code></td><td>The rules file, as YAML or JSON. The default is where the file sits when the <code>policies</code> folder is laid out as an OPA bundle, so the same file serves this provider and OPA.</td></tr>
 </tbody></table></div>
-<h4 id="opt-guardrails-bedrock"><code>guardrails</code> · <code>bedrock</code></h4>
+<h4 id="opt-guardrails-bedrock"><code>guardrails</code> Â· <code>bedrock</code></h4>
 <p class="small">Options of the <code>bedrock</code> guardrails provider. <span class="muted">(BedrockGuardrailsOptions)</span></p>
 <div class="table-wrap"><table class="opts">
 <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
@@ -1965,7 +2123,7 @@ async def classify(
 <tr><td><span class="var">max_tool_input_chars</span></td><td>integer</td><td><code>20000</code></td><td>The most text the arguments of a tool call may hold.</td></tr>
 <tr><td><span class="var">max_tool_result_chars</span></td><td>integer</td><td><code>200000</code></td><td>The most text a tool may return.</td></tr>
 </tbody></table></div>
-<h4 id="opt-guardrails-patterns"><code>guardrails</code> · <code>patterns</code></h4>
+<h4 id="opt-guardrails-patterns"><code>guardrails</code> Â· <code>patterns</code></h4>
 <p class="small">Options of the <code>patterns</code> guardrails provider. <span class="muted">(PatternGuardrailsOptions)</span></p>
 <div class="table-wrap"><table class="opts">
 <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
@@ -1979,7 +2137,7 @@ async def classify(
 <tr><td><span class="var">pii_kinds</span></td><td>list of &quot;email&quot; | &quot;credit_card&quot; | &quot;iban&quot; | &quot;us_ssn&quot;</td><td><code>[&quot;email&quot;, &quot;credit_card&quot;, &quot;iban&quot;, &quot;us_ssn&quot;]</code></td><td>The kinds of personal data looked for.</td></tr>
 <tr><td><span class="var">injection</span></td><td>&quot;off&quot; | &quot;flag&quot; | &quot;block&quot;</td><td><code>flag</code></td><td>What to do when a tool result reads like an instruction to the model.</td></tr>
 </tbody></table></div>
-<h4 id="opt-data-duckdb-csv"><code>data</code> · <code>duckdb_csv</code> <span class="tag warn">local only</span></h4>
+<h4 id="opt-data-duckdb-csv"><code>data</code> Â· <code>duckdb_csv</code> <span class="tag warn">local only</span></h4>
 <p class="small">Options of the <code>duckdb_csv</code> data source. <span class="muted">(DuckDbCsvOptions)</span></p>
 <div class="table-wrap"><table class="opts">
 <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
@@ -1989,7 +2147,7 @@ async def classify(
 <tr><td><span class="var">dialect</span></td><td>text</td><td><code>redshift</code></td><td>The dialect the queries are written in.</td></tr>
 <tr><td><span class="var">timeout_seconds</span></td><td>number</td><td><code>30.0</code></td><td>How long one query may run.</td></tr>
 </tbody></table></div>
-<h4 id="opt-data-redshift-data"><code>data</code> · <code>redshift_data</code></h4>
+<h4 id="opt-data-redshift-data"><code>data</code> Â· <code>redshift_data</code></h4>
 <p class="small">Options of the <code>redshift_data</code> data source. <span class="muted">(RedshiftDataOptions)</span></p>
 <div class="table-wrap"><table class="opts">
 <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
@@ -2002,7 +2160,7 @@ async def classify(
 <tr><td><span class="var">secret_arn</span></td><td>text</td><td><span class="muted">not set</span></td><td>A Secrets Manager secret that holds database credentials.</td></tr>
 <tr><td><span class="var">timeout_seconds</span></td><td>number</td><td><code>30.0</code></td><td>How long one query may take, waiting included.</td></tr>
 </tbody></table></div>
-<h4 id="opt-data-rest"><code>data</code> · <code>rest</code></h4>
+<h4 id="opt-data-rest"><code>data</code> Â· <code>rest</code></h4>
 <p class="small">Options of the <code>rest</code> data source. <span class="muted">(RestOptions)</span></p>
 <div class="table-wrap"><table class="opts">
 <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
@@ -2206,12 +2364,91 @@ async def classify(
         <tr><td><code>GET /healthz</code></td><td>Liveness: is the HTTP listener responding?</td></tr>
         <tr><td><code>GET /readyz</code></td><td>Readiness: are services and graph preparation complete?</td></tr>
         <tr><td><code>POST /invoke</code></td><td>Accepts <code>{"input":{"question":"..."},"thread_id":"..."}</code> for the generated agent. Returns <code>output</code>, <code>thread_id</code>, and <code>request_id</code>.</td></tr>
-        <tr><td><code>POST /invoke/stream</code></td><td>The same input, with graph-step updates as server-sent events. Each event reports a graph update, rather than an individual model token.</td></tr>
+        <tr><td><code>POST /invoke</code> with <code>Accept: text/event-stream</code></td><td>With <code>live_updates=True</code> in <code>agent_app</code>, streams provisional model text, then an accepted result with token usage. Enabled in newly generated agents and rmprep.</td></tr>
+        <tr><td><code>POST /invoke/stream</code></td><td>The same input, with graph-step updates as server-sent events. Each event reports a completed graph update.</td></tr>
       </tbody>
     </table></div>
     <p>For authenticated requests, send <code>Authorization: Bearer &lt;token&gt;</code>.
     An optional <code>x-request-id</code> correlates requests. The local static identity
     supplies the tutorial's configured development caller.</p>
+    <p><a href="../packages/ai-agent-lib-ui/README.md">Agent Lab</a> shows
+    a live draft while the model responds. It removes the temporary draft panel
+    once the final outcome is saved, then shows input/output tokens, elapsed time and cache-hit
+    ratio when reported. Usage includes model calls made for tool selection and
+    revisions. Missing counts display as unavailable; fake-model usage is marked
+    simulated. Reopening a conversation restores its saved answer and metrics.</p>
+    <p>The default pattern guardrails check the output size before each live text
+    update. Blocking PII checks and structured-output schemas wait for the complete
+    response before releasing text. Live drafts are provisional; only the accepted
+    final answer is saved. Chat keeps metrics and the Phoenix or Langfuse trace
+    link visible, with detailed evidence available through the trace and Logs page.</p>
+    <p>In the MCP console, each admitted named query writes a <code>data_query</code>
+    line: query name, duration, returned rows and columns, truncation and masked
+    columns. Local detail logging also shows bounded, credential-masked parameters
+    such as client UEN, date range and page offset. Returned records are not copied
+    into these log lines. Deployed logging omits parameter values; use the request
+    ID to connect queries with the MCP call and model trace.</p>
+    <p>The optional <a href="langfuse.md">library Langfuse integration</a> adds an
+    <strong>Open trace in Langfuse</strong> link to each accepted response. Langfuse
+    runs as a separate service; developers connect with the existing Python and pip
+    setup. Each request has its own trace, grouped with the thread's other requests.
+    Model attempts and MCP calls appear in its timeline. Checkpoint IDs link back
+    to saved state inspected through the agent. Content export is an explicit
+    setting; operational metrics retain their existing destination.</p>
+    <p>Checkpoint reference collection stops after one second or 64 references.
+    If the history read times out, the answer still returns and trace metadata
+    marks the references unavailable. The checkpoint database remains the source
+    of saved conversation state.</p>
+    <p>Newly generated agents include this integration in <code>service.py</code>.
+    The library owns export and shutdown; your response function owns what the
+    graph does. This is dependency injection: tests supply an in-memory exporter,
+    and deployed services use the same graph with the configured exporter.
+    Existing graph callbacks are preserved, and governed native tools appear once
+    in the trace. The adapter adds <code>output.trace</code> when enabled; existing
+    answer, streaming and checkpoint interfaces keep their behavior.</p>
+    <p>Get the project URL and keys from the platform team, then put them in a
+    private settings file. From Command Prompt, select the agent's Python environment
+    and follow its generated <code>docs/langfuse.md</code>:</p>
+    <pre><code class="language-bat">set "EAP_LANGFUSE_ENV_FILE=F:\work\langfuse\agent.env"
+python -m your_agent.service</code></pre>
+    <p>Replace the path and module name with your own values. The file sets
+    <code>EAP_LANGFUSE_ENABLED=true</code> and the project settings listed in the
+    <a href="#variables">configuration table</a>.
+    <code>EAP_LANGFUSE_CAPTURE_CONTENT=false</code> records metadata and usage;
+    set it to <code>true</code> for approved test data to inspect messages and results.
+    The generated dependencies include the <code>otel</code> extra and install
+    with Python and pip. For an older service, follow the
+    <a href="langfuse.md#add-tracing-to-an-existing-service">integration steps</a>.
+    The <a href="langfuse-trial.md">verified rmprep walkthrough</a> shows a memo
+    and follow-ups with their MCP calls, token counts and checkpoint references.</p>
+    <p>For a desktop trial using Python and pip, follow the
+    <a href="phoenix-trial.md">local Phoenix walkthrough</a>. Run
+    <code>start-phoenix.bat setup</code> once, then enable Phoenix in the root
+    <code>.env</code>. Run <code>start-local.bat</code> to start the local Phoenix server
+    before the MCP, agent, and UI services. It keeps its own Python environment;
+    <code>stop-local.bat</code> stops the stack and preserves SQLite traces. The agent
+    adds an <strong>Open trace in Agent Lab</strong> link to each response, opening the configured Phoenix trace. The walkthrough
+    lists the opt-in settings and a verified Anthropic conversation. Enable one
+    tracing backend at a time. Existing Langfuse integrations remain supported.</p>
+    <p>When model output guardrails or a structured-output schema are configured,
+    text is buffered until those checks pass. Otherwise provider tokens can appear
+    immediately. Drafts can still change during business validation; only the final
+    accepted answer enters chat history. Keep <code>live_updates=False</code> when
+    application-specific checks must finish before any draft is shown.</p>
+    <p>Long chats load recent messages first; use <strong>View older messages</strong>
+    to browse earlier pages. Reopening a held thread checks the agent's outcome journal
+    without resending its question. A confirmed outcome restores the answer or failure;
+    an unknown outcome keeps the thread held. Local rmprep and newly generated local
+    agents save this journal in <code>.agentlib/outcomes.sqlite</code> beside their
+    project file. It contains accepted answers, so protect it like checkpoints.
+    Restart the agent and UI after updating their code.</p>
+    <p>The agent HTTP service accepts one active request per caller and thread.
+    An overlapping request receives <code>409 thread_busy</code> before it runs.
+    Wait for the active turn to finish before submitting again. The default guard
+    covers one application instance. Multiple worker processes or replicas need
+    a shared admission provider; a shared checkpoint database alone does not
+    serialize turns. See <a href="http-thread-admission.md">thread admission</a>
+    for deployment and extension details.</p>
   </details>
   <details class="lesson" id="extras">
     <summary>Optional dependency groups (extras)</summary>
@@ -2223,7 +2460,7 @@ async def classify(
 <tr><td><code>ai-agent-lib-core[mcp]</code></td><td>The MCP bindings.</td><td><code>httpx2&gt;=2.0</code>, <code>mcp&gt;=2.3,&lt;3</code></td></tr>
 <tr><td><code>ai-agent-lib-core[serve]</code></td><td>The HTTP entry point, health routes and server loop in ai_agent_lib_core.integrations.http.</td><td><code>starlette&gt;=0.45</code>, <code>uvicorn&gt;=0.32</code></td></tr>
 <tr><td><code>ai-agent-lib-core[otel]</code></td><td>Exporting traces and metrics to an OpenTelemetry collector.</td><td><code>opentelemetry-exporter-otlp-proto-http&gt;=1.28</code>, <code>opentelemetry-sdk&gt;=1.28</code></td></tr>
-<tr><td><code>ai-agent-lib-core[anthropic]</code></td><td>The anthropic model provider.</td><td><code>langchain-anthropic&gt;=1.0,&lt;2</code></td></tr>
+<tr><td><code>ai-agent-lib-core[anthropic]</code></td><td>The anthropic model provider.</td><td><code>langchain-anthropic&gt;=1.7.5,&lt;2</code></td></tr>
 <tr><td><code>ai-agent-lib-core[testing]</code></td><td>Needed to use the contract test suites in ai_agent_lib_core.testing.contracts.</td><td><code>pytest&gt;=8.2</code>, <code>pytest-asyncio&gt;=1.4</code></td></tr>
 <tr><td><code>ai-agent-lib-aws[bedrock]</code></td><td>The bedrock model provider.</td><td><code>langchain-aws&gt;=1.0,&lt;2</code></td></tr>
 <tr><td><code>ai-agent-lib-aws[postgres]</code></td><td>The postgres checkpoint store.</td><td><code>langgraph-checkpoint-postgres&gt;=3.1,&lt;4</code>, <code>psycopg[binary,pool]&gt;=3.2</code>, <code>psycopg-pool&gt;=3.3</code></td></tr>
@@ -2239,15 +2476,16 @@ async def classify(
 <tbody>
 <tr><td><code>ai_agent_lib_core</code></td><td>Core package of the Enterprise Agentic Platform library.</td><td><code>AgentLibError</code>, <code>bind_request_context</code>, <code>BudgetExceeded</code>, <code>Classification</code>, <code>ConfigurationError</code>, <code>CredentialsExpiredError</code>, <code>ExecutionPaused</code>, <code>IntegrityError</code>, <code>PolicyDenied</code>, <code>Principal</code>, <code>RequestContext</code>, <code>Scope</code>, <code>ServiceConfig</code>, <code>ServiceContainer</code>, <code>ServiceProviders</code>, <code>StructuredOutput</code>, <code>SyncServices</code>, <code>TransientError</code>, <code>ValidationFailed</code></td></tr>
 <tr><td><code>ai_agent_lib_core.contracts</code></td><td>Ports, value types, options models and errors.</td><td><code>Access</code>, <code>AccessQuery</code>, <code>AccessRule</code>, <code>AgentEntry</code>, <code>AgentLibError</code>, <code>AgentRegistry</code>, <code>AgentSnapshot</code>, <code>AUDIT_SCHEMA</code>, <code>AuditOptions</code>, <code>AuditOutcome</code>, <code>AuditRecord</code>, <code>AuditSink</code>, <code>AuditValue</code>, <code>BudgetExceeded</code>, <code>BudgetLimits</code>, <code>CallLimits</code>, <code>causes</code>, <code>ChatModelProvider</code>, <code>CheckpointBackend</code>, <code>CheckResult</code>, <code>Classification</code>, <code>Clock</code>, <code>ConfigSource</code>, <code>ConfigurationError</code>, <code>CredentialsExpiredError</code>, <code>DataSource</code>, <code>Decision</code>, <code>DECISION_SCHEMA</code>, <code>DEFAULT_MODEL_ALIAS</code>, <code>DeploymentEnv</code>, <code>describe</code>, <code>EntryStatus</code>, <code>ExecutionPaused</code>, <code>ExternalSettings</code>, <code>generic_fix</code>, <code>GuardrailCheck</code>, <code>GuardrailFinding</code>, <code>GuardrailPoint</code>, <code>GuardrailVerdict</code>, <code>IdentityVerifier</code>, <code>IdGenerator</code>, <code>IntegrityError</code>, <code>kind_of</code>, <code>Limits</code>, <code>MASK</code>, <code>ModelCapabilities</code>, <code>ModelRef</code>, <code>ModelSection</code>, <code>ModelTraceSink</code>, <code>no_access</code>, <code>NoOptions</code>, <code>Obligations</code>, <code>options_error</code>, <code>OptionsModel</code>, <code>ParameterType</code>, <code>PolicyAction</code>, <code>PolicyDecisionPoint</code>, <code>PolicyDenied</code>, <code>PolicyRequest</code>, <code>PolicyResource</code>, <code>Principal</code>, <code>PrincipalKind</code>, <code>Profile</code>, <code>ProviderSelection</code>, <code>QueryDescription</code>, <code>QueryParameter</code>, <code>QueryResult</code>, <code>REGISTRY_SCHEMA</code>, <code>RegistrySource</code>, <code>RequestContext</code>, <code>RowFilter</code>, <code>Scalar</code>, <code>schema_fingerprint</code>, <code>Scope</code>, <code>SecretsProvider</code>, <code>Section</code>, <code>ServerEntry</code>, <code>ServiceConfig</code>, <code>shown_value</code>, <code>SourceMetadata</code>, <code>SpanNotes</code>, <code>StructuredOutput</code>, <code>SupportsAsyncClose</code>, <code>SupportsValidation</code>, <code>Telemetry</code>, <code>TelemetryMode</code>, <code>TokenAuthenticator</code>, <code>TokenExchanger</code>, <code>ToolEntry</code>, <code>ToolRegistry</code>, <code>ToolSnapshot</code>, <code>TransientError</code>, <code>ValidationFailed</code></td></tr>
-<tr><td><code>ai_agent_lib_core.config</code></td><td>Configuration: the only package that knows a variable name.</td><td><code>Binding</code>, <code>ConfigResolver</code>, <code>DEFAULT_BINDINGS</code>, <code>DotenvConfigSource</code>, <code>EnvironConfigSource</code>, <code>EnvSetting</code>, <code>Key</code>, <code>LayeredConfigSource</code>, <code>load_service_config</code>, <code>MappingConfigSource</code>, <code>MASKED</code>, <code>options_key</code>, <code>PREFIX</code>, <code>PROFILE_DEFAULTS</code>, <code>ProfileDefaults</code>, <code>provider_key</code>, <code>render_env_example</code>, <code>render_env_file</code>, <code>render_reference</code>, <code>Resolution</code>, <code>secret_key</code>, <code>service_resolver</code>, <code>telemetry_enabled</code>, <code>ValueKind</code>, <code>variable_for</code></td></tr>
+<tr><td><code>ai_agent_lib_core.config</code></td><td>Configuration: the only package that knows a variable name.</td><td><code>Binding</code>, <code>ConfigResolver</code>, <code>DEFAULT_BINDINGS</code>, <code>DotenvConfigSource</code>, <code>EnvironConfigSource</code>, <code>EnvSetting</code>, <code>Key</code>, <code>LangfuseSettings</code>, <code>LayeredConfigSource</code>, <code>load_langfuse_settings</code>, <code>load_service_config</code>, <code>MappingConfigSource</code>, <code>MASKED</code>, <code>options_key</code>, <code>PREFIX</code>, <code>PROFILE_DEFAULTS</code>, <code>ProfileDefaults</code>, <code>provider_key</code>, <code>render_env_example</code>, <code>render_env_file</code>, <code>render_reference</code>, <code>Resolution</code>, <code>secret_key</code>, <code>service_resolver</code>, <code>telemetry_enabled</code>, <code>ValueKind</code>, <code>variable_for</code></td></tr>
 <tr><td><code>ai_agent_lib_core.di</code></td><td>Select implementations at the composition boundary and manage their resources.</td><td><code>access_plan</code>, <code>AccessPlan</code>, <code>AdapterAccess</code>, <code>AUDIT</code>, <code>BuildContext</code>, <code>BuildResources</code>, <code>CHECKPOINT</code>, <code>DATA</code>, <code>DATA_PORT</code>, <code>diagnose</code>, <code>ENTRY_POINT_GROUP</code>, <code>Factory</code>, <code>FIRST_PARTY_PACKS</code>, <code>fix_for</code>, <code>GUARDRAILS</code>, <code>IDENTITY</code>, <code>MODEL</code>, <code>MODEL_PORT</code>, <code>POLICY</code>, <code>ProviderSpec</code>, <code>REGISTRY</code>, <code>SECRETS</code>, <code>ServiceContainer</code>, <code>ServicePort</code>, <code>ServiceProviders</code>, <code>SyncServices</code></td></tr>
 <tr><td><code>ai_agent_lib_core.observability</code></td><td>What the people who run a service see: operational logs, traces and metrics.</td><td><code>bind_diagnostic_links</code>, <code>build_providers</code>, <code>configure_logging</code>, <code>configure_telemetry</code>, <code>Diagnostics</code>, <code>error_fields</code>, <code>explain</code>, <code>JsonlModelTraceSink</code>, <code>JsonLogFormatter</code>, <code>LIBRARY_LOGGERS</code>, <code>redact</code>, <code>report_error</code>, <code>shows_details</code>, <code>start_telemetry</code>, <code>your_code</code></td></tr>
-<tr><td><code>ai_agent_lib_core.integrations.langgraph</code></td><td>LangGraph bindings. The only package in core that imports <code>langgraph</code>.</td><td><code>current_request_context</code>, <code>describe_model_response</code>, <code>govern_tools</code>, <code>GovernedChatModel</code>, <code>GovernedTool</code>, <code>InMemoryCheckpointBackend</code>, <code>LangGraphBindings</code>, <code>LangGraphModelProvider</code>, <code>LoopBridge</code>, <code>scoped_thread_id</code>, <code>ScopedCheckpointer</code>, <code>SqliteCheckpointBackend</code>, <code>SqliteCheckpointOptions</code>, <code>THREAD_NAMESPACE</code></td></tr>
+<tr><td><code>ai_agent_lib_core.integrations.langgraph</code></td><td>LangGraph bindings. The only package in core that imports <code>langgraph</code>.</td><td><code>current_request_context</code>, <code>describe_model_response</code>, <code>govern_tools</code>, <code>GovernedChatModel</code>, <code>GovernedTool</code>, <code>InMemoryCheckpointBackend</code>, <code>LangGraphBindings</code>, <code>LangGraphModelProvider</code>, <code>LoopBridge</code>, <code>scoped_thread_id</code>, <code>ScopedCheckpointer</code>, <code>SqliteCheckpointBackend</code>, <code>SqliteCheckpointOptions</code>, <code>static_system_prompt</code>, <code>THREAD_NAMESPACE</code></td></tr>
+<tr><td><code>ai_agent_lib_core.integrations.langgraph.langfuse</code></td><td>Optional Langfuse export at the service boundary, independent of business nodes.</td><td><code>GraphResponse</code>, <code>langfuse_tracing</code>, <code>LangfuseTracing</code></td></tr>
 <tr><td><code>ai_agent_lib_core.integrations.mcp</code></td><td>MCP bindings. The only package in core that imports the MCP SDK.</td><td><code>DoorTokenVerifier</code>, <code>GovernedToolsMiddleware</code>, <code>is_error_result</code>, <code>mcp_result_text</code>, <code>META_AUTHORIZATION</code>, <code>META_CLASSIFICATION_CEILING</code>, <code>META_REQUEST_ID</code>, <code>META_THREAD_ID</code>, <code>resource_server_settings</code>, <code>tool_fingerprints</code>, <code>verify_registration</code></td></tr>
-<tr><td><code>ai_agent_lib_core.integrations.http</code></td><td>HTTP serving. The only package in core that imports Starlette and uvicorn.</td><td><code>add_health_routes</code>, <code>agent_app</code>, <code>AgentServices</code>, <code>HEALTH_PATH</code>, <code>health_routes</code>, <code>INVOKE_PATH</code>, <code>READY_PATH</code>, <code>Run</code>, <code>serve</code>, <code>ServiceLifecycle</code>, <code>ServiceState</code>, <code>Stream</code>, <code>STREAM_PATH</code>, <code>SupportsCustomRoutes</code></td></tr>
+<tr><td><code>ai_agent_lib_core.integrations.http</code></td><td>HTTP serving. The only package in core that imports Starlette and uvicorn.</td><td><code>add_health_routes</code>, <code>agent_app</code>, <code>AgentServices</code>, <code>HEALTH_PATH</code>, <code>health_routes</code>, <code>InMemoryThreadAdmission</code>, <code>INVOKE_PATH</code>, <code>OutcomeJournal</code>, <code>READY_PATH</code>, <code>Run</code>, <code>serve</code>, <code>ServiceLifecycle</code>, <code>ServiceState</code>, <code>SqliteOutcomeJournal</code>, <code>Stream</code>, <code>STREAM_PATH</code>, <code>SupportsCustomRoutes</code>, <code>ThreadAdmission</code></td></tr>
 <tr><td><code>ai_agent_lib_core.testing</code></td><td>Fakes and contract test suites, shared with adapters and application teams.</td><td><code>ACCOUNT_COLUMNS</code>, <code>ACCOUNT_ENDPOINTS</code>, <code>ACCOUNT_QUERIES</code>, <code>ACCOUNT_ROWS</code>, <code>accounts_api</code>, <code>audit_records</code>, <code>calls_tool</code>, <code>calls_tools</code>, <code>fake_accounts_source</code>, <code>FAKE_PROVIDER</code>, <code>fake_providers</code>, <code>FakeChatModel</code>, <code>FakeChatModelProvider</code>, <code>FakeDataSource</code>, <code>FakeGuardrails</code>, <code>FakeIdentityVerifier</code>, <code>FakePolicyDecisionPoint</code>, <code>FakeQuery</code>, <code>FakeRegistry</code>, <code>Fakes</code>, <code>FakeSecretsProvider</code>, <code>FrozenClock</code>, <code>GuardrailAnswer</code>, <code>InMemoryAuditSink</code>, <code>last_shown_to_model</code>, <code>load_eval_config</code>, <code>load_test_config</code>, <code>PolicyAnswer</code>, <code>RecordingTelemetry</code>, <code>rest_stub_providers</code>, <code>rest_stub_transport</code>, <code>scripted_model</code>, <code>scripted_providers</code>, <code>SequentialIds</code>, <code>structured_reply</code>, <code>TEST_AGENT</code>, <code>write_accounts_endpoints</code>, <code>write_accounts_files</code></td></tr>
 <tr><td><code>ai_agent_lib_core.evaluation</code></td><td>Measuring how well an agent does its job, off the request path.</td><td><code>CaseResult</code>, <code>EvalCase</code>, <code>EvalReport</code>, <code>exact</code>, <code>judged</code>, <code>load_cases</code>, <code>run_eval</code>, <code>Score</code>, <code>scored_by</code>, <code>Scorer</code>, <code>Verdict</code></td></tr>
-<tr><td><code>ai_agent_lib_core.adapters</code></td><td>Local adapters that implement the ports without any cloud service.</td><td><code>AnthropicChatModelProvider</code>, <code>CachingPolicyDecisionPoint</code>, <code>DuckDbCsvDataSource</code>, <code>DuckDbCsvOptions</code>, <code>EnvSecretsProvider</code>, <code>ExchangingJwtIdentity</code>, <code>FakeChatModel</code>, <code>FakeChatModelProvider</code>, <code>FileRegistryOptions</code>, <code>FileRegistrySource</code>, <code>GuardrailsOptions</code>, <code>JsonlAuditOptions</code>, <code>JsonlAuditSink</code>, <code>JwtIdentityOptions</code>, <code>JwtIdentityVerifier</code>, <code>JwtSettings</code>, <code>NoCheckpointBackend</code>, <code>NullTelemetry</code>, <code>OAuthTokenExchanger</code>, <code>OpaPolicyDecisionPoint</code>, <code>OpaPolicyOptions</code>, <code>OpenTelemetryTelemetry</code>, <code>PatternGuardrails</code>, <code>PatternGuardrailsOptions</code>, <code>PolicyCacheOptions</code>, <code>resolve_jwt_options</code>, <code>RestDataSource</code>, <code>RestOptions</code>, <code>RulesPolicyDecisionPoint</code>, <code>RulesPolicyOptions</code>, <code>ScriptedResponse</code>, <code>StaticIdentityOptions</code>, <code>StaticIdentityVerifier</code>, <code>SystemClock</code>, <code>TokenExchangeOptions</code>, <code>UuidGenerator</code></td></tr>
+<tr><td><code>ai_agent_lib_core.adapters</code></td><td>Local adapters that implement the ports without any cloud service.</td><td><code>AnthropicChatModelProvider</code>, <code>AnthropicModelOptions</code>, <code>CachingPolicyDecisionPoint</code>, <code>DuckDbCsvDataSource</code>, <code>DuckDbCsvOptions</code>, <code>EnvSecretsProvider</code>, <code>ExchangingJwtIdentity</code>, <code>FakeChatModel</code>, <code>FakeChatModelProvider</code>, <code>FileRegistryOptions</code>, <code>FileRegistrySource</code>, <code>GuardrailsOptions</code>, <code>JsonlAuditOptions</code>, <code>JsonlAuditSink</code>, <code>JwtIdentityOptions</code>, <code>JwtIdentityVerifier</code>, <code>JwtSettings</code>, <code>NoCheckpointBackend</code>, <code>NullTelemetry</code>, <code>OAuthTokenExchanger</code>, <code>OpaPolicyDecisionPoint</code>, <code>OpaPolicyOptions</code>, <code>OpenTelemetryTelemetry</code>, <code>PatternGuardrails</code>, <code>PatternGuardrailsOptions</code>, <code>PolicyCacheOptions</code>, <code>resolve_jwt_options</code>, <code>RestDataSource</code>, <code>RestOptions</code>, <code>RulesPolicyDecisionPoint</code>, <code>RulesPolicyOptions</code>, <code>ScriptedResponse</code>, <code>StaticIdentityOptions</code>, <code>StaticIdentityVerifier</code>, <code>SystemClock</code>, <code>TokenExchangeOptions</code>, <code>UuidGenerator</code></td></tr>
 <tr><td><code>ai_agent_lib_core.pipeline</code></td><td>The interceptor contract and the fixed-order request pipelines.</td><td><code>AgentCheck</code>, <code>allowed_agent</code>, <code>AuditableCall</code>, <code>AuditInterceptor</code>, <code>bind_request_context</code>, <code>bound_request_context</code>, <code>BudgetInterceptor</code>, <code>BudgetLedger</code>, <code>build_model_pipeline</code>, <code>build_tool_pipeline</code>, <code>compose</code>, <code>DataCall</code>, <code>DataPolicyInterceptor</code>, <code>DataStage</code>, <code>DeadlineInterceptor</code>, <code>describe_query_result</code>, <code>enforce_decision</code>, <code>Evidence</code>, <code>frame_untrusted</code>, <code>FramingInterceptor</code>, <code>GovernedDataSource</code>, <code>Handler</code>, <code>IdentityInterceptor</code>, <code>InputGuardrailInterceptor</code>, <code>Interceptor</code>, <code>ModelCall</code>, <code>ModelPolicyInterceptor</code>, <code>ModelStage</code>, <code>name_actors</code>, <code>Operations</code>, <code>OutputGuardrailInterceptor</code>, <code>Pipeline</code>, <code>record_refused_sign_in</code>, <code>RegistryInterceptor</code>, <code>require_identified</code>, <code>ResilienceInterceptor</code>, <code>result_text</code>, <code>StructuredOutputInterceptor</code>, <code>tool_arguments_text</code>, <code>ToolCall</code>, <code>ToolPolicyInterceptor</code>, <code>ToolStage</code></td></tr>
 <tr><td><code>ai_agent_lib_core.kit</code></td><td>What a provider pack builds on.</td><td><code>agents_document</code>, <code>AUDIT</code>, <code>bind_parameters</code>, <code>build_statement</code>, <code>BuildContext</code>, <code>BuildResources</code>, <code>check_filter_columns</code>, <code>checked_base_url</code>, <code>CHECKPOINT</code>, <code>coerce_parameter</code>, <code>compile_query</code>, <code>CompiledQuery</code>, <code>content_revision</code>, <code>DATA</code>, <code>DATA_PORT</code>, <code>effective_row_cap</code>, <code>Factory</code>, <code>filter_rows</code>, <code>finish_result</code>, <code>GovernedStatement</code>, <code>GUARDRAILS</code>, <code>GuardrailsOptions</code>, <code>IDENTITY</code>, <code>load_registries</code>, <code>mask_rows</code>, <code>MODEL</code>, <code>MODEL_PORT</code>, <code>NamedQuery</code>, <code>parse_agents_document</code>, <code>parse_document_text</code>, <code>parse_tools_document</code>, <code>POLICY</code>, <code>ProviderSpec</code>, <code>QueryCatalog</code>, <code>REGISTRY</code>, <code>RegistryDocument</code>, <code>SECRETS</code>, <code>ServicePort</code>, <code>ServiceProviders</code>, <code>tls_verification</code>, <code>tools_document</code></td></tr>
 <tr><td><code>ai_agent_lib_aws</code></td><td>AWS adapters for the Enterprise Agentic Platform library.</td><td><code>register</code></td></tr>

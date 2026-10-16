@@ -36,7 +36,8 @@ async def test_memo_and_follow_up_share_tool_evidence_and_survive_restart(tmp_pa
     memo = history[0]["memos"][0]
     assert memo["uen"] == "JONE-0022" and memo["meeting_date"] == "2026-08-03"
     assert history[1]["context_diagnostics"]["memo_ids"] == [memo["memo_id"]]
-    assert '"estimated_input_tokens"' in requests[2]["messages"][0]["content"]
+    assert history[1]["context_diagnostics"]["estimated_input_tokens"] > 0
+    assert '"estimated_input_tokens"' not in str(requests[2]["messages"][0]["content"])
     for request_index, source in [(1, "credit_metrics[uen=JONE-0022]"), (3, "FAC000000130")]:
         tool_result = requests[request_index]["messages"][-1]
         preceding_call = events[2 * request_index - 1]["response"]["tool_calls"][0]

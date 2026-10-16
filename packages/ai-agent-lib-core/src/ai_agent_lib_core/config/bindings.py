@@ -55,6 +55,7 @@ class Key(enum.StrEnum):
     MODEL_PROVIDER = "model.provider"
     MODEL_ID = "model.model_id"
     MODEL_ALIASES = "model.aliases"
+    MODEL_OPTIONS = "model.options"
     MODEL_TRACE_PATH = "model.trace_path"
     DATA_SOURCES = "data.sources"
     AWS_PROFILE = "external.aws_profile"
@@ -303,6 +304,18 @@ def _default_bindings() -> tuple[Binding, ...]:
             default="`{}`: only the default alias",
         ),
         *_section_bindings(),
+        Binding(
+            name=f"{PREFIX}MODEL_OPTIONS",
+            key=Key.MODEL_OPTIONS,
+            description="JSON options keyed by model provider name.",
+            kind=ValueKind.JSON,
+            details=(
+                'For Anthropic prompt caching, use {"anthropic": {"prompt_caching": true, '
+                '"cache_ttl": "5m"}}. Options apply to every alias using that provider. '
+                "Unknown options stop startup. `agentlib config options model` lists options."
+            ),
+            default="`{}`: each provider's defaults; Anthropic prompt caching is off",
+        ),
         Binding(
             name=f"{PREFIX}DATA_SOURCES",
             key=Key.DATA_SOURCES,

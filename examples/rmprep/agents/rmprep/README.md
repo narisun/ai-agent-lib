@@ -36,7 +36,7 @@ saved conversation. See [memo context management](../../docs/context-management.
 for a Command Prompt walkthrough, budget configuration and trace examples.
 
 `graph.py` composes the service, `router.py` selects the specialist,
-`prompts.py` defines evidence and memo requirements, and `specialist.py`
+`prompts/` contains versioned evidence and memo instructions, and `specialist.py`
 runs the model/tool loop. `response_review.py` checks final-answer length and
 exact source references. The injected `ServiceContainer` supplies infrastructure.
 It also rejects citation placeholders and known wording that invents the fiscal
@@ -46,7 +46,7 @@ revenue citation cannot stand in for gross profit.
 Financial calculations and review findings belong to the MCP evidence layer;
 the agent explains them and proposes questions for the RM to investigate.
 
-Include `Keep it within 450 words.` to set a word limit. Defaults are 600 words
+Include `Keep it within 450 words.` to set a word limit. Defaults are 1,000 words
 for a memo and 350 for Q&A, including headings, tables and citations. A reply
 that fails length or citation checks gets up to two model revisions. Continued
 failure raises a validation error. Drafts appear in model traces; only accepted

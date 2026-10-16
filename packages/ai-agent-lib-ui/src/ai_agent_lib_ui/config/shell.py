@@ -2,6 +2,7 @@
 
 import os
 import secrets
+from hashlib import sha256
 from importlib.resources import files
 from pathlib import Path
 
@@ -35,12 +36,23 @@ def prepare_shell(state: Path, settings: Settings) -> tuple[str, str]:
     (shell / "public").mkdir(exist_ok=True)
     assets = files("ai_agent_lib_ui").joinpath("assets")
     config = assets.joinpath("chainlit.toml").read_text().replace("__ORIGIN__", settings.origin)
+    for name in ("chat.css", "conversations.svg", "memos.js"):
+        content = assets.joinpath(name).read_bytes()
+        (shell / "public" / name).write_bytes(content)
+        # Stable per-content URLs make browsers fetch changed assets on restart.
+        config = config.replace(
+            f'/public/{name}"', f'/public/{name}?v={sha256(content).hexdigest()[:16]}"'
+        )
     (shell / ".chainlit/config.toml").write_text(config, encoding="utf-8")
-    for name in ("chat.css", "conversations.svg"):
-        (shell / "public" / name).write_bytes(assets.joinpath(name).read_bytes())
+    logo = assets.joinpath("agent-lab.svg").read_bytes()
+    # Chainlit discovers these filenames for its theme logos and favicon.
+    for name in ("logo_light.svg", "logo_dark.svg", "favicon.svg"):
+        (shell / "public" / name).write_bytes(logo)
     (shell / "chainlit.md").write_text(
-        "# Agent workspace\nChoose an agent, then ask a question. "
-        "Previous conversations appear on the left.\n",
+        "# Agent Lab\nSelect **Choose agent**, then **Start chat** for the agent you want to test. "
+        "Ask a question in the message box. Previous chats appear on the left.\n\n"
+        "Open **Memos** to read a saved memo beside chat and choose its version. "
+        "Open **Logs** to inspect model input/output, MCP calls and checkpoints.\n",
         encoding="utf-8",
     )
     # Chainlit otherwise reads the working directory's .env during import. Keep

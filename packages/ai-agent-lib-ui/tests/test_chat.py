@@ -6,9 +6,12 @@ import os
 import sqlite3
 import subprocess
 import sys
+import tomllib
 from collections.abc import AsyncIterator
+from importlib.resources import files
 from pathlib import Path
 from unittest.mock import patch
+from urllib.parse import urlsplit
 
 import httpx
 import pytest
@@ -18,6 +21,8 @@ from ai_agent_lib_ui.adapters.catalog import FileCatalog, LocalAccess, pin_bindi
 from ai_agent_lib_ui.adapters.http import HttpDispatcher
 from ai_agent_lib_ui.adapters.sqlite import SqliteThreads
 from ai_agent_lib_ui.application.chat import ChatService, view_for
+from ai_agent_lib_ui.application.progress import Draft
+from ai_agent_lib_ui.config import shell
 from ai_agent_lib_ui.config.settings import LocalIdentity, Settings, agent_environment
 from ai_agent_lib_ui.contracts.conversations import TurnAdmission
 from ai_agent_lib_ui.contracts.queries import (
@@ -89,6 +94,10 @@ class ScriptedAgent:
             return httpx.Response(200, content=b"x" * 1_048_577)
         if self.mode == "failed":
             return httpx.Response(403, json={"detail": "denied"})
+        if self.mode == "thread_busy":
+            return httpx.Response(
+                409, json={"error": "thread_busy", "request_id": request.headers["x-request-id"]}
+            )
         if self.mode == "gateway":
             return httpx.Response(504)
         return httpx.Response(
@@ -115,6 +124,17 @@ async def chat(
         await service.close()
 
 
+@pytest.mark.parametrize(
+    "body", [b"data: " + b"x" * 65 + b"\n\n", b"data: " + b"x" * 65, b": heartbeat\n\n" * 50]
+)
+async def test_stream_parser_bounds_frames_and_total_bytes(body: bytes) -> None:
+    from ai_agent_lib_ui.adapters.events import events
+
+    with pytest.raises(ContractError, match="invalid_response"):
+        async for _ in events(httpx.Response(200, content=body), 64):
+            pass
+
+
 async def test_two_questions_restart_resume_and_only_new_input(
     chat: tuple[ChatService, ScriptedAgent, SqliteThreads], settings: Settings
 ) -> None:
@@ -135,6 +155,27 @@ async def test_two_questions_restart_resume_and_only_new_input(
     assert [turn.run.answer for turn in history] == ["answer 1", "answer 2"]
     await service.reattach(principal, thread.thread_id)
     assert len(agent.calls) == 2
+
+
+async def test_enabling_optional_artifacts_keeps_existing_chats_usable(
+    chat: tuple[ChatService, ScriptedAgent, SqliteThreads], settings: Settings
+) -> None:
+    service, agent, _ = chat
+    principal = settings.identity.principal()
+    thread = (await service.create(principal, "memo")).thread.thread_id
+    bindings = tuple(
+        binding.model_copy(
+            update={
+                "manifest": binding.manifest.model_copy(update={"capabilities": ("artifacts",)})
+            }
+        )
+        for binding in settings.bindings
+    )
+    updated = settings.model_copy(update={"bindings": bindings})
+    service.catalog = FileCatalog(updated, LocalAccess(updated))
+    result = await service.submit(principal, thread, "after-upgrade", "Continue this conversation")
+    assert result.state == "completed"
+    assert len(agent.calls) == 1
 
 
 async def test_duplicate_disconnect_and_same_thread_race(
@@ -181,13 +222,14 @@ async def test_uncertain_outcome_holds_admission_without_retry(
     assert len(agent.calls) == 1
 
 
+@pytest.mark.parametrize("mode", ["failed", "thread_busy"])
 async def test_definitive_http_failure_allows_new_turn_but_never_replays_old_key(
-    chat: tuple[ChatService, ScriptedAgent, SqliteThreads], settings: Settings
+    chat: tuple[ChatService, ScriptedAgent, SqliteThreads], settings: Settings, mode: str
 ) -> None:
     service, agent, _ = chat
     principal = settings.identity.principal()
     thread = (await service.create(principal, "memo")).thread.thread_id
-    agent.mode = "failed"
+    agent.mode = mode
     failed = await service.submit(principal, thread, "one", "hello")
     assert failed.state == "failed"
     agent.mode = "ok"
@@ -375,6 +417,40 @@ def test_shell_ignores_working_directory_dotenv(settings: Settings, tmp_path: Pa
     assert result.returncode == 0, result.stderr
 
 
+def test_shell_versions_assets_by_content_without_changing_saved_secrets(
+    settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A package copy lets the test simulate an upgrade across two local starts.
+    package = tmp_path / "package"
+    assets = package / "assets"
+    assets.mkdir(parents=True)
+    for name in ("chainlit.toml", "chat.css", "conversations.svg", "memos.js", "agent-lab.svg"):
+        (assets / name).write_bytes(files("ai_agent_lib_ui").joinpath("assets", name).read_bytes())
+    monkeypatch.setattr(shell, "files", lambda _: package)
+    monkeypatch.setattr("ai_agent_lib_ui.config.shell.os.environ", {})
+    state = tmp_path / "state"
+
+    def prepare() -> tuple[tuple[str, str], dict[str, object]]:
+        secrets = shell.prepare_shell(state, settings)
+        config = tomllib.loads((state / "shell/.chainlit/config.toml").read_text())
+        return secrets, config["UI"]
+
+    first_secrets, first = prepare()
+    second_secrets, second = prepare()
+    assert second == first
+    assert second_secrets == first_secrets
+    assert urlsplit(str(first["custom_css"])).path == "/public/chat.css"
+    assert urlsplit(str(first["custom_css"])).query.startswith("v=")
+    assert urlsplit(str(first["custom_js"])).query.startswith("v=")
+    css = (assets / "chat.css").read_bytes() + b"\n/* changed style */\n"
+    (assets / "chat.css").write_bytes(css)
+    third_secrets, third = prepare()
+    assert third_secrets == first_secrets
+    assert third["custom_css"] != first["custom_css"]
+    assert third["custom_js"] == first["custom_js"]
+    assert (state / "shell/public/chat.css").read_bytes() == css
+
+
 async def test_total_deadline_also_bounds_a_stalled_dispatch(
     chat: tuple[ChatService, ScriptedAgent, SqliteThreads], settings: Settings
 ) -> None:
@@ -386,3 +462,333 @@ async def test_total_deadline_also_bounds_a_stalled_dispatch(
         result = await service.submit(principal, thread, "one", "hello")
     assert result.state == "unknown"
     assert len(agent.calls) == 1
+
+
+class EventStream(httpx.AsyncByteStream):
+    def __init__(self, request: httpx.Request, mode: str, release: asyncio.Event) -> None:
+        self.request, self.mode, self.release = request, mode, release
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        identity = {
+            "thread_id": json.loads(self.request.content)["thread_id"],
+            "request_id": self.request.headers["x-request-id"],
+        }
+
+        def frame(name: str, **value: object) -> bytes:
+            return f"event: {name}\ndata: {json.dumps({**identity, **value})}\n\n".encode()
+
+        yield frame("draft", call=1, text="", reset=True)
+        yield frame("draft", call=1, text="Provisional £ text", reset=False)
+        await self.release.wait()
+        if self.mode == "missing":
+            return
+        if self.mode in {"cross_thread", "cross_thread_error"}:
+            identity["thread_id"] = "someone-else"
+        if self.mode == "cross_request_error":
+            identity["request_id"] = "someone-else"
+        if "error" in self.mode:
+            terminal = frame(
+                "error",
+                error="internal" if self.mode == "internal_error" else "invalid",
+                model_calls=3,
+                usage={
+                    "input_tokens": 90,
+                    "output_tokens": 20,
+                    "source": "langchain",
+                    "kind": "reported",
+                },
+                **({"output": {"answer": "Do not accept"}} if self.mode == "output_error" else {}),
+            )
+            yield terminal
+            if self.mode == "duplicate_error":
+                yield terminal
+            if self.mode == "interrupted_error":
+                raise httpx.ReadError("connection lost after terminal")
+            return
+        result = frame(
+            "result",
+            output={"answer": "Accepted answer"},
+            model_calls=2,
+            usage={
+                "source": "langchain",
+                "kind": "reported",
+                "input_tokens": 40,
+                "output_tokens": 12,
+                "cache_read_tokens": 10,
+            },
+        )
+        # Split arbitrary bytes, including UTF-8 and SSE delimiters.
+        for index in range(0, len(result), 7):
+            yield result[index : index + 7]
+        if self.mode == "duplicate":
+            yield result
+
+
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "ok",
+        "missing",
+        "cross_thread",
+        "error",
+        "duplicate",
+        "internal_error",
+        "cross_thread_error",
+        "cross_request_error",
+        "output_error",
+        "duplicate_error",
+        "interrupted_error",
+    ],
+)
+async def test_live_drafts_are_not_saved_and_only_one_terminal_result_is_accepted(
+    settings: Settings,
+    tmp_path: Path,
+    mode: str,
+) -> None:
+    release = asyncio.Event()
+    observed = asyncio.Event()
+    calls = 0
+
+    async def agent(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        if request.method == "GET":
+            return httpx.Response(404)  # Older servers do not have a status journal.
+        calls += 1
+        assert request.headers["accept"] == "text/event-stream, application/json"
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            stream=EventStream(request, mode, release),
+        )
+
+    async def display(draft: Draft) -> None:
+        if "Provisional" in draft.text:
+            observed.set()
+
+    access = LocalAccess(settings)
+    store = SqliteThreads(tmp_path / "stream.sqlite", access, b"key")
+    principal = settings.identity.principal()
+    async with httpx.AsyncClient(transport=httpx.MockTransport(agent)) as client:
+        service = ChatService(store, FileCatalog(settings, access), HttpDispatcher(client, 3))
+        thread = (await service.create(principal, "memo")).thread.thread_id
+        browser = asyncio.create_task(
+            service.submit(principal, thread, "send", "question", on_progress=display)
+        )
+        await asyncio.wait_for(observed.wait(), timeout=2)
+        assert not browser.done()
+        history = await store.history(view_for(principal, "memo"), thread)
+        assert history[0].run.answer is None
+        # Disconnect the browser during delivery. The service must still save the result.
+        browser.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await browser
+        release.set()
+        await service.reattach(principal, thread)
+        result = await service.submit(principal, thread, "send", "question")
+        assert result.state == {"ok": "completed", "error": "failed"}.get(mode, "unknown")
+        assert result.elapsed_ms is not None
+        if mode == "ok":
+            assert result.answer == "Accepted answer"
+            assert result.usage.input_tokens == 40
+            assert result.usage.output_tokens == 12
+            assert result.model_calls == 2
+            reopened = SqliteThreads(store.path, access, b"key")
+            assert (await reopened.history(view_for(principal, "memo"), thread))[0].run == result
+        else:
+            assert result.answer is None
+        assert calls == 1
+        if mode == "error":
+            assert result.failure_code == "invalid"
+            assert result.usage.input_tokens == 90
+            assert result.usage.output_tokens == 20
+            assert result.model_calls == 3
+            reopened = SqliteThreads(store.path, access, b"key")
+            assert (await reopened.history(view_for(principal, "memo"), thread))[0].run == result
+            # The original key never dispatches again; a different question is allowed.
+            assert await service.submit(principal, thread, "send", "question") == result
+            assert calls == 1
+            assert (
+                await service.submit(principal, thread, "next", "new question")
+            ).state == "failed"
+            assert calls == 2
+        elif mode != "ok":
+            with pytest.raises(ContractError):
+                await service.submit(principal, thread, "next", "new question")
+            assert calls == 1
+        await service.close()
+
+
+async def test_json_wrong_request_id_holds_admission(settings: Settings, tmp_path: Path) -> None:
+    access = LocalAccess(settings)
+    store = SqliteThreads(tmp_path / "correlation.sqlite", access, b"key")
+
+    async def wrong(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "thread_id": json.loads(request.content)["thread_id"],
+                "request_id": "another-request",
+                "output": {"answer": "wrong invocation"},
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(wrong)) as client:
+        chat = ChatService(store, FileCatalog(settings, access), HttpDispatcher(client, 2))
+        principal = settings.identity.principal()
+        thread = (await chat.create(principal, "memo")).thread.thread_id
+        result = await chat.submit(principal, thread, "one", "Question")
+        assert result.state == "unknown"
+        assert result.answer is None
+        assert result.request_id != "another-request"
+        with pytest.raises(ContractError, match="conflict"):
+            await chat.submit(principal, thread, "two", "Do not resend")
+
+
+async def test_unrelated_registry_change_preserves_existing_thread(
+    chat: tuple[ChatService, ScriptedAgent, SqliteThreads],
+    settings: Settings,
+) -> None:
+    service, agent, _ = chat
+    principal = settings.identity.principal()
+    thread = (await service.create(principal, "memo")).thread.thread_id
+    old_revision = settings.bindings[0].manifest.registry_revision
+    raw = json.loads(settings.agents_path.read_text())
+    raw["agents"][1]["version"] = "2"
+    settings.agents_path.write_text(json.dumps(raw))
+    result = await service.submit(principal, thread, "one", "Continue")
+    assert result.state == "completed"
+    assert len(agent.calls) == 1
+    assert result.registry_revision != old_revision
+
+
+async def test_history_pages_are_bounded_complete_and_scope_bound(
+    chat: tuple[ChatService, ScriptedAgent, SqliteThreads],
+    settings: Settings,
+) -> None:
+    service, _, store = chat
+    principal = settings.identity.principal()
+    view = view_for(principal, "memo")
+    thread = (await service.create(principal, "memo")).thread.thread_id
+    # Store representative long answers without making network/model calls.
+    from ai_agent_lib_ui.adapters.sqlite import now
+    from ai_agent_lib_ui.contracts.conversations import RunRecord
+
+    stamp = now()
+    with store.connection() as db:
+        for i in range(110):
+            run = RunRecord(
+                scope=view.scope,
+                thread_id=thread,
+                request_id=f"r-{i}",
+                run_id=f"run-{i}",
+                idempotency_key=f"key-{i}",
+                state="completed",
+                accepted_at=stamp,
+                updated_at=stamp,
+                answer="x" * 50_000,
+            )
+            db.execute(
+                "INSERT INTO runs VALUES (?,?,?,?,?,?)",
+                (run.run_id, thread, run.idempotency_key, str(i), run.state, run.model_dump_json()),
+            )
+    recent = await store.history(view, thread)
+    assert len(recent) < 50
+    assert recent[-1].question == "109"
+    page = await store.history_page(view, thread, PageRequest())
+    first_cursor = page.next_cursor
+    collected = list(page.items)
+    while page.next_cursor:
+        page = await store.history_page(view, thread, PageRequest(cursor=page.next_cursor))
+        collected = [*page.items, *collected]
+    assert [item.question for item in collected] == [str(i) for i in range(110)]
+    other = (await service.create(principal, "memo")).thread.thread_id
+    with pytest.raises(ContractError, match="invalid_input"):
+        await store.history_page(view, other, PageRequest(cursor=first_cursor))
+    assert first_cursor
+    with pytest.raises(ContractError, match="invalid_input"):
+        await store.history_page(view, thread, PageRequest(cursor=first_cursor + "x"))
+
+
+@pytest.mark.parametrize("outcome", ["completed", "failed", "pending", "wrong_id", "unavailable"])
+async def test_reopen_reconciles_only_confirmed_correlated_outcomes_without_resending(
+    settings: Settings,
+    tmp_path: Path,
+    outcome: str,
+) -> None:
+    access = LocalAccess(settings)
+    store = SqliteThreads(tmp_path / "recovery.sqlite", access, b"key")
+    saved: dict[str, object] = {}
+    methods: list[str] = []
+
+    async def agent(request: httpx.Request) -> httpx.Response:
+        methods.append(request.method)
+        if request.method == "POST":
+            saved.update(
+                thread_id=json.loads(request.content)["thread_id"],
+                request_id=request.headers["x-request-id"],
+                elapsed_ms=1250,
+                usage={"input_tokens": 20, "output_tokens": 5},
+                model_calls=1,
+            )
+            if outcome == "failed":
+                saved["error"] = "invalid"
+            else:
+                saved["output"] = {"answer": "The already accepted answer"}
+            raise httpx.ReadTimeout("response was lost")
+        if outcome == "pending":
+            return httpx.Response(200, json={"state": "unknown"})
+        if outcome == "unavailable":
+            return httpx.Response(404)
+        return httpx.Response(
+            200, json={**saved, **({"request_id": "wrong"} if outcome == "wrong_id" else {})}
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(agent)) as client:
+        service = ChatService(store, FileCatalog(settings, access), HttpDispatcher(client, 2))
+        principal = settings.identity.principal()
+        view = view_for(principal, "memo")
+        thread = (await service.create(principal, "memo")).thread.thread_id
+        unknown = await service.submit(principal, thread, "one", "Question")
+        assert unknown.state == "unknown"
+        await service.reattach(principal, thread)
+        latest = (await store.history(view, thread))[-1].run
+        assert methods == ["POST", "GET"]
+        if outcome in {"completed", "failed"}:
+            assert latest.state == outcome
+            assert latest.usage.input_tokens == 20
+            assert latest.elapsed_ms == 1250
+            with store.connection() as db:
+                assert db.execute("SELECT state FROM reconciliations").fetchall() == [(outcome,)]
+            await service.reattach(principal, thread)
+            assert methods == ["POST", "GET"]
+            assert await service.submit(principal, thread, "one", "Question") == latest
+        else:
+            assert latest == unknown
+            with pytest.raises(ContractError, match="conflict"):
+                await service.submit(principal, thread, "two", "Not safe to retry")
+
+
+async def test_waiting_for_database_write_does_not_block_the_ui_loop(
+    chat: tuple[ChatService, ScriptedAgent, SqliteThreads],
+    settings: Settings,
+) -> None:
+    service, _, store = chat
+    principal = settings.identity.principal()
+    view = view_for(principal, "memo")
+    thread = (await service.create(principal, "memo")).thread.thread_id
+    with store.connection() as blocker:
+        blocker.execute("BEGIN IMMEDIATE")
+        waiting = asyncio.create_task(
+            store.admit(
+                view,
+                TurnAdmission(
+                    scope=view.scope, thread_id=thread, idempotency_key="wait", question="Question"
+                ),
+            )
+        )
+        try:
+            await asyncio.sleep(0.05)
+            assert not waiting.done()  # The event loop can release the competing lock.
+        finally:
+            blocker.commit()
+            await waiting

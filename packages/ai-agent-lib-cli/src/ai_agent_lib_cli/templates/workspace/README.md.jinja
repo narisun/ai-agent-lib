@@ -10,11 +10,15 @@ folder of Python wheels. The default tests use scripted models and local fixture
 
 ## Select Python
 
-Use one virtual environment for all services. A virtual environment keeps
+Use one virtual environment for this workspace's agents and MCP servers. A virtual environment keeps
 their packages separate from system Python. The commands call that environment's
 Python executable directly. On Windows, use **Command Prompt (cmd.exe)** and run
 one line at a time. `set` stores a variable; `%PYTHON%` reads it. Keep the quotes
 around paths so they work when a folder name contains spaces.
+
+Agent Lab, if used, runs in a separate UI environment and calls these agents
+over HTTP. Follow its package README to register your generated agent; the
+library checkout's batch launcher starts the included rmprep example.
 
 {% if library.kind == "path" %}
 This workspace uses the library checkout recorded in `agentlib.toml` and its

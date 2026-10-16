@@ -1,5 +1,6 @@
 """SQLite stores UI history only; agent checkpoints stay behind the agent API."""
 
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -83,8 +84,12 @@ class SqliteThreads:
 
     async def get(self, principal: Principal, thread_id: str) -> Conversation:
         """Check both ownership and current permission before exposing a thread."""
-        with self.connection() as db:
-            result = self._get(db, principal, thread_id)
+
+        def read() -> Conversation:
+            with self.connection() as db:
+                return self._get(db, principal, thread_id)
+
+        result = await asyncio.to_thread(read)
         await self.authorizer.require(
             ViewContext(principal=principal, scope=result.thread.scope),
             Permission.CONVERSATION_READ,
@@ -102,26 +107,30 @@ class SqliteThreads:
         thread = ThreadRecord(
             scope=view.scope, thread_id=thread_id, title=title, created_at=stamp, updated_at=stamp
         )
-        with self.connection() as db:
-            db.execute("BEGIN IMMEDIATE")
-            db.execute(
-                "INSERT OR IGNORE INTO threads VALUES (?,?,?,?,?,?,?,?,?)",
-                (
-                    thread_id,
-                    view.scope.tenant,
-                    view.scope.subject,
-                    view.scope.application,
-                    title,
-                    stamp.isoformat(),
-                    0,
-                    thread.model_dump_json(),
-                    binding.model_dump_json(),
-                ),
-            )
-            result = self._get(db, view.principal, thread_id)
-            if result.thread.scope != view.scope or result.binding != binding:
-                raise ContractError(ErrorCode.CONFLICT)
-        return result
+
+        def write() -> Conversation:
+            with self.connection() as db:
+                db.execute("BEGIN IMMEDIATE")
+                db.execute(
+                    "INSERT OR IGNORE INTO threads VALUES (?,?,?,?,?,?,?,?,?)",
+                    (
+                        thread_id,
+                        view.scope.tenant,
+                        view.scope.subject,
+                        view.scope.application,
+                        title,
+                        stamp.isoformat(),
+                        0,
+                        thread.model_dump_json(),
+                        binding.model_dump_json(),
+                    ),
+                )
+                result = self._get(db, view.principal, thread_id)
+                if result.thread.scope != view.scope or result.binding != binding:
+                    raise ContractError(ErrorCode.CONFLICT)
+            return result
+
+        return await asyncio.to_thread(write)
 
     async def change(
         self,
@@ -133,31 +142,35 @@ class SqliteThreads:
     ) -> ThreadRecord:
         """Rename or archive; existing transcript and pending work remain intact."""
         await self.authorizer.require(view, Permission.CONVERSATION_WRITE)
-        with self.connection() as db:
-            db.execute("BEGIN IMMEDIATE")
-            conversation = self._get(db, view.principal, thread_id)
-            if conversation.thread.scope != view.scope:
-                raise ContractError(ErrorCode.NOT_FOUND)
-            values = conversation.thread.model_dump()
-            values.update(updated_at=now())
-            if title is not None:
-                if not title.strip():
-                    raise ContractError(ErrorCode.INVALID_INPUT)
-                values["title"] = title.strip()
-            if archived is not None:
-                values["archived"] = archived
-            thread = ThreadRecord.model_validate(values)
-            db.execute(
-                "UPDATE threads SET title=?,updated=?,archived=?,record=? WHERE id=?",
-                (
-                    thread.title,
-                    thread.updated_at.isoformat(),
-                    thread.archived,
-                    thread.model_dump_json(),
-                    thread_id,
-                ),
-            )
-        return thread
+
+        def write() -> ThreadRecord:
+            with self.connection() as db:
+                db.execute("BEGIN IMMEDIATE")
+                conversation = self._get(db, view.principal, thread_id)
+                if conversation.thread.scope != view.scope:
+                    raise ContractError(ErrorCode.NOT_FOUND)
+                values = conversation.thread.model_dump()
+                values.update(updated_at=now())
+                if title is not None:
+                    if not title.strip():
+                        raise ContractError(ErrorCode.INVALID_INPUT)
+                    values["title"] = title.strip()
+                if archived is not None:
+                    values["archived"] = archived
+                thread = ThreadRecord.model_validate(values)
+                db.execute(
+                    "UPDATE threads SET title=?,updated=?,archived=?,record=? WHERE id=?",
+                    (
+                        thread.title,
+                        thread.updated_at.isoformat(),
+                        thread.archived,
+                        thread.model_dump_json(),
+                        thread_id,
+                    ),
+                )
+            return thread
+
+        return await asyncio.to_thread(write)
 
     async def threads(self, view: ViewContext, page: PageRequest) -> Page[ThreadRecord]:
         """List within exactly one authorized agent scope."""
@@ -201,22 +214,26 @@ class SqliteThreads:
             AND instr(lower(title), lower(?))>0
             AND (updated < ? OR (updated = ? AND id > ?))
             ORDER BY updated DESC,id LIMIT ?"""
-        with self.connection() as db:
-            rows = db.execute(
-                query,
-                (
-                    principal.tenant,
-                    principal.subject,
-                    archived,
-                    agent,
-                    agent,
-                    search,
-                    after[0],
-                    after[0],
-                    after[1],
-                    page.limit + 1,
-                ),
-            ).fetchall()
+
+        def read() -> list[tuple[str, str, str]]:
+            with self.connection() as db:
+                return db.execute(
+                    query,
+                    (
+                        principal.tenant,
+                        principal.subject,
+                        archived,
+                        agent,
+                        agent,
+                        search,
+                        after[0],
+                        after[0],
+                        after[1],
+                        page.limit + 1,
+                    ),
+                ).fetchall()
+
+        rows = await asyncio.to_thread(read)
         items: list[ThreadRecord] = []
         for row in rows[: page.limit]:
             thread = ThreadRecord.model_validate_json(row[0])
@@ -260,37 +277,41 @@ class SqliteThreads:
             accepted_at=stamp,
             updated_at=stamp,
         )
-        try:
-            with self.connection() as db:
-                db.execute("BEGIN IMMEDIATE")
-                conversation = self._get(db, view.principal, turn.thread_id)
-                if conversation.thread.scope != view.scope:
-                    raise ContractError(ErrorCode.NOT_FOUND)
-                row = db.execute(
-                    "SELECT question,record FROM runs WHERE thread=? AND key=?",
-                    (turn.thread_id, turn.idempotency_key),
-                ).fetchone()
-                if row:
-                    if row[0] != turn.question:
+
+        def write() -> RunRecord:
+            try:
+                with self.connection() as db:
+                    db.execute("BEGIN IMMEDIATE")
+                    conversation = self._get(db, view.principal, turn.thread_id)
+                    if conversation.thread.scope != view.scope:
+                        raise ContractError(ErrorCode.NOT_FOUND)
+                    row = db.execute(
+                        "SELECT question,record FROM runs WHERE thread=? AND key=?",
+                        (turn.thread_id, turn.idempotency_key),
+                    ).fetchone()
+                    if row:
+                        if row[0] != turn.question:
+                            raise ContractError(ErrorCode.CONFLICT)
+                        return RunRecord.model_validate_json(row[1])
+                    if conversation.thread.archived:
                         raise ContractError(ErrorCode.CONFLICT)
-                    return RunRecord.model_validate_json(row[1])
-                if conversation.thread.archived:
-                    raise ContractError(ErrorCode.CONFLICT)
-                db.execute(
-                    "INSERT INTO runs VALUES (?,?,?,?,?,?)",
-                    (
-                        run.run_id,
-                        turn.thread_id,
-                        turn.idempotency_key,
-                        turn.question,
-                        run.state,
-                        run.model_dump_json(),
-                    ),
-                )
-                self._touch(db, conversation.thread, stamp)
-        except sqlite3.IntegrityError:
-            raise ContractError(ErrorCode.CONFLICT) from None
-        return run
+                    db.execute(
+                        "INSERT INTO runs VALUES (?,?,?,?,?,?)",
+                        (
+                            run.run_id,
+                            turn.thread_id,
+                            turn.idempotency_key,
+                            turn.question,
+                            run.state,
+                            run.model_dump_json(),
+                        ),
+                    )
+                    self._touch(db, conversation.thread, stamp)
+            except sqlite3.IntegrityError:
+                raise ContractError(ErrorCode.CONFLICT) from None
+            return run
+
+        return await asyncio.to_thread(write)
 
     @staticmethod
     def _touch(db: sqlite3.Connection, thread: ThreadRecord, stamp: datetime) -> None:
@@ -301,47 +322,172 @@ class SqliteThreads:
         )
 
     async def update(self, view: ViewContext, run: RunRecord, *, expected: RunRecord) -> bool:
+        """Save an ordinary state transition; unknown runs require reconciliation."""
+        return await self._update(view, run, expected=expected)
+
+    async def reconcile(self, view: ViewContext, run: RunRecord, *, expected: RunRecord) -> bool:
+        """Audit a server-verified terminal outcome; never unlock by elapsed time alone."""
+        if expected.state != "unknown":
+            raise ContractError(ErrorCode.CONFLICT)
+        return await self._update(view, run, expected=expected, reconciled=True)
+
+    async def _update(
+        self, view: ViewContext, run: RunRecord, *, expected: RunRecord, reconciled: bool = False
+    ) -> bool:
         """Atomically save a legal outcome and accepted answer, with compare-and-set."""
         await self.authorizer.require(view, Permission.CONVERSATION_WRITE)
-        identity = ("scope", "thread_id", "run_id", "idempotency_key", "accepted_at")
+        identity = ("scope", "thread_id", "request_id", "run_id", "idempotency_key", "accepted_at")
         if run.scope != view.scope or any(
             getattr(run, key) != getattr(expected, key) for key in identity
         ):
             raise ContractError(ErrorCode.NOT_FOUND)
-        require_transition(expected.state, run.state)
-        with self.connection() as db:
-            db.execute("BEGIN IMMEDIATE")
-            conversation = self._get(db, view.principal, run.thread_id)
-            if conversation.thread.scope != view.scope:
-                raise ContractError(ErrorCode.NOT_FOUND)
-            updated = (
-                db.execute(
-                    "UPDATE runs SET state=?,record=? WHERE id=? AND record=?",
-                    (
-                        run.state,
-                        run.model_dump_json(),
-                        run.run_id,
-                        expected.model_dump_json(),
-                    ),
-                ).rowcount
-                == 1
-            )
-            if updated:
-                self._touch(db, conversation.thread, run.updated_at)
-        return updated
+        require_transition(expected.state, run.state, reconciled=reconciled)
+
+        def write() -> bool:
+            with self.connection() as db:
+                db.execute("BEGIN IMMEDIATE")
+                conversation = self._get(db, view.principal, run.thread_id)
+                if conversation.thread.scope != view.scope:
+                    raise ContractError(ErrorCode.NOT_FOUND)
+                row = db.execute("SELECT record FROM runs WHERE id=?", (run.run_id,)).fetchone()
+                # Older JSON records omit newly optional fields. Compare their parsed
+                # values, then use the exact stored bytes for compare-and-set.
+                if row is None or RunRecord.model_validate_json(row[0]) != expected:
+                    return False
+                updated = (
+                    db.execute(
+                        "UPDATE runs SET state=?,record=? WHERE id=? AND record=?",
+                        (
+                            run.state,
+                            run.model_dump_json(),
+                            run.run_id,
+                            row[0],
+                        ),
+                    ).rowcount
+                    == 1
+                )
+                if updated:
+                    for item in run.artifacts:
+                        artifact = item.artifact
+                        if artifact.content is not None:
+                            # Repeated or conflicting declarations cannot overwrite an
+                            # accepted version. Optional documents never reject the answer.
+                            db.execute(
+                                "INSERT OR IGNORE INTO artifacts VALUES (?,?,?,?,?,?)",
+                                (
+                                    run.thread_id,
+                                    artifact.id,
+                                    artifact.document_id,
+                                    artifact.version,
+                                    run.run_id,
+                                    item.model_dump_json(),
+                                ),
+                            )
+                    self._touch(db, conversation.thread, run.updated_at)
+                    if reconciled:
+                        db.execute(
+                            "CREATE TABLE IF NOT EXISTS reconciliations "
+                            "(run TEXT, request TEXT, subject TEXT, state TEXT, stamp TEXT)"
+                        )
+                        db.execute(
+                            "INSERT INTO reconciliations VALUES (?,?,?,?,?)",
+                            (
+                                run.run_id,
+                                run.request_id,
+                                view.principal.subject,
+                                run.state,
+                                run.updated_at.isoformat(),
+                            ),
+                        )
+            return updated
+
+        return await asyncio.to_thread(write)
 
     async def history(self, view: ViewContext, thread_id: str) -> tuple[StoredTurn, ...]:
-        """Restore admitted user messages and accepted answers, never framework drafts."""
+        """Read the latest bounded page; use history_page to retrieve older exchanges."""
+        return (await self.history_page(view, thread_id, PageRequest())).items
+
+    async def turn(self, view: ViewContext, thread_id: str, run_id: str) -> StoredTurn:
+        """Read one owned turn, including older turns outside the recent history page."""
         conversation = await self.get(view.principal, thread_id)
         if conversation.thread.scope != view.scope:
             raise ContractError(ErrorCode.NOT_FOUND)
-        with self.connection() as db:
-            rows = db.execute(
-                "SELECT question,record FROM runs WHERE thread=? ORDER BY rowid", (thread_id,)
-            ).fetchall()
-        return tuple(
-            StoredTurn(question=row[0], run=RunRecord.model_validate_json(row[1])) for row in rows
-        )
+
+        def read() -> StoredTurn:
+            with self.connection() as db:
+                self._get(db, view.principal, thread_id)
+                row = db.execute(
+                    "SELECT question,record FROM runs WHERE thread=? AND id=?", (thread_id, run_id)
+                ).fetchone()
+            if row is None:
+                raise ContractError(ErrorCode.NOT_FOUND)
+            run = RunRecord.model_validate_json(row[1])
+            if run.scope != view.scope or run.thread_id != thread_id:
+                raise ContractError(ErrorCode.NOT_FOUND)
+            return StoredTurn(question=row[0], run=run)
+
+        return await asyncio.to_thread(read)
+
+    async def history_page(
+        self, view: ViewContext, thread_id: str, page: PageRequest
+    ) -> Page[StoredTurn]:
+        """Load a bounded page off the event loop, with a cursor bound to its owner/thread."""
+        conversation = await self.get(view.principal, thread_id)
+        if conversation.thread.scope != view.scope:
+            raise ContractError(ErrorCode.NOT_FOUND)
+        binding = [
+            "history",
+            [view.scope.tenant, view.scope.subject, view.scope.application],
+            thread_id,
+        ]
+        before = 2**63 - 1
+        if page.cursor:
+            try:
+                payload, signature = page.cursor.split(".")
+                expected = hmac.digest(self.cursor_secret, payload.encode(), "sha256").hex()
+                if not hmac.compare_digest(signature, expected):
+                    raise ValueError
+                decoded = json.loads(base64.urlsafe_b64decode(payload))
+                if decoded["binding"] != binding or type(decoded["before"]) is not int:
+                    raise ValueError
+                before = decoded["before"]
+            except (ValueError, KeyError, TypeError):
+                raise ContractError(ErrorCode.INVALID_INPUT) from None
+
+        def read() -> Page[StoredTurn]:
+            items: list[StoredTurn] = []
+            size, last, more = 0, before, False
+            with self.connection() as db:
+                self._get(db, view.principal, thread_id)
+                rows = db.execute(
+                    "SELECT rowid,question,record FROM runs WHERE thread=? AND rowid<? "
+                    "ORDER BY rowid DESC LIMIT ?",
+                    (thread_id, before, page.limit + 1),
+                )
+                for position, question, record in rows:
+                    amount = len(record.encode("utf-8")) + len(question.encode("utf-8"))
+                    # Always include one turn so even a large answer remains accessible.
+                    if len(items) >= page.limit or (items and size + amount > 2 * 1024 * 1024):
+                        more = True
+                        break
+                    items.append(
+                        StoredTurn(question=question, run=RunRecord.model_validate_json(record))
+                    )
+                    size += amount
+                    last = position
+            cursor = None
+            if more:
+                payload = base64.urlsafe_b64encode(
+                    json.dumps({"binding": binding, "before": last}).encode()
+                ).decode()
+                cursor = (
+                    payload
+                    + "."
+                    + hmac.digest(self.cursor_secret, payload.encode(), "sha256").hex()
+                )
+            return Page(items=tuple(reversed(items)), next_cursor=cursor)
+
+        return await asyncio.to_thread(read)
 
     def recover(self) -> None:
         """Hold admission for interrupted runs; call only under the server process lock."""

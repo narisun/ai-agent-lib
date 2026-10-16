@@ -232,6 +232,7 @@ def test_new_agent_adds_an_agent_linked_to_the_servers_it_names(
         ".env.example",
         "README.md",
         "docs/anthropic-example.md",
+        "docs/langfuse.md",
         "evals/cases.jsonl",
         "pyproject.toml",
         "src/hello_agent/__init__.py",

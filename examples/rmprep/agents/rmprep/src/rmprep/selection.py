@@ -1,11 +1,13 @@
-"""Resolve explicit memo references before a specialist interprets business evidence."""
+"""Resolve client groups and memo references before a specialist reads business evidence."""
 
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
-from typing import Literal, TypedDict
+from collections.abc import Mapping, Sequence
+from typing import Literal, NotRequired, TypedDict
 
+from rmprep.clients import ClientLookup, named_clients
+from rmprep.focus import ConversationFocus
 from rmprep.memos import MemoVersion
 
 _MONTHS = (
@@ -34,6 +36,9 @@ class ContextSelection(TypedDict):
     mode: Literal["snapshot", "refresh", "new"]
     reason: str
     clarification: str
+    client_uens: NotRequired[list[str]]
+    lookup_message_ids: NotRequired[list[str]]
+    evidence_message_ids: NotRequired[list[str]]
 
 
 def _choice(
@@ -44,6 +49,8 @@ def _choice(
     mode: Literal["snapshot", "refresh", "new"] = "snapshot",
     reason: str = "active memo",
     clarification: str = "",
+    client_uens: Sequence[str] = (),
+    lookup_message_ids: Sequence[str] = (),
 ) -> ContextSelection:
     clients = {memo["uen"] for memo in memos}
     dates = {memo["meeting_date"] for memo in memos}
@@ -55,6 +62,59 @@ def _choice(
         mode=mode,
         reason=reason,
         clarification=clarification,
+        client_uens=sorted(set(client_uens) | clients | ({uen} if uen else set())),
+        lookup_message_ids=list(lookup_message_ids),
+    )
+
+
+def _client_group_selection(
+    question: str,
+    clients: set[str],
+    recent: ClientLookup | None,
+    active: Sequence[str],
+    mode: Literal["snapshot", "refresh", "new"],
+    explicit_group: bool,
+) -> ContextSelection | None:
+    """Resolve a listed group or an established comparison without choosing one member."""
+    has_group = len(recent.clients) > 1 if recent is not None else len(active) > 1
+    plural = bool(
+        re.search(
+            r"\b(?:(?:these|those|the)\s+(?:two\s+)?|two\s+)(?:clients|companies)\b",
+            question,
+        )
+    ) or (has_group and bool(re.search(r"\b(?:both|them|their)\b", question)))
+    if len(clients) == 1 or _names_new_client(question, clients):
+        return None
+    if len(clients) > 1:
+        if not explicit_group:
+            return None
+        chosen = sorted(clients)
+    elif plural:
+        chosen = list(recent.clients) if recent is not None else list(active)
+        pair = bool(re.search(r"\b(?:both|two|pair)\b", question))
+        if (
+            (recent is not None and not recent.complete)
+            or len(chosen) < 2
+            or (pair and len(chosen) != 2)
+        ):
+            return _choice(
+                reason="client group is ambiguous or unavailable",
+                clarification="Please specify the client names or UENs to compare; the current search does not identify that group completely.",
+            )
+    elif len(active) > 1:
+        chosen = list(active)
+    else:
+        return None
+    dates = re.findall(r"\b\d{4}-\d{2}-\d{2}\b", question)
+    anchors = (
+        recent.message_ids if recent is not None and set(chosen) <= set(recent.clients) else ()
+    )
+    return _choice(
+        client_uens=chosen,
+        lookup_message_ids=anchors,
+        meeting_date=dates[-1] if dates else "",
+        mode=mode,
+        reason="selected client group",
     )
 
 
@@ -75,20 +135,38 @@ def _clarify(candidates: Sequence[MemoVersion], reason: str) -> ContextSelection
     )
 
 
-def _dated_candidates(question: str, candidates: list[MemoVersion]) -> list[MemoVersion]:
-    dates = re.findall(r"\b\d{4}-\d{2}-\d{2}\b", question)
-    if dates:
-        return [memo for memo in candidates if memo["meeting_date"] in dates]
-    selected = [
-        str(i).zfill(2)
-        for i, month in enumerate(_MONTHS, 1)
-        if re.search(rf"\b{month}\b", question)
-    ]
-    return (
-        [memo for memo in candidates if memo["meeting_date"][5:7] in selected]
-        if selected
-        else candidates
+def _memo_dates(question: str) -> list[str]:
+    """Read dates attached to a document reference, not events discussed inside it."""
+    date = r"(?:\d{4}-\d{2}-\d{2}|(?:" + "|".join(_MONTHS) + r")(?:\s+\d{4})?)"
+    dates = date + r"(?:\s*(?:,|and|with|vs\.?)\s*" + date + r")*"
+    phrases = re.finditer(
+        rf"\b(?:(?P<before>{dates})\s+memos?\b|memos?\s+"
+        rf"(?:(?:from|dated|as of|for|on|in)\s+)?(?P<after>{dates})\b)",
+        question,
     )
+    return [
+        match[0]
+        for phrase in phrases
+        for match in re.finditer(date, phrase["before"] or phrase["after"])
+    ]
+
+
+def _dated_candidates(question: str, candidates: list[MemoVersion]) -> list[MemoVersion]:
+    selectors = _memo_dates(question)
+    if not selectors:
+        return candidates
+    selected = []
+    for memo in candidates:
+        for selector in selectors:
+            parts = selector.split()
+            matches = memo["meeting_date"] == selector
+            if parts[0] in _MONTHS:
+                matches = int(memo["meeting_date"][5:7]) == _MONTHS.index(parts[0]) + 1
+                matches &= len(parts) == 1 or memo["meeting_date"][:4] == parts[1]
+            if matches:
+                selected.append(memo)
+                break
+    return selected
 
 
 def _historical_candidates(
@@ -124,66 +202,38 @@ def _historical_candidates(
 
 
 def _names_new_client(question: str, known_clients: set[str]) -> bool:
-    """Treat an unrecognized named client as a new lookup, not the active memo."""
+    """Recognize explicit company naming, never arbitrary words after 'about'.
+
+    Unknown names can be resolved by find_clients. Only successful resolution
+    changes durable focus; this predicate merely isolates a proposed lookup.
+    """
     if known_clients:
         return False
-    subject = re.search(
-        r"\b(?:for|about)\s+([A-Za-z][A-Za-z &'\u2019-]{2,})", question, re.IGNORECASE
-    )
+    subject = re.search(r"\b(?:for|about)\s+(.+?)(?:[?.!]|$)", question, re.IGNORECASE)
     if subject is None:
-        subject = re.search(r"^memo:\s*([A-Za-z][A-Za-z &'\u2019-]{2,})", question, re.IGNORECASE)
+        subject = re.search(r"^memo:\s*(.+)", question, re.IGNORECASE)
     if subject is None:
         return False
-    first = subject[1].casefold().split()[0]
-    # These are workflow words and references to the established conversation,
-    # rather than a newly named company. Exact known client names are handled above.
-    context_words = {
-        "this",
-        "that",
-        "the",
-        "our",
-        "my",
-        "a",
-        "an",
-        "same",
-        "next",
-        "previous",
-        "today",
-        "tomorrow",
-        "yesterday",
-        "me",
-        "prepare",
-        "create",
-        "generate",
-        "refresh",
-        "update",
-        "write",
-        "please",
-        "credit",
-        "covenants",
-        "covenant",
-        "working",
-        "financial",
-        "payments",
-        "payment",
-        "liquidity",
-        "treasury",
-        "version",
-        "versions",
-        "meeting",
-    }
-    return first not in context_words and first not in _MONTHS
+    name = subject[1].strip()
+    explicit = re.search(
+        r"^(?:another|a different|client|company)\b|\b(?:company|inc|ltd|llc|corporation|holdings)\b",
+        name,
+        re.IGNORECASE,
+    )
+    # Capitalization is not evidence of a company: "Cash Flow" and "Total Debt"
+    # are ordinary topics. An explicitly quoted name can request a fresh lookup.
+    quoted_name = re.match(r"""["']\S.+["']""", name)
+    return bool(explicit or quoted_name)
 
 
 def _has_selector(question: str) -> bool:
     return bool(
         re.search(
-            r"\b(previous|earlier|older|first|original|latest|newest|recent|versions?)\b|\d{4}-|\bv\d+\b"
-            + "|"
-            + "|".join(rf"\b{month}\b" for month in _MONTHS),
+            r"\b(?:previous|earlier|older|first|original|latest|newest|most recent)\s+memos?\b"
+            r"|\bversions?\s+\d|\bv\d+\b|\bcompare\b.*\b(?:latest|previous|first)\b",
             question,
         )
-    )
+    ) or bool(_memo_dates(question))
 
 
 def _new_memo_selection(
@@ -218,7 +268,8 @@ def _reference_selection(
     mode: Literal["snapshot", "refresh", "new"],
 ) -> ContextSelection:
     if re.search(
-        r"\byesterday\b|\blast (week|month|year|monday|tuesday|wednesday|thursday|friday)\b",
+        r"\b(?:yesterday|last (?:week|month|year|monday|tuesday|wednesday|thursday|friday))['\u2019]?(?:s)?\s+memo\b"
+        r"|\bmemo\s+(?:from\s+)?(?:yesterday|last (?:week|month|year|monday|tuesday|wednesday|thursday|friday))\b",
         question,
     ):
         return _clarify(
@@ -246,13 +297,16 @@ def _selection_mode(
     return "snapshot"
 
 
-def select_context(
+def _select_context(
     question: str,
     memos: Sequence[MemoVersion],
     active_id: str,
     active_client: str,
     *,
     creating_memo: bool,
+    known_names: Mapping[str, Sequence[str]] | None = None,
+    recent_lookup: ClientLookup | None = None,
+    active_clients: Sequence[str] = (),
 ) -> ContextSelection:
     """Resolve known references deterministically and ask when a reference is ambiguous.
 
@@ -261,12 +315,23 @@ def select_context(
     """
     text = question.casefold()
     explicit_ids = re.findall(r"\bmemo-[a-z0-9]{12}\b", text)
-    clients = set(re.findall(r"\b[A-Z]{4}-\d{4}\b", question.upper()))
-    clients.update(
-        memo["uen"]
-        for memo in memos
-        if memo["client_name"] != memo["uen"] and memo["client_name"].casefold() in text
-    )
+    names = {uen: list(aliases) for uen, aliases in (known_names or {}).items()}
+    for memo in memos:
+        names.setdefault(memo["uen"], []).append(memo["client_name"])
+    clients = named_clients(question, names)
+    unique_names = {
+        uen: [
+            alias
+            for alias in aliases
+            if sum(
+                alias.casefold() in {other.casefold() for other in others}
+                for others in names.values()
+            )
+            == 1
+        ]
+        for uen, aliases in names.items()
+    }
+    explicit_group = len(named_clients(question, unique_names)) > 1
     uen = next(iter(clients)) if len(clients) == 1 else (active_client if not clients else "")
     candidates = [memo for memo in memos if not uen or memo["uen"] == uen]
     reference = bool(re.search(r"\bmemos?\b|\bversions?\s+\d|\bv\d+\b", text))
@@ -275,6 +340,14 @@ def select_context(
         re.search(r"\b(latest|current|today|refresh|updated)\b|what.*changed|since then", text)
     )
     mode = _selection_mode(text, creating_memo, refreshing)
+    if not (creating_memo or reference or explicit_ids):
+        group = _client_group_selection(
+            text, clients, recent_lookup, active_clients, mode, explicit_group
+        )
+        if group is not None:
+            return group
+    if len(clients) > 1 and not explicit_group and not explicit_ids:
+        return _clarify(candidates, "Please choose one client")
     if explicit_ids:
         uen = next(iter(clients)) if len(clients) == 1 else ""
         selected = [memo for memo in memos if memo["memo_id"] in explicit_ids]
@@ -309,6 +382,16 @@ def select_context(
         selected = [m for m in candidates if m["memo_id"] == active_id]
         if clients and not selected:
             selected = candidates[-1:]
+    if creating_memo and explicit_ids:
+        dates = re.findall(r"\b\d{4}-\d{2}-\d{2}\b", question)
+        if len(selected) != 1 or len(dates) > 1:
+            return _clarify(selected, "Create one client memo for one meeting date at a time")
+        return _choice(
+            uen=selected[0]["uen"],
+            meeting_date=dates[0] if dates else selected[0]["meeting_date"],
+            mode="new",
+            reason="new version of the referenced memo",
+        )
     if reference or explicit_ids:
         required = 2 if comparison else 1
         if len(selected) != required:
@@ -323,3 +406,47 @@ def select_context(
         mode=mode,
         reason="explicit reference" if reference or explicit_ids else "active client",
     )
+
+
+def select_context(
+    question: str,
+    memos: Sequence[MemoVersion],
+    active_id: str,
+    active_client: str,
+    *,
+    creating_memo: bool,
+    known_names: Mapping[str, Sequence[str]] | None = None,
+    recent_lookup: ClientLookup | None = None,
+    active_clients: Sequence[str] = (),
+    focus: ConversationFocus | None = None,
+) -> ContextSelection:
+    """Resolve explicit requests, then carry accepted focus into ordinary follow-ups."""
+    selection = _select_context(
+        question,
+        memos,
+        active_id,
+        active_client,
+        creating_memo=creating_memo,
+        known_names=known_names,
+        recent_lookup=recent_lookup,
+        active_clients=active_clients,
+    )
+    dates = re.findall(r"\b\d{4}-\d{2}-\d{2}\b", question)
+    if dates and selection["mode"] == "refresh" and not selection["clarification"]:
+        selection = {**selection, "retrieval_date": dates[-1]}
+    if focus is None or creating_memo or selection["clarification"]:
+        return selection
+    same_clients = set(selection.get("client_uens", [])) == set(focus["client_uens"])
+    explicit = selection["reason"] == "explicit reference" or bool(
+        re.search(r"\bmemo-[a-z0-9]{12}\b|\b\d{4}-\d{2}-\d{2}\b", question)
+    )
+    if same_clients and not explicit and selection["mode"] == "snapshot":
+        selection = {
+            **selection,
+            "memo_ids": list(focus["memo_ids"]),
+            "meeting_date": focus["evidence_date"],
+            "retrieval_date": focus["evidence_date"],
+            "evidence_message_ids": list(focus["message_ids"]),
+            "reason": "accepted conversation focus",
+        }
+    return selection

@@ -27,6 +27,8 @@ from ai_agent_lib_core.config.bindings import (
     secret_name,
     validate_bindings,
 )
+from ai_agent_lib_core.config.langfuse import LANGFUSE_VARIABLES
+from ai_agent_lib_core.config.phoenix import PHOENIX_VARIABLES
 from ai_agent_lib_core.config.profiles import PROFILE_DEFAULTS, ProfileDefaults
 from ai_agent_lib_core.contracts import (
     ConfigSource,
@@ -131,6 +133,7 @@ class ConfigResolver:
             provider=model_provider,
             model_id=values.get(Key.MODEL_ID),
             aliases=self._aliases(values, model_provider),
+            options=self._model_options(values),
         )
 
         sections: dict[Section, ProviderSelection] = {}
@@ -186,6 +189,12 @@ class ConfigResolver:
             shown=MappingProxyType(shown),
         )
 
+    def _model_options(self, values: Mapping[str, str]) -> dict[str, dict[str, object]]:
+        options = self._json_object(values, Key.MODEL_OPTIONS)
+        if any(not isinstance(value, dict) for value in options.values()):
+            raise ConfigurationError("model options must map provider names to JSON objects")
+        return {name: dict(value) for name, value in options.items() if isinstance(value, dict)}
+
     def _display(self, key: str, value: str) -> str:
         """Return a value as it may be shown to a person."""
         binding = self._by_key.get(key)
@@ -197,6 +206,9 @@ class ConfigResolver:
 
     def _reject_unknown_names(self) -> None:
         known = {name for binding in self._bindings for name in binding.all_names}
+        # Optional tracing is resolved by its own loader at the service boundary.
+        known.update(LANGFUSE_VARIABLES.values())
+        known.update(PHOENIX_VARIABLES)
         unknown = sorted(
             name
             for name in self._source.names()

@@ -115,7 +115,7 @@ def access_plan(config: ServiceConfig, providers: ServiceProviders | None = None
     registry = providers if providers is not None else ServiceProviders.default()
     wanted: list[tuple[str, ProviderSelection, AccessQuery]] = []
     for provider, model_ids in selected_models(config).items():
-        selection = ProviderSelection(provider=provider)
+        selection = config.model.selection(provider)
         wanted.append((MODEL_PORT, selection, AccessQuery(selection, tuple(model_ids))))
     for section, selection in config.sections.items():
         wanted.append((str(section), selection, AccessQuery(selection)))

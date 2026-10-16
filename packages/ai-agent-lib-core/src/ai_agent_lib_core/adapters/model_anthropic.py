@@ -11,23 +11,42 @@ variables of the underlying HTTP library.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import SecretStr
+from langchain_core.messages import BaseMessage, SystemMessage
+from pydantic import Field, SecretStr
 
 from ai_agent_lib_core.contracts import (
     AgentLibError,
     ConfigurationError,
     ModelCapabilities,
+    OptionsModel,
     TransientError,
 )
 
-__all__ = ["AnthropicChatModelProvider"]
+__all__ = ["AnthropicChatModelProvider", "AnthropicModelOptions"]
 
 _INSTALL_HINT = "install it with: pip install 'ai-agent-lib-core[anthropic]'"
 _TRANSIENT_STATUS = frozenset({408, 409, 429})
 _REJECTED_STATUS = frozenset({401, 403})
 _SERVER_ERROR = 500
+
+
+class AnthropicModelOptions(OptionsModel):
+    """Anthropic prompt caching; every call still runs the model pipeline.
+
+    Set these under ``anthropic`` in the model options map. Requires the
+    ``anthropic`` extra and secret ``anthropic_api_key`` (``ANTHROPIC_API_KEY``
+    locally, Secrets Manager when deployed). Uses the configured HTTPS proxy.
+    """
+
+    prompt_caching: bool = Field(
+        default=False, strict=True, description="Enable automatic Anthropic prompt caching."
+    )
+    cache_ttl: Literal["5m", "1h"] = Field(
+        default="5m",
+        description="Cache lifetime. One-hour writes cost more than five-minute writes.",
+    )
 
 
 class AnthropicChatModelProvider:
@@ -40,6 +59,7 @@ class AnthropicChatModelProvider:
         max_retries: Retries done by the vendor client. Set this to ``0`` once
             the pipeline's own resilience stage is in use, so retries are not
             multiplied.
+        options: Prompt caching settings. Disabled by default for existing callers.
 
     Raises:
         ConfigurationError: If the optional dependency is missing or the key is empty.
@@ -52,6 +72,7 @@ class AnthropicChatModelProvider:
         proxy: str | None = None,
         timeout_seconds: float | None = None,
         max_retries: int = 2,
+        options: AnthropicModelOptions | None = None,
     ) -> None:
         try:
             import anthropic
@@ -68,6 +89,44 @@ class AnthropicChatModelProvider:
         self._proxy = proxy
         self._timeout = timeout_seconds
         self._max_retries = max_retries
+        self._options = options or AnthropicModelOptions()
+
+    def _cache_control(self) -> dict[str, str] | None:
+        if not self._options.prompt_caching:
+            return None
+        return {"type": "ephemeral", "ttl": self._options.cache_ttl}
+
+    def prepare_request(
+        self, messages: list[BaseMessage], options: dict[str, Any]
+    ) -> tuple[list[BaseMessage], dict[str, Any]]:
+        """Mark the static prefix and enable automatic caching of growing conversations.
+
+        A static_system_prompt marks its first block as stable. The explicit
+        breakpoint preserves that prefix when the following request context
+        changes. Copies keep cache directives out of the durable checkpoint.
+        """
+        prepared_options = dict(options)
+        control = prepared_options.get("cache_control", self._cache_control())
+        if not control:
+            return list(messages), prepared_options
+        prepared_options["cache_control"] = dict(control)
+        prepared = []
+        marked = False
+        for message in messages:
+            if (
+                not marked
+                and isinstance(message, SystemMessage)
+                and message.additional_kwargs.get("agentlib_static_prefix") is True
+                and isinstance(message.content, list)
+                and message.content
+                and isinstance(message.content[0], dict)
+                and message.content[0].get("type") == "text"
+            ):
+                prefix = {**message.content[0], "cache_control": dict(control)}
+                message = message.model_copy(update={"content": [prefix, *message.content[1:]]})
+                marked = True
+            prepared.append(message)
+        return prepared, prepared_options
 
     @property
     def capabilities(self) -> ModelCapabilities:
@@ -90,6 +149,8 @@ class AnthropicChatModelProvider:
             options["anthropic_proxy"] = self._proxy
         if self._timeout is not None:
             options["timeout"] = self._timeout
+        if self._options.prompt_caching:
+            options["model_kwargs"] = {"cache_control": self._cache_control()}
         return self._chat_model(**options)
 
     def classify_error(self, error: BaseException) -> AgentLibError | None:

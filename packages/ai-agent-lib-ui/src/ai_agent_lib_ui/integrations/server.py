@@ -10,37 +10,77 @@ from typing import Annotated
 from urllib.parse import urlencode
 from uuid import uuid4
 
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ai_agent_lib_ui.application.chat import view_for
 from ai_agent_lib_ui.contracts.queries import ContractError, ErrorCode, ErrorResponse, PageRequest
+from ai_agent_lib_ui.integrations.documents import register_documents
+from ai_agent_lib_ui.integrations.inspection import register_inspector
+from ai_agent_lib_ui.integrations.logs import register_logs
+from ai_agent_lib_ui.integrations.navigation import login_destination
 from ai_agent_lib_ui.integrations.runtime import Runtime
 from ai_agent_lib_ui.integrations.security import SessionBoundary, current_principal
 
 
 def page(title: str, body: str) -> HTMLResponse:
     """Render a responsive local page; callers escape all dynamic text."""
-    return HTMLResponse(
-        "<!doctype html><html lang='en'><meta charset='utf-8'>"
-        "<meta name='viewport' content='width=device-width, initial-scale=1'>"
-        f"<title>{escape(title)} · Agent workspace</title><style>"
-        "body{font:1rem/1.6 system-ui;margin:0;background:#f5f7fa;color:#14263d}"
-        "main{padding:clamp(1rem,4vw,3rem);max-width:90rem;margin:auto}"
-        "a{color:#175da2}nav{display:flex;gap:1.5rem;flex-wrap:wrap}"
-        "article{background:white;border:1px solid #d5dfeb;border-radius:.6rem;"
-        "padding:1rem;margin:1rem 0;overflow:auto}form{display:flex;gap:.6rem;flex-wrap:wrap}"
-        "input,button,select{font:inherit;padding:.5rem;"
-        "border:1px solid #8a9caf;border-radius:.3rem}"
-        "input{min-width:0;max-width:100%}button{cursor:pointer;background:#e6edf6}"
-        "code{overflow-wrap:anywhere}small{color:#495a70}</style><main>"
-        "<nav><a href='/chat/'>Chat</a><a href='/conversations'>Conversations</a>"
-        "<a href='/catalog'>Catalog</a></nav>"
-        f"<h1>{escape(title)}</h1>{body}"
-        "<p role='status' data-form-status></p>"
-        "<script src='/ui/forms.js' defer></script></main></html>"
+    navigation = "".join(
+        f"<a href='{path}'" + (" aria-current='page'" if title == name else "") + f">{name}</a>"
+        for name, path in (("Chat", "/chat/"), ("Choose agent", "/catalog"), ("Logs", "/logs"))
     )
+    return HTMLResponse(
+        "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+        f"<title>{escape(title)} · Agent Lab</title>"
+        "<link rel='icon' href='/favicon' type='image/svg+xml'>"
+        "<link rel='stylesheet' href='/ui/theme.css'>"
+        "<script src='/ui/theme.js'></script></head><body class='agent-lab-page'>"
+        "<header class='lab-header'><a class='brand' href='/chat/'>"
+        "<img src='/ui/agent-lab.svg' width='28' height='28' alt=''>Agent Lab</a>"
+        f"<nav aria-label='Main navigation'>{navigation}"
+        "<select class='theme-picker' aria-label='Theme' data-theme>"
+        "<option value='light'>Light</option><option value='dark'>Dark</option>"
+        "<option value='system'>System</option></select></nav></header>"
+        f"<main><h1>{escape(title)}</h1>{body}"
+        "<p role='status' data-form-status></p></main>"
+        "<script src='/ui/forms.js' defer></script></body></html>"
+    )
+
+
+def _asset_routes(app: FastAPI) -> None:
+    """Serve only the bundled, public presentation assets."""
+
+    @app.get("/ui/forms.js")
+    async def form_script() -> Response:
+        return Response(
+            files("ai_agent_lib_ui").joinpath("assets/forms.js").read_text(),
+            media_type="text/javascript",
+        )
+
+    @app.get("/favicon")
+    @app.get("/ui/agent-lab.svg")
+    async def brand_icon() -> Response:
+        # Parent pages, including sign-in, use the same icon as mounted chat.
+        return Response(
+            files("ai_agent_lib_ui").joinpath("assets/agent-lab.svg").read_bytes(),
+            media_type="image/svg+xml",
+        )
+
+    @app.get("/ui/theme.css")
+    async def theme_styles() -> Response:
+        return Response(
+            files("ai_agent_lib_ui").joinpath("assets/theme.css").read_text(),
+            media_type="text/css",
+        )
+
+    @app.get("/ui/theme.js")
+    async def theme_script() -> Response:
+        return Response(
+            files("ai_agent_lib_ui").joinpath("assets/theme.js").read_text(),
+            media_type="text/javascript",
+        )
 
 
 class NewThread(BaseModel):
@@ -70,7 +110,7 @@ def create_app(resources: Runtime) -> FastAPI:
             await resources.chat.close()
             await resources.client.aclose()
 
-    app = FastAPI(title="Agent workspace", lifespan=lifespan, docs_url=None, redoc_url=None)
+    app = FastAPI(title="Agent Lab", lifespan=lifespan, docs_url=None, redoc_url=None)
     app.add_middleware(SessionBoundary, resources=resources)
 
     @app.exception_handler(ValidationError)
@@ -89,31 +129,34 @@ def create_app(resources: Runtime) -> FastAPI:
         return {"status": "ok"}
 
     @app.get("/login")
-    async def login_page() -> HTMLResponse:
+    async def login_page(
+        return_to: Annotated[str, Query(alias="next", max_length=2048)] = "/chat/",
+    ) -> HTMLResponse:
         return page(
             "Sign in locally",
             "<p>Enter the access code from the UI state folder. "
             "This session uses the identity configured for your local agents.</p>"
-            "<form method='post' action='/login'><label>Access code "
+            "<form method='post' action='/login'>"
+            "<input name='next' type='hidden' "
+            f"value='{escape(login_destination(return_to), quote=True)}'>"
+            "<label>Access code "
             "<input name='code' type='password' required autocomplete='current-password'>"
-            "</label><button type='submit'>Sign in</button></form>",
+            "</label><button class='primary' type='submit'>Sign in</button></form>",
         )
 
-    @app.get("/ui/forms.js")
-    async def form_script() -> Response:
-        return Response(
-            files("ai_agent_lib_ui").joinpath("assets/forms.js").read_text(),
-            media_type="text/javascript",
-        )
+    _asset_routes(app)
 
     @app.post("/login")
-    async def login(code: Annotated[str, Form(max_length=200)]) -> RedirectResponse:
+    async def login(
+        code: Annotated[str, Form(max_length=200)],
+        return_to: Annotated[str, Form(alias="next", max_length=2048)] = "/chat/",
+    ) -> RedirectResponse:
         if not hmac.compare_digest(code, resources.access_code):
             from fastapi import HTTPException
 
             raise HTTPException(401, "Access code did not match")
         token = resources.store.new_session(resources.identity)
-        response = RedirectResponse("/chat/", status_code=303)
+        response = RedirectResponse(login_destination(return_to), status_code=303)
         response.set_cookie(
             "agentlib_session", token, httponly=True, samesite="strict", max_age=3600
         )
@@ -122,7 +165,7 @@ def create_app(resources: Runtime) -> FastAPI:
 
     @app.get("/")
     async def index() -> RedirectResponse:
-        return RedirectResponse("/chat/", status_code=303)
+        return RedirectResponse("/catalog", status_code=303)
 
     _catalog_api(app, resources)
 
@@ -130,6 +173,9 @@ def create_app(resources: Runtime) -> FastAPI:
 
     _catalog_page(app, resources)
     _conversation_pages(app, resources)
+    register_inspector(app, resources, page)
+    register_documents(app, resources)
+    register_logs(app, resources, page)
 
     mount_chainlit(app, target=str(Path(__file__).with_name("callbacks.py")), path="/chat")
     return app
@@ -141,23 +187,66 @@ def _catalog_page(app: FastAPI, resources: Runtime) -> None:
         principal = current_principal()
         agents = await resources.catalog.agents(principal, PageRequest(limit=200))
         mcps = await resources.catalog.mcps(principal, PageRequest(limit=200))
-        body = "<p>Choose an agent in Chat. Start a new conversation to change agents.</p>"
+        body = (
+            "<p>Choose an agent below and select <strong>Start chat</strong>. "
+            "Type a question in the message box, then press Enter. "
+            "Continue in that chat for follow-ups; changing agents starts a new chat.</p>"
+            "<div class='agent-grid'>"
+        )
         for binding in agents.items:
             manifest = binding.manifest
             body += (
                 f"<article><h2>{escape(manifest.title)}</h2><p>Version "
-                f"{escape(manifest.agent_version)} · {escape(manifest.adapter)}</p></article>"
+                f"{escape(manifest.agent_version)} · {escape(manifest.adapter)}</p>"
+                "<form action='/catalog/start' method='post'>"
+                "<input name='agent_id' type='hidden' "
+                f"value='{escape(manifest.agent_id, quote=True)}'>"
+                f"<button class='primary'>Start chat with {escape(manifest.title)}</button>"
+                "</form></article>"
             )
-        body += "<h2>Registered MCP services</h2>"
+        body += "</div><h2>Registered MCP services</h2>"
+        if not mcps.items:
+            body += "<p class='muted'>No MCP services are registered in this environment.</p>"
         for mcp in mcps.items:
             body += (
                 f"<article><strong>{escape(mcp.id)}</strong>"
                 f"<p>{escape(', '.join(mcp.tool_names))}</p></article>"
             )
-        return page("Catalog", body)
+        return page("Choose agent", body)
+
+    @app.post("/catalog/start")
+    async def start_chat(agent_id: Annotated[str, Form(max_length=200)]) -> RedirectResponse:
+        conversation = await resources.chat.create(current_principal(), agent_id)
+        return RedirectResponse(f"/chat/thread/{conversation.thread.thread_id}", status_code=303)
 
 
 def _conversation_pages(app: FastAPI, resources: Runtime) -> None:
+    @app.get("/conversations/{thread_id}/history")
+    async def older_history(thread_id: str, cursor: str | None = None) -> HTMLResponse:
+        from ai_agent_lib_ui.integrations.data_layer import outcome_text
+
+        principal = current_principal()
+        conversation = await resources.store.get(principal, thread_id)
+        history = await resources.store.history_page(
+            view_for(principal, conversation.thread.scope.application),
+            thread_id,
+            PageRequest(cursor=cursor),
+        )
+        body = f"<p><a href='/chat/thread/{escape(thread_id, quote=True)}'>Return to chat</a></p>"
+        for stored in history.items:
+            body += (
+                "<article><strong>You</strong><div style='white-space:pre-wrap'>"
+                + escape(stored.question)
+                + "</div><hr><div style='white-space:pre-wrap'>"
+                + escape(outcome_text(stored.run))
+                + "</div>"
+            )
+            body += "</article>"
+        if history.next_cursor:
+            query = urlencode({"cursor": history.next_cursor})
+            body += f"<a href='?{escape(query, quote=True)}'>Older messages</a>"
+        return page("Conversation history", body)
+
     @app.get("/conversations")
     async def conversations(
         search: str = "", archived: bool = False, cursor: str | None = None
@@ -241,13 +330,15 @@ def _thread_api(app: FastAPI, resources: Runtime) -> None:
         return await resources.chat.create(current_principal(), body.agent_id)
 
     @app.get("/api/threads/{thread_id}")
-    async def thread_api(thread_id: str) -> object:
+    async def thread_api(thread_id: str, cursor: str | None = None) -> object:
         principal = current_principal()
         conversation = await resources.store.get(principal, thread_id)
         view = view_for(principal, conversation.thread.scope.application)
+        history = await resources.store.history_page(view, thread_id, PageRequest(cursor=cursor))
         return {
             "thread": conversation.thread,
-            "turns": await resources.store.history(view, thread_id),
+            "turns": history.items,
+            "next_cursor": history.next_cursor,
         }
 
     @app.post("/api/threads/{thread_id}/messages")

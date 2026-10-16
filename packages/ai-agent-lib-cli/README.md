@@ -1,42 +1,44 @@
 # ai-agent-lib-cli
 
-The `agentlib` command. It creates a local development workspace and adds
-agents and MCP servers to it. What it writes is working code with its tests:
-a hello-world you can run and test before you change a line, and a place to
-start every later change with a failing test.
+The CLI creates workspaces, agents, and MCP servers with runnable Python code,
+configuration, and tests. Install and run generated services using Python and pip.
 
-Nothing it writes needs an account or a network connection to run and test.
-When a service is ready for AWS, `agentlib deploy` writes what runs it there.
+For your first project, follow the [getting-started tutorial](../../docs/getting-started.md).
+To test the included rmprep agent in Agent Lab, use the repository's
+[batch startup guide](../../docs/local-startup.md). The commands below create
+your own workspace.
 
-New here? [`docs/getting-started.md`](../../docs/getting-started.md) walks
-through all of it, test first.
+## Create a workspace
 
-## Five minutes
+Open **Command Prompt** in the library checkout, using your team's Python and
+approved pip package source. Choose another name if `my-platform` already exists:
 
-From a checkout of the library, using Python and pip in a virtual environment:
-
-```bash
-python -m pip install -e <lib>/packages/ai-agent-lib-core -e <lib>/packages/ai-agent-lib-cli
-python -m ai_agent_lib_cli init my-platform --lib-path <lib>
-cd my-platform
-python -m ai_agent_lib_cli install                             # install workspace development tools
-python -m ai_agent_lib_cli new mcp hello-mcp                  # an MCP server over sample data
-python -m ai_agent_lib_cli new agent hello-agent --mcp hello  # an agent that may call it
-python -m ai_agent_lib_cli install                             # install the two new services
-python -m pytest                                      # every test, all offline
+```bat
+set "LIBRARY=%CD%"
+python -m venv .venv
+set "PYTHON=%LIBRARY%\.venv\Scripts\python.exe"
+"%PYTHON%" -m pip install -e packages/ai-agent-lib-core -e packages/ai-agent-lib-cli
+"%PYTHON%" -m ai_agent_lib_cli init my-platform --dir .. --lib-path "%LIBRARY%" --owner my-team
+cd /d ..\my-platform
+"%PYTHON%" -m ai_agent_lib_cli new agent hello-agent --description "A practice assistant" --model fake
+"%PYTHON%" -m ai_agent_lib_cli install
+"%PYTHON%" -m pytest
+"%PYTHON%" -m hello_agent "Say hello to Ada."
 ```
 
-Then check the workspace and run the two services:
+The tests use scripted replies; the configured fake model echoes your question.
+Next, add shared tools with [the MCP tutorial](../../docs/getting-started.md#5-add-a-shared-tool-server).
 
-```bash
-python -m ai_agent_lib_cli doctor                   # is everything each service needs usable?
-python -m ai_agent_lib_cli run hello-mcp            # terminal 1: http://127.0.0.1:8100/mcp
-hello-agent "Say hello to Ada."   # terminal 2: one question
-python -m ai_agent_lib_cli run hello-agent          # or serve the agent: POST /invoke on port 8000
+In the same window, check the service and start its HTTP endpoint:
+
+```bat
+"%PYTHON%" -m ai_agent_lib_cli doctor hello-agent
+"%PYTHON%" -m ai_agent_lib_cli run hello-agent
 ```
 
-The agent starts on the `fake` model, which echoes the question. Select a real
-model in `agents/hello-agent/.env` when you want one.
+Keep that window open; stop with **Ctrl+C**. In a new window, select the same
+`PYTHON` executable and change to your workspace root before running commands.
+The `agentlib` shorthand below is equivalent to `"%PYTHON%" -m ai_agent_lib_cli`.
 
 ## Commands
 
@@ -75,7 +77,7 @@ what went wrong, then what was expected, what was found and the fix.
 
 ```text
 my-platform/
-  pyproject.toml              dependencies, optional uv workspace, test and lint settings
+  pyproject.toml              dependencies, test and lint settings
   agentlib.toml               the answers this workspace was generated from
   registry/agents.yaml        which agents exist, and which servers each may call
   registry/mcp-tools.yaml     which servers and tools exist, with schema pins
@@ -158,7 +160,9 @@ The plan a server was generated from is recorded in `agentlib.toml`, so
 
 ## Checking a workspace
 
-`agentlib doctor` changes nothing and calls no model. For the workspace it
+`agentlib doctor` validates configuration and starts configured adapters for their
+checks. It calls no model; provider startup can create local state or contact
+configured services. For the workspace it
 checks that the registries and the rules file are valid and agree with each
 other, and that the schema pin of every tool matches the running code. For
 each service it resolves the settings, builds every adapter the service
@@ -244,5 +248,13 @@ metadata is only used by uv.
 
 Use `python -m ai_agent_lib_cli install` after adding services or changing their
 dependencies. It resolves all members and the development tools together in the
-current Python environment. `--no-dev` omits the development group. Use a virtual
-environment; Docker and uv are optional deployment/development tools.
+current Python environment. `--no-dev` omits the development group. Keep Agent
+Lab in its [separate UI environment](../ai-agent-lib-ui/README.md#1-prepare-a-separate-ui-environment).
+
+## Upgrade generated files
+
+Run `agentlib update --diff` from the workspace root after reviewing your current
+changes. It updates untouched generated files and shows template differences for
+files you edited. **`--diff` is not a dry run.** Your `.env`, policies, and
+registries remain under your control. Review the resulting changes before running
+`agentlib install` and `agentlib check`.

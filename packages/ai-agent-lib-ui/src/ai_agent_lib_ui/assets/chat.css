@@ -1,8 +1,64 @@
+@import url("/ui/theme.css");
+
 body { font-family: system-ui, sans-serif; }
+/* Keep the shell within the available width, including when a vertical
+   scrollbar or the memo panel takes space from the chat column. */
+#root { width: 100%; max-width: 100%; min-width: 0; }
+#root main .flex:has(#welcome-screen) { min-width: 0; }
+/* The empty-chat viewport scrolls vertically only. Chainlit's overflow-auto
+   wrappers otherwise give small width overflows their own bottom scrollbar.
+   Scope this to welcome ancestors so response tables and code keep scrolling. */
+#root main .overflow-auto:has(#welcome-screen),
+#root main .overflow-y-auto:has(#welcome-screen) {
+  min-width: 0; max-width: 100%; overflow-x: hidden;
+}
 pre, .table-wrapper { max-width: 100%; overflow: auto; max-height: 65vh; }
 .markdown-body { overflow-wrap: anywhere; min-width: 0; }
 #chat-profiles { max-width: min(14rem, 42vw); min-width: 0; }
+#header { flex-wrap: wrap; height: auto; min-height: 60px; gap: .25rem; }
+#header > div { min-width: 0; max-width: 100%; flex-wrap: wrap; }
+.dark #header img[src$="/conversations.svg"] { filter: invert(1); }
+/* Chainlit renders the profile introduction above the composer. Allow it to
+   shrink and wrap naturally, including on short windows and narrow screens. */
+#welcome-screen { min-width: 0; max-width: 100%; min-height: min-content; margin-top: 0; padding-block: 1.5rem; overflow-wrap: anywhere; }
+#welcome-screen > div:first-child { width: 100%; max-width: min(42rem, 100%); min-width: 0; text-align: center; }
+#welcome-screen .prose { width: 100%; max-width: 100%; min-width: 0; }
+#welcome-screen > div:first-child > img { width: 6rem; height: 6rem; border-radius: 1.5rem; margin-bottom: .5rem; }
+#welcome-screen h2 { font-size: 1.5rem; margin-block: .5rem; padding: 0; border: 0; }
+#welcome-screen p { color: hsl(var(--muted-foreground)); }
+#welcome-screen #message-composer { max-width: 100%; min-width: 0; }
+
+body.agent-lab-memos-open #root { width: calc(100% - min(42vw, 40rem)); }
+#agent-lab-memos {
+  position: fixed; inset: 0 0 0 auto; width: min(42vw, 40rem); z-index: 45;
+  box-sizing: border-box; padding: 1.25rem; background: hsl(var(--background));
+  color: hsl(var(--foreground)); border-left: 1px solid hsl(var(--border));
+  overflow: auto; display: flex; flex-direction: column; gap: .75rem; font-size: .875rem;
+}
+#agent-lab-memos[hidden] { display: none; }
+#agent-lab-memos header, .memo-actions { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
+#agent-lab-memos h2 { font-weight: 600; font-size: 1.125rem; }
+#agent-lab-memos [data-close] { width: 2rem; height: 2rem; padding: .25rem; border: 0; }
+#agent-lab-memos label { display: flex; flex-direction: column; gap: .4rem; min-width: 0; font-weight: 500; }
+#agent-lab-memos select { width: 100%; font-weight: 400; }
+#agent-lab-memos [role='status'] { color: hsl(var(--muted-foreground)); }
+#agent-lab-memos [role='status']:empty { display: none; }
+#agent-lab-memos details small { display: block; margin-top: .5rem; }
+#agent-lab-memos article { overflow: auto; overflow-wrap: anywhere; min-height: 6rem; flex: 1; padding-top: .5rem; border-top: 1px solid hsl(var(--border)); }
+#agent-lab-memos article p, #agent-lab-memos article ul, #agent-lab-memos article ol { margin: .75rem 0; }
+#agent-lab-memos article h1, #agent-lab-memos article h2, #agent-lab-memos article h3 { font-weight: 600; margin: 1rem 0 .5rem; }
+#agent-lab-memos article h1 { font-size: 1.5rem; line-height: 1.3; }
+#agent-lab-memos article ul { list-style: disc; padding-left: 1.5rem; }
+#agent-lab-memos article ol { list-style: decimal; padding-left: 1.5rem; }
+#agent-lab-memos article table { border-collapse: collapse; width: 100%; }
+#agent-lab-memos article th, #agent-lab-memos article td { border: 1px solid hsl(var(--border)); padding: .6rem; text-align: left; }
+#agent-lab-memos article th { background: hsl(var(--muted)); font-weight: 500; }
+#agent-lab-memos article a { text-decoration: underline; }
+@media (max-width: 900px) {
+  body.agent-lab-memos-open #root { width: 100%; }
+  #agent-lab-memos { width: min(100%, 42rem); box-shadow: -8px 0 30px #0002; }
+}
 @media (max-width: 640px) {
-  #header { flex-wrap: wrap; height: auto; min-height: 60px; gap: .25rem; }
-  #header > div { min-width: 0; max-width: 100%; flex-wrap: wrap; }
+  #welcome-screen { padding-block: .75rem; }
+  #welcome-screen > div:first-child > img { width: 4rem; height: 4rem; border-radius: 1rem; }
 }
