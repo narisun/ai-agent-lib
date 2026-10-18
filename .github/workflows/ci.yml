@@ -28,6 +28,8 @@ jobs:
         working-directory: packages/ai-agent-lib-ui
       - run: python -m mypy
         working-directory: packages/ai-agent-lib-ui
+      - run: python -c "from importlinter.cli import lint_imports; raise SystemExit(lint_imports())"
+        working-directory: packages/ai-agent-lib-ui
       - run: python -m pip check
       - run: python -m pip wheel --no-deps --wheel-dir dist packages/ai-agent-lib-ui
       - name: Installed UI wheel chat and restart checks

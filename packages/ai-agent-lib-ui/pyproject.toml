@@ -9,7 +9,7 @@ dependencies = ["ai-agent-lib-core>=0.1.0,<0.2", "pydantic>=2.7,<3"]
 
 [project.optional-dependencies]
 chat = ["chainlit==2.12.0", "httpx>=0.27,<1", "python-dotenv>=1,<2", "filelock>=3.16,<4", "markdown-it-py>=3,<5"]
-dev = ["pytest>=8.2", "pytest-asyncio>=0.24", "aiohttp>=3.10", "mypy>=1.11", "ruff>=0.6", "hatchling>=1.25"]
+dev = ["pytest>=8.2", "pytest-asyncio>=0.24", "aiohttp>=3.10", "mypy>=1.11", "ruff>=0.6", "hatchling>=1.25", "import-linter>=2.0"]
 
 [build-system]
 requires = ["hatchling>=1.25"]
@@ -44,6 +44,43 @@ extend = "../../pyproject.toml"
 "src/ai_agent_lib_ui/integrations/data_layer.py" = ["ARG002"]
 "src/ai_agent_lib_ui/integrations/callbacks.py" = ["ARG001"]
 "src/ai_agent_lib_ui/__main__.py" = ["T201"]
+
+[tool.importlinter]
+root_packages = ["ai_agent_lib_ui"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "UI contracts import nothing else from the package"
+type = "forbidden"
+source_modules = ["ai_agent_lib_ui.contracts"]
+forbidden_modules = [
+    "ai_agent_lib_ui.adapters",
+    "ai_agent_lib_ui.application",
+    "ai_agent_lib_ui.config",
+    "ai_agent_lib_ui.integrations",
+]
+
+[[tool.importlinter.contracts]]
+name = "the UI application layer is framework-free"
+type = "forbidden"
+source_modules = ["ai_agent_lib_ui.application"]
+forbidden_modules = [
+    "ai_agent_lib_ui.integrations",
+    "chainlit",
+    "fastapi",
+    "starlette",
+]
+
+[[tool.importlinter.contracts]]
+name = "only UI integrations imports the browser framework"
+type = "forbidden"
+source_modules = [
+    "ai_agent_lib_ui.adapters",
+    "ai_agent_lib_ui.application",
+    "ai_agent_lib_ui.config",
+    "ai_agent_lib_ui.contracts",
+]
+forbidden_modules = ["chainlit"]
 
 [[tool.mypy.overrides]]
 module = "ai_agent_lib_ui.integrations.callbacks"
