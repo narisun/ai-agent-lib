@@ -18,6 +18,12 @@ from ai_agent_lib_core.integrations.http.agent import (
     agent_app,
     health_routes,
 )
+from ai_agent_lib_core.integrations.http.composition import (
+    AgentService,
+    build_agent_app,
+    read_question,
+    run_agent,
+)
 from ai_agent_lib_core.integrations.http.lifecycle import ServiceLifecycle, ServiceState
 from ai_agent_lib_core.integrations.http.outcomes import OutcomeJournal, SqliteOutcomeJournal
 from ai_agent_lib_core.integrations.http.serving import serve
@@ -27,6 +33,7 @@ __all__ = [
     "INVOKE_PATH",
     "READY_PATH",
     "STREAM_PATH",
+    "AgentService",
     "AgentServices",
     "InMemoryThreadAdmission",
     "OutcomeJournal",
@@ -39,6 +46,9 @@ __all__ = [
     "ThreadAdmission",
     "add_health_routes",
     "agent_app",
+    "build_agent_app",
     "health_routes",
+    "read_question",
+    "run_agent",
     "serve",
 ]
