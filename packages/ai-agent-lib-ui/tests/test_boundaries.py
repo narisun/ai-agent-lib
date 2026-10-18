@@ -44,6 +44,18 @@ def test_ui_uses_core_contracts_only_and_keeps_frameworks_out_of_domain() -> Non
                         and path.name in {"feedback.py", "runtime.py"}
                         and path.parent.name in {"contracts", "integrations"}
                     )
+                    # Task 10's interaction exporter joins saved conversations with
+                    # viewer feedback for offline/online evals; both evaluation
+                    # modules it needs are named explicitly for this one file only.
+                    or (
+                        name
+                        in {
+                            "ai_agent_lib_core.evaluation.feedback",
+                            "ai_agent_lib_core.evaluation.online",
+                        }
+                        and path.name == "interactions.py"
+                        and path.parent.name == "adapters"
+                    )
                 ), (path, name)
             if path.parent.name == "contracts" and name.startswith("ai_agent_lib_ui"):
                 assert name.startswith("ai_agent_lib_ui.contracts"), (path, name)
