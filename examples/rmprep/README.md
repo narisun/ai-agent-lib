@@ -21,11 +21,10 @@ identity, policy, audit and checkpoint providers. The MCP service retrieves
 evidence and calculates review findings; the model turns that evidence into prose.
 
 For a local trace timeline with Python and pip, follow the
-[Phoenix walkthrough](../../docs/phoenix-trial.md). Teams with a container host
-can use the [Langfuse walkthrough](../../docs/langfuse-trial.md).
-Both adapters are shared library code, also included in newly generated agents.
-The selected backend runs as a separate service and adds a trace link to each Agent Lab response,
-with model attempts, MCP calls and checkpoint references grouped by thread.
+[Phoenix walkthrough](../../docs/phoenix-trial.md). The Phoenix adapter is shared
+library code, also included in newly generated agents. Phoenix runs as a separate
+service and adds a trace link to each Agent Lab response, with model attempts,
+MCP calls and checkpoint references grouped by thread.
 
 ## 1. Install with Python and pip
 

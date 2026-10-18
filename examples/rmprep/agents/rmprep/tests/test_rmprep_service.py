@@ -3,18 +3,48 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
+from unittest.mock import Mock
 
 import httpx
 import pytest
 from ai_agent_lib_core import Principal
-from ai_agent_lib_core.integrations.http import ServiceLifecycle
+from ai_agent_lib_core.integrations.http import ServiceLifecycle, build_agent_app
 from ai_agent_lib_core.testing import FakeChatModelProvider, FakeIdentityVerifier, Fakes
 from langchain_core.messages import AIMessage
 
-from rmprep.service import build_app
+from rmprep import service
+from rmprep.service import SERVICE, build_app
 
 ADA = {"authorization": "Bearer ada-token"}
+
+
+async def test_the_declared_service_composes_the_local_inspector_on_its_own(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(service, "ENV_FILE", tmp_path / "missing.env")  # the default budget
+    kit = fakes("Hello there.")
+    async with kit.container() as services:
+        lifecycle = ServiceLifecycle(services.validate)
+        app = await build_agent_app(SERVICE, services, lifecycle)
+        await lifecycle.start()
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://agent.test"
+        ) as client:
+            answer = await client.post("/invoke", json=question("Hello?"), headers=ADA)
+            inspected = await client.get(
+                f"/requests/{answer.json()['request_id']}/inspection?thread_id=th-1", headers=ADA
+            )
+    assert inspected.status_code == 200
+    assert inspected.json()["checkpoints"]["record_count"] > 0
+
+
+def test_a_deployed_service_gets_no_inspector_from_the_declared_service() -> None:
+    deployed = Mock()
+    deployed.config.deployment_env = "dev"
+    assert SERVICE.app_extras is not None
+    assert SERVICE.app_extras(deployed, lambda: None) == {}
 
 
 async def test_inspector_can_be_composed_before_container_startup() -> None:

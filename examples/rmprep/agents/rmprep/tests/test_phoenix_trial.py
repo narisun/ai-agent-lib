@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
@@ -9,6 +10,7 @@ from unittest.mock import Mock
 import pytest
 from ai_agent_lib_core import ServiceContainer
 from ai_agent_lib_core.config.phoenix import PhoenixSettings
+from ai_agent_lib_core.integrations.http import composition
 from ai_agent_lib_core.integrations.langgraph import phoenix
 from ai_agent_lib_core.integrations.langgraph.phoenix import PhoenixTracing
 from ai_agent_lib_core.observability.model_trace import JsonlModelTraceSink
@@ -18,26 +20,29 @@ from langchain_core.messages import AIMessage
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from rmprep import service
-from rmprep.context import ContextBuilder
 from rmprep.examples.trace_react import FOLLOW_UP, MEMO, QUESTIONS, WORKSPACE
 from rmprep.graph import APPLICATION, build_graph, response
 from rmprep_data import SERVER_ID, build_server
 
 
-async def test_service_closes_exporter_when_container_construction_fails(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_service_closes_exporter_when_container_construction_fails(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     trial = Mock()
-    # agent_tracing now starts Phoenix only, so the service-level close is exercised there.
+    env_file = WORKSPACE / "agents/rmprep/.env.example"
+    # The real entry path: main loads the budget, run_agent starts Phoenix, then the container fails.
     monkeypatch.setenv("EAP_PHOENIX_ENABLED", "true")
     monkeypatch.setenv("EAP_PHOENIX_ENV_FILE", "")
+    monkeypatch.setattr(service, "ENV_FILE", env_file)
+    monkeypatch.setattr(service, "SERVICE", replace(service.SERVICE, env_file=env_file))
     monkeypatch.setattr(phoenix, "PhoenixTracing", Mock(return_value=trial))
     monkeypatch.setattr(
-        service, "ServiceContainer", Mock(side_effect=RuntimeError("invalid adapter"))
+        composition, "ServiceContainer", Mock(side_effect=RuntimeError("invalid adapter"))
     )
-    config = load_test_config(WORKSPACE / "agents/rmprep/.env.example", state_dir=tmp_path)
-    with pytest.raises(RuntimeError, match="invalid adapter"):
-        await service._serve(config, "127.0.0.1", 8000, ContextBuilder())
+
+    assert service.main([]) != 0
+
+    assert "invalid adapter" in capsys.readouterr().err
     trial.close.assert_called_once_with()
 
 
