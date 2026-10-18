@@ -49,8 +49,9 @@ def outcome_text(run: RunRecord) -> str:
     if usage.kind in {"simulated", "estimated"}:
         metrics += f" · {usage.kind.capitalize()} usage"
     if run.trace is not None:
-        label = "Agent Lab" if run.trace.provider == "phoenix" else run.trace.label
-        metrics += f"\n\n[Open trace in {label}]({run.trace.url})"
+        # Local Phoenix ships embedded as Agent Lab's trace viewer, so the link text
+        # names the product the user is in, not the tracing backend behind it.
+        metrics += f"\n\n[Open trace in Agent Lab]({run.trace.url})"
     return _outcome(run) + "\n\n---\n\n" + metrics
 
 
@@ -306,6 +307,8 @@ class DataLayer(BaseDataLayer):
         return "/logs"
 
     async def close(self) -> None:
-        # Connections are short-lived; server resources close in the parent lifespan.
-        """Connections are released by each store operation."""
+        """Nothing to close: each store operation releases its own short-lived connection.
+
+        Server resources close in the parent lifespan.
+        """
         return None
