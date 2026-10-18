@@ -35,18 +35,29 @@ from ai_agent_lib_core.evaluation.feedback import (
     JsonlFeedbackLog,
     load_feedback,
 )
+from ai_agent_lib_core.evaluation.online import (
+    INTERACTION_SCHEMA,
+    Interaction,
+    as_cases,
+    load_interactions,
+    sampled,
+    score_interactions,
+    write_interactions,
+)
 from ai_agent_lib_core.evaluation.report import REPORT_SCHEMA, CaseResult, EvalReport
 from ai_agent_lib_core.evaluation.run import run_eval
 from ai_agent_lib_core.evaluation.scorers import Score, Scorer, Verdict, exact, judged, scored_by
 
 __all__ = [
     "FEEDBACK_SCHEMA",
+    "INTERACTION_SCHEMA",
     "REPORT_SCHEMA",
     "CalibrationReport",
     "CaseResult",
     "EvalCase",
     "EvalReport",
     "FeedbackRecord",
+    "Interaction",
     "JsonlFeedbackLog",
     "LabeledCase",
     "Regression",
@@ -54,15 +65,20 @@ __all__ = [
     "Score",
     "Scorer",
     "Verdict",
+    "as_cases",
     "calibrate",
     "dataset_digest",
     "exact",
     "judged",
     "load_cases",
     "load_feedback",
+    "load_interactions",
     "load_report",
     "regressions",
     "require_no_regression",
     "run_eval",
+    "sampled",
+    "score_interactions",
     "scored_by",
+    "write_interactions",
 ]
