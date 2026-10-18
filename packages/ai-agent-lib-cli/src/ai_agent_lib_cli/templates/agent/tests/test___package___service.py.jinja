@@ -10,9 +10,13 @@ from ai_agent_lib_core import Principal
 from ai_agent_lib_core.integrations.http import ServiceLifecycle
 from ai_agent_lib_core.testing import FakeChatModelProvider, FakeIdentityVerifier, Fakes
 
-from {{ package }}.service import build_app
+from {{ package }}.service import SERVICE, build_app
 
 ADA = {"authorization": "Bearer ada-token"}
+
+
+def test_service_defaults_to_its_assigned_port() -> None:
+    assert SERVICE.default_port == {{ port }}
 
 
 def fakes(*replies: Any) -> Fakes:

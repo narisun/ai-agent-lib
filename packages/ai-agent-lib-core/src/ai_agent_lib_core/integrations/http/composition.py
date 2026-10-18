@@ -80,7 +80,7 @@ class AgentService:
         live_updates: Whether ``POST /invoke`` negotiates model drafts.
         default_port: The port ``--port`` defaults to.
         app_kwargs: Extra keyword arguments for ``agent_app``, such as
-            ``outcomes``, ``inspector``, ``diagnostics`` or ``admission``.
+            ``inspector``, ``diagnostics`` or ``admission``.
         env_file: The service's own ``.env`` file. ``run_agent`` resolves
             configuration and Langfuse settings from it; without one, both
             fall back to their own default (the process environment and a

@@ -54,6 +54,7 @@ SERVICE = AgentService(
     build_graph=_build_graph,
     respond=_respond,
     stream=_stream,
+    default_port={{ port }},
     env_file=ENV_FILE,
     outcomes=_outcomes,
 )
