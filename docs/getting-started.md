@@ -608,7 +608,7 @@ the test suite repeatable.
 An **evaluation** (eval) asks a real model your example questions and scores
 its answers, so a prompt or model change is judged by numbers rather than one
 transcript. The generated agent has both halves.
-`agents/helper/evals/cases.jsonl` holds three questions, each with a name a good
+`agents/helper/evals/cases.jsonl` holds three questions, each with a word a good
 answer must mention. `agents/helper/tests/test_helper_eval.py` asks them, scores
 each answer 1 or 0 for mentioning that name, and requires a mean of at least 0.8,
 which with three cases means every case must pass. Read both, then follow the loop:
@@ -643,7 +643,7 @@ which with three cases means every case must pass. Read both, then follow the lo
    `agents/helper/evals/baseline.json`. Commit that file with `cases.jsonl`:
    both hold synthetic test cases and aggregate scores, not conversation content.
 
-4. **Let the baseline guard you.** Once `baseline.json` exists, every run also
+4. **Let the baseline guard you.** Once `baseline.json` exists, every ordinary run also
    compares itself with it. The run fails when any metric's mean falls more than
    0.05 below its baseline, even if the score still clears 0.8. The failure names
    each regressed metric, both means, and the IDs of the cases whose own score

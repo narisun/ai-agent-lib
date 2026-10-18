@@ -15,7 +15,7 @@ and `start-local.sh`. Commands are shown for **Command Prompt (cmd.exe)**. On
 macOS/Linux, open a bash or zsh terminal there and use the spelling in the right
 column. The `.sh` launchers take the same arguments as their `.bat` twins and run
 `python3` from your `PATH`, so that must be your approved Python 3.11+. Paths in
-the prose use Windows separators; use `/` on macOS/Linux.
+the commands and prose use Windows separators; use `/` on macOS/Linux.
 
 | Command Prompt | macOS/Linux |
 | --- | --- |
@@ -320,9 +320,11 @@ the highest-priority source below that defines it:
 | --- | --- | --- |
 | 1 | Process environment | Variables set in the terminal that runs the launcher. They override every file below. |
 | 2 | Launcher file: the root `.env`, or the file passed with `--env-file` | The root file is found beside the launcher even when you start it from another folder. `--env-file` replaces it, and a relative path uses your current folder. A missing default root file keeps service settings; a missing explicit file stops startup. |
-| 3 | Separate Phoenix env file, `EAP_PHOENIX_ENV_FILE` (optional) | Adds one level for the tracing settings. In the root file, use an absolute path. In a service `.env`, the path is relative to that file; set in the process environment or the launcher file, a relative path uses `examples\rmprep`. |
-| 4 | rmprep service `.env` | Library storage paths such as `EAP_MODEL_TRACE_PATH` resolve from the service folder. |
+| 3 | Separate Phoenix env file, `EAP_PHOENIX_ENV_FILE` (optional) | Adds one level for the tracing settings. Prefer an absolute path; a relative one resolves from `examples\rmprep`, or from the service folder when set in a service `.env`. |
+| 4 | rmprep service `.env` | `examples\rmprep\agents\rmprep\.env`, the rmprep service's own settings file. |
 | 5 | Defaults | The library's built-in values. |
+
+Wherever a value is set, library storage paths such as `EAP_MODEL_TRACE_PATH` resolve from the service folder.
 
 To select a different file instead of the root `.env`:
 
