@@ -64,7 +64,7 @@ class JsonlFeedbackLog:
     def _append(self, line: str) -> None:
         with self._lock:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            with self.path.open("a", encoding="utf-8") as file:
+            with self.path.open("a", encoding="utf-8", newline="\n") as file:
                 file.write(line + "\n")
 
 
