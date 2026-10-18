@@ -25,7 +25,7 @@ development preview; use the [release scope](docs/release-scope.md) for support 
 
 Agent Lab is the browser simulator for testing agents. Use your team's Python
 3.11+ and pip setup, approved package index, and a writable repository checkout.
-Open **Command Prompt** in the repository root.
+Open **Command Prompt** (Windows) or a **Bash terminal** (macOS/Linux) in the repository root.
 
 **First time:** follow [local setup and model settings](docs/local-startup.md#1-set-up-once).
 Use `setup-local.bat --model anthropic` or `setup-local.bat --model bedrock`,
@@ -44,12 +44,24 @@ the scaffolding CLI and the rmprep/Agent Lab development tools.
 start-local.bat
 ```
 
+Or on POSIX:
+
+```bash
+./start-local.sh
+```
+
 Check the printed environment path, model and masked settings. Wait for **All
 selected services are ready**, then open [Agent Lab](http://127.0.0.1:8765).
-Read its login code in a second Command Prompt at the repository root:
+Read its login code in a second Command Prompt or Bash terminal at the repository root:
 
 ```bat
 type .agentlib\ui-rmprep\access-code
+```
+
+Or on POSIX:
+
+```bash
+cat .agentlib/ui-rmprep/access-code
 ```
 
 Select **Choose agent → Start chat with rmprep**. With Anthropic configured, ask:
@@ -62,10 +74,16 @@ and response time. **Memos** opens saved versions beside chat. With Phoenix enab
 **Open trace in Agent Lab** opens the response's model input/output, MCP calls,
 metrics and checkpoint references. **Logs** provides local diagnostic inspection.
 
-When finished, run in the second Command Prompt:
+When finished, run in the second Command Prompt or Bash terminal:
 
 ```bat
 stop-local.bat
+```
+
+Or on POSIX:
+
+```bash
+./stop-local.sh
 ```
 
 Wait for **Stopped gracefully**. Conversations, memo versions, traces and
