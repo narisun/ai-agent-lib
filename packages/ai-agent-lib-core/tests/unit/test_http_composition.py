@@ -10,15 +10,23 @@ import pytest
 
 import ai_agent_lib_core.integrations.http.composition as composition
 from ai_agent_lib_core.config import PREFIX, Key, variable_for
-from ai_agent_lib_core.contracts import Principal, RequestContext, ServiceConfig, ValidationFailed
+from ai_agent_lib_core.contracts import (
+    DeploymentEnv,
+    Principal,
+    RequestContext,
+    ServiceConfig,
+    ValidationFailed,
+)
 from ai_agent_lib_core.di import ServiceContainer
 from ai_agent_lib_core.integrations.http import (
     AgentService,
+    OutcomeJournal,
     ServiceLifecycle,
     build_agent_app,
     read_question,
     run_agent,
 )
+from ai_agent_lib_core.integrations.http.composition import _with_outcomes
 from ai_agent_lib_core.testing import Fakes
 from ai_agent_lib_core.testing.fakes import FakeIdentityVerifier
 
@@ -122,6 +130,81 @@ async def test_build_graph_runs_before_readiness() -> None:
 
         assert ran == ["built"]
         assert (await client.get("/readyz")).status_code == 200
+
+
+# --------------------------------------------------------------- config-aware outcome journal
+
+
+class _FakeJournal:
+    """A stand-in journal: identity, not behavior, is what these tests check."""
+
+    async def begin(self, context: RequestContext) -> bool:
+        return True
+
+    async def finish(self, context: RequestContext, envelope: dict[str, object]) -> None:
+        return None
+
+    async def read(self, context: RequestContext, request_id: str) -> dict[str, object] | None:
+        return None
+
+
+def test_with_outcomes_merges_a_journal_the_factory_returns() -> None:
+    journal = _FakeJournal()
+    service = AgentService(
+        application="probe",
+        build_graph=_build_graph,
+        respond=_respond,
+        outcomes=lambda config: journal,
+    )
+
+    merged = _with_outcomes(service, ServiceConfig())
+
+    assert merged.app_kwargs["outcomes"] is journal
+
+
+def test_with_outcomes_leaves_app_kwargs_alone_when_the_factory_returns_none() -> None:
+    service = AgentService(
+        application="probe",
+        build_graph=_build_graph,
+        respond=_respond,
+        app_kwargs={"diagnostics": "on"},
+        outcomes=lambda config: None,
+    )
+
+    merged = _with_outcomes(service, ServiceConfig())
+
+    assert merged is service
+    assert "outcomes" not in merged.app_kwargs
+
+
+def test_with_outcomes_leaves_the_service_alone_without_a_factory() -> None:
+    service = AgentService(
+        application="probe",
+        build_graph=_build_graph,
+        respond=_respond,
+        app_kwargs={"diagnostics": "on"},
+    )
+
+    merged = _with_outcomes(service, ServiceConfig())
+
+    assert merged is service
+
+
+def test_with_outcomes_passes_the_resolved_configuration_to_the_factory() -> None:
+    seen: list[ServiceConfig] = []
+
+    def factory(config: ServiceConfig) -> OutcomeJournal | None:
+        seen.append(config)
+        return None
+
+    service = AgentService(
+        application="probe", build_graph=_build_graph, respond=_respond, outcomes=factory
+    )
+    config = ServiceConfig(deployment_env=DeploymentEnv.PROD)
+
+    _with_outcomes(service, config)
+
+    assert seen == [config]
 
 
 # --------------------------------------------------------------- run_agent's own .env file

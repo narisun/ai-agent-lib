@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import dataclasses
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -26,6 +27,7 @@ from ai_agent_lib_core.contracts import (
 from ai_agent_lib_core.di import ServiceContainer
 from ai_agent_lib_core.integrations.http.agent import agent_app
 from ai_agent_lib_core.integrations.http.lifecycle import ServiceLifecycle
+from ai_agent_lib_core.integrations.http.outcomes import OutcomeJournal
 from ai_agent_lib_core.integrations.http.serving import serve
 from ai_agent_lib_core.observability import (
     configure_logging,
@@ -83,6 +85,9 @@ class AgentService:
             configuration and Langfuse settings from it; without one, both
             fall back to their own default (the process environment and a
             ``.env`` in the working directory).
+        outcomes: Builds the service's outcome journal from the resolved
+            configuration; return None for no journal. Called once per
+            serve, so the choice can depend on the deployment environment.
     """
 
     application: str
@@ -94,6 +99,7 @@ class AgentService:
     default_port: int = 8000
     app_kwargs: Mapping[str, Any] = field(default_factory=dict)
     env_file: Path | None = None
+    outcomes: Callable[[ServiceConfig], OutcomeJournal | None] | None = None
 
 
 async def build_agent_app(
@@ -138,9 +144,27 @@ async def build_agent_app(
     )
 
 
+def _with_outcomes(service: AgentService, config: ServiceConfig) -> AgentService:
+    """Resolve ``service.outcomes`` against ``config`` and merge it into ``app_kwargs``.
+
+    Without a factory, ``service`` is returned unchanged. A factory that
+    returns ``None`` (for example, because the deployment isn't local) also
+    leaves ``app_kwargs`` unchanged; only a returned journal is merged in.
+    """
+    if service.outcomes is None:
+        return service
+    journal = service.outcomes(config)
+    if journal is None:
+        return service
+    return dataclasses.replace(
+        service, app_kwargs={**dict(service.app_kwargs), "outcomes": journal}
+    )
+
+
 async def _serve(service: AgentService, config: ServiceConfig, host: str, port: int) -> None:
     from ai_agent_lib_core.integrations.langgraph.langfuse import langfuse_tracing
 
+    service = _with_outcomes(service, config)
     dotenv_path = service.env_file if service.env_file is not None else Path(".env")
     async with langfuse_tracing(service.application, config, dotenv_path=dotenv_path) as tracing:
         services = ServiceContainer(config, model_trace=tracing)
