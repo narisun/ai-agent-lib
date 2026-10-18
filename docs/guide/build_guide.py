@@ -291,7 +291,7 @@ def _phoenix_variable_rows() -> list[list[str]]:
             _e(local),
             _e(aws),
             "Process settings override the separate tracing file, then the service .env. "
-            "Enable one agent tracing backend at a time. This desktop trial stores traces "
+            "Nothing is exported until tracing is enabled. This desktop trial stores traces "
             "in SQLite and runs in its own Python environment. A shared deployment needs "
             "separate platform provisioning; it is outside this trial. "
             '<a href="phoenix-trial.md">Phoenix setup and verified example</a>.',
@@ -737,11 +737,11 @@ def walkthrough_files() -> dict[Path, str]:
     return {
         **{HERE.parent / path: content for path, content in shared.items()},
         # The repository has a general integration guide; generated agents get
-        # their own Langfuse instructions with service-specific paths and commands.
+        # their own Phoenix tracing instructions with service-specific paths and commands.
         **{
             HERE.parent / path: content
             for path, content in agent.items()
-            if path != PurePosixPath("langfuse.md")
+            if path != PurePosixPath("tracing.md")
         },
         **{HERE.parent / "examples" / path: content for path, content in reader.items()},
     }

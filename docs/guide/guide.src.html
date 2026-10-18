@@ -422,7 +422,6 @@ def test_expiry_uses_the_supplied_clock() -&gt; None:
     <tbody>
       <tr><td>Agent and MCP services</td><td>Business workflow, evidence, policy enforcement, and graph checkpoints</td><td><code>.venv/Lib/site-packages</code>; the approved Python runs it</td></tr>
       <tr><td>Agent Lab</td><td>Agent selection, displayed chat history, memo versions, and inspection pages</td><td><code>packages/ai-agent-lib-ui/.venv/Lib/site-packages</code>; the same approved Python</td></tr>
-      <tr><td>Langfuse, when enabled</td><td>Model/tool observations and trace browsing</td><td>A separate service; the agent exports through its existing Python environment</td></tr>
       <tr><td>Phoenix local trial, when enabled</td><td>Model/tool observations in a local SQLite database</td><td><code>.agentlib/phoenix/.venv/Lib/site-packages</code> with the same Python; included by <code>start-local.bat</code> when enabled</td></tr>
     </tbody>
   </table></div>
@@ -905,11 +904,11 @@ EAP_MODEL_PROVIDER=fake</code></pre>
   secrets. <code>options</code> lists accepted keys and defaults. <code>doctor</code>
   tries to build and validate the configured services; with cloud adapters, this can
   contact those services.</p>
-  <p>For optional Phoenix or Langfuse tracing, <code>explain</code> also shows the
-  source file or process variable for each setting and masks API keys.
-  <code>doctor</code> uses the same resolver as startup, checks the destination
-  and capture settings, and rejects enabling both backends together. These tracing
-  checks validate configuration without contacting the tracing server.</p>
+  <p>For optional Phoenix tracing, <code>explain</code> also shows the
+  source file or process variable for each setting and masks the API key.
+  <code>doctor</code> uses the same resolver as startup and checks the destination
+  and capture settings. These tracing checks validate configuration without
+  contacting the tracing server.</p>
   <h3>Optional: use a hosted model</h3>
   <p>Continue using the fake model while learning and testing. Follow these steps
   when your team has approved a model endpoint and supplied account access:</p>
@@ -1866,7 +1865,7 @@ async def classify(
     <p>The default pattern guardrails check the output size before each live text
     update. Blocking PII checks and structured-output schemas wait for the complete
     response before releasing text. Live drafts are provisional; only the accepted
-    final answer is saved. Chat keeps metrics and the Phoenix or Langfuse trace
+    final answer is saved. Chat keeps metrics and the Phoenix trace
     link visible, with detailed evidence available through the trace and Logs page.</p>
     <p>In the MCP console, each admitted named query writes a <code>data_query</code>
     line: query name, duration, returned rows and columns, truncation and masked
@@ -1874,8 +1873,8 @@ async def classify(
     such as client UEN, date range and page offset. Returned records are not copied
     into these log lines. Deployed logging omits parameter values; use the request
     ID to connect queries with the MCP call and model trace.</p>
-    <p>The optional <a href="langfuse.md">library Langfuse integration</a> adds an
-    <strong>Open trace in Langfuse</strong> link to each accepted response. Langfuse
+    <p>The optional <a href="phoenix-trial.md">library Phoenix integration</a> adds an
+    <strong>Open trace in Agent Lab</strong> link to each accepted response. Phoenix
     runs as a separate service; developers connect with the existing Python and pip
     setup. Each request has its own trace, grouped with the thread's other requests.
     Model attempts and MCP calls appear in its timeline. Checkpoint IDs link back
@@ -1885,28 +1884,14 @@ async def classify(
     If the history read times out, the answer still returns and trace metadata
     marks the references unavailable. The checkpoint database remains the source
     of saved conversation state.</p>
-    <p>Newly generated agents include this integration in <code>service.py</code>.
-    The library owns export and shutdown; your response function owns what the
-    graph does. This is dependency injection: tests supply an in-memory exporter,
-    and deployed services use the same graph with the configured exporter.
+    <p>Newly generated agents get this integration from <code>run_agent</code> in
+    <code>service.py</code>, with no code to add. The library owns export and
+    shutdown; your response function owns what the graph does. This is dependency
+    injection: tests supply an in-memory exporter, and deployed services use the
+    same graph with the configured exporter.
     Existing graph callbacks are preserved, and governed native tools appear once
     in the trace. The adapter adds <code>output.trace</code> when enabled; existing
     answer, streaming and checkpoint interfaces keep their behavior.</p>
-    <p>Get the project URL and keys from the platform team, then put them in a
-    private settings file. From Command Prompt, select the agent's Python environment
-    and follow its generated <code>docs/langfuse.md</code>:</p>
-    <pre><code class="language-bat">set "EAP_LANGFUSE_ENV_FILE=F:\work\langfuse\agent.env"
-python -m your_agent.service</code></pre>
-    <p>Replace the path and module name with your own values. The file sets
-    <code>EAP_LANGFUSE_ENABLED=true</code> and the project settings listed in the
-    <a href="#variables">configuration table</a>.
-    <code>EAP_LANGFUSE_CAPTURE_CONTENT=false</code> records metadata and usage;
-    set it to <code>true</code> for approved test data to inspect messages and results.
-    The generated dependencies include the <code>otel</code> extra and install
-    with Python and pip. For an older service, follow the
-    <a href="langfuse.md#add-tracing-to-an-existing-service">integration steps</a>.
-    The <a href="langfuse-trial.md">verified rmprep walkthrough</a> shows a memo
-    and follow-ups with their MCP calls, token counts and checkpoint references.</p>
     <p>For a desktop trial using Python and pip, follow the
     <a href="phoenix-trial.md">local Phoenix walkthrough</a>. Run
     <code>start-phoenix.bat setup</code> once, then enable Phoenix in the root
@@ -1914,8 +1899,9 @@ python -m your_agent.service</code></pre>
     before the MCP, agent, and UI services. It keeps separate <code>.venv</code> packages and uses the default Python;
     <code>stop-local.bat</code> stops the stack and preserves SQLite traces. The agent
     adds an <strong>Open trace in Agent Lab</strong> link to each response, opening the configured Phoenix trace. The walkthrough
-    lists the opt-in settings and a verified Anthropic conversation. Enable one
-    tracing backend at a time. Existing Langfuse integrations remain supported.</p>
+    lists the opt-in settings and a verified Anthropic conversation. A generated
+    agent's <code>docs/tracing.md</code> lists the same settings for its own
+    service; the <a href="#variables">configuration table</a> names each one.</p>
     <p>Blocking PII checks and structured-output schemas buffer text until they pass.
     Default pattern checks validate each growing text update, allowing early display. Drafts can still change during business validation; only the final
     accepted answer enters chat history. Keep <code>live_updates=False</code> when

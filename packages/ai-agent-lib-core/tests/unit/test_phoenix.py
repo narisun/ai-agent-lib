@@ -23,6 +23,7 @@ from ai_agent_lib_core.config.phoenix import (
     PHOENIX_VARIABLES,
     PhoenixSettings,
     load_phoenix_settings,
+    phoenix_env_example,
 )
 from ai_agent_lib_core.contracts import ConfigurationError, Principal
 from ai_agent_lib_core.integrations.langgraph._agent_tracing import _content
@@ -34,13 +35,7 @@ from ai_agent_lib_core.testing import calls_tool, fake_providers
 
 @pytest.fixture(autouse=True)
 def clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    for name in (
-        *PHOENIX_VARIABLES,
-        "EAP_LANGFUSE_ENABLED",
-        "EAP_LANGFUSE_ENV_FILE",
-        "RMPREP_LANGFUSE_ENABLED",
-        "RMPREP_LANGFUSE_ENV_FILE",
-    ):
+    for name in PHOENIX_VARIABLES:
         monkeypatch.delenv(name, raising=False)
 
 
@@ -69,6 +64,22 @@ def test_settings_precedence_explicit_disable_and_secret_repr(
     monkeypatch.setenv("EAP_PHOENIX_ENABLED", "false")
     monkeypatch.setenv("EAP_PHOENIX_ENV_FILE", "missing.env")
     assert load_phoenix_settings(service) is None
+
+
+def test_env_example_comments_every_variable_with_its_default() -> None:
+    block = phoenix_env_example()
+    lines = [line for line in block.splitlines() if line.strip()]
+    assert all(line.startswith("#") for line in lines)
+    assert "docs/phoenix-trial.md" in lines[0]
+    assert "docs/tracing.md" in phoenix_env_example(guide="docs/tracing.md").splitlines()[1]
+    shown = dict(line.removeprefix("# ").split("=", 1) for line in lines[1:])
+    assert tuple(shown) == PHOENIX_VARIABLES
+    defaults = PhoenixSettings()
+    assert shown["EAP_PHOENIX_ENABLED"] == "false"
+    assert shown["EAP_PHOENIX_CAPTURE_CONTENT"] == "false"
+    assert shown["PHOENIX_COLLECTOR_ENDPOINT"] == defaults.base_url
+    assert shown["PHOENIX_PROJECT_NAME"] == defaults.project_name
+    assert shown["PHOENIX_API_KEY"] != defaults.api_key
 
 
 @pytest.mark.parametrize(

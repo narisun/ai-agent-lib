@@ -12,7 +12,7 @@ from tools.local_processes import report
 
 if TYPE_CHECKING:
     from ai_agent_lib_core.config import Resolution
-    from ai_agent_lib_core.config.tracing import TracingResolution
+    from ai_agent_lib_core.config.phoenix import PhoenixResolution
     from ai_agent_lib_core.contracts import ConfigSource
 
 # Application and tracing controls outside the core binding table. Everything
@@ -28,14 +28,6 @@ _VISIBLE_EXTRAS = frozenset(
         "EAP_PHOENIX_ENV_FILE",
         "PHOENIX_COLLECTOR_ENDPOINT",
         "PHOENIX_PROJECT_NAME",
-        "EAP_LANGFUSE_ENABLED",
-        "EAP_LANGFUSE_CAPTURE_CONTENT",
-        "EAP_LANGFUSE_ENV_FILE",
-        "RMPREP_LANGFUSE_ENABLED",
-        "RMPREP_LANGFUSE_CAPTURE_CONTENT",
-        "RMPREP_LANGFUSE_ENV_FILE",
-        "LANGFUSE_BASE_URL",
-        "LANGFUSE_PROJECT_ID",
     }
 )
 
@@ -71,7 +63,7 @@ def report_environment(
     resolution: Resolution,
     layers: Sequence[tuple[str, ConfigSource]],
     *,
-    tracing: TracingResolution | None = None,
+    tracing: PhoenixResolution | None = None,
 ) -> None:
     """Print effective agent variables and their winning layer, with safe defaults.
 
@@ -107,6 +99,7 @@ def report_environment(
     names.update(
         name
         for name in layers[0][1].names()
+        # LANGFUSE_ is defense for stale environments: shown masked, never read.
         if name.startswith(
             ("EAP_", "RMPREP_", "LANGFUSE_", "PHOENIX_", "OTEL_", "AWS_", "ANTHROPIC_")
         )
@@ -119,16 +112,15 @@ def report_environment(
     if tracing is not None:
         # Raw launcher/service layers cannot explain a separate tracing file.
         # Replace those rows with the same resolution used by agent startup.
-        for backend in (tracing.langfuse, tracing.phoenix):
-            for name, value in backend.shown.items():
-                origin = backend.origins[name]
-                if origin.startswith("process environment: "):
-                    variable = origin.removeprefix("process environment: ")
-                    origin = next(
-                        (label for label, source in layers[:2] if source.get(variable) is not None),
-                        origin,
-                    )
-                rows[name] = (_display(value, visible=name in _VISIBLE_EXTRAS), origin)
+        for name, value in tracing.shown.items():
+            origin = tracing.origins[name]
+            if origin.startswith("process environment: "):
+                variable = origin.removeprefix("process environment: ")
+                origin = next(
+                    (label for label, source in layers[:2] if source.get(variable) is not None),
+                    origin,
+                )
+            rows[name] = (_display(value, visible=name in _VISIBLE_EXTRAS), origin)
     report(
         "Agent configuration (credentials, sensitive fields and unrecognized variables are masked):"
     )

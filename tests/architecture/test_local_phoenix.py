@@ -24,8 +24,7 @@ def checkout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         path.write_text("")
     package_runtime.package_folder(root, "phoenix").mkdir(parents=True)
     (root / ".env").write_text(
-        "EAP_MODEL_PROVIDER=fake\nEAP_PHOENIX_ENABLED=true\n"
-        "EAP_LANGFUSE_ENABLED=false\nANTHROPIC_API_KEY=root-private-key\n"
+        "EAP_MODEL_PROVIDER=fake\nEAP_PHOENIX_ENABLED=true\nANTHROPIC_API_KEY=root-private-key\n"
     )
     monkeypatch.setattr(local_dev, "prepare_ui", Mock(return_value=8765))
     return root

@@ -18,7 +18,6 @@ from ai_agent_lib_core.config.bindings import (
     provider_key,
     secret_key,
 )
-from ai_agent_lib_core.config.langfuse import LangfuseSettings, load_langfuse_settings
 from ai_agent_lib_core.config.profiles import PROFILE_DEFAULTS, ProfileDefaults
 from ai_agent_lib_core.config.reference import (
     EnvSetting,
@@ -48,13 +47,11 @@ __all__ = [
     "EnvSetting",
     "EnvironConfigSource",
     "Key",
-    "LangfuseSettings",
     "LayeredConfigSource",
     "MappingConfigSource",
     "ProfileDefaults",
     "Resolution",
     "ValueKind",
-    "load_langfuse_settings",
     "load_service_config",
     "options_key",
     "provider_key",

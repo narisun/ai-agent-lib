@@ -13,9 +13,9 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from ai_agent_lib_cli.__main__ import main
 from ai_agent_lib_cli.testing import toolbox_for_tests
 from ai_agent_lib_core import Principal, ServiceContainer
-from ai_agent_lib_core.config.langfuse import LANGFUSE_VARIABLES, LangfuseSettings
+from ai_agent_lib_core.config.phoenix import PHOENIX_LABELS, PHOENIX_VARIABLES, PhoenixSettings
 from ai_agent_lib_core.integrations.http import ServiceLifecycle
-from ai_agent_lib_core.integrations.langgraph.langfuse import LangfuseTracing
+from ai_agent_lib_core.integrations.langgraph.phoenix import PhoenixTracing
 from ai_agent_lib_core.testing import FakeChatModelProvider, FakeIdentityVerifier, Fakes, calls_tool
 
 
@@ -33,15 +33,17 @@ async def test_generated_agent_traces_tool_and_same_thread_followup(
     monkeypatch.syspath_prepend(str(folder / "src"))
     module = importlib.import_module(f"{package}.service")
     config_text = (folder / ".env.example").read_text()
-    instructions = (folder / "docs/langfuse.md").read_text()
-    assert all(variable in config_text for variable in LANGFUSE_VARIABLES.values())
+    instructions = (folder / "docs/tracing.md").read_text()
+    assert all(variable in config_text for variable in PHOENIX_VARIABLES)
+    assert all(variable in instructions for variable in PHOENIX_VARIABLES)
+    assert f"{PHOENIX_LABELS['project']}={name}" in instructions
     assert f'"%PYTHON%" -m {package}.service' in instructions
     assert "Python and pip" in instructions
     assert "PowerShell" not in instructions
     assert "{{" not in instructions
     exporter = InMemorySpanExporter()
-    tracing = LangfuseTracing(
-        LangfuseSettings("http://localhost:3000", "test", "public", "secret", True),
+    tracing = PhoenixTracing(
+        PhoenixSettings(project_name="test", capture_content=True),
         application=name,
         exporter=exporter,
     )
@@ -87,10 +89,7 @@ async def test_generated_agent_traces_tool_and_same_thread_followup(
         assert len([s for s in spans if s.name == "model"]) == 3
         roots = [s for s in spans if s.name == f"{name}.turn"]
         assert len(roots) == 2
-        assert len({s.attributes["langfuse.session.id"] for s in roots if s.attributes}) == 1
-        assert all(
-            s.attributes and "langfuse.observation.metadata.checkpoints" in s.attributes
-            for s in roots
-        )
+        assert len({s.attributes["session.id"] for s in roots if s.attributes}) == 1
+        assert all(s.attributes and "agentlib.checkpoints" in s.attributes for s in roots)
     finally:
         tracing.close()

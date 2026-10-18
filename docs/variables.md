@@ -47,18 +47,6 @@ These keep their own names. The library reads them and never renames them.
 | `NO_PROXY` | Hosts that bypass the proxy.<br>Comma-separated hosts the AWS clients reach without the proxy. | not set | also read from `no_proxy` |
 | `ANTHROPIC_API_KEY` | API key for the anthropic model provider.<br>Supplies the secret `anthropic_api_key`, which the anthropic model provider asks the secrets port for. Masked wherever it is shown. | not set | sensitive |
 
-## Optional Langfuse integration
-
-These settings are resolved by `load_langfuse_settings` at the service boundary, separately from `ServiceConfig`. See [Langfuse setup](langfuse.md) for purposes, defaults and precedence.
-
-- `EAP_LANGFUSE_ENABLED`
-- `EAP_LANGFUSE_CAPTURE_CONTENT`
-- `EAP_LANGFUSE_ENV_FILE`
-- `LANGFUSE_BASE_URL`
-- `LANGFUSE_PROJECT_ID`
-- `LANGFUSE_PUBLIC_KEY`
-- `LANGFUSE_SECRET_KEY`
-
 ## Optional Phoenix integration
 
 These settings are resolved by `load_phoenix_settings` separately from `ServiceConfig`. See the [local Phoenix trial](phoenix-trial.md) for purposes, defaults, precedence and the separate SQLite server setup.

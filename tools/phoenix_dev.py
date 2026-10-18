@@ -32,6 +32,7 @@ def server_environment(folder: Path) -> dict[str, str]:
     environment = {
         key: value
         for key, value in os.environ.items()
+        # LANGFUSE_ is defense for stale environments: the library no longer reads it.
         if not key.startswith(
             ("EAP_", "RMPREP_", "PHOENIX_", "OTEL_", "LANGFUSE_", "ANTHROPIC_", "OPENAI_", "AWS_")
         )

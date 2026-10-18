@@ -109,7 +109,6 @@ To see model input/output and MCP calls in local Phoenix, add:
 
 ```dotenv
 EAP_TELEMETRY=off
-EAP_LANGFUSE_ENABLED=false
 EAP_PHOENIX_ENABLED=true
 EAP_PHOENIX_CAPTURE_CONTENT=true
 PHOENIX_COLLECTOR_ENDPOINT=http://127.0.0.1:6006
@@ -313,9 +312,9 @@ settings, and `demo` uses scripted replies.
 
 For tracing, an optional separate file adds one level:
 **shell → launcher file → separate tracing file → service file → defaults**.
-Use absolute paths for `EAP_PHOENIX_ENV_FILE` or `EAP_LANGFUSE_ENV_FILE` in the
-root file. In a service `.env`, those paths are relative to that file; in shell
-or launcher settings, relative tracing-file paths use `examples\rmprep`.
+Use an absolute path for `EAP_PHOENIX_ENV_FILE` in the
+root file. In a service `.env`, that path is relative to that file; in shell
+or launcher settings, a relative tracing-file path uses `examples\rmprep`.
 Library storage paths such as `EAP_MODEL_TRACE_PATH` resolve from the service folder.
 
 The summary masks credentials, sensitive JSON fields, database connection strings
