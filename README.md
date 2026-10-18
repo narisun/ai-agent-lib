@@ -31,12 +31,25 @@ Open **Command Prompt** (Windows) or a **Bash terminal** (macOS/Linux) in the re
 Use `setup-local.bat --model anthropic` or `setup-local.bat --model bedrock`,
 then configure the selected provider in the root `.env`. If that file already
 selects your model, `setup-local.bat` detects it. Phoenix tracing is optional.
+
+Or on POSIX:
+
+```bash
+./setup-local.sh --model anthropic
+```
+
 All services use the same approved Python. Agent/MCP, Agent Lab, and Phoenix keep
 separate `.venv` package folders. The launchers use the default Python and its
 pip module, rather than executables inside those folders. The generated
 `fake` model echoes questions for a basic connectivity check.
 Setup installs runtime packages. Use `setup-local.bat --dev` to also install
 the scaffolding CLI and the rmprep/Agent Lab development tools.
+
+Or on POSIX:
+
+```bash
+./setup-local.sh --dev
+```
 
 **Each testing session:**
 
