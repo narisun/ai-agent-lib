@@ -12,7 +12,7 @@ from ai_agent_lib_core import ServiceContainer
 from ai_agent_lib_core.config import MappingConfigSource
 from ai_agent_lib_core.config.phoenix import PhoenixSettings
 from ai_agent_lib_core.contracts import ConfigurationError
-from ai_agent_lib_core.integrations.langgraph import langfuse
+from ai_agent_lib_core.integrations.langgraph import phoenix
 from ai_agent_lib_core.integrations.langgraph.phoenix import PhoenixTracing
 from ai_agent_lib_core.observability.model_trace import JsonlModelTraceSink
 from ai_agent_lib_core.testing import calls_tool, load_test_config, scripted_providers
@@ -90,14 +90,10 @@ async def test_service_closes_exporter_when_container_construction_fails(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     trial = Mock()
-    monkeypatch.setenv("EAP_PHOENIX_ENABLED", "false")
-    monkeypatch.setenv("EAP_LANGFUSE_ENABLED", "true")
-    monkeypatch.setenv("EAP_LANGFUSE_ENV_FILE", "")
-    monkeypatch.setenv("LANGFUSE_BASE_URL", settings().base_url)
-    monkeypatch.setenv("LANGFUSE_PROJECT_ID", settings().project_id)
-    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", settings().public_key)
-    monkeypatch.setenv("LANGFUSE_SECRET_KEY", settings().secret_key)
-    monkeypatch.setattr(langfuse, "LangfuseTracing", Mock(return_value=trial))
+    # agent_tracing now starts Phoenix only, so the service-level close is exercised there.
+    monkeypatch.setenv("EAP_PHOENIX_ENABLED", "true")
+    monkeypatch.setenv("EAP_PHOENIX_ENV_FILE", "")
+    monkeypatch.setattr(phoenix, "PhoenixTracing", Mock(return_value=trial))
     monkeypatch.setattr(
         service, "ServiceContainer", Mock(side_effect=RuntimeError("invalid adapter"))
     )

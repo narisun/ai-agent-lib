@@ -6,7 +6,7 @@ import argparse
 import asyncio
 import dataclasses
 from collections.abc import AsyncIterator, Sequence
-from typing import Any, cast
+from typing import Any
 
 from ai_agent_lib_core import RequestContext, ServiceConfig, ServiceContainer, ValidationFailed
 from ai_agent_lib_core.adapters.audit_jsonl import JsonlAuditOptions
@@ -27,9 +27,8 @@ from ai_agent_lib_core.integrations.http import (
     build_agent_app,
     serve,
 )
+from ai_agent_lib_core.integrations.langgraph import AgentTracing
 from ai_agent_lib_core.integrations.langgraph.inspection import GraphCheckpointPreview
-from ai_agent_lib_core.integrations.langgraph.langfuse import LangfuseTracing
-from ai_agent_lib_core.integrations.langgraph.phoenix import PhoenixTracing
 from ai_agent_lib_core.integrations.langgraph.tracing import agent_tracing
 from ai_agent_lib_core.observability import (
     configure_logging,
@@ -97,7 +96,7 @@ async def build_app(
     context_builder: ContextBuilder | None = None,
     outcomes: OutcomeJournal | None = None,
     inspector: TurnInspector | None = None,
-    tracing: LangfuseTracing | PhoenixTracing | None = None,
+    tracing: AgentTracing | None = None,
 ) -> Any:
     """Build the agent's HTTP application on the shared ``AgentService`` composition.
 
@@ -160,17 +159,11 @@ async def build_app(
         build_graph=prepare_graph,
         app_kwargs={**dict(SERVICE.app_kwargs), "outcomes": outcomes, "inspector": inspector},
     )
-    # build_agent_app's tracing parameter predates Phoenix support; both backends
-    # share the same run(graph, services, context, question, respond=...) shape.
-    return await build_agent_app(
-        service, services, lifecycle, tracing=cast("LangfuseTracing | None", tracing)
-    )
+    return await build_agent_app(service, services, lifecycle, tracing=tracing)
 
 
 async def _serve(config: ServiceConfig, host: str, port: int, contexts: ContextBuilder) -> None:
-    async with agent_tracing(
-        APPLICATION, config, dotenv_path=ENV_FILE, legacy_prefix="RMPREP"
-    ) as tracing:
+    async with agent_tracing(APPLICATION, config, dotenv_path=ENV_FILE) as tracing:
         services = ServiceContainer(config, model_trace=tracing)
 
         async def start() -> None:

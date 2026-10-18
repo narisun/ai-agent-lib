@@ -2,7 +2,7 @@
 
 A service declares what is its own — the application name, how its graph is
 built, how it responds — and ``run_agent`` owns the rest: configuration,
-logging, telemetry, optional Langfuse tracing, container lifecycle, serving
+logging, telemetry, optional agent tracing (Phoenix), container lifecycle, serving
 and teardown. ``agent_app`` and ``serve`` remain available for services that
 compose by hand.
 """
@@ -39,14 +39,27 @@ from ai_agent_lib_core.observability import (
 if TYPE_CHECKING:
     # Type-only: a runtime import here would pull langgraph into the HTTP module
     # graph, which the import contracts forbid outside integrations.langgraph.
-    from ai_agent_lib_core.integrations.langgraph.langfuse import LangfuseTracing
+    from ai_agent_lib_core.integrations.langgraph import AgentTracing
 
 __all__ = ["AgentService", "build_agent_app", "read_question", "run_agent"]
 
 Respond = Callable[[Any, ServiceContainer, RequestContext, str], Awaitable[dict[str, Any]]]
+"""Answers one question with the compiled graph.
+
+It is given the graph, the service container, the caller's request context and
+the question, and returns the response body, which must be something JSON can
+hold. This is where a service decides how its graph is invoked.
+"""
+
 StreamSteps = Callable[
     [Any, ServiceContainer, RequestContext, object], AsyncIterator[dict[str, Any]]
 ]
+"""Answers one question with the compiled graph and yields each step as it happens.
+
+It is given the graph, the service container, the caller's request context and
+the raw request input (not yet read as a question), and yields one JSON-ready
+item per step, such as the update of one graph node.
+"""
 
 
 def read_question(given: object) -> str:
@@ -81,10 +94,11 @@ class AgentService:
         default_port: The port ``--port`` defaults to.
         app_kwargs: Extra keyword arguments for ``agent_app``, such as
             ``inspector``, ``diagnostics`` or ``admission``.
-        env_file: The service's own ``.env`` file. ``run_agent`` resolves
-            configuration and Langfuse settings from it; without one, both
-            fall back to their own default (the process environment and a
-            ``.env`` in the working directory).
+        env_file: The service's own ``.env`` file. ``run_agent`` reads both
+            the service configuration and the Phoenix tracing settings from
+            it, with the process environment taking precedence. Without one,
+            both read the process environment and a ``.env`` in the working
+            directory.
         outcomes: Builds the service's outcome journal from the resolved
             configuration; return None for no journal. Called once per
             serve, so the choice can depend on the deployment environment.
@@ -107,9 +121,24 @@ async def build_agent_app(
     services: ServiceContainer,
     lifecycle: ServiceLifecycle,
     *,
-    tracing: LangfuseTracing | None = None,
+    tracing: AgentTracing | None = None,
 ) -> Any:
-    """Build the agent's HTTP application; the graph is prepared before readiness."""
+    """Build the agent's HTTP application; the graph is prepared before readiness.
+
+    Args:
+        service: What the agent is: its name, graph builder and responders.
+        services: The service container the graph and its governed calls use.
+        lifecycle: Readiness bookkeeping; the graph is built by a hook that
+            runs after the container is validated and before the service
+            reports ready.
+        tracing: The running tracing adapter, or None for no agent tracing.
+            When given, each request runs under it. The caller owns the
+            adapter and closes it (``agent_tracing`` does so when its context
+            exits); this function never does.
+
+    Returns:
+        The ASGI application.
+    """
     graph: Any = None
 
     async def prepare() -> None:
@@ -162,11 +191,11 @@ def _with_outcomes(service: AgentService, config: ServiceConfig) -> AgentService
 
 
 async def _serve(service: AgentService, config: ServiceConfig, host: str, port: int) -> None:
-    from ai_agent_lib_core.integrations.langgraph.langfuse import langfuse_tracing
+    from ai_agent_lib_core.integrations.langgraph.tracing import agent_tracing
 
     service = _with_outcomes(service, config)
     dotenv_path = service.env_file if service.env_file is not None else Path(".env")
-    async with langfuse_tracing(service.application, config, dotenv_path=dotenv_path) as tracing:
+    async with agent_tracing(service.application, config, dotenv_path=dotenv_path) as tracing:
         services = ServiceContainer(config, model_trace=tracing)
 
         async def start() -> None:

@@ -1,5 +1,6 @@
 """LangGraph bindings. The only package in core that imports ``langgraph``."""
 
+from ai_agent_lib_core.integrations.langgraph._agent_tracing import AgentTracing
 from ai_agent_lib_core.integrations.langgraph.bindings import LangGraphBindings
 from ai_agent_lib_core.integrations.langgraph.bridge import LoopBridge
 from ai_agent_lib_core.integrations.langgraph.checkpoint import (
@@ -21,6 +22,7 @@ from ai_agent_lib_core.integrations.langgraph.tools import GovernedTool, govern_
 
 __all__ = [
     "THREAD_NAMESPACE",
+    "AgentTracing",
     "GovernedChatModel",
     "GovernedTool",
     "InMemoryCheckpointBackend",

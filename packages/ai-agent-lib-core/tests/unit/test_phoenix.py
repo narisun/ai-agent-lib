@@ -114,19 +114,28 @@ def test_planned_child_environment_uses_the_same_file_layers_without_mutation(
         load_phoenix_settings(source=environment, environment=environment)
 
 
-async def test_backend_selection_rejects_two_enabled_destinations(
-    monkeypatch: pytest.MonkeyPatch,
+async def test_agent_tracing_yields_nothing_until_phoenix_is_enabled(tmp_path: Path) -> None:
+    async with agent_tracing("test", ServiceConfig.for_testing(), dotenv_path=None) as tracing:
+        assert tracing is None
+    service = tmp_path / ".env"
+    service.write_text("PHOENIX_PROJECT_NAME=from-file\n")
+    async with agent_tracing("test", ServiceConfig.for_testing(), dotenv_path=service) as tracing:
+        assert tracing is None
+
+
+async def test_agent_tracing_starts_phoenix_from_the_service_file_or_given_settings(
+    tmp_path: Path,
 ) -> None:
-    monkeypatch.setenv("EAP_PHOENIX_ENABLED", "true")
-    monkeypatch.setenv("EAP_LANGFUSE_ENABLED", "true")
-    monkeypatch.setenv("LANGFUSE_BASE_URL", "http://localhost:3000")
-    monkeypatch.setenv("LANGFUSE_PROJECT_ID", "trial")
-    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk")
-    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk")
-    with pytest.raises(ConfigurationError, match="Enable one"):
-        async with agent_tracing("test", ServiceConfig.for_testing(), dotenv_path=None):
-            pytest.fail("Conflicting destinations must not run a request")
-    assert load_phoenix_settings(source=MappingConfigSource({})) is None
+    service = tmp_path / ".env"
+    service.write_text("EAP_PHOENIX_ENABLED=true\nPHOENIX_PROJECT_NAME=from-file\n")
+    config = ServiceConfig.for_testing()
+    async with agent_tracing("test", config, dotenv_path=service) as tracing:
+        assert isinstance(tracing, PhoenixTracing)
+        assert tracing.settings.project_name == "from-file"
+    given = PhoenixSettings(project_name="given")
+    async with agent_tracing("test", config, dotenv_path=service, settings=given) as tracing:
+        assert isinstance(tracing, PhoenixTracing)
+        assert tracing.settings == given
 
 
 class State(TypedDict):
