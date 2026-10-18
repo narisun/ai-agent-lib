@@ -7,7 +7,8 @@ service moves from a local adapter to an AWS one by changing configuration,
 never code.
 
 From the repository root in **Command Prompt**, use your enterprise-approved
-Python and its pip to install the checkout:
+Python and its pip to install the checkout. On macOS/Linux, use a bash or zsh
+terminal and `python3` in place of `python`:
 
 ```bat
 python -m pip install -e packages/ai-agent-lib-aws

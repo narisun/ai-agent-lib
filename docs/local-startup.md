@@ -222,13 +222,12 @@ Chat presents readable answers without long source references beside every
 figure. The original answer and memo documents retain their references for review.
 MCP service logs include the query, parameters and record statistics.
 
-rmprep defaults to 1,000 words for memos and 350 for Q&A. Ask `Keep it within
-450 words.` to change a limit. Heading text, figures and full citations count;
-Markdown heading/list markers and divider-only lines do not; code is counted
-literally. The agent preserves
-accepted text and checks exact references and known evidence-limit errors.
-A failing draft can be revised twice; rejected drafts remain in traces rather
-than accepted conversation history. See [context management](../examples/rmprep/docs/context-management.md).
+Ask `Keep it within 450 words.` to change an answer's length limit. The agent
+checks length and exact source references before it saves an answer. A failing
+draft can be revised twice; rejected drafts remain in traces rather than
+accepted conversation history. The [rmprep README](../examples/rmprep/README.md#3-generate-a-memo-with-your-configured-model)
+lists the default limits, how words are counted and every check; see also
+[context management](../examples/rmprep/docs/context-management.md).
 
 ## 4. Stop and restart
 

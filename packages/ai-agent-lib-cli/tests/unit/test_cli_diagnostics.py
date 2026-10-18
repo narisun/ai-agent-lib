@@ -618,6 +618,26 @@ def test_update_plan_flag_previews_and_exits_clean(
     assert after == before  # nothing was written
 
 
+def test_the_diff_hint_in_plan_mode_names_the_command_that_writes_nothing(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    tools = workspace / "agents/hello-agent/src/hello_agent/tools.py"
+    original = tools.read_text(encoding="utf-8")
+    tools.write_text(original.replace("Hello, ", "Good day, "), encoding="utf-8")
+    capsys.readouterr()
+
+    assert run("update", "--plan", "--workspace", workspace) == 0
+    out = capsys.readouterr().out
+    assert "agentlib update --plan --diff" in out
+    # Plain `update --diff` writes; the dry-run hint must not send people to it.
+    assert "agentlib update --diff" not in out
+    assert "Good day" in tools.read_text(encoding="utf-8")
+
+    # Once --diff is given there is nothing left to suggest.
+    assert run("update", "--plan", "--diff", "--workspace", workspace) == 0
+    assert "See what the templates would change" not in capsys.readouterr().out
+
+
 def test_a_lock_file_that_cannot_be_read_stops_the_command(
     workspace: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
