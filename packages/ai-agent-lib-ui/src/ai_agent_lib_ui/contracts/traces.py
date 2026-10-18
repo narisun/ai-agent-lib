@@ -37,11 +37,6 @@ class TraceLink(DiagnosticValue):
             raise ValueError("invalid private trace link")
         return self
 
-    @property
-    def label(self) -> str:
-        """Name the tracing backend that served this link."""
-        return "Phoenix"
-
 
 def tolerant_trace(payload: object) -> TraceLink | None:
     """A trace link that no longer validates degrades to None; the answer never fails for it.

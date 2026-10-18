@@ -68,7 +68,7 @@ def test_optional_trace_links_are_correlated_with_accepted_envelope(url: str) ->
         URL + "#x",
         URL + ")[bad](https://evil.example)",
         URL.replace(TRACE_ID, "0" * 32),
-        "https://example.com\n/project/trial/traces/" + TRACE_ID,
+        "https://example.com\n/redirects/traces/" + TRACE_ID,
         URL.replace("traces.example", "traces.example:70000"),
         "\x00" + URL,
     ],
@@ -100,7 +100,6 @@ def test_phoenix_trace_link_is_correlated_and_named(host: str) -> None:
     answer = QuestionAnswerAdapter(manifest()).response(VIEW, TURN, json.dumps(value).encode())
     assert answer.trace is not None
     assert answer.trace.url == url
-    assert answer.trace.label == "Phoenix"
     assert answer.trace.model_dump()["provider"] == "phoenix"
 
 
