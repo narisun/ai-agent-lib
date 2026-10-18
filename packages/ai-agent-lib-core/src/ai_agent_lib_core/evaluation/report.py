@@ -12,7 +12,10 @@ from ai_agent_lib_core.contracts import ValidationFailed
 from ai_agent_lib_core.evaluation.cases import EvalCase
 from ai_agent_lib_core.evaluation.scorers import Score
 
-__all__ = ["CaseResult", "EvalReport"]
+__all__ = ["REPORT_SCHEMA", "CaseResult", "EvalReport"]
+
+REPORT_SCHEMA = "agentlib.eval-report/v1"
+"""The identity of the JSON a report writes; load_report checks it."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,10 +42,13 @@ class EvalReport:
     Attributes:
         results: One per case, in the order of the cases.
         metrics: The names of the scorers, in order.
+        metadata: Where the run came from — model, dataset digest, application —
+            for comparing runs.
     """
 
     results: tuple[CaseResult, ...]
     metrics: tuple[str, ...] = field(default=())
+    metadata: Mapping[str, str] = field(default_factory=dict)
 
     @property
     def means(self) -> dict[str, float]:
@@ -57,7 +63,7 @@ class EvalReport:
     def by_tag(self, tag: str) -> dict[str, float]:
         """The mean score of each metric over the cases with ``tag``."""
         chosen = [r for r in self.results if tag in r.case.tags]
-        return EvalReport(tuple(chosen), self.metrics).means
+        return EvalReport(tuple(chosen), self.metrics, self.metadata).means
 
     @property
     def failed_cases(self) -> list[CaseResult]:
@@ -124,6 +130,8 @@ class EvalReport:
         """The report as JSON, to keep with the commit that produced it."""
         return json.dumps(
             {
+                "schema": REPORT_SCHEMA,
+                "metadata": dict(self.metadata),
                 "cases": len(self.results),
                 "means": self.means,
                 "results": [

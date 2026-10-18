@@ -17,11 +17,12 @@ runs on the request path, and the request path never imports it.
 """
 
 from ai_agent_lib_core.evaluation.cases import EvalCase, load_cases
-from ai_agent_lib_core.evaluation.report import CaseResult, EvalReport
+from ai_agent_lib_core.evaluation.report import REPORT_SCHEMA, CaseResult, EvalReport
 from ai_agent_lib_core.evaluation.run import run_eval
 from ai_agent_lib_core.evaluation.scorers import Score, Scorer, Verdict, exact, judged, scored_by
 
 __all__ = [
+    "REPORT_SCHEMA",
     "CaseResult",
     "EvalCase",
     "EvalReport",

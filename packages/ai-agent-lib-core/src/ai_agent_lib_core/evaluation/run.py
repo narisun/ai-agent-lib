@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any
 
 from ai_agent_lib_core.evaluation.cases import EvalCase
@@ -20,6 +20,7 @@ async def run_eval(
     scorers: Sequence[Scorer],
     *,
     concurrency: int = 4,
+    metadata: Mapping[str, str] | None = None,
 ) -> EvalReport:
     """Run ``task`` on every case, at most ``concurrency`` at a time, and score each output.
 
@@ -31,6 +32,7 @@ async def run_eval(
         cases: The dataset.
         scorers: How each output is judged. Their names are the report's metrics.
         concurrency: How many cases run at once.
+        metadata: Where the run came from, kept on the report for comparison.
     """
     names = _metrics(scorers)
     if len(set(names)) != len(names):
@@ -51,4 +53,4 @@ async def run_eval(
             return CaseResult(case, scores, None, seconds)
 
     results = await asyncio.gather(*(one(case) for case in cases))
-    return EvalReport(tuple(results), names)
+    return EvalReport(tuple(results), names, dict(metadata or {}))
