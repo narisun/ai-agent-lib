@@ -95,6 +95,8 @@ def evals(tools: Toolbox, service: str | None, accept: bool, workspace: Path | N
     arguments = ("-m", "eval", "-q", "-rs", target.relative_to(root).as_posix() if service else ".")
     click.echo(f"== evals: python -m pytest {' '.join(arguments)}")
     accept_marker = target / ".agentlib" / "eval-accept.flag"
+    # A marker left by a killed --accept run must not skip later regression gates.
+    accept_marker.unlink(missing_ok=True)
     if accept:
         accept_marker.parent.mkdir(parents=True, exist_ok=True)
         accept_marker.touch()
