@@ -7,8 +7,8 @@ Choose the walkthrough for your task:
 | Test rmprep in Agent Lab with Anthropic and Phoenix | [Local startup and testing](local-startup.md): setup, root `.env`, login, memo/follow-ups, traces, and stop/restart. |
 | Build your own agent and tools | Continue below to create the `tutorial` workspace. |
 
-The batch scripts run the checked-in rmprep example. This tutorial uses the
-generated agent's service `.env` and Python commands. Use the
+The launchers (`.bat` on Windows, `.sh` on macOS/Linux) run the checked-in rmprep
+example. This tutorial uses the generated agent's service `.env` and Python commands. Use the
 [documentation map](README.md) for configuration and contributor references.
 
 Build an agent named `helper`, add a tool, and test its behavior and
@@ -603,34 +603,83 @@ The model can now choose tools. Its exact wording may vary. The generated
 configuration tests read `.env.example` and use scripted replies to keep
 the test suite repeatable.
 
-An **evaluation** checks real-model response quality against example
-questions. Review `agents/helper/evals/cases.jsonl` and
-`agents/helper/tests/test_helper_eval.py`, then run explicitly:
+### Evaluate the agent
 
-```bat
-"%PYTHON%" -m ai_agent_lib_cli eval helper
-```
+An **evaluation** (eval) asks a real model your example questions and scores
+its answers, so a prompt or model change is judged by numbers rather than one
+transcript. The generated agent has both halves.
+`agents/helper/evals/cases.jsonl` holds three questions, each with a name a good
+answer must mention. `agents/helper/tests/test_helper_eval.py` asks them, scores
+each answer 1 or 0 for mentioning that name, and requires a mean of at least 0.8,
+which with three cases means every case must pass. Read both, then follow the loop:
 
-These tests are excluded from the default run. With a fake model, the
-generated evaluation skips. With a real model, it uses network access and
-can incur charges. Inspect individual failures as well as the overall score.
+1. **Run the eval.** This command runs only the tests marked `eval`:
+
+   ```bat
+   "%PYTHON%" -m ai_agent_lib_cli eval helper
+   ```
+
+   These tests are excluded from `pytest` and `check`, so an ordinary run never
+   calls a model. With a fake model the eval skips and says why. With a real
+   model it uses network access and can incur charges. The generated eval builds
+   the agent without its linked MCP servers' tools, so those servers need not be
+   running.
+
+2. **Read the report.** Each run writes
+   `agents/helper/.agentlib/eval-report.json`: the model and a digest of the
+   dataset, the mean for each metric, and every case's score. Git ignores that
+   folder, so the report is working state. pytest prints the score summary only
+   when the run fails, so open the file to inspect individual cases as well as
+   the overall mean.
+
+3. **Accept a baseline.** When the scores are ones you want to protect, run the
+   eval again with `--accept`:
+
+   ```bat
+   "%PYTHON%" -m ai_agent_lib_cli eval helper --accept
+   ```
+
+   If the run passes, the CLI copies its report to
+   `agents/helper/evals/baseline.json`. Commit that file with `cases.jsonl`:
+   both hold synthetic test cases and aggregate scores, not conversation content.
+
+4. **Let the baseline guard you.** Once `baseline.json` exists, every run also
+   compares itself with it. The run fails when any metric's mean falls more than
+   0.05 below its baseline, even if the score still clears 0.8. The failure names
+   each regressed metric, both means, and the IDs of the cases whose own score
+   dropped; read those cases first. The comparison uses means, so accept a new
+   baseline after you add or edit cases on purpose.
+
+5. **Move the bar on purpose.** When a drop is intended, such as a new model or a
+   rewritten prompt, run `eval helper --accept` again. For that run it skips only
+   the regression comparison. The 0.8 bar still applies, so the run must pass
+   before its report replaces the baseline.
+
+For scorers that ask a model to judge an answer, a way to check a judge against
+human grades, and the same gates over real conversations captured in Agent Lab,
+read [Measure an agent with evals](evals.md).
 
 ## 9. Keep generated files up to date
 
-After upgrading the library, start from a committed or backed-up workspace
-and run:
+After upgrading the library, start from a committed or backed-up workspace.
+Preview the update, then apply it:
 
 ```bat
+"%PYTHON%" -m ai_agent_lib_cli update --plan
 "%PYTHON%" -m ai_agent_lib_cli update --diff
 "%PYTHON%" -m ai_agent_lib_cli install
 "%PYTHON%" -m ai_agent_lib_cli check
 ```
 
+**`update --plan` is the dry run.** It lists every file the update would replace
+or create, and every file it would leave alone because you edited it, and it
+writes nothing. Add `--diff` (`update --plan --diff`) to also see how each edited
+file differs from what the templates now generate.
+
 **`update --diff` applies changes** to unmodified generated files. It preserves
 files you edited and prints their proposed template changes for you to merge.
 Review the resulting diff before committing. Keep `agentlib.lock`: its hashes
-distinguish generated files from
-files you have changed.
+distinguish generated files from files you have changed.
 
 ## 10. Optional: prepare a deployment
 
@@ -688,7 +737,7 @@ New agents include runnable examples. From the workspace root, use
 The [annotated verified run](verified-anthropic-run.md) includes captured JSON
 and explains the tool result and checkpoint messages that became model input.
 
-Use the developer guide's Q&A for these tasks:
+Use these guides for common tasks:
 
 | You want to… | Recipe |
 | --- | --- |
@@ -697,6 +746,7 @@ Use the developer guide's Q&A for these tasks:
 | Follow a real two-question conversation | [Inspect the verified Anthropic run](developer-guide.html#verified-anthropic) |
 | Continue or start a conversation | [Use scoped checkpoint threads](developer-guide.html#checkpoint-questions) |
 | Investigate missing context, repeated tool calls, or an empty trace | [Common questions](developer-guide.html#faq) |
+| Set an eval baseline, judge answers with a model, or score real conversations | [Measure an agent with evals](evals.md) |
 
 ## When something goes wrong
 
@@ -722,8 +772,9 @@ reporting a bug, and remove credentials and sensitive data from reports.
 | Concepts, architecture, testing, and reference tables | [Developer guide](developer-guide.html) |
 | All CLI commands and flags | [CLI reference](developer-guide.html#cli) |
 | Repository layout and contributing | [README](../README.md) |
-| Test rmprep in Agent Lab with its MCP server, using Command Prompt batch files | [Local startup scenarios](local-startup.md) |
+| Test rmprep in Agent Lab with its MCP server, using the `.bat` or `.sh` launchers | [Local startup scenarios](local-startup.md) |
 | Environment variables | [Configuration reference](variables.md) |
 | User identity and service delegation | [Identity guide](identity.md) |
+| Eval baselines, model judges, and scoring real conversations | [Measure an agent with evals](evals.md) |
 | AWS adapters and dependencies | [AWS package](../packages/ai-agent-lib-aws/README.md) |
 | Supported behavior and operational limits | [Release scope](release-scope.md) |
