@@ -99,12 +99,14 @@ def _documents() -> list[Path]:
         "examples/**/.env.example",
     )
     found = {path for pattern in patterns for path in REPO_ROOT.glob(pattern)}
-    # The target specification, the design and plan process records, and the ADRs
-    # quote proposed or removed variable patterns as they were when written;
-    # current release docs and templates must use the implemented vocabulary.
-    # See docs/release-scope.md. The two Langfuse guides describe the integration
-    # this change removed and are deleted with the documentation wave.
-    records = (Path("docs/design"), Path("docs/adr"))
+    # Dated records quoting removed variables; ADR 0004 keeps its historical Context.
+    records = {
+        REPO_ROOT / "docs/adr/0004-tracing-configuration.md",
+        REPO_ROOT / "docs/design/code-structure-review-2026-10-13.md",
+        REPO_ROOT / "docs/design/enterprise-architecture-review-2026-10-18.md",
+    }
+    # The two Langfuse guides describe the integration this change removed and are
+    # deleted with the documentation wave.
     retired = {REPO_ROOT / "docs/langfuse.md", REPO_ROOT / "docs/langfuse-trial.md"}
     return sorted(
         path
@@ -112,7 +114,7 @@ def _documents() -> list[Path]:
         if ".venv" not in path.parts
         and path != REPO_ROOT / "docs/Specification.md"
         and "superpowers" not in path.parts
-        and not any(path.is_relative_to(REPO_ROOT / record) for record in records)
+        and path not in records
         and path not in retired
     )
 
