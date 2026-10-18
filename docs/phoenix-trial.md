@@ -465,7 +465,7 @@ agents keep their own model dependencies and can still send traces to Phoenix.
 | Repeated connection errors on port 4318 | Set `EAP_TELEMETRY=off` for this local setup, or configure your separate operational collector. Restart the stack. |
 | Startup says tracing needs `ai-agent-lib-core[otel]` | Install the extra with pip, as shown in [Compose tracing by hand](#compose-tracing-by-hand), then restart. |
 | Startup rejects `PHOENIX_COLLECTOR_ENDPOINT` | Use an HTTPS origin, or HTTP for loopback only, with no path, query, or credentials. |
-| Startup fails with `unknown configuration variable` naming a Langfuse setting | Langfuse support was removed. Delete those lines from the `.env`; see [Since the October review](release-scope.md#since-the-october-review). |
+| Startup fails with `unknown configuration variable` naming a Langfuse setting | Langfuse support was removed. Delete those lines from the `.env`, or unset the variables in the process environment; see [Since the October review](release-scope.md#since-the-october-review). |
 | No trace link | Check `EAP_PHOENIX_ENABLED` in the agent startup output and restart after changing settings. |
 | Link opens before a trace appears | Allow a few seconds, then reload. Check the agent log for exporter connection errors. |
 | Inputs and outputs are missing | Set `EAP_PHOENIX_CAPTURE_CONTENT=true` for approved test data, restart the agent, and send a new question. |

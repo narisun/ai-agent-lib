@@ -339,6 +339,7 @@ async def test_app_extras_receive_the_container_and_the_prepared_graph() -> None
     assert len(calls) == 1  # composed once, with the live container
     services, prepared = calls[0]
     assert services is running.services
+    assert prepared() is None  # nothing is prepared until readiness passes
 
     reply = await _invoke(running)
 

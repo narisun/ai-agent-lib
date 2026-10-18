@@ -1881,7 +1881,9 @@ async def classify(
     followed by OpenTelemetry, Python/pip setup and rmprep context settings used in
     this guide. <strong>Local</strong> is the zero-config default on any machine:
     with nothing set, every provider is local (files, SQLite and in-process engines)
-    and no cloud infrastructure is needed. <strong>AWS</strong> is a per-variable opt-in:
+    and no cloud infrastructure is needed (the model's local default is
+    <code>anthropic</code>, a hosted API; use <code>EAP_MODEL_PROVIDER=fake</code>
+    to stay fully offline). <strong>AWS</strong> is a per-variable opt-in:
     <code>EAP_PROFILE=aws</code> switches every section, and a single
     <code>EAP_&lt;SECTION&gt;_PROVIDER</code> moves just that section. The
     <a href="#profiles">profile defaults</a> list what each side selects, and the

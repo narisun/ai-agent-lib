@@ -47,5 +47,5 @@ def tolerant_trace(payload: object) -> TraceLink | None:
     """
     try:
         return TraceLink.model_validate(payload)
-    except ValueError:  # pydantic's ValidationError, and a malformed URL port.
+    except ValueError:  # pydantic wraps validator errors, so ValidationError is the only escape.
         return None

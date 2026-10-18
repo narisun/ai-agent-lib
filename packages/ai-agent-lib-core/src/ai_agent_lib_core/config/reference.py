@@ -35,9 +35,11 @@ _HEADER = "<!-- Generated from the binding table. Do not edit by hand. -->"
 _SECRET_PATTERN = f"{SECRET_VARIABLE_PREFIX}<NAME>"
 _LOCAL_FIRST = (
     "With nothing set, every provider is local: files, SQLite and in-process engines, with no "
-    "cloud infrastructure. `EAP_PROFILE=aws` switches every section to its AWS provider, and any "
-    "single `EAP_<SECTION>_PROVIDER` opts one section in. A few local adapters are local only: the "
-    "one-way guard (`EAP_DEPLOYMENT_ENV`) refuses them anywhere but local development."
+    "cloud infrastructure (the model's local default is `anthropic`, a hosted API; use "
+    "`EAP_MODEL_PROVIDER=fake` to stay fully offline). `EAP_PROFILE=aws` switches every section "
+    "to its AWS provider, and any single `EAP_<SECTION>_PROVIDER` opts one section in. A few "
+    "local adapters are local only: the one-way guard (`EAP_DEPLOYMENT_ENV`) refuses them "
+    "anywhere but local development."
 )
 _PROFILE_TABLE_INTRO = (
     "What each profile selects when nothing else is set. `EAP_MODEL_PROVIDER` and each "

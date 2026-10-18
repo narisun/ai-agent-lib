@@ -51,14 +51,20 @@ These changes landed afterward; each is documented where it is used and covered 
 
 **Migrating from Langfuse.**
 
-- A service `.env` that still sets a Langfuse variable with the `EAP_` prefix
-  (its enable, content-capture, or env-file setting) fails startup with
-  `unknown configuration variable`. Delete those lines.
+- A service that still sets a Langfuse variable with the `EAP_` prefix (its
+  enable, content-capture, or env-file setting), in its `.env` or its process
+  environment, fails startup with `unknown configuration variable`. Delete the
+  lines, or unset the variables.
 - Bare `LANGFUSE_*` and `RMPREP_LANGFUSE_*` names are inert: nothing reads them.
   Delete them too.
 - `run_agent` now honors `EAP_PHOENIX_ENABLED`, so a generated service traces with
   no code. `EAP_PHOENIX_CAPTURE_CONTENT` defaults to `false`, so content stays out
-  of traces unless you opt in. See [Trace agents with Phoenix](phoenix-trial.md).
+  of traces unless you opt in. Before this release, generated agents and
+  accounts-agent ignored `EAP_PHOENIX_ENABLED`; only rmprep honored it. If
+  `EAP_PHOENIX_ENABLED=true` is already set in a service's environment (exported
+  in a shell profile, or shared with the rmprep trial setup), that service starts
+  exporting traces on upgrade with no `.env` change. Unset it where tracing is not
+  wanted. See [Trace agents with Phoenix](phoenix-trial.md).
 - Agent Lab conversations saved with a Langfuse trace link still open. The link is
   dropped and the answer and metrics are kept (UI `test_trace_links.py`).
 
