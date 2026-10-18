@@ -65,6 +65,7 @@ name = "the UI application layer is framework-free"
 type = "forbidden"
 source_modules = ["ai_agent_lib_ui.application"]
 forbidden_modules = [
+    "ai_agent_lib_ui.adapters",
     "ai_agent_lib_ui.integrations",
     "chainlit",
     "fastapi",
