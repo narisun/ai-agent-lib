@@ -32,7 +32,7 @@ Start with the [repository README](../../README.md) or
 variables, adapter options, commands, and public modules. The
 [code map](../../docs/README.md#find-the-code) identifies where changes belong.
 
-The [Langfuse integration](../../docs/langfuse.md) supplies shared model/tool
+The [Phoenix integration](../../docs/phoenix-trial.md) supplies shared model/tool
 tracing, usage and checkpoint references. Generated HTTP agents already include
 it; configure a project to enable export to a separate backend.
 

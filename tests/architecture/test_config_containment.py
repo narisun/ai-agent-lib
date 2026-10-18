@@ -99,15 +99,12 @@ def _documents() -> list[Path]:
         "examples/**/.env.example",
     )
     found = {path for pattern in patterns for path in REPO_ROOT.glob(pattern)}
-    # Dated records quoting removed variables; ADR 0004 keeps its historical Context.
+    # Dated records quoting removed variables; ADR 0004 keeps its history and its removal amendment.
     records = {
         REPO_ROOT / "docs/adr/0004-tracing-configuration.md",
         REPO_ROOT / "docs/design/code-structure-review-2026-10-13.md",
         REPO_ROOT / "docs/design/enterprise-architecture-review-2026-10-18.md",
     }
-    # The two Langfuse guides describe the integration this change removed and are
-    # deleted with the documentation wave.
-    retired = {REPO_ROOT / "docs/langfuse.md", REPO_ROOT / "docs/langfuse-trial.md"}
     return sorted(
         path
         for path in found
@@ -115,7 +112,6 @@ def _documents() -> list[Path]:
         and path != REPO_ROOT / "docs/Specification.md"
         and "superpowers" not in path.parts
         and path not in records
-        and path not in retired
     )
 
 
