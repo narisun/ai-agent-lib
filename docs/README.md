@@ -13,6 +13,7 @@ Python, and pip with your team's approved package source.
 | Inspect model context and tool use | [Tracing and ReAct walkthrough](developer-guide.html#model-debugging) | Read model input/output and checkpoint history |
 | Export traces to Langfuse | [Shared integration](langfuse.md) | Configure one separately hosted backend for generated or existing agents |
 | Inspect traces on a restricted desktop | [Local Phoenix trial](phoenix-trial.md) | Run Phoenix with the same Python, isolated packages, and SQLite and follow Agent Lab's trace links |
+| Measure an agent offline and online | [Evals guide](evals.md) | Run generated evals, accept a baseline, capture feedback, and score sampled production answers |
 | Understand the business example | [rmprep](../examples/rmprep/README.md) and [context management](../examples/rmprep/docs/context-management.md) | Follow client selection, memo generation, and same-thread questions |
 | Change the library | [Contributor setup](../README.md#working-on-the-library) | Install development dependencies and run the appropriate checks |
 
