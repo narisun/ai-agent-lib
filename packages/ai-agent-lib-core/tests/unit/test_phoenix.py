@@ -507,7 +507,7 @@ async def test_independent_agent_records_tools_usage_context_and_preserves_callb
 async def test_concurrent_agents_and_cancelled_attempts_do_not_leak_context() -> None:
     exports = [InMemorySpanExporter(), InMemorySpanExporter()]
     tracers = [
-        PhoenixTracing(PhoenixSettings(), application=app, exporter=export)
+        PhoenixTracing(PhoenixSettings(capture_content=True), application=app, exporter=export)
         for app, export in zip(("alpha", "beta"), exports, strict=True)
     ]
 
@@ -590,7 +590,7 @@ async def test_checkpoint_diagnostics_are_bounded_and_preserve_cancellation(mode
     entered, closed = asyncio.Event(), asyncio.Event()
     exporter = InMemorySpanExporter()
     tracing = PhoenixTracing(
-        PhoenixSettings(),
+        PhoenixSettings(capture_content=True),
         application="test",
         exporter=exporter,
         checkpoint_timeout_seconds=0.03 if mode != "cancelled" else 10,
