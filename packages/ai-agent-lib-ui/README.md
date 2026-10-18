@@ -295,7 +295,7 @@ agent logs to fix the artifact before requesting another memo.
 
 ## Live responses and metrics
 
-Restart the agent and UI after updating this checkout. The batch launcher and new
+Restart the agent and UI after updating this checkout. The launcher and new
 CLI-generated agents enable live responses automatically. For an existing agent,
 add `live_updates=True` to its `agent_app(...)` call in `service.py`.
 

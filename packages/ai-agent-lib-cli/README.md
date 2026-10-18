@@ -5,7 +5,7 @@ configuration, and tests. Install and run generated services using Python and pi
 
 For your first project, follow the [getting-started tutorial](../../docs/getting-started.md).
 To test the included rmprep agent in Agent Lab, use the repository's
-[batch startup guide](../../docs/local-startup.md). The commands below create
+[startup guide](../../docs/local-startup.md). The commands below create
 your own workspace.
 
 ## Create a workspace

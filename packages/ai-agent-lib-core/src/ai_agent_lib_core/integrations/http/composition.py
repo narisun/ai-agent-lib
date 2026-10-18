@@ -99,9 +99,12 @@ class AgentService:
             container and a zero-argument getter for the prepared graph (the
             same object ``respond`` receives). ``build_agent_app`` calls it
             once, while building the app, and merges the mapping it returns
-            over ``app_kwargs``, so on a shared key the extras win. The getter
-            returns the graph only once readiness has passed, which every
-            request implies; call it per request, never while composing.
+            over ``app_kwargs``, so on a shared key the extras win (that
+            includes ``outcomes``: extras also override a journal supplied by
+            the ``outcomes`` factory below). The getter returns the graph only
+            once readiness has passed, which every invoke request implies; the
+            inspection routes may see None. Call it per request, never while
+            composing.
         env_file: The service's own ``.env`` file. ``run_agent`` reads both
             the service configuration and the Phoenix tracing settings from
             it, with the process environment taking precedence. Without one,
@@ -142,15 +145,17 @@ async def build_agent_app(
             runs after the container is validated and before the service
             reports ready.
         tracing: The running tracing adapter, or None for no agent tracing.
-            When given, each request runs under it. The caller owns the
-            adapter and closes it (``agent_tracing`` does so when its context
-            exits); this function never does.
+            When given, each ``/invoke`` request runs under it. The caller
+            owns the adapter and closes it (``agent_tracing`` does so when its
+            context exits); this function never does.
 
     Returns:
         The ASGI application. ``service.app_extras``, when set, has been called
         with ``services`` and a getter for the prepared graph; the getter
         returns the graph once ``lifecycle`` has passed readiness, which every
-        request implies. What it returns overrides ``service.app_kwargs``.
+        invoke request implies (the inspection routes may see None). What it
+        returns overrides ``service.app_kwargs``, including a journal supplied
+        by ``service.outcomes``.
     """
     graph: Any = None
 

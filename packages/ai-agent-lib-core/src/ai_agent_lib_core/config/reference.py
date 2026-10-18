@@ -148,7 +148,7 @@ def render_reference(bindings: Sequence[Binding] = DEFAULT_BINDINGS) -> str:
             "## Optional Phoenix integration",
             "",
             "These settings are resolved by `load_phoenix_settings` separately from "
-            "`ServiceConfig`. See the [local Phoenix trial](phoenix-trial.md) for "
+            "`ServiceConfig`. See [Trace agents with Phoenix](phoenix-trial.md) for "
             "purposes, defaults, precedence and the separate SQLite server setup.",
             "",
             *[f"- `{name}`" for name in PHOENIX_VARIABLES],

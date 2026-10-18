@@ -1,8 +1,12 @@
 """Scoring what production already answered: records, sampling and the runner.
 
-Capture is on the request path and append-only; scoring is here, in a separate
-process, with the same scorers offline evals use. The task given to
-:func:`run_eval` only returns the recorded answer — the scorers, typically
+Interactions are exported from what production already saved: the UI package's
+``export_interactions`` joins its conversation store with the feedback log and
+writes interaction files. This module loads those files, draws a sample and
+scores it, in a separate process and with the same scorers offline evals use.
+The append-only artifacts written on the request path are the UI store and the
+feedback log, not the interaction files here. The task given to
+:func:`run_eval` only returns the recorded answer; the scorers, typically
 :func:`~ai_agent_lib_core.evaluation.judged`, do any model calls.
 """
 

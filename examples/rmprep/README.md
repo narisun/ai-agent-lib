@@ -42,7 +42,7 @@ selecting it in the panel changes only the viewer.
 
 The remaining steps cover manual setup and command-line walkthroughs. Manual
 agent commands read `agents/rmprep/.env`; they do not automatically load the
-root `.env` used by the batch launcher.
+root `.env` used by the launcher.
 
 Open **Command Prompt** in the library repository. Use Python 3.11 or newer and
 your team's existing pip configuration, including its enterprise package index.

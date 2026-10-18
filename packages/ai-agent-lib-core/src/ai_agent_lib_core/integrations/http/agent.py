@@ -339,6 +339,14 @@ class _Invoke:
         )
 
     async def _recorded_answer(self, context: RequestContext, given: object) -> Response:
+        """Answer an admitted request, then add what the caller and the journal need.
+
+        The reply gets its thread and request IDs and its elapsed time, plus
+        usage when it was tracked and a trace link on an error. A confirmed
+        outcome is saved to the journal before the reply is returned. A
+        streaming reply is returned untouched: it has no envelope to extend,
+        and its final answer is never saved.
+        """
         started = time.perf_counter()
         with capture_trace(context) as trace:
             response = await self._answer(context, given)
@@ -352,16 +360,12 @@ class _Invoke:
         if live is not None:
             body.update(usage=live.usage().model_dump(), model_calls=live.model_calls)
         body["elapsed_ms"] = (time.perf_counter() - started) * 1000
+        # Save what is confirmed: an accepted answer, or a refusal of this request. A
+        # refused sign-in is not listed because it is answered, in ``_respond``, before
+        # the journal is touched; internal and unavailable failures stay unsaved.
         if self._outcomes is not None and (
             response.status_code == 200
-            or body.get("error")
-            in {
-                "invalid",
-                "denied",
-                "unauthorized",
-                "budget_exceeded",
-                "paused",
-            }
+            or body.get("error") in {"invalid", "denied", "budget_exceeded", "paused"}
         ):
             await self._outcomes.finish(context, body)
         _LOG.info(
@@ -593,6 +597,11 @@ def agent_app(
     reported by a code, never by the error's own text. ``GET /healthz`` and
     ``GET /readyz`` need no token.
 
+    A caller may send an ``x-request-id`` header of letters, digits and
+    ``._:-`` (at most 128 characters); anything else is ignored and a new ID
+    is made. Answers and run failures return the ID in the same header and in
+    the body's ``request_id``.
+
     Args:
         services: A started service container.
         run: Runs the agent for one request.
@@ -619,8 +628,10 @@ def agent_app(
             guard shared by this app's invocation routes. Overlap returns 409
             thread_busy before execution or request reservation. Multiple instances
             sharing checkpoints must inject a shared coordinator. Stream ownership
-            lasts through graph cancellation and cleanup. A journal also deduplicates
-            legacy stream request IDs, but that route has no recoverable final answer.
+            lasts through graph cancellation and cleanup. With a journal,
+            ``/invoke/stream`` also reserves its request IDs, so a duplicate is
+            refused; but the journal never saves a streamed run's final answer,
+            so that answer cannot be recovered from ``GET /requests/{id}``.
     """
     if diagnostics is not None:
         run = _observed_run(run, diagnostics)

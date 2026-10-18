@@ -427,8 +427,9 @@ def test_expiry_uses_the_supplied_clock() -&gt; None:
   <p>A service need not write its own composition root. The generated agents, the
   reference <code>accounts-agent</code>, and <code>rmprep</code> declare what is
   theirs in one <code>AgentService</code> and pass it to <code>run_agent</code>.
-  This is the generated <code>helper</code> agent's <code>service.py</code> without
-  its optional streaming and outcome-journal settings:</p>
+  This is the generated <code>helper</code> agent's <code>service.py</code>, trimmed
+  to the essentials; the generated file adds streaming, the outcome journal,
+  <code>main(argv)</code> and the <code>__main__</code> guard:</p>
 <pre><code class="language-python" id="service-example">from typing import Any
 
 from ai_agent_lib_core import RequestContext, ServiceContainer
@@ -1595,8 +1596,8 @@ async def classify(
   to the configured model and use your account's quota and billing. The generated
   evaluation skips when the selected model is <code>fake</code>. Each run writes
   <code>agents/helper/.agentlib/eval-report.json</code>, with the mean for each metric
-  and every case's score. The folder is excluded from version control, so open the
-  file to inspect individual failures alongside the aggregate score.</p>
+  and every case's score. The <code>.agentlib</code> folder is excluded from version
+  control, so open the file to inspect individual failures alongside the aggregate score.</p>
 
   <h3 id="eval-baselines">Protect a baseline</h3>
   <p>When the scores are ones you want to protect, accept them:</p>
@@ -1620,7 +1621,7 @@ async def classify(
   it with answers a person has already graded before you let its score gate anything.</p>
 
   <h3 id="eval-online">Online evaluation</h3>
-  <p>The same scorers and gates also run over what your service has already
+  <p>Ordinary scorers such as judges also run over what your service has already
   answered. Agent Lab records thumbs up or down beneath each accepted answer in
   <code>feedback.jsonl</code>. <code>export_interactions</code> turns saved
   conversations, joined with that feedback, into interaction records.

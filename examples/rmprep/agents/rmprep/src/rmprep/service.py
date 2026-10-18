@@ -50,8 +50,10 @@ def _build_graph_with(
 
 async def _build_graph(services: ServiceContainer) -> Any:
     # SERVICE on its own reads the context settings here, when the graph is built, so
-    # importing this module reads none. ``main`` loads them first, so a malformed value
-    # fails before anything starts, and replaces this builder with the loaded budget.
+    # importing this module reads none. That also means a bare ``run_agent(SERVICE)``
+    # surfaces a malformed budget during graph preparation, after the listener has
+    # started; only ``main`` is fail-fast. It loads the settings first, so a malformed
+    # value fails before anything starts, and replaces this builder with the loaded budget.
     return await _build_graph_with(ContextBuilder(load_context_budget(ENV_FILE)))(services)
 
 
