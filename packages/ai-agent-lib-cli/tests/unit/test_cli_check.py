@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -118,3 +119,47 @@ def test_eval_says_so_when_there_are_none(
     err = capsys.readouterr().err
     assert "there are no evals in mcp-servers/hello-mcp" in err
     assert "@pytest.mark.eval" in err
+
+
+def test_eval_accept_promotes_the_report_to_the_baseline(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    tools = Tools()
+    assert (
+        main(["new", "agent", "helper", "--workspace", str(workspace)], toolbox=toolbox(tools)) == 0
+    )
+    report = workspace / "agents" / "helper" / ".agentlib" / "eval-report.json"
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(
+        '{"schema": "agentlib.eval-report/v1", "means": {"m": 1.0}, "results": [], "metadata": {}}',
+        encoding="utf-8",
+    )
+    assert (
+        main(["eval", "helper", "--accept", "--workspace", str(workspace)], toolbox=toolbox(tools))
+        == 0
+    )
+    baseline = workspace / "agents" / "helper" / "evals" / "baseline.json"
+    assert json.loads(baseline.read_text(encoding="utf-8"))["means"] == {"m": 1.0}
+    assert "baseline accepted: agents/helper/evals/baseline.json" in capsys.readouterr().out
+
+
+def test_eval_accept_without_a_service_is_refused(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    tools = Tools()
+    assert main(["eval", "--accept", "--workspace", str(workspace)], toolbox=toolbox(tools)) != 0
+    assert "--accept needs a service" in capsys.readouterr().err
+
+
+def test_eval_accept_without_a_report_names_the_fix(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    tools = Tools()
+    assert (
+        main(["new", "agent", "helper", "--workspace", str(workspace)], toolbox=toolbox(tools)) == 0
+    )
+    assert (
+        main(["eval", "helper", "--accept", "--workspace", str(workspace)], toolbox=toolbox(tools))
+        != 0
+    )
+    assert "eval-report.json" in capsys.readouterr().err

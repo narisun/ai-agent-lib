@@ -69,14 +69,23 @@ def check(
 
 @click.command("eval")
 @click.argument("service", required=False)
+@click.option(
+    "--accept",
+    is_flag=True,
+    help="After the evals pass, save the report as the service's evals/baseline.json.",
+)
 @workspace_option
 @pass_toolbox
-def evals(tools: Toolbox, service: str | None, workspace: Path | None) -> None:
+def evals(tools: Toolbox, service: str | None, accept: bool, workspace: Path | None) -> None:
     """Run the evals of SERVICE, or of every service: its tests marked eval, with a real model.
 
     An eval skips itself until a real model is set in the service's .env. Each
     writes a report to the service's .agentlib/eval-report.json.
+    --accept saves the passing report as evals/baseline.json; later runs fail
+    on regressions against it.
     """
+    if accept and not service:
+        raise CliError("--accept needs a service", fix="agentlib eval SERVICE --accept")
     root = workspace_root(workspace)
     target = service_folder(root, load_answers(root), service) if service else root
     arguments = ("-m", "eval", "-q", "-rs", target.relative_to(root).as_posix() if service else ".")
@@ -90,6 +99,17 @@ def evals(tools: Toolbox, service: str | None, workspace: Path | None) -> None:
         )
     if code != 0:
         raise CliError("the evals did not meet their bar", fix="read the report above")
+    if accept:
+        report = target / ".agentlib" / "eval-report.json"
+        if not report.is_file():
+            raise CliError(
+                f"there is no report at {report.relative_to(root).as_posix()}",
+                fix="run the evals once without --accept, or check the service's eval test",
+            )
+        baseline = target / "evals" / "baseline.json"
+        baseline.parent.mkdir(parents=True, exist_ok=True)
+        baseline.write_bytes(report.read_bytes())
+        click.echo(f"baseline accepted: {baseline.relative_to(root).as_posix()}")
 
 
 _NO_TESTS = 5
