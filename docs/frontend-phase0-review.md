@@ -1,8 +1,9 @@
 # Frontend Phase 0: Chainlit validation
 
 Reviewed on 11 October 2026 against Chainlit **2.12.0**, Windows x64 and
-Python **3.11.15**. The runnable sample is
-[experiments/chainlit-phase0](../experiments/chainlit-phase0/README.md).
+Python **3.11.15**. The runnable sample lived at `experiments/chainlit-phase0/`;
+it was removed from the tree after this review concluded (R6.3) and remains
+available in git history.
 
 ## Decision
 
@@ -33,7 +34,7 @@ certification. The broader requirements remain in the
 
 | Phase 0 criterion | Result | Evidence and limits |
 | --- | --- | --- |
-| Command Prompt, Python and pip | Passed on this Windows host | Clean virtual environment, pinned install, and `pip check`. Setup commands are in the sample README. |
+| Command Prompt, Python and pip | Passed on this Windows host | Clean virtual environment, pinned install, and `pip check`. Setup commands were recorded in the sample's README (removed; see git history). |
 | Install entirely from wheels | Passed with prepared wheelhouse | A second clean environment installed with `--no-index --only-binary=:all:` and ran all 24 checks. Actual JFrog availability and enterprise approval are pending. |
 | Chat profiles from registry | Passed for a fixture registry | Two agent entries populate Chat Profiles. The registry document also parses with the current library parser. Dynamic registry refresh and production authorization are later work. |
 | Authenticated history | Passed | Two questions on one thread, server restart, resumed user/assistant messages and elements. One scoped SQLite store. |
@@ -118,13 +119,14 @@ Anthropic call, a real MCP server, or a LangGraph checkpoint database.
 | Literal AI / Traceloop SDK | 0.1.201 / 0.62.4 | Apache-2.0 | Chainlit transitive dependencies; external tracing not configured. |
 | pytest / pytest-asyncio | 9.1.1 / 1.4.0 | MIT / Apache-2.0 | Automated checks. |
 
-The [full Python inventory](../experiments/chainlit-phase0/evidence/dependencies.json)
-records versions, runtime/check scope, license declarations and available license
-file metadata. The [wheel manifest](../experiments/chainlit-phase0/evidence/wheels.json)
-records SHA-256 values for the 131 tested wheel files. The
-[runtime lock](../experiments/chainlit-phase0/requirements.lock) and
-[check lock](../experiments/chainlit-phase0/requirements-checks.lock) contain the pins.
-`record_dependencies.py` regenerates these records from the installed environment.
+The full Python inventory recorded versions, runtime/check scope, license
+declarations and available license file metadata. The wheel manifest recorded
+SHA-256 values for the 131 tested wheel files, and the runtime and check
+lockfiles held the pins. `record_dependencies.py` generated these records from
+the installed environment; the spike directory that held them (including
+`evidence/dependencies.json`, `evidence/wheels.json`, `requirements.lock`, and
+`requirements-checks.lock`) was removed after this review concluded (R6.3) and
+remains available in git history.
 
 The configured index did not supply suitable wheels for `literalai==0.1.201`,
 `syncer==2.0.3`, and `cuid==0.4`. `pip wheel` built those three without an external
@@ -168,17 +170,10 @@ use React/assistant-ui with the same application layer and Python-served assets.
 
 ## Screenshots
 
-These show synthetic data only. Inspector screenshots show the model/checkpoint
-fixtures; they are not evidence of live model execution.
-
-![Desktop chat with memo and metrics](../experiments/chainlit-phase0/evidence/chat-1440.jpg)
-
-| Tablet | Phone chat | Phone memo |
-| --- | --- | --- |
-| ![Tablet chat](../experiments/chainlit-phase0/evidence/chat-768.jpg) | ![Phone chat](../experiments/chainlit-phase0/evidence/chat-390.jpg) | ![Phone memo](../experiments/chainlit-phase0/evidence/memo-390.jpg) |
-
-![Desktop inspector](../experiments/chainlit-phase0/evidence/inspector-1440.jpg)
-
-| Tablet inspector | Phone inspector |
-| --- | --- |
-| ![Tablet inspector](../experiments/chainlit-phase0/evidence/inspector-768.jpg) | ![Phone inspector](../experiments/chainlit-phase0/evidence/inspector-390.jpg) |
+The review captured desktop (1440 px), tablet (768 px), and phone (390 px)
+screenshots of the chat with memo and metrics, and of the full-width
+inspector. These showed synthetic data only — the inspector screenshots
+showed the model/checkpoint fixtures, not evidence of live model execution.
+The image evidence lived under the spike's `evidence/` directory and was
+removed after this review concluded (R6.3); it remains available in git
+history.

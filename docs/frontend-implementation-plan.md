@@ -25,10 +25,12 @@ checkpoint, authorization, or persistence design.
 
 ## Phase 0: prove the framework fit
 
-The [Phase 0 experiment and decision record](frontend-phase0-review.md) now
-demonstrate the functional path with Chainlit 2.12.0. The decision is conditional:
-actual 200% browser zoom and enterprise dependency/CSP approval remain open.
-See the [sample setup](../experiments/chainlit-phase0/README.md) to repeat it.
+The [Phase 0 experiment and decision record](frontend-phase0-review.md)
+demonstrated the functional path with Chainlit 2.12.0. The decision was
+conditional: actual 200% browser zoom and enterprise dependency/CSP approval
+remained open. The spike that produced this evidence was removed from the
+tree after the decision (R6.3); its setup steps are preserved in git history
+alongside the decision record.
 
 Create a disposable integration sample using the candidate pinned Chainlit version
 and a scripted HTTP agent. This is a time-boxed technical spike, not the production

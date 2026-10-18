@@ -1,8 +1,0 @@
-.phase0-metrics { display:flex; gap:.5rem 1rem; flex-wrap:wrap; align-items:center; border-top:1px solid #cbd5e1; padding:.8rem 0; font-size:.85rem; }
-.phase0-metrics small { flex-basis:100%; color:#475569; }
-.phase0-metrics a { text-decoration:underline; text-underline-offset:3px; }
-pre { overflow:auto; max-height:65vh; }
-table { display:block; max-width:100%; overflow:auto; max-height:65vh; }
-#side-view-content h1 { font-size:1.7rem; }
-#side-view-content h2 { font-size:1.25rem; }
-
