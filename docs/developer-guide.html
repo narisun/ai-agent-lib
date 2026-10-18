@@ -1775,10 +1775,16 @@ async def classify(
     <summary>Configuration variables: local and AWS</summary>
     <p>This is the complete list of environment variables bound by ai-agent-lib,
     followed by OpenTelemetry, Python/pip setup and rmprep context settings used in
-    this guide. <strong>Local</strong> means the Windows tutorial.
-    <strong>AWS</strong> means the team's Fargate deployment. Values are examples
-    unless labelled as defaults; replace service names, endpoints, IDs, and paths
-    with values supplied by your team. Set only the variables your service needs.</p>
+    this guide. <strong>Local</strong> is the zero-config default on any machine:
+    with nothing set, every provider is local (files, SQLite and in-process engines)
+    and no cloud account is needed. <strong>AWS</strong> is a per-variable opt-in:
+    <code>EAP_PROFILE=aws</code> switches every section, and a single
+    <code>EAP_&lt;SECTION&gt;_PROVIDER</code> moves just that section. The
+    <a href="#profiles">profile defaults</a> list what each side selects, and the
+    <a href="#environment-providers">one-way guard</a> keeps local-only adapters out
+    of deployed environments. Values are examples unless labelled as defaults;
+    replace service names, endpoints, IDs, and paths with values supplied by your
+    team. Set only the variables your service needs.</p>
 
     <h3 id="aws-platform-settings">How the settings fit the AWS design</h3>
     <p>Run agents and MCP servers as ECS Fargate services. The generated deployment

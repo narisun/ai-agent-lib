@@ -113,6 +113,8 @@ You need Python 3.11 or newer with pip, a copy of this repository, and access
 to your approved package index or a folder of pre-downloaded Python wheels.
 The tutorial uses a fake model that runs in the Python process and local
 providers for configuration, permissions, audit records, and conversation state.
+Local is the default for every setting, so no cloud account is needed; AWS is a
+per-variable opt-in described in the [configuration reference](docs/variables.md).
 
 Open a terminal in the repository's top-level `ai-agent-lib/` folder. Choose
 the commands for your terminal below. They use your existing Python and create
