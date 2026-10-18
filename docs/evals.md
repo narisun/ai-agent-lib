@@ -87,6 +87,7 @@ SERVICE = Path(__file__).resolve().parents[1]
 CASES = SERVICE / "evals" / "cases.jsonl"
 REPORT = SERVICE / ".agentlib" / "eval-report.json"
 BASELINE = SERVICE / "evals" / "baseline.json"
+ACCEPT_MARKER = SERVICE / ".agentlib" / "eval-accept.flag"
 
 
 def mentions(case: EvalCase, output: str) -> bool:
@@ -116,14 +117,14 @@ async def test_helper_meets_its_bar(tmp_path: Path) -> None:
             case_timeout=120.0,
             metadata={
                 "application": APPLICATION,
-                "model": config.model.provider,
+                "model": f"{config.model.provider}:{config.model.model_id or ''}",
                 "dataset": dataset_digest(CASES),
             },
         )
     REPORT.parent.mkdir(parents=True, exist_ok=True)
     REPORT.write_text(report.to_json(), encoding="utf-8")
     print("\n".join(report.summary()))
-    if BASELINE.exists():
+    if BASELINE.exists() and not ACCEPT_MARKER.exists():
         require_no_regression(report, load_report(BASELINE), tolerance=0.05)
     report.require({"mentions": 0.8})
 ```
@@ -161,8 +162,16 @@ every `agentlib eval helper` run also calls `require_no_regression`, which
 compares each metric's mean against the baseline and fails when it dropped by
 more than its `tolerance` (0.05 above). The failure names the regressed
 metrics, both means, and the case IDs whose own score dropped — read those
-cases first. Re-run `--accept` once a regression is intentional (the model
-changed, the rubric changed) to move the bar.
+cases first.
+
+Re-run `--accept` once a regression is intentional (the model changed, the
+rubric changed) to move the bar. While that run is in flight, `--accept`
+leaves a marker (`.agentlib/eval-accept.flag`) beside the report, and the
+generated test skips only the `require_no_regression` gate against the
+existing baseline while the marker is there — the absolute
+`report.require({...})` bar still applies, so the run still has to earn the
+promotion it then gets. The marker is removed once the run ends, whether or
+not it passed.
 
 ## 3. Judges
 
