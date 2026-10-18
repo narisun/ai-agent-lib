@@ -21,6 +21,7 @@ async def run_eval(
     *,
     concurrency: int = 4,
     metadata: Mapping[str, str] | None = None,
+    case_timeout: float | None = None,
 ) -> EvalReport:
     """Run ``task`` on every case, at most ``concurrency`` at a time, and score each output.
 
@@ -33,6 +34,8 @@ async def run_eval(
         scorers: How each output is judged. Their names are the report's metrics.
         concurrency: How many cases run at once.
         metadata: Where the run came from, kept on the report for comparison.
+        case_timeout: Seconds one case may take. A case over it scores 0 and is
+            reported as TimeoutError; None never interrupts.
     """
     names = _metrics(scorers)
     if len(set(names)) != len(names):
@@ -43,7 +46,10 @@ async def run_eval(
         async with gate:
             started = time.perf_counter()
             try:
-                output = await task(case)
+                if case_timeout is None:
+                    output = await task(case)
+                else:
+                    output = await asyncio.wait_for(task(case), case_timeout)
             except Exception as error:  # noqa: BLE001 - one failed case must not end the run
                 seconds = time.perf_counter() - started
                 failed = tuple(Score(name, 0.0, "the task failed") for name in names)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -10,7 +11,16 @@ from typing import Any
 
 from ai_agent_lib_core.contracts import ConfigurationError
 
-__all__ = ["EvalCase", "load_cases"]
+__all__ = ["EvalCase", "dataset_digest", "load_cases"]
+
+
+def dataset_digest(path: Path) -> str:
+    """The dataset's identity for a report's metadata: sha256 over the file's bytes.
+
+    Two reports are comparable only when they ran the same cases; the digest
+    makes that checkable without keeping the file.
+    """
+    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 @dataclass(frozen=True, slots=True)
