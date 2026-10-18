@@ -14,7 +14,7 @@ from ai_agent_lib_ui.adapters.catalog import FileCatalog, LocalAccess, pin_bindi
 from ai_agent_lib_ui.adapters.http import HttpDispatcher
 from ai_agent_lib_ui.adapters.interactions import export_interactions
 from ai_agent_lib_ui.adapters.sqlite import SqliteThreads
-from ai_agent_lib_ui.application.chat import ChatService
+from ai_agent_lib_ui.application.chat import ChatService, view_for
 from ai_agent_lib_ui.config.settings import LocalIdentity, Settings
 from ai_agent_lib_ui.contracts.conversations import RunRecord
 
@@ -170,3 +170,14 @@ async def test_export_without_a_feedback_file_is_not_an_error(
         store, principal, tmp_path / "out.jsonl", feedback_path=tmp_path / "missing.jsonl"
     )
     assert count == 1
+
+
+async def test_export_includes_archived_threads(tmp_path: Path, environment: Environment) -> None:
+    store, principal, completed = environment
+    await store.change(
+        view_for(principal, completed.scope.application), completed.thread_id, archived=True
+    )
+    count = await export_interactions(store, principal, tmp_path / "out.jsonl")
+    assert count == 1
+    [item] = load_interactions(tmp_path / "out.jsonl")
+    assert item.thread_id == completed.thread_id

@@ -23,9 +23,10 @@ async def export_interactions(
 ) -> int:
     """Write every completed exchange the principal owns as interaction JSONL.
 
-    Feedback, when a file is given, is joined by request ID; the latest line
-    for a request wins. Returns how many interactions were written. The output
-    holds conversation content; keep it beside the UI's other private state.
+    Active and archived conversations are both included. Feedback, when a
+    file is given, is joined by request ID; the latest line for a request
+    wins. Returns how many interactions were written. The output holds
+    conversation content; keep it beside the UI's other private state.
     """
     verdicts: dict[str, str] = {}
     if feedback_path is not None and feedback_path.exists():
@@ -49,13 +50,20 @@ async def export_interactions(
 
 
 async def _owned_threads(store: ThreadRepository, principal: Principal) -> list[ThreadRecord]:
-    """Page through every thread this principal owns, across all its scopes."""
+    """Page through every thread this principal owns, across all its scopes.
+
+    Both active and archived threads are included, since archiving a
+    conversation does not remove its completed runs from export scope.
+    """
     threads: list[ThreadRecord] = []
-    page = await store.list_owned(principal, PageRequest())
-    threads.extend(page.items)
-    while page.next_cursor:
-        page = await store.list_owned(principal, PageRequest(cursor=page.next_cursor))
+    for archived in (False, True):
+        page = await store.list_owned(principal, PageRequest(), archived=archived)
         threads.extend(page.items)
+        while page.next_cursor:
+            page = await store.list_owned(
+                principal, PageRequest(cursor=page.next_cursor), archived=archived
+            )
+            threads.extend(page.items)
     return threads
 
 
