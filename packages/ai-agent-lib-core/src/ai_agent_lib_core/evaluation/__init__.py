@@ -23,6 +23,11 @@ from ai_agent_lib_core.evaluation.baseline import (
     regressions,
     require_no_regression,
 )
+from ai_agent_lib_core.evaluation.calibration import (
+    CalibrationReport,
+    LabeledCase,
+    calibrate,
+)
 from ai_agent_lib_core.evaluation.cases import EvalCase, dataset_digest, load_cases
 from ai_agent_lib_core.evaluation.report import REPORT_SCHEMA, CaseResult, EvalReport
 from ai_agent_lib_core.evaluation.run import run_eval
@@ -30,14 +35,17 @@ from ai_agent_lib_core.evaluation.scorers import Score, Scorer, Verdict, exact, 
 
 __all__ = [
     "REPORT_SCHEMA",
+    "CalibrationReport",
     "CaseResult",
     "EvalCase",
     "EvalReport",
+    "LabeledCase",
     "Regression",
     "SavedReport",
     "Score",
     "Scorer",
     "Verdict",
+    "calibrate",
     "dataset_digest",
     "exact",
     "judged",
