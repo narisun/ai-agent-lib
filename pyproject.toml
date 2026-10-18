@@ -33,6 +33,8 @@ dev = [
 line-length = 100
 target-version = "py311"
 src = ["packages/*/src", "examples/*/src"]
+# Plan documents quote Python fragments that are not standalone files.
+exclude = ["docs/superpowers"]
 
 [tool.ruff.lint]
 select = [
