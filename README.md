@@ -250,7 +250,7 @@ have these examples under their own package names; their READMEs give exact comm
 | [Reference agent](examples/accounts-agent/README.md) | A working LangGraph agent |
 | [Reference MCP server](examples/accounts-mcp/README.md) | Shared tools, named queries, and sample CSV data |
 | [Relationship manager preparation](examples/rmprep/README.md) | Router, memo and Q&A nodes over 33 supplied CSVs, with governed MCP evidence, source references and checkpoints |
-| [Agent Lab package](packages/ai-agent-lib-ui/README.md) | `packages/ai-agent-lib-ui`: the browser simulator with chat, memo versions, trace links, answer feedback, and saved-chat export |
+| [Agent Lab package](packages/ai-agent-lib-ui/README.md) | `packages/ai-agent-lib-ui`: the browser simulator with chat, memo versions, trace links, answer feedback, and online-eval export of saved chats |
 | [Policies](policies/README.md) | Rules and the OPA policy bundle |
 | [Architecture tests](tests/architecture) | Checks that enforce package boundaries and keep documentation current |
 | [Configuration reference](docs/variables.md) | Supported environment variables |

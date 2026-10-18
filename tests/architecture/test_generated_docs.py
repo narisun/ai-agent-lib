@@ -5,6 +5,8 @@ from __future__ import annotations
 import html
 import json
 import re
+import sys
+import types
 from collections.abc import Callable
 from pathlib import Path
 from typing import cast
@@ -18,6 +20,7 @@ from ai_agent_lib_core.config.bindings import options_key, provider_key
 from ai_agent_lib_core.config.phoenix import PHOENIX_VARIABLES
 from ai_agent_lib_core.contracts import NoOptions, Section
 from ai_agent_lib_core.di import ServiceProviders
+from ai_agent_lib_core.integrations.http import AgentService
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -53,6 +56,28 @@ def test_the_guides_dependency_injection_example_runs() -> None:
     exec(code, namespace)  # noqa: S102 - execute the checked-in documentation example
     run_test = cast(Callable[[], None], namespace["test_expiry_uses_the_supplied_clock"])
     run_test()
+
+
+def test_the_guides_service_example_builds_an_agent_service(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    guide = build_guide.guide_html()
+    (example,) = re.findall(
+        r'<code class="language-python" id="service-example">(.*?)</code>', guide, re.S
+    )
+    graph = types.SimpleNamespace(
+        APPLICATION="helper", answer=None, build_graph=None, registered_mcp_tools=None
+    )
+    settings = types.SimpleNamespace(ENV_FILE=Path("helper.env"))
+    monkeypatch.setitem(sys.modules, "helper", types.ModuleType("helper"))
+    monkeypatch.setitem(sys.modules, "helper.graph", cast(types.ModuleType, graph))
+    monkeypatch.setitem(sys.modules, "helper.settings", cast(types.ModuleType, settings))
+    namespace: dict[str, object] = {}
+    code = compile(html.unescape(example), "<guide service example>", "exec")
+    exec(code, namespace)  # noqa: S102 - execute the checked-in documentation example
+    service = cast(AgentService, namespace["SERVICE"])
+    assert (service.application, service.env_file) == ("helper", Path("helper.env"))
+    assert callable(namespace["main"])
 
 
 def test_walkthrough_docs_and_samples_match_the_shipped_templates() -> None:

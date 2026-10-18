@@ -14,18 +14,21 @@ source.
 | Connect an existing agent to the simulator | [Agent Lab setup](../packages/ai-agent-lib-ui/README.md#1-prepare-the-ui-packages) | Register an HTTP agent, start the UI, and resume saved chats |
 | Find a configuration variable | [Searchable configuration table](developer-guide.html#variables) | See its purpose, local/AWS values, and provider options |
 | Inspect model context and tool use | [Tracing and ReAct walkthrough](developer-guide.html#model-debugging) | Read model input/output and checkpoint history |
-| Inspect traces on a restricted desktop | [Local Phoenix trial](phoenix-trial.md) | Run Phoenix with the same Python, isolated packages, and SQLite and follow Agent Lab's trace links |
+| Trace agent runs with Phoenix | [Trace agents with Phoenix](phoenix-trial.md) | Turn tracing on with one setting, run Phoenix locally or send traces to a team-hosted server, and follow Agent Lab's trace links |
 | Learn by tracing a real run | [Verified Anthropic run](verified-anthropic-run.md), then [Ask Anthropic two questions](anthropic-example.md) | Read captured model input and checkpoints first, then reproduce them with your own key and model |
 | Measure an agent offline and online | [Evals guide](evals.md) | Run generated evals, accept a baseline, capture feedback, and score sampled production answers |
 | Understand who is calling | [Identity guide](identity.md) | Follow a signed token from sign-in through the agent and MCP server to policy, and learn why a call was refused |
 | Keep turns on one thread in order | [Thread admission](http-thread-admission.md) | Learn when an overlapping request gets HTTP 409 `thread_busy` and which coordination fits your deployment |
 | Understand the business example | [rmprep](../examples/rmprep/README.md) and [context management](../examples/rmprep/docs/context-management.md) | Follow client selection, memo generation, and same-thread questions |
-| Upgrade a generated workspace | [Keep generated files up to date](getting-started.md#9-keep-generated-files-up-to-date) and [updating generated code](../packages/ai-agent-lib-cli/README.md#updating-generated-code) | Preview with `agentlib update --plan`, which writes nothing (add `--diff` to see edited files' proposed changes), then run `agentlib update`; `update --diff` without `--plan` **writes updates** to untouched files |
+| Upgrade a generated workspace | [Keep generated files up to date](getting-started.md#9-keep-generated-files-up-to-date) and [updating generated code](../packages/ai-agent-lib-cli/README.md#updating-generated-code) | Preview with `agentlib update --plan`, which writes nothing, then run `agentlib update` |
 | Change the library | [Contributor setup](../README.md#working-on-the-library) | Install development dependencies and run the appropriate checks |
+
+Add `--diff` to `agentlib update --plan` to see the proposed changes to files you
+edited. Without `--plan`, `update --diff` **writes updates** to untouched files.
 
 The README, getting-started tutorial, and HTML developer guide use the same
 `tutorial` workspace. Continue from your last completed step when switching
-documents. The batch launcher runs the separate, checked-in `examples/rmprep`
+documents. The launcher runs the separate, checked-in `examples/rmprep`
 workspace; it does not launch the agent you generated in `tutorial`.
 
 ## Find the code
@@ -50,7 +53,7 @@ injects them into the components that use them.
 | `…/integrations/`, `…/assets/` in UI | FastAPI/Chainlit hooks, pages, and styling | Changing browser behavior or presentation |
 | `examples/rmprep/agents/rmprep/src/rmprep/` | Routing, memo/Q&A context selection, and business checks | Changing the RM preparation workflow |
 | `examples/rmprep/mcp-servers/rmprep-data/` | Evidence queries over the example data | Changing business data retrieval |
-| `tools/local_dev.py`, `tools/local_processes.py` | Repository setup and process supervision | Changing the batch startup scenarios |
+| `tools/local_dev.py`, `tools/local_processes.py` | Repository setup and process supervision | Changing the startup scenarios |
 
 Follow one request in this order:
 
@@ -112,8 +115,10 @@ The [enterprise architecture review](design/enterprise-architecture-review-2026-
 (18 October 2026) judges the library against its goals, and the
 [improvement specification](design/improvement-specification-2026-10-18.md)
 turns its findings into requirements. Both are design records: use the guides above
-for behavior in this checkout. [Agent Lab contracts](frontend-contracts.md) describe the
-UI's package boundaries, presentation manifest, and registry rules.
+for behavior in this checkout.
+
+For Agent Lab's package boundaries, presentation manifest, and registry rules, read
+[Agent Lab contracts](frontend-contracts.md).
 
 ## Keep documentation in sync
 

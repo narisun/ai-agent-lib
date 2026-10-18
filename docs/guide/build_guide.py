@@ -255,8 +255,8 @@ def _phoenix_variable_rows() -> list[list[str]]:
     settings = (
         (
             "Enable Phoenix tracing; start-local.bat also starts the local server.",
-            "false; true for this trial",
-            "false until provisioned",
+            "false; true to trace locally",
+            "false until a Phoenix server is available",
         ),
         (
             "Capture model and tool input/output.",
@@ -280,8 +280,9 @@ def _phoenix_variable_rows() -> list[list[str]]:
         ),
         (
             "Optional API key; never included in trace links.",
-            "Unset for the local trial",
-            "Secrets Manager",
+            "Unset for the local server",
+            "Process environment (on Fargate, an ECS task-definition secret); "
+            "not the secrets provider",
         ),
     )
     return [
@@ -291,10 +292,12 @@ def _phoenix_variable_rows() -> list[list[str]]:
             _e(local),
             _e(aws),
             "Process settings override the separate tracing file, then the service .env. "
-            "Nothing is exported until tracing is enabled. This desktop trial stores traces "
-            "in SQLite and runs in its own Python environment. A shared deployment needs "
-            "separate platform provisioning; it is outside this trial. "
-            '<a href="phoenix-trial.md">Phoenix setup and verified example</a>.',
+            "Nothing is exported until tracing is enabled. A local Phoenix stores traces "
+            "in SQLite and runs in its own Python environment. A team-hosted Phoenix is "
+            "supported over HTTPS; your platform team runs it. "
+            '<a href="phoenix-trial.md">Trace agents with Phoenix</a>, including the '
+            '<a href="phoenix-trial.md#send-traces-to-a-team-hosted-phoenix">team-hosted '
+            "setup</a>.",
         ]
         for name, (purpose, local, aws) in zip(PHOENIX_VARIABLES, settings, strict=True)
     ]

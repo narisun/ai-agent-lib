@@ -35,8 +35,8 @@ multiple workers require injected shared coordination.
 
 ## Since the October review
 
-The matrix above records the October review's findings. These changes landed
-afterward; each is documented where it is used and covered by the tests named.
+The matrix above records the review priorities and their regression evidence.
+These changes landed afterward; each is documented where it is used and covered by the tests named.
 
 | Change | Current behavior | Regression evidence |
 | --- | --- | --- |

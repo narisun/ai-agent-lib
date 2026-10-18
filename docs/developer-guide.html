@@ -216,6 +216,7 @@ kbd { font-family: var(--font-mono); font-size: .85em; border: 1px solid var(--l
         <ol>
           <li><a href="#interfaces-and-injection">Interfaces and injection</a></li>
           <li><a href="#langgraph-boundary">The LangGraph boundary</a></li>
+          <li><a href="#service-entry-point">The service entry point</a></li>
           <li><a href="#environment-providers">Environment-specific providers</a></li>
         </ol>
       </li>
@@ -287,7 +288,11 @@ kbd { font-family: var(--font-mono); font-size: .85em; border: 1px solid var(--l
   <p>ai-agent-lib gives each responsibility a clear home: your application defines
   the workflow and business logic, shared pipelines apply checks around calls, and
   adapters connect to models and other services. This structure centralizes common
-  rules and lets tests replace external dependencies with controlled implementations.</p>
+  rules and lets tests replace external dependencies with controlled implementations.
+  The <a href="Specification.md">specification</a> also calls this mechanism an
+  <em>interceptor chain</em>, and the code names one stage an
+  <code>Interceptor</code>; this guide says pipeline for the same fixed-order
+  sequence, described in <a href="#pipelines">What happens during a call</a>.</p>
   <p>Consider a tool that looks up an account balance. Its business job is to return
   the balance. Before calling it, the application needs a caller identity and a
   permission decision; afterwards, it needs a record of what happened. Keeping
@@ -366,6 +371,12 @@ def test_expiry_uses_the_supplied_clock() -&gt; None:
   <strong>Dependency injection</strong> passes the selected implementation to a
   consumer. Explicit dependencies make the component easy to test; a container
   automates the assembly of larger groups of components.</p>
+  <p>The HTTP layer has a worked example of a port and its adapters. To keep turns
+  on one conversation thread in order, <code>agent_app</code> asks a
+  <code>ThreadAdmission</code> port for ownership of the thread. The library supplies
+  an in-memory adapter; a deployment with several worker processes injects its own.
+  <a href="http-thread-admission.md">Keep conversation turns in order</a> shows the
+  port, the default adapter, and what a replacement must preserve.</p>
 
   <h3 id="composition">Connect the parts in one place</h3>
   <p>The place that builds and connects an application's components is often called
@@ -418,6 +429,60 @@ def test_expiry_uses_the_supplied_clock() -&gt; None:
   the integration checks their types and capabilities. This keeps LangGraph details
   out of the shared contracts, while the application graph itself remains LangGraph code.</p>
   </details>
+
+  <h3 id="service-entry-point">Declare the service; <code>run_agent</code> runs it</h3>
+  <p>A service need not write its own composition root. The generated agents, the
+  reference <code>accounts-agent</code>, and <code>rmprep</code> declare what is
+  theirs in one <code>AgentService</code> and pass it to <code>run_agent</code>.
+  This is the generated <code>helper</code> agent's <code>service.py</code> without
+  its optional streaming and outcome-journal settings:</p>
+<pre><code class="language-python" id="service-example">from typing import Any
+
+from ai_agent_lib_core import RequestContext, ServiceContainer
+from ai_agent_lib_core.integrations.http import AgentService, run_agent
+
+from helper.graph import APPLICATION, answer, build_graph, registered_mcp_tools
+from helper.settings import ENV_FILE
+
+
+async def _build_graph(services: ServiceContainer) -&gt; Any:
+    return build_graph(services, await registered_mcp_tools(services))
+
+
+async def _respond(
+    graph: Any, services: ServiceContainer, context: RequestContext, question: str
+) -&gt; dict[str, Any]:
+    return {"answer": await answer(graph, services, context, question)}
+
+
+SERVICE = AgentService(
+    application=APPLICATION,
+    build_graph=_build_graph,
+    respond=_respond,
+    env_file=ENV_FILE,
+)
+
+
+def main() -&gt; int:
+    return run_agent(SERVICE)</code></pre>
+  <p><code>python -m ai_agent_lib_cli run helper</code> starts the module that calls
+  <code>main()</code>, which serves the agent until the platform stops it. The two
+  sides of that call have separate jobs:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Owner</th><th>Responsibility</th></tr></thead>
+    <tbody>
+      <tr><td>Your service (<code>AgentService</code>)</td><td>The application name; the graph, built once after the container is validated and before the service reports ready; how <code>respond</code> turns a question into an answer; how the question is read from the request's <code>input</code>, by default its non-empty <code>question</code> string; and its own <code>.env</code> file.</td></tr>
+      <tr><td><code>run_agent</code></td><td>Loading configuration, logging, telemetry, agent tracing when <a href="phoenix-trial.md">Phoenix</a> is enabled, opening and validating the container, readiness, serving HTTP with <code>--host</code> and <code>--port</code>, and closing everything in order when the process stops.</td></tr>
+    </tbody>
+  </table></div>
+  <p>This is the <a href="#composition">composition root</a> as one function. A change
+  to how every service starts, traces, or stops lands once in <code>run_agent</code>,
+  not in each agent. Inside <code>build_graph</code> and <code>respond</code> the graph
+  should reach models, tools, and data through the operations in the
+  <a href="#langgraph-boundary">integration-boundary table</a> above; the runner
+  supplies the <code>services</code> container they use. A service with unusual
+  needs can still compose by hand with <code>agent_app</code> and <code>serve</code>.</p>
+
   <h3 id="library-and-simulator">How the library and Agent Lab fit together</h3>
   <p>The library supplies the agent's services; <strong>Agent Lab</strong> is the
   browser simulator used to test them. The UI sends a question to the selected
@@ -429,7 +494,7 @@ def test_expiry_uses_the_supplied_clock() -&gt; None:
     <tbody>
       <tr><td>Agent and MCP services</td><td>Business workflow, evidence, policy enforcement, and graph checkpoints</td><td><code>.venv/Lib/site-packages</code>; the approved Python runs it</td></tr>
       <tr><td>Agent Lab</td><td>Agent selection, displayed chat history, memo versions, and inspection pages</td><td><code>packages/ai-agent-lib-ui/.venv/Lib/site-packages</code>; the same approved Python</td></tr>
-      <tr><td>Phoenix local trial, when enabled</td><td>Model/tool observations in a local SQLite database</td><td><code>.agentlib/phoenix/.venv/Lib/site-packages</code> with the same Python; included by <code>start-local.bat</code> when enabled</td></tr>
+      <tr><td>Local Phoenix server, when enabled</td><td>Model/tool observations in a local SQLite database</td><td><code>.agentlib/phoenix/.venv/Lib/site-packages</code> with the same Python; included by <code>start-local.bat</code> when enabled</td></tr>
     </tbody>
   </table></div>
   <p>A saved UI message, a graph checkpoint, and a model input are different things.
@@ -498,7 +563,9 @@ def test_expiry_uses_the_supplied_clock() -&gt; None:
     <li><strong>Extend at the right boundary.</strong> Implement a port, register its
     factory and dependencies, describe its options, and run its contract and
     integration tests. The <a href="#architecture">extension walkthrough</a>
-    explains the registration and cleanup responsibilities.</li>
+    explains the registration and cleanup responsibilities, and release scope has a
+    short <a href="release-scope.md#using-the-new-extension-points"><code>ServiceProviders.register</code>
+    example</a>.</li>
   </ul>
   <details class="lesson">
   <summary>Read the library implementation after completing the tutorial</summary>
@@ -1563,9 +1630,45 @@ async def classify(
 <pre><code class="language-bat">"%PYTHON%" -m ai_agent_lib_cli eval helper</code></pre>
   <p>This command selects tests marked <code>eval</code>. They require network access
   to the configured model and use your account's quota and billing. The generated
-  evaluation skips when the selected model is <code>fake</code>.</p>
-  <p>The evaluation package offers exact-match and model-judged scorers. Choose criteria
-  that reflect the task and inspect individual failures alongside the aggregate score.</p>
+  evaluation skips when the selected model is <code>fake</code>. Each run writes
+  <code>agents/helper/.agentlib/eval-report.json</code>, with the mean for each metric
+  and every case's score. The folder is excluded from version control, so open the
+  file to inspect individual failures alongside the aggregate score.</p>
+
+  <h3 id="eval-baselines">Protect a baseline</h3>
+  <p>When the scores are ones you want to protect, accept them:</p>
+<pre><code class="language-bat">"%PYTHON%" -m ai_agent_lib_cli eval helper --accept</code></pre>
+  <p><code>--accept</code> runs the evaluation itself and, if it passes, saves the
+  report as <code>agents/helper/evals/baseline.json</code>. Commit that file with
+  <code>cases.jsonl</code>: both hold synthetic cases and aggregate scores, not
+  conversation content. From then on every run is also a regression gate. It fails
+  when any metric's mean falls more than 0.05 below the baseline, even if the score
+  still clears the absolute bar, and it names the regressed metrics and the cases
+  whose own score dropped. Run <code>--accept</code> again when a drop is intended,
+  such as a new model or a rewritten prompt; that run skips only the baseline
+  comparison, so it must still pass the absolute bar. Accept a new baseline after you
+  add or edit cases on purpose; the gate does not notice that the dataset changed.</p>
+
+  <h3 id="eval-judges">Judges</h3>
+  <p>Scorers range from exact-match checks to model-judged ones. Use a judge for
+  qualities that code cannot match, such as tone or faithfulness to evidence, and
+  build it from the <code>judge</code> model alias rather than a fixed model ID.
+  A judge is a model call that can be wrong, so run <code>calibrate</code> to compare
+  it with answers a person has already graded before you let its score gate anything.</p>
+
+  <h3 id="eval-online">Online evaluation</h3>
+  <p>The same scorers and gates also run over what your service has already
+  answered. Agent Lab records thumbs up or down beneath each accepted answer in
+  <code>feedback.jsonl</code>. <code>export_interactions</code> turns saved
+  conversations, joined with that feedback, into interaction records.
+  <code>sampled</code> then picks a reproducible slice, and
+  <code>score_interactions</code> scores it with ordinary scorers into an ordinary
+  report; it does not call the agent again. Exporting is a Python entry point, not
+  yet a CLI command. Feedback logs and exports hold real conversation content, so
+  keep them in private <code>.agentlib/</code> state and never commit them.</p>
+  <p>The <a href="evals.md">evals guide</a> covers the dataset and report formats,
+  the generated test, judges and calibration, the export and scoring scripts, and
+  privacy in full.</p>
 </section>
 
 <section id="security">
@@ -1914,12 +2017,12 @@ async def classify(
 <tr><td><span class="var" id="var-otel_traces_sampler">OTEL_TRACES_SAMPLER</span></td><td>OpenTelemetry SDK: Sampling. Use parentbased_traceidratio with OTEL_TRACES_SAMPLER_ARG for high volume.</td><td>Unset for the tutorial. SDK default: <code>parentbased_always_on</code>.</td><td>Default, or <code>parentbased_traceidratio</code> with the ratio below.</td><td>Set in the process environment; the SDK does not read the service's .env file.</td></tr>
 <tr><td><span class="var" id="var-otel_traces_sampler_arg">OTEL_TRACES_SAMPLER_ARG</span></td><td>OpenTelemetry SDK: Sampling ratio from 0 to 1 when using a ratio sampler, e.g. 0.1 for 10% of root traces.</td><td>Unset for the tutorial. SDK default: <code>not set</code>.</td><td>Optional ratio, e.g. <code>0.1</code>; agree the coverage with the team.</td><td>Set in the process environment; the SDK does not read the service's .env file.</td></tr>
 <tr><td><span class="var" id="var-otel_sdk_disabled">OTEL_SDK_DISABLED</span></td><td>OpenTelemetry SDK: Turns the SDK off without a code change.</td><td>Unset for the tutorial. SDK default: <code>false</code>.</td><td>Use the SDK default: <code>false</code>.</td><td>Set in the process environment; the SDK does not read the service's .env file. Disables telemetry only; audit and model diagnostic files are separate.</td></tr>
-<tr><td><span class="var" id="var-eap_phoenix_enabled">EAP_PHOENIX_ENABLED</span></td><td>Enable Phoenix tracing; start-local.bat also starts the local server.</td><td>false; true for this trial</td><td>false until provisioned</td><td>Process settings override the separate tracing file, then the service .env. Nothing is exported until tracing is enabled. This desktop trial stores traces in SQLite and runs in its own Python environment. A shared deployment needs separate platform provisioning; it is outside this trial. <a href="phoenix-trial.md">Phoenix setup and verified example</a>.</td></tr>
-<tr><td><span class="var" id="var-eap_phoenix_capture_content">EAP_PHOENIX_CAPTURE_CONTENT</span></td><td>Capture model and tool input/output.</td><td>false; true for approved test data</td><td>false unless approved</td><td>Process settings override the separate tracing file, then the service .env. Nothing is exported until tracing is enabled. This desktop trial stores traces in SQLite and runs in its own Python environment. A shared deployment needs separate platform provisioning; it is outside this trial. <a href="phoenix-trial.md">Phoenix setup and verified example</a>.</td></tr>
-<tr><td><span class="var" id="var-eap_phoenix_env_file">EAP_PHOENIX_ENV_FILE</span></td><td>Optional private agent tracing settings file.</td><td>Unset; use the root .env or an absolute file path</td><td>Unset; inject task environment settings</td><td>Process settings override the separate tracing file, then the service .env. Nothing is exported until tracing is enabled. This desktop trial stores traces in SQLite and runs in its own Python environment. A shared deployment needs separate platform provisioning; it is outside this trial. <a href="phoenix-trial.md">Phoenix setup and verified example</a>.</td></tr>
-<tr><td><span class="var" id="var-phoenix_collector_endpoint">PHOENIX_COLLECTOR_ENDPOINT</span></td><td>Phoenix HTTP origin, without /v1/traces.</td><td>http://127.0.0.1:6006</td><td>Team-managed authenticated HTTPS origin</td><td>Process settings override the separate tracing file, then the service .env. Nothing is exported until tracing is enabled. This desktop trial stores traces in SQLite and runs in its own Python environment. A shared deployment needs separate platform provisioning; it is outside this trial. <a href="phoenix-trial.md">Phoenix setup and verified example</a>.</td></tr>
-<tr><td><span class="var" id="var-phoenix_project_name">PHOENIX_PROJECT_NAME</span></td><td>Project for this agent&#x27;s traces.</td><td>agent-lab; rmprep-trial in the walkthrough</td><td>Team project</td><td>Process settings override the separate tracing file, then the service .env. Nothing is exported until tracing is enabled. This desktop trial stores traces in SQLite and runs in its own Python environment. A shared deployment needs separate platform provisioning; it is outside this trial. <a href="phoenix-trial.md">Phoenix setup and verified example</a>.</td></tr>
-<tr><td><span class="var" id="var-phoenix_api_key">PHOENIX_API_KEY</span></td><td>Optional API key; never included in trace links.</td><td>Unset for the local trial</td><td>Secrets Manager</td><td>Process settings override the separate tracing file, then the service .env. Nothing is exported until tracing is enabled. This desktop trial stores traces in SQLite and runs in its own Python environment. A shared deployment needs separate platform provisioning; it is outside this trial. <a href="phoenix-trial.md">Phoenix setup and verified example</a>.</td></tr>
+<tr><td><span class="var" id="var-eap_phoenix_enabled">EAP_PHOENIX_ENABLED</span></td><td>Enable Phoenix tracing; start-local.bat also starts the local server.</td><td>false; true to trace locally</td><td>false until a Phoenix server is available</td><td>Process settings override the separate tracing file, then the service .env. Nothing is exported until tracing is enabled. A local Phoenix stores traces in SQLite and runs in its own Python environment. A team-hosted Phoenix is supported over HTTPS; your platform team runs it. <a href="phoenix-trial.md">Trace agents with Phoenix</a>, including the <a href="phoenix-trial.md#send-traces-to-a-team-hosted-phoenix">team-hosted setup</a>.</td></tr>
+<tr><td><span class="var" id="var-eap_phoenix_capture_content">EAP_PHOENIX_CAPTURE_CONTENT</span></td><td>Capture model and tool input/output.</td><td>false; true for approved test data</td><td>false unless approved</td><td>Process settings override the separate tracing file, then the service .env. Nothing is exported until tracing is enabled. A local Phoenix stores traces in SQLite and runs in its own Python environment. A team-hosted Phoenix is supported over HTTPS; your platform team runs it. <a href="phoenix-trial.md">Trace agents with Phoenix</a>, including the <a href="phoenix-trial.md#send-traces-to-a-team-hosted-phoenix">team-hosted setup</a>.</td></tr>
+<tr><td><span class="var" id="var-eap_phoenix_env_file">EAP_PHOENIX_ENV_FILE</span></td><td>Optional private agent tracing settings file.</td><td>Unset; use the root .env or an absolute file path</td><td>Unset; inject task environment settings</td><td>Process settings override the separate tracing file, then the service .env. Nothing is exported until tracing is enabled. A local Phoenix stores traces in SQLite and runs in its own Python environment. A team-hosted Phoenix is supported over HTTPS; your platform team runs it. <a href="phoenix-trial.md">Trace agents with Phoenix</a>, including the <a href="phoenix-trial.md#send-traces-to-a-team-hosted-phoenix">team-hosted setup</a>.</td></tr>
+<tr><td><span class="var" id="var-phoenix_collector_endpoint">PHOENIX_COLLECTOR_ENDPOINT</span></td><td>Phoenix HTTP origin, without /v1/traces.</td><td>http://127.0.0.1:6006</td><td>Team-managed authenticated HTTPS origin</td><td>Process settings override the separate tracing file, then the service .env. Nothing is exported until tracing is enabled. A local Phoenix stores traces in SQLite and runs in its own Python environment. A team-hosted Phoenix is supported over HTTPS; your platform team runs it. <a href="phoenix-trial.md">Trace agents with Phoenix</a>, including the <a href="phoenix-trial.md#send-traces-to-a-team-hosted-phoenix">team-hosted setup</a>.</td></tr>
+<tr><td><span class="var" id="var-phoenix_project_name">PHOENIX_PROJECT_NAME</span></td><td>Project for this agent&#x27;s traces.</td><td>agent-lab; rmprep-trial in the walkthrough</td><td>Team project</td><td>Process settings override the separate tracing file, then the service .env. Nothing is exported until tracing is enabled. A local Phoenix stores traces in SQLite and runs in its own Python environment. A team-hosted Phoenix is supported over HTTPS; your platform team runs it. <a href="phoenix-trial.md">Trace agents with Phoenix</a>, including the <a href="phoenix-trial.md#send-traces-to-a-team-hosted-phoenix">team-hosted setup</a>.</td></tr>
+<tr><td><span class="var" id="var-phoenix_api_key">PHOENIX_API_KEY</span></td><td>Optional API key; never included in trace links.</td><td>Unset for the local server</td><td>Process environment (on Fargate, an ECS task-definition secret); not the secrets provider</td><td>Process settings override the separate tracing file, then the service .env. Nothing is exported until tracing is enabled. A local Phoenix stores traces in SQLite and runs in its own Python environment. A team-hosted Phoenix is supported over HTTPS; your platform team runs it. <a href="phoenix-trial.md">Trace agents with Phoenix</a>, including the <a href="phoenix-trial.md#send-traces-to-a-team-hosted-phoenix">team-hosted setup</a>.</td></tr>
 <tr><td><span class="var">LIBRARY</span></td><td>Command Prompt shortcut for the library checkout.</td><td>Example: <code>F:\work\ai-agent-lib</code></td><td>Not used by the service.</td><td>Defined by the setup commands; it is not an ai-agent-lib setting.</td></tr>
 <tr><td><span class="var">PYTHON</span></td><td>Command Prompt shortcut for the virtual environment&#x27;s Python.</td><td><code>%LIBRARY%\.venv\Scripts\python.exe</code></td><td>Not used by the service.</td><td>Run <code>&quot;%PYTHON%&quot; -m pip</code> to install into this environment. This is a guide shortcut, not Python&#x27;s PYTHONPATH setting.</td></tr>
 <tr><td><span class="var">PIP_CONFIG_FILE</span></td><td>Pip: selects the team&#x27;s approved configuration file.</td><td>Team-provided path, e.g. <code>C:\company\python\pip.ini</code></td><td>Build environment only, when the build team supplies it.</td><td>The enterprise setup may already configure pip; keep it unless the team tells you to select another file. Pip variables belong in the process environment.</td></tr>
@@ -2429,15 +2532,18 @@ async def classify(
     Existing graph callbacks are preserved, and governed native tools appear once
     in the trace. The adapter adds <code>output.trace</code> when enabled; existing
     answer, streaming and checkpoint interfaces keep their behavior.</p>
-    <p>For a desktop trial using Python and pip, follow the
-    <a href="phoenix-trial.md">local Phoenix walkthrough</a>. Run
+    <p>To run Phoenix on your own machine with Python and pip, follow
+    <a href="phoenix-trial.md">Trace agents with Phoenix</a>. Run
     <code>start-phoenix.bat setup</code> once, then enable Phoenix in the root
     <code>.env</code>. Run <code>start-local.bat</code> to start the local Phoenix server
     before the MCP, agent, and UI services. It keeps separate <code>.venv</code> packages and uses the default Python;
     <code>stop-local.bat</code> stops the stack and preserves SQLite traces. The agent
     adds an <strong>Open trace in Agent Lab</strong> link to each response, opening the configured Phoenix trace. The walkthrough
-    lists the opt-in settings and a verified Anthropic conversation. A generated
-    agent's <code>docs/tracing.md</code> lists the same settings for its own
+    lists the opt-in settings and a verified Anthropic conversation. To send traces
+    to a Phoenix server your platform team runs instead, set
+    <code>PHOENIX_COLLECTOR_ENDPOINT</code> as described in its
+    <a href="phoenix-trial.md#send-traces-to-a-team-hosted-phoenix">team-hosted section</a>.
+    A generated agent's <code>docs/tracing.md</code> lists the same settings for its own
     service; the <a href="#variables">configuration table</a> names each one.</p>
     <p>Blocking PII checks and structured-output schemas buffer text until they pass.
     Default pattern checks validate each growing text update, allowing early display. Drafts can still change during business validation; only the final

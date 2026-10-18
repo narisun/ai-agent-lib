@@ -64,7 +64,7 @@ On macOS/Linux, use a bash or zsh terminal. Write `LIBRARY="$PWD"` and
 | `agentlib run SERVICE [ARGS]` | Starts an agent's HTTP entry point or an MCP server, from any folder of the workspace |
 | `agentlib graph AGENT` | Prints the agent's graph as a Mermaid diagram |
 | `agentlib policy test [--opa]` | Decides the sample requests in `tests/policy-samples.yaml` and compares with what each expects |
-| `agentlib update [--plan] [--diff]` | Brings generated files up to what this version writes, leaving the files you changed alone. `--plan` previews every change and writes nothing; `--diff` shows what the templates would change in the files you changed. See [Updating generated code](#updating-generated-code) |
+| `agentlib update [--plan] [--diff]` | Brings generated files up to what this version writes, leaving the files you changed alone. `--plan` previews every change and writes nothing; `--diff` shows what the templates would change in the files you changed (without `--plan`, `--diff` also applies the update). See [Updating generated code](#updating-generated-code) |
 | `agentlib config options [PORT [NAME]] [--schema]` | Lists every adapter, and each adapter's options with types, defaults and meanings; `--schema` prints JSON Schema for an editor |
 | `agentlib check [--opa] [--keep-going]` | Runs what CI runs: ruff, the format check, mypy, pytest and the policy samples. Names the step that failed |
 | `agentlib eval [SERVICE] [--accept]` | Runs the evals of one service or all: its tests marked `eval`, with the real model in its `.env`. `--accept` runs one service's evals and, if they pass, promotes the report to `evals/baseline.json`; later runs gate on it. See [Measure an agent with evals](../../docs/evals.md) |
