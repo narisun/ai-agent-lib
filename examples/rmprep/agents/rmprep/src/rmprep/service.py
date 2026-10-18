@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import dataclasses
 from collections.abc import AsyncIterator, Sequence
-from typing import Any
+from typing import Any, cast
 
 from ai_agent_lib_core import RequestContext, ServiceConfig, ServiceContainer, ValidationFailed
 from ai_agent_lib_core.adapters.audit_jsonl import JsonlAuditOptions
@@ -19,10 +20,11 @@ from ai_agent_lib_core.contracts import (
 )
 from ai_agent_lib_core.contracts.inspection import TurnInspector
 from ai_agent_lib_core.integrations.http import (
+    AgentService,
     OutcomeJournal,
     ServiceLifecycle,
     SqliteOutcomeJournal,
-    agent_app,
+    build_agent_app,
     serve,
 )
 from ai_agent_lib_core.integrations.langgraph.inspection import GraphCheckpointPreview
@@ -41,7 +43,51 @@ from rmprep.context import ContextBuilder
 from rmprep.graph import APPLICATION, build_graph, registered_mcp_tools, response, steps
 from rmprep.settings import ENV_FILE, load_context_budget
 
-__all__ = ["build_app", "main"]
+__all__ = ["SERVICE", "build_app", "main"]
+
+
+def _question(given: Any) -> str:
+    question = given.get("question") if isinstance(given, dict) else None
+    if not isinstance(question, str) or not question.strip():
+        raise ValidationFailed(
+            "the input is not a question",
+            expected='an object such as {"question": "Prepare a memo for JONE-0022."}',
+            actual="no non-empty 'question' in it",
+        )
+    return question
+
+
+async def _build_graph(services: ServiceContainer) -> Any:
+    # The service's own default: no context policy. build_app overrides this
+    # with one that also carries the request's context_builder.
+    return build_graph(services, await registered_mcp_tools(services))
+
+
+async def _stream(
+    graph: Any, services: ServiceContainer, context: RequestContext, given: Any
+) -> AsyncIterator[dict[str, Any]]:
+    # POST /invoke/stream sends each step as a server-sent event.
+    async for step in steps(graph, services, context, _question(given)):
+        yield step
+
+
+def _outcomes(config: ServiceConfig) -> OutcomeJournal | None:
+    # Local-only: a deployed service gets no durable journal from this library.
+    if config.deployment_env == "local":
+        return SqliteOutcomeJournal(ENV_FILE.parent / ".agentlib" / "outcomes.sqlite")
+    return None
+
+
+SERVICE = AgentService(
+    application=APPLICATION,
+    build_graph=_build_graph,
+    respond=response,
+    question=_question,
+    stream=_stream,
+    default_port=8000,
+    env_file=ENV_FILE,
+    outcomes=_outcomes,
+)
 
 
 async def build_app(
@@ -53,7 +99,7 @@ async def build_app(
     inspector: TurnInspector | None = None,
     tracing: LangfuseTracing | PhoenixTracing | None = None,
 ) -> Any:
-    """Build the agent's HTTP application.
+    """Build the agent's HTTP application on the shared ``AgentService`` composition.
 
     The graph is prepared once after the listener starts and before readiness.
     Each request brings its own caller: the entry point turns the bearer token into a
@@ -64,30 +110,23 @@ async def build_app(
             callback must start and validate it before graph preparation runs.
         lifecycle: Receives deferred preparation before serving starts.
         context_builder: Optional context policy, shared by normal and streamed requests.
+        outcomes: Optional durable outcome journal; see ``SERVICE.outcomes``.
         inspector: Optional diagnostic reader; local services otherwise use their configured
             trace/audit files and graph. Deployed services must inject an authorized reader.
         tracing: Optional library tracing adapter, owned by the entry point.
     """
-    graph: Any = None
+    # The graph does not exist until the lifecycle's prepare step runs, after
+    # this function returns. The inspector's checkpoint reader is built now but
+    # only dereferences the graph per request, once it is always present.
+    graph_box: list[Any] = []
 
-    async def prepare() -> None:
+    async def prepare_graph(services: ServiceContainer) -> Any:
         # Admission stays closed until discovery and graph compilation succeed.
-        nonlocal graph
         graph = build_graph(
             services, await registered_mcp_tools(services), context_builder=context_builder
         )
-
-    lifecycle.prepare(prepare)
-
-    async def run(context: RequestContext, given: Any) -> dict[str, Any]:
-        if tracing is not None:
-            return await tracing.run(graph, services, context, _question(given), respond=response)
-        return await response(graph, services, context, _question(given))
-
-    async def stream(context: RequestContext, given: Any) -> AsyncIterator[dict[str, Any]]:
-        # POST /invoke/stream sends each step as a server-sent event.
-        async for step in steps(graph, services, context, _question(given)):
-            yield step
+        graph_box.append(graph)
+        return graph
 
     async def authorize_inspection(context: RequestContext) -> None:
         decision = await services.policy.decide(
@@ -111,30 +150,21 @@ async def build_app(
             audit_paths=(audit.parse_options(JsonlAuditOptions).path,)
             if audit.provider == "jsonl"
             else (),
-            checkpoints=GraphCheckpointPreview(lambda: graph, services.invocation),
+            checkpoints=GraphCheckpointPreview(
+                lambda: graph_box[-1] if graph_box else None, services.invocation
+            ),
         )
 
-    return agent_app(
-        services,
-        run,
-        application=APPLICATION,
-        lifecycle=lifecycle,
-        stream=stream,
-        live_updates=True,
-        outcomes=outcomes,
-        inspector=inspector,
+    service = dataclasses.replace(
+        SERVICE,
+        build_graph=prepare_graph,
+        app_kwargs={**dict(SERVICE.app_kwargs), "outcomes": outcomes, "inspector": inspector},
     )
-
-
-def _question(given: Any) -> str:
-    question = given.get("question") if isinstance(given, dict) else None
-    if not isinstance(question, str) or not question.strip():
-        raise ValidationFailed(
-            "the input is not a question",
-            expected='an object such as {"question": "Prepare a memo for JONE-0022."}',
-            actual="no non-empty 'question' in it",
-        )
-    return question
+    # build_agent_app's tracing parameter predates Phoenix support; both backends
+    # share the same run(graph, services, context, question, respond=...) shape.
+    return await build_agent_app(
+        service, services, lifecycle, tracing=cast("LangfuseTracing | None", tracing)
+    )
 
 
 async def _serve(config: ServiceConfig, host: str, port: int, contexts: ContextBuilder) -> None:
@@ -156,9 +186,7 @@ async def _serve(config: ServiceConfig, host: str, port: int, contexts: ContextB
                     lifecycle,
                     context_builder=contexts,
                     tracing=tracing,
-                    outcomes=SqliteOutcomeJournal(ENV_FILE.parent / ".agentlib" / "outcomes.sqlite")
-                    if config.deployment_env == "local"
-                    else None,
+                    outcomes=_outcomes(config),
                 ),
                 lifecycle,
                 host=host,
@@ -172,7 +200,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Serve until stopped. SIGTERM lets requests in flight finish first."""
     parser = argparse.ArgumentParser(prog="rmprep-serve", description=__doc__)
     parser.add_argument("--host", default="127.0.0.1", help="address to listen on")
-    parser.add_argument("--port", type=int, default=8000, help="port to listen on")
+    parser.add_argument("--port", type=int, default=SERVICE.default_port, help="port to listen on")
     arguments = parser.parse_args(argv)
     config: ServiceConfig | None = None
     try:
