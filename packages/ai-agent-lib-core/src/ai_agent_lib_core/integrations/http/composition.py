@@ -13,6 +13,7 @@ import argparse
 import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from ai_agent_lib_core.config import load_service_config
@@ -78,6 +79,10 @@ class AgentService:
         default_port: The port ``--port`` defaults to.
         app_kwargs: Extra keyword arguments for ``agent_app``, such as
             ``outcomes``, ``inspector``, ``diagnostics`` or ``admission``.
+        env_file: The service's own ``.env`` file. ``run_agent`` resolves
+            configuration and Langfuse settings from it; without one, both
+            fall back to their own default (the process environment and a
+            ``.env`` in the working directory).
     """
 
     application: str
@@ -88,6 +93,7 @@ class AgentService:
     live_updates: bool = True
     default_port: int = 8000
     app_kwargs: Mapping[str, Any] = field(default_factory=dict)
+    env_file: Path | None = None
 
 
 async def build_agent_app(
@@ -135,7 +141,8 @@ async def build_agent_app(
 async def _serve(service: AgentService, config: ServiceConfig, host: str, port: int) -> None:
     from ai_agent_lib_core.integrations.langgraph.langfuse import langfuse_tracing
 
-    async with langfuse_tracing(service.application, config) as tracing:
+    dotenv_path = service.env_file if service.env_file is not None else Path(".env")
+    async with langfuse_tracing(service.application, config, dotenv_path=dotenv_path) as tracing:
         services = ServiceContainer(config, model_trace=tracing)
 
         async def start() -> None:
@@ -160,7 +167,11 @@ def run_agent(service: AgentService, argv: Sequence[str] | None = None) -> int:
     arguments = parser.parse_args(argv)
     config: ServiceConfig | None = None
     try:
-        config = load_service_config()
+        config = (
+            load_service_config(service.env_file)
+            if service.env_file is not None
+            else load_service_config()
+        )
         configure_logging(service.application, details=shows_details(config))
         stop_telemetry = start_telemetry(service.application, config)
         try:

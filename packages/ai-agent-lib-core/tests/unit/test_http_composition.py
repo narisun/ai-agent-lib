@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
 
-from ai_agent_lib_core.contracts import Principal, RequestContext, ValidationFailed
+import ai_agent_lib_core.integrations.http.composition as composition
+from ai_agent_lib_core.config import PREFIX, Key, variable_for
+from ai_agent_lib_core.contracts import Principal, RequestContext, ServiceConfig, ValidationFailed
 from ai_agent_lib_core.di import ServiceContainer
 from ai_agent_lib_core.integrations.http import (
     AgentService,
     ServiceLifecycle,
     build_agent_app,
     read_question,
+    run_agent,
 )
 from ai_agent_lib_core.testing import Fakes
 from ai_agent_lib_core.testing.fakes import FakeIdentityVerifier
@@ -118,3 +122,65 @@ async def test_build_graph_runs_before_readiness() -> None:
 
         assert ran == ["built"]
         assert (await client.get("/readyz")).status_code == 200
+
+
+# --------------------------------------------------------------- run_agent's own .env file
+
+
+def test_run_agent_resolves_configuration_from_the_services_own_env_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``env_file`` is the service's own file: run_agent reads it, not ``.env``."""
+    env_file = tmp_path / "service.env"
+    env_file.write_text(f"{variable_for(Key.DEPLOYMENT_ENV)}=dev\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)  # a stray ".env" here must not be what is read
+
+    captured: dict[str, Any] = {}
+
+    async def fake_serve(
+        service: AgentService, config: ServiceConfig, host: str, port: int
+    ) -> None:
+        captured["config"] = config
+
+    monkeypatch.setattr(composition, "_serve", fake_serve)
+    service = AgentService(
+        application="probe", build_graph=_build_graph, respond=_respond, env_file=env_file
+    )
+
+    assert run_agent(service, []) == 0
+    assert captured["config"].deployment_env.value == "dev"
+
+
+def test_run_agent_without_an_env_file_reads_the_working_directorys_dotenv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Without ``env_file`` the behavior is unchanged: only the process environment."""
+    monkeypatch.chdir(tmp_path)  # no ".env" here either
+    captured: dict[str, Any] = {}
+
+    async def fake_serve(
+        service: AgentService, config: ServiceConfig, host: str, port: int
+    ) -> None:
+        captured["config"] = config
+
+    monkeypatch.setattr(composition, "_serve", fake_serve)
+    service = AgentService(application="probe", build_graph=_build_graph, respond=_respond)
+
+    assert run_agent(service, []) == 0
+    assert captured["config"].deployment_env.value == "local"
+
+
+def test_run_agent_reports_a_configuration_error_from_a_bad_env_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A problem in the service's own file is reported, not a crash or a silent default."""
+    env_file = tmp_path / "service.env"
+    env_file.write_text(f"{PREFIX}NONSENSE=1\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    service = AgentService(
+        application="probe", build_graph=_build_graph, respond=_respond, env_file=env_file
+    )
+
+    exit_code = run_agent(service, [])
+
+    assert exit_code == 1
