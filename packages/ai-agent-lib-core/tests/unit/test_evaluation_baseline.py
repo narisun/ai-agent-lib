@@ -62,3 +62,51 @@ def test_a_file_that_is_not_a_report_is_refused(tmp_path: Path) -> None:
     path.write_text("[1, 2]", encoding="utf-8")
     with pytest.raises(ValidationFailed):
         load_report(path)
+
+
+def test_a_different_schema_is_refused(tmp_path: Path) -> None:
+    """A baseline with a different schema value is refused with ValidationFailed."""
+    path = tmp_path / "baseline.json"
+    path.write_text('{"means": {"y": 0.5}, "schema": "other/v1"}', encoding="utf-8")
+    with pytest.raises(ValidationFailed):
+        load_report(path)
+
+
+def test_a_pre_v1_report_without_schema_loads(tmp_path: Path) -> None:
+    """A pre-v1 report (no schema key) with means dict and results list loads successfully."""
+    path = tmp_path / "baseline.json"
+    report_json = (
+        '{"means": {"y": 0.5}, "results": '
+        '[{"id": "a", "scores": {"y": 1.0}}, {"id": "b", "scores": {"y": 0.0}}]}'
+    )
+    path.write_text(report_json, encoding="utf-8")
+    saved = load_report(path)
+    assert saved.means == {"y": 0.5}
+    assert saved.case_scores == {"a": {"y": 1.0}, "b": {"y": 0.0}}
+
+
+def test_non_numeric_mean_raises_validation_failed(tmp_path: Path) -> None:
+    """A baseline with non-numeric mean value raises ValidationFailed, not raw ValueError."""
+    path = tmp_path / "baseline.json"
+    path.write_text('{"means": {"y": "not-a-number"}}', encoding="utf-8")
+    with pytest.raises(ValidationFailed):
+        load_report(path)
+
+
+def test_null_scores_raises_validation_failed(tmp_path: Path) -> None:
+    """A baseline with scores: null in a result raises ValidationFailed, not raw AttributeError."""
+    path = tmp_path / "baseline.json"
+    path.write_text(
+        '{"means": {"y": 0.5}, "results": [{"id": "a", "scores": null}]}',
+        encoding="utf-8",
+    )
+    with pytest.raises(ValidationFailed):
+        load_report(path)
+
+
+def test_invalid_utf8_raises_validation_failed(tmp_path: Path) -> None:
+    """A file with invalid UTF-8 bytes raises ValidationFailed, not raw UnicodeDecodeError."""
+    path = tmp_path / "baseline.json"
+    path.write_bytes(b"\xff\xfe{")
+    with pytest.raises(ValidationFailed):
+        load_report(path)

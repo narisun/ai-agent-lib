@@ -53,11 +53,12 @@ def load_report(path: Path) -> SavedReport:
     """
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as problem:
+    except (OSError, ValueError) as problem:
         raise ValidationFailed(
             f"the baseline {path} cannot be read",
             expected="the JSON an eval writes with report.to_json()",
             actual=str(problem),
+            fix="write the baseline with agentlib eval SERVICE --accept",
         ) from problem
     wrong = not isinstance(data, dict) or not isinstance(data.get("means"), dict)
     if wrong or data.get("schema", REPORT_SCHEMA) != REPORT_SCHEMA:
@@ -68,15 +69,23 @@ def load_report(path: Path) -> SavedReport:
             fix="write the baseline with agentlib eval SERVICE --accept",
         )
     results = data.get("results", [])
-    return SavedReport(
-        means={str(k): float(v) for k, v in data["means"].items()},
-        case_scores={
-            str(r["id"]): {str(k): float(v) for k, v in r.get("scores", {}).items()}
-            for r in results
-            if isinstance(r, dict) and "id" in r
-        },
-        metadata={str(k): str(v) for k, v in data.get("metadata", {}).items()},
-    )
+    try:
+        return SavedReport(
+            means={str(k): float(v) for k, v in data["means"].items()},
+            case_scores={
+                str(r["id"]): {str(k): float(v) for k, v in r.get("scores", {}).items()}
+                for r in results
+                if isinstance(r, dict) and "id" in r
+            },
+            metadata={str(k): str(v) for k, v in data.get("metadata", {}).items()},
+        )
+    except (TypeError, ValueError, AttributeError) as problem:
+        raise ValidationFailed(
+            f"the baseline {path} is not an eval report",
+            expected="means, scores and metadata as the eval writes them",
+            actual=str(problem),
+            fix="write the baseline with agentlib eval SERVICE --accept",
+        ) from problem
 
 
 def regressions(
