@@ -109,6 +109,8 @@ Its proposed commands are recommendations, not commands available in this checko
   before treating an existing generated project's README as authoritative.
 - Edit package READMEs and this index directly. Link to the detailed guide for
   advanced setup instead of copying it into every README.
-- `agentlib update --diff` **writes updates** to untouched generated files and
-  shows proposed changes for edited files. Review your working tree before and
-  after running it; the flag is not a dry run.
+- `agentlib update --plan` previews every change (add `--diff` to see edited
+  files' proposed changes too) and writes nothing. `agentlib update --diff`
+  without `--plan` **writes updates** to untouched generated files while it
+  shows proposed changes for edited files; review your working tree before and
+  after running it, since that flag alone is not a dry run.

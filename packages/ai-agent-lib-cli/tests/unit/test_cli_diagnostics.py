@@ -681,6 +681,34 @@ def test_update_replaces_what_the_developer_left_alone_and_keeps_what_they_chang
     assert [path.name for path in again.kept] == ["tools.py"]
 
 
+def test_plan_lists_changes_without_writing(tmp_path: Path) -> None:
+    scaffolder().init(tmp_path, ANSWERS)
+    agent = tmp_path / "agents/hello-agent"
+    tools = agent / "src/hello_agent/tools.py"
+    tools.write_text(tools.read_text(encoding="utf-8") + "\n# my tool\n", encoding="utf-8")
+
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    report = scaffolder(NewerTemplates()).plan(tmp_path)
+    after = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    assert after == before  # nothing was written
+
+    assert [path.as_posix() for path in report.updated] == [
+        "agents/hello-agent/src/hello_agent/graph.py"
+    ]
+    assert [path.as_posix() for path in report.created] == [
+        "agents/hello-agent/src/hello_agent/extra.py"
+    ]
+    assert [path.as_posix() for path in report.kept] == [
+        "agents/hello-agent/src/hello_agent/tools.py"
+    ]
+    assert "# written by a newer version" in report.new_text[report.kept[0]]
+    # The listed "would be updated" file was not actually touched on disk.
+    graph = agent / "src/hello_agent/graph.py"
+    assert "# written by a newer version" not in graph.read_text(encoding="utf-8")
+    assert not (agent / "src/hello_agent/extra.py").exists()
+    assert tools.read_text(encoding="utf-8").endswith("# my tool\n")
+
+
 def test_the_update_command_lists_what_it_did_and_can_show_the_difference(
     workspace: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -700,6 +728,22 @@ def test_the_update_command_lists_what_it_did_and_can_show_the_difference(
     assert '    -    return f"Good day, {cleaned}!"' in out
     assert '    +    return f"Hello, {cleaned}!"' in out
     assert "Good day" in tools.read_text(encoding="utf-8")
+
+
+def test_update_plan_flag_previews_and_exits_clean(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    before = {p: p.read_bytes() for p in workspace.rglob("*") if p.is_file()}
+
+    newer_tools = toolbox_for_tests(pins=PINS, renderer=NewerTemplates())
+    capsys.readouterr()
+    assert run("update", "--plan", "--workspace", workspace, tools=newer_tools) == 0
+    out = capsys.readouterr().out
+    assert "would update  agents/hello-agent/src/hello_agent/graph.py" in out
+    assert "would create  agents/hello-agent/src/hello_agent/extra.py" in out
+
+    after = {p: p.read_bytes() for p in workspace.rglob("*") if p.is_file()}
+    assert after == before  # nothing was written
 
 
 def test_a_lock_file_that_cannot_be_read_stops_the_command(

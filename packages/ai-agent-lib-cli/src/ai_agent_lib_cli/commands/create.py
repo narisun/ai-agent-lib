@@ -342,20 +342,22 @@ def registry_pin(tools: Toolbox, server: str, workspace: Path | None) -> None:
 @click.option(
     "--diff", "show_diff", is_flag=True, help="Show what would change in files you changed."
 )
+@click.option("--plan", "plan_only", is_flag=True, help="Preview every change; write nothing.")
 @workspace_option
 @pass_toolbox
-def update(tools: Toolbox, show_diff: bool, workspace: Path | None) -> None:
+def update(tools: Toolbox, show_diff: bool, plan_only: bool, workspace: Path | None) -> None:
     """Bring generated files up to what this version of agentlib writes.
 
     A file you have not changed since it was generated is replaced. A file you
     changed is left alone and listed. Registries, rules, samples and .env
-    files are never touched.
+    files are never touched. --plan previews every change and writes nothing.
     """
     root = workspace_root(workspace)
-    report = tools.scaffolder().update(root)
+    report = tools.scaffolder().plan(root) if plan_only else tools.scaffolder().update(root)
+    verb = {"updated": "would update", "created": "would create"} if plan_only else {}
     for label, paths in (("updated", report.updated), ("created", report.created)):
         for path in paths:
-            click.echo(f"  {label}  {path.as_posix()}")
+            click.echo(f"  {verb.get(label, label)}  {path.as_posix()}")
     for path in report.kept:
         click.echo(f"  kept     {path.as_posix()}  (you changed it)")
         if show_diff:
