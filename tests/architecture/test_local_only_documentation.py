@@ -15,11 +15,10 @@ import pytest
 from ai_agent_lib_core.config import DEFAULT_BINDINGS, Key, provider_key, render_reference
 from ai_agent_lib_core.config.bindings import LOCAL_ONLY_ADAPTERS, Binding
 from ai_agent_lib_core.contracts import Section
-from ai_agent_lib_core.di import ServiceProviders
+from ai_agent_lib_core.di import ServiceProviders, ports
 from ai_agent_lib_core.di.providers import DATA_PORT, MODEL_PORT
 
 _PORTS = (MODEL_PORT, *(section.value for section in Section), DATA_PORT)
-_LOCAL_ONLY_WORDING = re.compile(r"local[- ]only")
 
 
 def _binding(key: str) -> Binding:
@@ -45,6 +44,10 @@ def _registered_local_only() -> set[tuple[str, str]]:
     }
 
 
+def test_the_port_list_covers_every_public_port() -> None:
+    assert {getattr(ports, name).name for name in ports.__all__} == set(_PORTS)
+
+
 def test_the_documented_list_is_exactly_the_registered_local_only_adapters() -> None:
     assert set(LOCAL_ONLY_ADAPTERS) == _registered_local_only()
 
@@ -60,7 +63,6 @@ def test_the_setting_that_selects_a_local_only_adapter_says_it_is_local_only(
     port: str, name: str
 ) -> None:
     binding = _selecting_binding(port)
-    assert f"`{name}`" in binding.details, f"{binding.name} does not name `{name}`"
-    assert _LOCAL_ONLY_WORDING.search(binding.details), (
-        f"{binding.name} names `{name}` without saying it is local-only"
+    assert re.search(rf"`{re.escape(name)}`[^`]*local[- ]only", binding.details), (
+        f"{binding.name} does not say `{name}` is local-only"
     )

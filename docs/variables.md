@@ -2,7 +2,7 @@
 
 # Configuration variables
 
-With nothing set, every provider is local: files, SQLite and in-process engines, with no cloud account. `EAP_PROFILE=aws` switches every section to its AWS provider, and any single `EAP_<SECTION>_PROVIDER` opts one section in. A few local adapters are local only: the one-way guard (`EAP_DEPLOYMENT_ENV`) refuses them anywhere but local development.
+With nothing set, every provider is local: files, SQLite and in-process engines, with no cloud infrastructure. `EAP_PROFILE=aws` switches every section to its AWS provider, and any single `EAP_<SECTION>_PROVIDER` opts one section in. A few local adapters are local only: the one-way guard (`EAP_DEPLOYMENT_ENV`) refuses them anywhere but local development.
 
 ## Profile defaults
 

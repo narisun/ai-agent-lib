@@ -35,8 +35,8 @@ _HEADER = "<!-- Generated from the binding table. Do not edit by hand. -->"
 _SECRET_PATTERN = f"{SECRET_VARIABLE_PREFIX}<NAME>"
 _LOCAL_FIRST = (
     "With nothing set, every provider is local: files, SQLite and in-process engines, with no "
-    "cloud account. `EAP_PROFILE=aws` switches every section to its AWS provider, and any single "
-    "`EAP_<SECTION>_PROVIDER` opts one section in. A few local adapters are local only: the "
+    "cloud infrastructure. `EAP_PROFILE=aws` switches every section to its AWS provider, and any "
+    "single `EAP_<SECTION>_PROVIDER` opts one section in. A few local adapters are local only: the "
     "one-way guard (`EAP_DEPLOYMENT_ENV`) refuses them anywhere but local development."
 )
 _PROFILE_TABLE_INTRO = (
@@ -161,8 +161,8 @@ def render_env_example(bindings: Sequence[Binding] = DEFAULT_BINDINGS) -> str:
     """Return a commented ``.env.example`` listing every variable."""
     lines = [
         "# Generated from the binding table. Do not edit by hand.",
-        "# With nothing set, every provider is local: no cloud account. EAP_PROFILE=aws or one",
-        "# EAP_<SECTION>_PROVIDER opts into AWS. Copy to .env and uncomment what you need.",
+        "# With nothing set, every provider is local: no cloud infrastructure. EAP_PROFILE=aws",
+        "# or one EAP_<SECTION>_PROVIDER opts into AWS. Copy to .env and uncomment what you need.",
         "",
     ]
     for binding in bindings:
