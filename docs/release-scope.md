@@ -1,11 +1,11 @@
 # Release 0.1 architecture and specification traceability
 
 The [October specification](Specification.md) describes the target design. The
-matrix below maps the twelve priorities of the October code review to the
-current release and resolves its contradictions using the [decision
+matrix below maps the twelve review priorities to the current release and
+resolves the specification's contradictions using the [decision
 records](adr/README.md); [Since the October review](#since-the-october-review)
-records what was added or removed afterward. Future concerns in that document
-are not claims that this release implements them.
+records what was added or removed afterward. Future concerns in the
+specification are not claims that this release implements them.
 
 For the current local developer workflow, use the [documentation map](README.md).
 Agent Lab adds saved chat, response inspection, and memo views in a separate UI
@@ -99,10 +99,10 @@ wheelhouse supports offline installation.
 Native extensions still require a wheel compatible with that Python
 and platform; pip cannot replace a missing platform wheel with pure Python.
 
-When upgrading generated projects, run `agentlib update --plan` first: it lists
-every file the update would replace or create, and each file it would leave alone
-because you edited it, and writes nothing. Then run `agentlib update --diff`. It
-preserves developer-modified files. Existing deployment Dockerfiles are user-owned: review
+When upgrading generated projects, run `agentlib update --plan` first. It lists
+every file the update would replace or create and every file it would leave alone
+because you edited it, and it writes nothing. Then run `agentlib update --diff`,
+which preserves the files you edited. Existing deployment Dockerfiles are user-owned: review
 the new template alongside the generated `Dockerfile.dockerignore`, replace the
 old uv build steps, and create the per-service `requirements.lock` using the
 deployment README. Unmodified generated files can be updated normally. The

@@ -121,7 +121,7 @@ Startup checks that the packages match the selected Python; it does not install 
 missing, run `start-phoenix.bat setup`, then try again.
 
 Open Agent Lab at <http://127.0.0.1:8765> and Phoenix at
-<http://127.0.0.1:6006>. This local, single-user Phoenix trial needs no separate
+<http://127.0.0.1:6006>. This local, single-user Phoenix setup needs no separate
 login. Check the printed model and settings before testing. Read the Agent Lab
 access code with `type .agentlib\ui-rmprep\access-code` in another terminal.
 
@@ -165,7 +165,7 @@ API key in the root `.env`:
 | Built-in assistant | `PHOENIX_DISABLE_AGENT_ASSISTANT=true` | Test your agent through Agent Lab. |
 
 The launcher also disables usage telemetry and the optional gRPC collector.
-The native Phoenix banner may still list gRPC; this trial uses HTTP only.
+The native Phoenix banner may still list gRPC; this local setup uses HTTP only.
 `tools/phoenix_server.py` contains version-checked compatibility shims for the
 gRPC listener and the optional Bedrock Playground dependency check. The latter
 only checks for `aioboto3` when Phoenix allows its AWS provider. Neither shim
@@ -209,7 +209,7 @@ your own numbers. Model output, caching, and timing vary between runs.
 
 ### Verified Anthropic run
 
-On October 15, 2026, the two questions above ran through Agent Lab using the root
+On October 15, 2026, these two questions ran through Agent Lab using the root
 `.env` and `claude-sonnet-4-5`. The synthetic name returned zero matches. The
 follow-up recalled that name and count without another MCP call.
 
@@ -227,6 +227,7 @@ Phoenix's API and SQLite records matched Agent Lab's saved metrics, the agent's
 model JSONL records, the MCP server audit, and all eight checkpoint references.
 Both traces remained available after stopping and restarting Phoenix with the
 same SQLite file.
+These counts are an example of one run; model output, caching, and duration vary.
 
 ### Verified JONE-0022 memo and follow-ups
 
@@ -252,9 +253,9 @@ usage totals and all 12 checkpoint references matched the local records. Source
 checks covered 59 CSV records, 579 fields, nine payment groups and 14 comparisons.
 
 The memo and Q&A specialists have different static prompt prefixes. The first
-Q&A call wrote its cache; the next follow-up reused it. Regression tests also
-cover trace links and checkpoint references for confirmed failed turns; the live
-conversation above had no failed turns.
+Q&A call wrote its cache; the next follow-up reused it. Cache hits and timing vary
+between runs. Regression tests also cover trace links and checkpoint references
+for confirmed failed turns; the live conversation above had no failed turns.
 
 ### Verified Jones follow-up after restart
 
@@ -277,9 +278,9 @@ without changing stored conversation, checkpoint or trace rows during shutdown.
 The earlier follow-up needed two calls because Markdown markers pushed the raw
 word count over its limit. Content-word counting now excludes those markers;
 regression tests preserve that original draft unchanged and still reject invalid
-citations and answers over their content-word limit. Follow the [local test
-questions](local-startup.md#generate-a-memo-and-ask-follow-ups) to run this
-scenario with your own saved memo reference.
+citations and answers over their content-word limit. Live wording, timing and call counts vary.
+Follow the [local test questions](local-startup.md#generate-a-memo-and-ask-follow-ups)
+to run this scenario with your own saved memo reference.
 
 </details>
 
@@ -361,7 +362,7 @@ you turn it on.
 
 | `EAP_PHOENIX_CAPTURE_CONTENT` | What a trace holds |
 | --- | --- |
-| `false` (default) | Span names and timings, token counts, request and thread IDs, a scoped session hash, and checkpoint references. |
+| `false` (default) | Includes, for example, span names and timings, token counts, request and thread IDs, a scoped session hash, checkpoint references, model and provider names, tool and MCP server names, artifact IDs, and error types. |
 | `true` | All of the above plus model messages, tool arguments and results, and the request and accepted answer. For rmprep that includes client evidence. |
 
 Even with capture off, request and thread IDs and checkpoint references identify
@@ -405,7 +406,7 @@ from ai_agent_lib_core.integrations.langgraph.tracing import agent_tracing
 async with agent_tracing(APPLICATION, config, dotenv_path=ENV_FILE) as tracing:
     services = ServiceContainer(config, model_trace=tracing)
     try:
-        ...  # start and validate services, build the graph, serve
+        ...  # start and validate services, then build `graph`
 
         async def run(context, given):
             question = parse_question(given)
@@ -414,6 +415,8 @@ async with agent_tracing(APPLICATION, config, dotenv_path=ENV_FILE) as tracing:
                     graph, services, context, question, respond=your_response_function
                 )
             return await your_response_function(graph, services, context, question)
+
+        ...  # serve, with `run` as the request handler
     finally:
         await services.aclose()
 ```
@@ -422,8 +425,10 @@ async with agent_tracing(APPLICATION, config, dotenv_path=ENV_FILE) as tracing:
 behavior and returns the output dictionary. It must invoke the graph it is given,
 because that graph carries the tracing callbacks. The adapter copies that
 dictionary and adds `trace` metadata, so treat that key as reserved while tracing
-is enabled. For isolated tests, inject an in-memory exporter instead of running a
-server. The rmprep service shows the full composition through `run_agent`.
+is enabled. For isolated tests, construct
+`PhoenixTracing(settings, application=..., exporter=...)` from
+`ai_agent_lib_core.integrations.langgraph.phoenix` with an in-memory exporter
+(OpenTelemetry's `InMemorySpanExporter`) instead of running a server. The rmprep service shows the full composition through `run_agent`.
 
 The agent needs the library's `otel` extra, installed with
 `python -m pip install "ai-agent-lib-core[otel]"`; generated agents already
@@ -457,7 +462,7 @@ agents keep their own model dependencies and can still send traces to Phoenix.
 | Package installation fails | Ask your package administrators for `arize-phoenix==20.22.0` and compatible wheels for your Python version and platform. |
 | Phoenix environment is missing | Run `start-phoenix.bat setup` once, then retry `start-local.bat`. |
 | Port 6006 is in use | Stop a standalone Phoenix window before starting the combined stack. The launcher fails before starting services and leaves the existing process alone. |
-| Repeated connection errors on port 4318 | Set `EAP_TELEMETRY=off` for this local trial, or configure your separate operational collector. Restart the stack. |
+| Repeated connection errors on port 4318 | Set `EAP_TELEMETRY=off` for this local setup, or configure your separate operational collector. Restart the stack. |
 | Startup says tracing needs `ai-agent-lib-core[otel]` | Install the extra with pip, as shown in [Compose tracing by hand](#compose-tracing-by-hand), then restart. |
 | Startup rejects `PHOENIX_COLLECTOR_ENDPOINT` | Use an HTTPS origin, or HTTP for loopback only, with no path, query, or credentials. |
 | Startup fails with `unknown configuration variable` naming a Langfuse setting | Langfuse support was removed. Delete those lines from the `.env`; see [Since the October review](release-scope.md#since-the-october-review). |
