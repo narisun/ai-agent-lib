@@ -16,6 +16,13 @@ model, through the ``judge`` alias, for what cannot be matched. Nothing here
 runs on the request path, and the request path never imports it.
 """
 
+from ai_agent_lib_core.evaluation.baseline import (
+    Regression,
+    SavedReport,
+    load_report,
+    regressions,
+    require_no_regression,
+)
 from ai_agent_lib_core.evaluation.cases import EvalCase, dataset_digest, load_cases
 from ai_agent_lib_core.evaluation.report import REPORT_SCHEMA, CaseResult, EvalReport
 from ai_agent_lib_core.evaluation.run import run_eval
@@ -26,6 +33,8 @@ __all__ = [
     "CaseResult",
     "EvalCase",
     "EvalReport",
+    "Regression",
+    "SavedReport",
     "Score",
     "Scorer",
     "Verdict",
@@ -33,6 +42,9 @@ __all__ = [
     "exact",
     "judged",
     "load_cases",
+    "load_report",
+    "regressions",
+    "require_no_regression",
     "run_eval",
     "scored_by",
 ]
