@@ -94,6 +94,14 @@ class AgentService:
         default_port: The port ``--port`` defaults to.
         app_kwargs: Extra keyword arguments for ``agent_app``, such as
             ``inspector``, ``diagnostics`` or ``admission``.
+        app_extras: Builds more keyword arguments for ``agent_app`` from what
+            only exists once the service is composed: the live service
+            container and a zero-argument getter for the prepared graph (the
+            same object ``respond`` receives). ``build_agent_app`` calls it
+            once, while building the app, and merges the mapping it returns
+            over ``app_kwargs``, so on a shared key the extras win. The getter
+            returns the graph only once readiness has passed, which every
+            request implies; call it per request, never while composing.
         env_file: The service's own ``.env`` file. ``run_agent`` reads both
             the service configuration and the Phoenix tracing settings from
             it, with the process environment taking precedence. Without one,
@@ -112,6 +120,7 @@ class AgentService:
     live_updates: bool = True
     default_port: int = 8000
     app_kwargs: Mapping[str, Any] = field(default_factory=dict)
+    app_extras: Callable[[ServiceContainer, Callable[[], Any]], Mapping[str, Any]] | None = None
     env_file: Path | None = None
     outcomes: Callable[[ServiceConfig], OutcomeJournal | None] | None = None
 
@@ -128,6 +137,7 @@ async def build_agent_app(
     Args:
         service: What the agent is: its name, graph builder and responders.
         services: The service container the graph and its governed calls use.
+            It is also what ``service.app_extras`` receives.
         lifecycle: Readiness bookkeeping; the graph is built by a hook that
             runs after the container is validated and before the service
             reports ready.
@@ -137,7 +147,10 @@ async def build_agent_app(
             exits); this function never does.
 
     Returns:
-        The ASGI application.
+        The ASGI application. ``service.app_extras``, when set, has been called
+        with ``services`` and a getter for the prepared graph; the getter
+        returns the graph once ``lifecycle`` has passed readiness, which every
+        request implies. What it returns overrides ``service.app_kwargs``.
     """
     graph: Any = None
 
@@ -162,6 +175,11 @@ async def build_agent_app(
 
         steps = bound
 
+    def prepared_graph() -> Any:
+        return graph
+
+    extras = dict(service.app_extras(services, prepared_graph)) if service.app_extras else {}
+
     return agent_app(
         services,
         run,
@@ -169,7 +187,7 @@ async def build_agent_app(
         lifecycle=lifecycle,
         stream=steps,
         live_updates=service.live_updates,
-        **dict(service.app_kwargs),
+        **{**dict(service.app_kwargs), **extras},
     )
 
 

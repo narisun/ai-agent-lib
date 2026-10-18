@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +28,9 @@ from ai_agent_lib_core.integrations.http import (
     read_question,
     run_agent,
 )
+from ai_agent_lib_core.integrations.http.admission import InMemoryThreadAdmission
 from ai_agent_lib_core.integrations.http.composition import _with_outcomes
+from ai_agent_lib_core.integrations.langgraph import tracing as tracing_module
 from ai_agent_lib_core.testing import Fakes
 from ai_agent_lib_core.testing.fakes import FakeIdentityVerifier
 
@@ -267,3 +271,191 @@ def test_run_agent_reports_a_configuration_error_from_a_bad_env_file(
     exit_code = run_agent(service, [])
 
     assert exit_code == 1
+
+
+# --------------------------------------------------------------- app_extras: composition access
+
+
+class _CountingJournal(_FakeJournal):
+    """A journal that counts the requests it reserved: which instance served is observable."""
+
+    def __init__(self) -> None:
+        self.begun = 0
+
+    async def begin(self, context: RequestContext) -> bool:
+        self.begun += 1
+        return True
+
+
+class _CountingAdmission(InMemoryThreadAdmission):
+    """An admission guard that counts the turns it held."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.held = 0
+
+    @asynccontextmanager
+    async def hold(self, context: RequestContext) -> AsyncIterator[bool]:
+        self.held += 1
+        async with super().hold(context) as acquired:
+            yield acquired
+
+
+async def _invoke(running: _Running, question: str = "hi") -> httpx.Response:
+    """Ready the service, then send it one authorized question."""
+    await running.lifecycle.start()
+    async with running.client() as client:
+        return await client.post(
+            "/invoke",
+            json={"input": {"question": question}, "thread_id": "t-1"},
+            headers={"authorization": "Bearer token"},
+        )
+
+
+async def test_app_extras_receive_the_container_and_the_prepared_graph() -> None:
+    graph = object()
+    responded_with: list[object] = []
+    calls: list[tuple[ServiceContainer, Callable[[], Any]]] = []
+
+    async def build_graph(services: ServiceContainer) -> object:
+        return graph
+
+    async def respond(
+        given: Any, services: ServiceContainer, context: RequestContext, question: str
+    ) -> dict[str, Any]:
+        responded_with.append(given)
+        return {"answer": question}
+
+    def extras(services: ServiceContainer, prepared: Callable[[], Any]) -> dict[str, Any]:
+        calls.append((services, prepared))
+        return {}
+
+    service = AgentService(
+        application="probe", build_graph=build_graph, respond=respond, app_extras=extras
+    )
+    running = _Running(service)
+    await running.build()
+
+    assert len(calls) == 1  # composed once, with the live container
+    services, prepared = calls[0]
+    assert services is running.services
+
+    reply = await _invoke(running)
+
+    assert reply.status_code == 200
+    assert responded_with == [graph]
+    assert prepared() is graph  # the very object respond was given
+    assert len(calls) == 1  # requests do not compose again
+
+
+async def test_app_extras_win_over_app_kwargs_on_a_conflicting_key() -> None:
+    from_kwargs, from_extras = _CountingJournal(), _CountingJournal()
+
+    service = AgentService(
+        application="probe",
+        build_graph=_build_graph,
+        respond=_respond,
+        app_kwargs={"outcomes": from_kwargs},
+        app_extras=lambda services, graph: {"outcomes": from_extras},
+    )
+    running = _Running(service)
+    await running.build()
+
+    reply = await _invoke(running)
+
+    assert reply.status_code == 200
+    assert from_extras.begun == 1
+    assert from_kwargs.begun == 0
+
+
+async def test_app_extras_add_to_app_kwargs_without_replacing_other_keys() -> None:
+    journal, admission = _CountingJournal(), _CountingAdmission()
+
+    service = AgentService(
+        application="probe",
+        build_graph=_build_graph,
+        respond=_respond,
+        app_kwargs={"outcomes": journal},
+        app_extras=lambda services, graph: {"admission": admission},
+    )
+    running = _Running(service)
+    await running.build()
+
+    reply = await _invoke(running)
+
+    assert reply.status_code == 200
+    assert journal.begun == 1  # the service's own app_kwargs survive the merge
+    assert admission.held == 1  # and the hook's addition is applied
+
+
+async def test_without_app_extras_app_kwargs_apply_as_before() -> None:
+    journal = _CountingJournal()
+    service = AgentService(
+        application="probe",
+        build_graph=_build_graph,
+        respond=_respond,
+        app_kwargs={"outcomes": journal},
+    )
+    running = _Running(service)
+    await running.build()
+
+    reply = await _invoke(running)
+
+    assert reply.status_code == 200
+    assert journal.begun == 1
+
+
+# --------------------------------------------------------------- _serve: one tracing instance
+
+
+def test_run_agent_gives_one_tracing_adapter_to_the_container_and_the_app(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The adapter is the model-trace sink and the request tracer: the same instance, once."""
+    adapter = object()
+    opened: list[tuple[str, ServiceConfig, Path | None]] = []
+    container_args: list[dict[str, Any]] = []
+    app_args: list[dict[str, Any]] = []
+    served: list[Any] = []
+
+    @asynccontextmanager
+    async def fake_agent_tracing(
+        application: str, config: ServiceConfig, *, dotenv_path: Path | None = None
+    ) -> AsyncIterator[object]:
+        opened.append((application, config, dotenv_path))
+        yield adapter
+
+    class FakeContainer:
+        def __init__(self, config: ServiceConfig, **kwargs: Any) -> None:
+            container_args.append({"config": config, **kwargs})
+
+        async def aclose(self) -> None:
+            return None
+
+    async def fake_build_agent_app(
+        service: AgentService, services: Any, lifecycle: Any, **kwargs: Any
+    ) -> str:
+        app_args.append({"services": services, **kwargs})
+        return "the-app"
+
+    async def fake_serve(app: Any, lifecycle: Any, **kwargs: Any) -> None:
+        served.append(app)
+
+    monkeypatch.setattr(tracing_module, "agent_tracing", fake_agent_tracing)
+    monkeypatch.setattr(composition, "ServiceContainer", FakeContainer)
+    monkeypatch.setattr(composition, "build_agent_app", fake_build_agent_app)
+    monkeypatch.setattr(composition, "serve", fake_serve)
+    env_file = tmp_path / "service.env"
+    env_file.write_text("", encoding="utf-8")
+    service = AgentService(
+        application="probe", build_graph=_build_graph, respond=_respond, env_file=env_file
+    )
+
+    assert run_agent(service, []) == 0
+
+    assert [(name, path) for name, _, path in opened] == [("probe", env_file)]
+    assert len(container_args) == 1
+    assert len(app_args) == 1
+    assert container_args[0]["model_trace"] is adapter
+    assert app_args[0]["tracing"] is adapter
+    assert served == ["the-app"]
