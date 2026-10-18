@@ -26,17 +26,14 @@ development preview; use the [release scope](docs/release-scope.md) for support 
 Agent Lab is the browser simulator for testing agents. Use your team's Python
 3.11+ and pip setup, approved package index, and a writable repository checkout.
 Open **Command Prompt** (Windows) or a **Bash terminal** (macOS/Linux) in the repository root.
+Commands are shown for Command Prompt. On macOS/Linux, run the `.sh` launcher with
+the same name and arguments, for example `./setup-local.sh --dev` for
+`setup-local.bat --dev`.
 
 **First time:** follow [local setup and model settings](docs/local-startup.md#1-set-up-once).
 Use `setup-local.bat --model anthropic` or `setup-local.bat --model bedrock`,
 then configure the selected provider in the root `.env`. If that file already
 selects your model, `setup-local.bat` detects it. Phoenix tracing is optional.
-
-Or on POSIX:
-
-```bash
-./setup-local.sh --model anthropic
-```
 
 All services use the same approved Python. Agent/MCP, Agent Lab, and Phoenix keep
 separate `.venv` package folders. The launchers use the default Python and its
@@ -45,36 +42,19 @@ pip module, rather than executables inside those folders. The generated
 Setup installs runtime packages. Use `setup-local.bat --dev` to also install
 the scaffolding CLI and the rmprep/Agent Lab development tools.
 
-Or on POSIX:
-
-```bash
-./setup-local.sh --dev
-```
-
 **Each testing session:**
 
 ```bat
 start-local.bat
 ```
 
-Or on POSIX:
-
-```bash
-./start-local.sh
-```
-
 Check the printed environment path, model and masked settings. Wait for **All
 selected services are ready**, then open [Agent Lab](http://127.0.0.1:8765).
-Read its login code in a second Command Prompt or Bash terminal at the repository root:
+Read its login code in a second Command Prompt or Bash terminal at the repository
+root (on macOS/Linux, `cat .agentlib/ui-rmprep/access-code`):
 
 ```bat
 type .agentlib\ui-rmprep\access-code
-```
-
-Or on POSIX:
-
-```bash
-cat .agentlib/ui-rmprep/access-code
 ```
 
 Select **Choose agent → Start chat with rmprep**. With Anthropic configured, ask:
@@ -93,12 +73,6 @@ When finished, run in the second Command Prompt or Bash terminal:
 stop-local.bat
 ```
 
-Or on POSIX:
-
-```bash
-./stop-local.sh
-```
-
 Wait for **Stopped gracefully**. Conversations, memo versions, traces and
 checkpoints remain available next time you start. Restart after changing code
 or settings. Ctrl+C in the launcher window also stops its stack.
@@ -113,6 +87,9 @@ You need Python 3.11 or newer with pip, a copy of this repository, and access
 to your approved package index or a folder of pre-downloaded Python wheels.
 The tutorial uses a fake model that runs in the Python process and local
 providers for configuration, permissions, audit records, and conversation state.
+Local is the default for every setting, so no cloud infrastructure is needed;
+AWS is a per-variable opt-in described in the
+[configuration reference](docs/variables.md).
 
 Open a terminal in the repository's top-level `ai-agent-lib/` folder. Choose
 the commands for your terminal below. They use your existing Python and create
@@ -241,16 +218,15 @@ continue a conversation, and inspect checkpoint state. Its
 call and a second question through the generated graph using scripted replies.
 
 Every new workspace also includes the [verified Anthropic walkthrough](docs/verified-anthropic-run.md),
-selected-field trace samples, and a JSONL reader. The real run made three model
-calls with **2, 4, and 6 input messages**; its checkpoints grew from **4 to 6
-messages**. The annotations show how a tool result and the saved first turn
-reach the model on the next call.
+selected-field trace samples, and a JSONL reader. The walkthrough follows a real
+run call by call and shows how a tool result and the saved first turn reach the
+model on the next call.
 
 From your generated workspace, run the scripted example:
 
 ```bat
 "%PYTHON%" -m helper.examples.trace_react
-"%PYTHON%" examples\read_trace.py agents/helper/.agentlib/react-demo.jsonl --last 6
+"%PYTHON%" examples/read_trace.py agents/helper/.agentlib/react-demo.jsonl --last 6
 ```
 
 For a live run, follow [Anthropic setup](docs/anthropic-example.md) to add its
@@ -274,10 +250,12 @@ have these examples under their own package names; their READMEs give exact comm
 | [Reference agent](examples/accounts-agent/README.md) | A working LangGraph agent |
 | [Reference MCP server](examples/accounts-mcp/README.md) | Shared tools, named queries, and sample CSV data |
 | [Relationship manager preparation](examples/rmprep/README.md) | Router, memo and Q&A nodes over 33 supplied CSVs, with governed MCP evidence, source references and checkpoints |
+| [Agent Lab package](packages/ai-agent-lib-ui/README.md) | `packages/ai-agent-lib-ui`: the browser simulator with chat, memo versions, trace links, answer feedback, and online-eval export of saved chats |
 | [Policies](policies/README.md) | Rules and the OPA policy bundle |
 | [Architecture tests](tests/architecture) | Checks that enforce package boundaries and keep documentation current |
 | [Configuration reference](docs/variables.md) | Supported environment variables |
 | [Identity guide](docs/identity.md) | User identity and delegated service calls |
+| [Evals guide](docs/evals.md) | Offline evals with baselines (`agentlib eval`) and online scoring of sampled, saved chats |
 
 The repository root holds shared development settings. Install the packages
 under `packages/` using pip or the development helper below.
@@ -326,7 +304,9 @@ how to document ownership, failures, and examples.
 The default tests block connections to external hosts while allowing
 loopback for local tests and Python's event loop. Tests that need OPA,
 Terraform, Docker, a database, or cloud credentials are separate, opt-in
-checks for suitable machines. See [CI](.github/workflows/ci.yml) and the
+checks for suitable machines. CI also gates coverage: the core `contracts`,
+`config`, `di`, and `pipeline` packages must keep 90% branch coverage. See
+[CI](.github/workflows/ci.yml) and the
 [release scope](docs/release-scope.md) for those checks and supported configurations.
 
 When editing the developer guide, change `docs/guide/guide.src.html`, then

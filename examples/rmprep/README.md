@@ -21,11 +21,10 @@ identity, policy, audit and checkpoint providers. The MCP service retrieves
 evidence and calculates review findings; the model turns that evidence into prose.
 
 For a local trace timeline with Python and pip, follow the
-[Phoenix walkthrough](../../docs/phoenix-trial.md). Teams with a container host
-can use the [Langfuse walkthrough](../../docs/langfuse-trial.md).
-Both adapters are shared library code, also included in newly generated agents.
-The selected backend runs as a separate service and adds a trace link to each Agent Lab response,
-with model attempts, MCP calls and checkpoint references grouped by thread.
+[Phoenix walkthrough](../../docs/phoenix-trial.md). The Phoenix adapter is shared
+library code, also included in newly generated agents. Phoenix runs as a separate
+service and adds a trace link to each Agent Lab response, with model attempts,
+MCP calls and checkpoint references grouped by thread.
 
 ## 1. Install with Python and pip
 
@@ -43,7 +42,7 @@ selecting it in the panel changes only the viewer.
 
 The remaining steps cover manual setup and command-line walkthroughs. Manual
 agent commands read `agents/rmprep/.env`; they do not automatically load the
-root `.env` used by the batch launcher.
+root `.env` used by the launcher.
 
 Open **Command Prompt** in the library repository. Use Python 3.11 or newer and
 your team's existing pip configuration, including its enterprise package index.
@@ -173,19 +172,20 @@ calculated changes and explicit evidence limits: for example, a recorded waiver
 expiry date does not establish that a waiver was executed. Payment summaries
 show the requested window and the last observed transaction date.
 
-To set an answer length, include `Keep it within 450 words.` in your question.
-The defaults are 1,000 words for a memo and 350 for Q&A. Counts include heading text,
-figures, tables and full citations. Markdown heading/list markers and divider-only
-lines do not count; code is counted literally. The answer stays unchanged when it
-passes these checks. Before saving an answer, the agent checks its length and
-checks that each citation matches a source reference returned by MCP. It also
-rejects citation placeholders and wording that assigns an unsupported fiscal
-year to an audited-statement requirement. Common financial comparisons must
-include their own two source references when citing a financial page. These are
-conservative checks for known failure patterns. The model can revise a failing
-draft at most twice, then the agent reports a validation error if the checks
-still fail. These checks verify length and reference names;
-business reviewers still need to judge whether each claim follows from its evidence.
+**Answer length and checks.** To set an answer length, include `Keep it within
+450 words.` in your question. The defaults are 1,000 words for a memo and 350
+for Q&A. Counts include heading text, figures, tables and full citations.
+Markdown heading/list markers and divider-only lines do not count; code is
+counted literally. The answer stays unchanged when it passes these checks.
+Before saving an answer, the agent checks its length and checks that each
+citation matches a source reference returned by MCP. It also rejects citation
+placeholders and wording that assigns an unsupported fiscal year to an
+audited-statement requirement. Common financial comparisons must include their
+own two source references when citing a financial page. These are conservative
+checks for known failure patterns. The model can revise a failing draft at most
+twice, then the agent reports a validation error if the checks still fail.
+These checks verify length and reference names; business reviewers still need
+to judge whether each claim follows from its evidence.
 
 For an HTTP endpoint, run `python -m rmprep.service` and send `POST /invoke`:
 
@@ -263,6 +263,7 @@ currency caveats and the example review thresholds. Read the
 | File | Responsibility |
 | --- | --- |
 | `agents/rmprep/src/rmprep/graph.py` | Compose the three business nodes and inject library services. |
+| `service.py` in that package | The HTTP entry point: `SERVICE`, an `AgentService`, runs on the shared `run_agent`. The context budget loads fail-fast in `main`, so a malformed value stops the start. |
 | `router.py`, `prompts/`, `specialist.py` in that package | Select the workflow, load versioned instructions, and run the model/tool loop. |
 | `response_review.py` in that package | Check answer length and exact source references before saving a reply. |
 | `memos.py`, `selection.py` in that package | Preserve immutable memo versions and resolve document references within a scoped thread. |
@@ -312,7 +313,7 @@ references, comparisons, long histories, tool argument drift and older checkpoin
 The [Phoenix trial](../../docs/phoenix-trial.md) uses the same Python, a separate package folder, and SQLite.
 Run `start-phoenix.bat setup` once from the library repository root, then follow
 the guide to enable Phoenix in the root `.env`. `start-local.bat` starts the local
-Phoenix server before rmprep and Agent Lab, using `.agentlib\phoenix\.venv\Lib\site-packages`.
+Phoenix server before rmprep and Agent Lab, using the package folder `.agentlib\phoenix\.venv`.
 `stop-local.bat` in another Command Prompt stops the stack and preserves
 conversations, traces, and checkpoints. **Ctrl+C** in the original launcher also works.
 Each response links to its Phoenix trace; the existing turn inspector remains available.

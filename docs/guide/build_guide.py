@@ -44,7 +44,6 @@ from ai_agent_lib_core.config.bindings import (
     options_key,
     provider_key,
 )
-from ai_agent_lib_core.config.langfuse import LANGFUSE_VARIABLES
 from ai_agent_lib_core.config.phoenix import PHOENIX_VARIABLES
 from ai_agent_lib_core.config.profiles import PROFILE_DEFAULTS
 from ai_agent_lib_core.config.reference import default_text
@@ -246,66 +245,18 @@ def configuration_variables() -> str:
         ]
     )
     rows.extend(_otel_variable_rows())
-    rows.extend(_langfuse_variable_rows())
     rows.extend(_phoenix_variable_rows())
     rows.extend(_desktop_variable_rows())
     rows.extend(_rmprep_variable_rows())
     return _table(("Variable name", "Purpose", "Local", "AWS", "Notes"), rows, "vars environments")
 
 
-def _langfuse_variable_rows() -> list[list[str]]:
-    settings = {
-        "enabled": ("Enable the agent's Langfuse exporter.", "false", "true when provisioned"),
-        "capture_content": (
-            "Export model messages and tool inputs/results.",
-            "false; true for approved test data",
-            "false unless approved",
-        ),
-        "env_file": (
-            "Optional private settings file.",
-            "Absolute path to langfuse/agent.env",
-            "Unset; inject task environment settings",
-        ),
-        "base_url": ("Langfuse origin.", "http://localhost:3000", "Internal HTTPS service URL"),
-        "project_id": (
-            "Project ID from the Langfuse browser URL.",
-            "rmprep-trial for the sample backend",
-            "Team's project ID",
-        ),
-        "public_key": (
-            "Project public API key.",
-            "From private agent.env",
-            "Inject project key into the agent task",
-        ),
-        "secret_key": (
-            "Project secret API key; never sent to the browser.",
-            "From private agent.env",
-            "Inject from Secrets Manager into the agent task",
-        ),
-    }
-    return [
-        [
-            f'<span class="var" id="var-{LANGFUSE_VARIABLES[label].lower()}">'
-            f"{_e(LANGFUSE_VARIABLES[label])}</span>",
-            _e(purpose),
-            _e(local),
-            _e(aws),
-            "Read by the optional library tracing adapter. Process overrides the separate file, "
-            "then the service .env. Requires the core otel extra. The backend is a separate "
-            "service with PostgreSQL, ClickHouse, Redis and object storage (S3 on AWS); "
-            "operational telemetry keeps its destination. "
-            '<a href="langfuse.md">Setup and access/retention notes</a>.',
-        ]
-        for label, (purpose, local, aws) in settings.items()
-    ]
-
-
 def _phoenix_variable_rows() -> list[list[str]]:
     settings = (
         (
             "Enable Phoenix tracing; start-local.bat also starts the local server.",
-            "false; true for this trial",
-            "false until provisioned",
+            "false; true to trace locally",
+            "false until a Phoenix server is available",
         ),
         (
             "Capture model and tool input/output.",
@@ -329,8 +280,9 @@ def _phoenix_variable_rows() -> list[list[str]]:
         ),
         (
             "Optional API key; never included in trace links.",
-            "Unset for the local trial",
-            "Secrets Manager",
+            "Unset for the local server",
+            "Process environment (on Fargate, an ECS task-definition secret); "
+            "not the secrets provider",
         ),
     )
     return [
@@ -340,10 +292,12 @@ def _phoenix_variable_rows() -> list[list[str]]:
             _e(local),
             _e(aws),
             "Process settings override the separate tracing file, then the service .env. "
-            "Enable one agent tracing backend at a time. This desktop trial stores traces "
-            "in SQLite and runs in its own Python environment. A shared deployment needs "
-            "separate platform provisioning; it is outside this trial. "
-            '<a href="phoenix-trial.md">Phoenix setup and verified example</a>.',
+            "Nothing is exported until tracing is enabled. A local Phoenix stores traces "
+            "in SQLite and runs in its own Python environment. A team-hosted Phoenix is "
+            "supported over HTTPS; your platform team runs it. "
+            '<a href="phoenix-trial.md">Trace agents with Phoenix</a>, including the '
+            '<a href="phoenix-trial.md#send-traces-to-a-team-hosted-phoenix">team-hosted '
+            "setup</a>.",
         ]
         for name, (purpose, local, aws) in zip(PHOENIX_VARIABLES, settings, strict=True)
     ]
@@ -728,7 +682,6 @@ API_MODULES: tuple[str, ...] = (
     "ai_agent_lib_core.di",
     "ai_agent_lib_core.observability",
     "ai_agent_lib_core.integrations.langgraph",
-    "ai_agent_lib_core.integrations.langgraph.langfuse",
     "ai_agent_lib_core.integrations.mcp",
     "ai_agent_lib_core.integrations.http",
     "ai_agent_lib_core.testing",
@@ -787,11 +740,11 @@ def walkthrough_files() -> dict[Path, str]:
     return {
         **{HERE.parent / path: content for path, content in shared.items()},
         # The repository has a general integration guide; generated agents get
-        # their own Langfuse instructions with service-specific paths and commands.
+        # their own Phoenix tracing instructions with service-specific paths and commands.
         **{
             HERE.parent / path: content
             for path, content in agent.items()
-            if path != PurePosixPath("langfuse.md")
+            if path != PurePosixPath("tracing.md")
         },
         **{HERE.parent / "examples" / path: content for path, content in reader.items()},
     }

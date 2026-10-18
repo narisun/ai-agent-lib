@@ -15,7 +15,7 @@ from ai_agent_lib_core.integrations.http import (
     build_agent_app,
     run_agent,
 )
-from ai_agent_lib_core.integrations.langgraph.langfuse import LangfuseTracing
+from ai_agent_lib_core.integrations.langgraph import AgentTracing
 
 __all__ = ["SERVICE", "build_app", "main"]
 
@@ -66,7 +66,7 @@ async def build_app(
     services: ServiceContainer,
     lifecycle: ServiceLifecycle,
     *,
-    tracing: LangfuseTracing | None = None,
+    tracing: AgentTracing | None = None,
 ) -> Any:
     """Build the agent's HTTP application; kept for callers of the previous shape."""
     return await build_agent_app(SERVICE, services, lifecycle, tracing=tracing)

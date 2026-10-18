@@ -14,14 +14,19 @@ from ai_agent_lib_core.config.sources import (
 )
 from ai_agent_lib_core.contracts import ConfigSource, ConfigurationError
 
-PHOENIX_VARIABLES = (
-    "EAP_PHOENIX_ENABLED",
-    "EAP_PHOENIX_CAPTURE_CONTENT",
-    "EAP_PHOENIX_ENV_FILE",
-    "PHOENIX_COLLECTOR_ENDPOINT",
-    "PHOENIX_PROJECT_NAME",
-    "PHOENIX_API_KEY",
+PHOENIX_LABELS = MappingProxyType(
+    {
+        "enabled": "EAP_PHOENIX_ENABLED",
+        "capture_content": "EAP_PHOENIX_CAPTURE_CONTENT",
+        "env_file": "EAP_PHOENIX_ENV_FILE",
+        "endpoint": "PHOENIX_COLLECTOR_ENDPOINT",
+        "project": "PHOENIX_PROJECT_NAME",
+        "api_key": "PHOENIX_API_KEY",
+    }
 )
+"""Variable names by the short label generated documents refer to them by."""
+
+PHOENIX_VARIABLES = tuple(PHOENIX_LABELS.values())
 
 
 @dataclass(frozen=True)
@@ -152,3 +157,24 @@ def resolve_phoenix_settings(
     )
     shown = {**values, "PHOENIX_API_KEY": "********" if values["PHOENIX_API_KEY"] else ""}
     return PhoenixResolution(settings, MappingProxyType(shown), MappingProxyType(origins))
+
+
+def phoenix_env_example(guide: str = "docs/phoenix-trial.md") -> str:
+    """Return commented defaults for opt-in tracing, for generated and example ``.env`` files.
+
+    Args:
+        guide: The path, from the file that carries the block, of the tracing guide.
+    """
+    defaults = PhoenixSettings()
+    examples = {
+        "enabled": "false",
+        "capture_content": "false",
+        "env_file": "path/to/phoenix.env",
+        "endpoint": defaults.base_url,
+        "project": defaults.project_name,
+        "api_key": "your-api-key",
+    }
+    return (
+        f"\n# Optional Phoenix tracing: see {guide}. Keep real keys in private files.\n"
+        + "".join(f"# {PHOENIX_LABELS[label]}={value}\n" for label, value in examples.items())
+    )

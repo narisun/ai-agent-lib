@@ -132,8 +132,9 @@ async def test_helper_meets_its_bar(tmp_path: Path) -> None:
 This test is marked `@pytest.mark.eval` and excluded from the default
 `pytest`/`agentlib check` run, so it never blocks on a model nor incurs
 charges by accident. With `EAP_MODEL_PROVIDER=fake` it skips itself.
-`dataset_digest(CASES)` is a sha256 of the file's bytes, kept in the report's
-metadata so two reports are only compared when they ran the same cases.
+`dataset_digest(CASES)` is a sha256 of the file's bytes, recorded in the
+report's metadata. It is a record for people: it tells you whether two reports
+ran the same cases. The baseline gate does not check it (see below).
 
 Run it explicitly once a real model is configured (see [step 8 of the
 tutorial](getting-started.md#8-optional-use-and-evaluate-a-real-model)):
@@ -154,24 +155,28 @@ it:
 python -m ai_agent_lib_cli eval helper --accept
 ```
 
-`--accept` only runs after the evals already passed; it copies
-`.agentlib/eval-report.json` to `evals/baseline.json` and prints the path.
-Commit `evals/baseline.json` alongside `evals/cases.jsonl` — both hold
-synthetic cases and aggregate scores, not conversation content. From then on,
-every `agentlib eval helper` run also calls `require_no_regression`, which
-compares each metric's mean against the baseline and fails when it dropped by
-more than its `tolerance` (0.05 above). The failure names the regressed
-metrics, both means, and the case IDs whose own score dropped — read those
-cases first.
+`--accept` runs the evals itself — it does not reuse the last report. If that
+run passes, it copies the fresh `.agentlib/eval-report.json` to
+`evals/baseline.json` and prints the path. Commit `evals/baseline.json`
+alongside `evals/cases.jsonl` — both hold synthetic cases and aggregate scores,
+not conversation content. From then on, every `agentlib eval helper` run also
+calls `require_no_regression`, which compares each metric's mean against the
+baseline and fails when it dropped by more than its `tolerance` (0.05 above).
+The failure names the regressed metrics, both means, and the case IDs whose own
+score dropped — read those cases first.
+
+The comparison matches metrics by name and cases by ID. A metric present in
+only one report is not compared, and the gate never looks at `dataset_digest`,
+so after you add or edit cases on purpose, accept a new baseline yourself.
 
 Re-run `--accept` once a regression is intentional (the model changed, the
-rubric changed) to move the bar. While that run is in flight, `--accept`
-leaves a marker (`.agentlib/eval-accept.flag`) beside the report, and the
-generated test skips only the `require_no_regression` gate against the
-existing baseline while the marker is there — the absolute
-`report.require({...})` bar still applies, so the run still has to earn the
-promotion it then gets. The marker is removed once the run ends, whether or
-not it passed.
+rubric changed) to move the bar. On an intentional regression, `--accept`
+skips only the baseline gate. While that run is in flight it leaves a marker
+(`.agentlib/eval-accept.flag`) beside the report, and the generated test skips
+only the `require_no_regression` gate against the existing baseline while the
+marker is there. The absolute `report.require({...})` bar still applies, so the
+run still has to pass before its report replaces the baseline. The marker is
+removed once the run ends, whether or not it passed.
 
 ## 3. Judges
 
@@ -327,8 +332,7 @@ Every file in this guide other than `evals/cases.jsonl` and
 `evals/baseline.json` holds real conversation content: `feedback.jsonl`, an
 exported interaction JSONL, and any report produced by scoring real
 interactions (a judge's `reason` can quote the question or the answer). Treat
-these exactly like the model trace in the [Langfuse
-guide](langfuse.md#settings-and-privacy):
+them like a model trace that captures content:
 
 - Keep them under the service's private `.agentlib/` state (or another path
   the repository already ignores) — never commit them. The checked-in
@@ -339,6 +343,10 @@ guide](langfuse.md#settings-and-privacy):
 - Credential masking elsewhere in the library is best effort, not a
   substitute for keeping these files private — a question or answer that
   contains a secret is retained verbatim.
+
+The same rule governs the traces themselves; what a Phoenix trace holds with
+content capture on and off, and where local traces live, is in [Privacy and
+content capture](phoenix-trial.md#privacy-and-content-capture).
 
 `feedback.jsonl` and an exported interaction file can grow without bound as
 real traffic accumulates; rotate or prune them the way you would any other

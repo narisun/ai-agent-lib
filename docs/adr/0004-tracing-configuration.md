@@ -24,6 +24,35 @@ optional integration must resolve its settings through one loader shared by
 startup, `doctor` and `config explain` — the Langfuse fix generalized as a
 standing rule, not a one-off.
 
+### Amendment, 2026-10-18: Langfuse removed
+
+The Context and the Decision above stay as written; they record the decision
+as it was made. This amendment changes what is in force.
+
+Langfuse support was removed, and Phoenix is the only agent-trace backend.
+`config/langfuse.py`, the Langfuse integration module, `EAP_LANGFUSE_ENABLED`,
+`EAP_LANGFUSE_CAPTURE_CONTENT` and `EAP_LANGFUSE_ENV_FILE` no longer exist, so
+the Consequences below apply to Phoenix alone. A service `.env` that still sets
+an `EAP_LANGFUSE_*` variable fails startup as an unknown variable. Bare
+`LANGFUSE_*` names are inert: nothing reads them.
+
+The standing rule now reads for Phoenix. `resolve_phoenix_settings` is the one
+loader for `EAP_PHOENIX_ENABLED`, `EAP_PHOENIX_CAPTURE_CONTENT`,
+`EAP_PHOENIX_ENV_FILE`, `PHOENIX_COLLECTOR_ENDPOINT`, `PHOENIX_PROJECT_NAME` and
+`PHOENIX_API_KEY`. Startup, `doctor`, `config explain` and the local launcher
+all resolve through it, so a check shows what startup will use.
+`PHOENIX_API_KEY` is read through the same layering (process environment,
+separate tracing file, service `.env`), not through the secrets provider;
+deployments inject it as a task-definition secret. `agent_tracing` is the single
+composition-boundary name and `run_agent` composes it, so a service honors
+`EAP_PHOENIX_ENABLED` without tracing code. Adding a backend later is a change
+inside that module, not a registry.
+
+Registering the Phoenix variables in the binding table, with the loader reading
+through it, is still future work. Until then the resolver accepts the
+`EAP_PHOENIX_*` names, and the vendor-named `PHOENIX_*` names stay outside the
+"unknown `EAP_` names fail startup" guarantee.
+
 ## Consequences
 
 Langfuse and Phoenix need their variables registered and their loaders

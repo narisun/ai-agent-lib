@@ -209,6 +209,7 @@ kbd { font-family: var(--font-mono); font-size: .85em; border: 1px solid var(--l
         <ol>
           <li><a href="#interfaces-and-injection">Interfaces and injection</a></li>
           <li><a href="#langgraph-boundary">The LangGraph boundary</a></li>
+          <li><a href="#service-entry-point">The service entry point</a></li>
           <li><a href="#environment-providers">Environment-specific providers</a></li>
         </ol>
       </li>
@@ -280,7 +281,11 @@ kbd { font-family: var(--font-mono); font-size: .85em; border: 1px solid var(--l
   <p>ai-agent-lib gives each responsibility a clear home: your application defines
   the workflow and business logic, shared pipelines apply checks around calls, and
   adapters connect to models and other services. This structure centralizes common
-  rules and lets tests replace external dependencies with controlled implementations.</p>
+  rules and lets tests replace external dependencies with controlled implementations.
+  The <a href="Specification.md">specification</a> also calls this mechanism an
+  <em>interceptor chain</em>, and the code names one stage an
+  <code>Interceptor</code>; this guide says pipeline for the same fixed-order
+  sequence, described in <a href="#pipelines">What happens during a call</a>.</p>
   <p>Consider a tool that looks up an account balance. Its business job is to return
   the balance. Before calling it, the application needs a caller identity and a
   permission decision; afterwards, it needs a record of what happened. Keeping
@@ -359,6 +364,12 @@ def test_expiry_uses_the_supplied_clock() -&gt; None:
   <strong>Dependency injection</strong> passes the selected implementation to a
   consumer. Explicit dependencies make the component easy to test; a container
   automates the assembly of larger groups of components.</p>
+  <p>The HTTP layer has a worked example of a port and its adapters. To keep turns
+  on one conversation thread in order, <code>agent_app</code> asks a
+  <code>ThreadAdmission</code> port for ownership of the thread. The library supplies
+  an in-memory adapter; a deployment with several worker processes injects its own.
+  <a href="http-thread-admission.md">Keep conversation turns in order</a> shows the
+  port, the default adapter, and what a replacement must preserve.</p>
 
   <h3 id="composition">Connect the parts in one place</h3>
   <p>The place that builds and connects an application's components is often called
@@ -411,6 +422,61 @@ def test_expiry_uses_the_supplied_clock() -&gt; None:
   the integration checks their types and capabilities. This keeps LangGraph details
   out of the shared contracts, while the application graph itself remains LangGraph code.</p>
   </details>
+
+  <h3 id="service-entry-point">Declare the service; <code>run_agent</code> runs it</h3>
+  <p>A service need not write its own composition root. The generated agents, the
+  reference <code>accounts-agent</code>, and <code>rmprep</code> declare what is
+  theirs in one <code>AgentService</code> and pass it to <code>run_agent</code>.
+  This is the generated <code>helper</code> agent's <code>service.py</code>, trimmed
+  to the essentials; the generated file adds streaming, the outcome journal,
+  <code>main(argv)</code> and the <code>__main__</code> guard:</p>
+<pre><code class="language-python" id="service-example">from typing import Any
+
+from ai_agent_lib_core import RequestContext, ServiceContainer
+from ai_agent_lib_core.integrations.http import AgentService, run_agent
+
+from helper.graph import APPLICATION, answer, build_graph, registered_mcp_tools
+from helper.settings import ENV_FILE
+
+
+async def _build_graph(services: ServiceContainer) -&gt; Any:
+    return build_graph(services, await registered_mcp_tools(services))
+
+
+async def _respond(
+    graph: Any, services: ServiceContainer, context: RequestContext, question: str
+) -&gt; dict[str, Any]:
+    return {"answer": await answer(graph, services, context, question)}
+
+
+SERVICE = AgentService(
+    application=APPLICATION,
+    build_graph=_build_graph,
+    respond=_respond,
+    env_file=ENV_FILE,
+)
+
+
+def main() -&gt; int:
+    return run_agent(SERVICE)</code></pre>
+  <p><code>python -m ai_agent_lib_cli run helper</code> starts the module that calls
+  <code>main()</code>, which serves the agent until the platform stops it. The two
+  sides of that call have separate jobs:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Owner</th><th>Responsibility</th></tr></thead>
+    <tbody>
+      <tr><td>Your service (<code>AgentService</code>)</td><td>The application name; the graph, built once after the container is validated and before the service reports ready; how <code>respond</code> turns a question into an answer; how the question is read from the request's <code>input</code>, by default its non-empty <code>question</code> string; and its own <code>.env</code> file.</td></tr>
+      <tr><td><code>run_agent</code></td><td>Loading configuration, logging, telemetry, agent tracing when <a href="phoenix-trial.md">Phoenix</a> is enabled, opening and validating the container, readiness, serving HTTP with <code>--host</code> and <code>--port</code>, and closing everything in order when the process stops.</td></tr>
+    </tbody>
+  </table></div>
+  <p>This is the <a href="#composition">composition root</a> as one function. A change
+  to how every service starts, traces, or stops lands once in <code>run_agent</code>,
+  not in each agent. Inside <code>build_graph</code> and <code>respond</code> the graph
+  should reach models, tools, and data through the operations in the
+  <a href="#langgraph-boundary">integration-boundary table</a> above; the runner
+  supplies the <code>services</code> container they use. A service with unusual
+  needs can still compose by hand with <code>agent_app</code> and <code>serve</code>.</p>
+
   <h3 id="library-and-simulator">How the library and Agent Lab fit together</h3>
   <p>The library supplies the agent's services; <strong>Agent Lab</strong> is the
   browser simulator used to test them. The UI sends a question to the selected
@@ -422,8 +488,7 @@ def test_expiry_uses_the_supplied_clock() -&gt; None:
     <tbody>
       <tr><td>Agent and MCP services</td><td>Business workflow, evidence, policy enforcement, and graph checkpoints</td><td><code>.venv/Lib/site-packages</code>; the approved Python runs it</td></tr>
       <tr><td>Agent Lab</td><td>Agent selection, displayed chat history, memo versions, and inspection pages</td><td><code>packages/ai-agent-lib-ui/.venv/Lib/site-packages</code>; the same approved Python</td></tr>
-      <tr><td>Langfuse, when enabled</td><td>Model/tool observations and trace browsing</td><td>A separate service; the agent exports through its existing Python environment</td></tr>
-      <tr><td>Phoenix local trial, when enabled</td><td>Model/tool observations in a local SQLite database</td><td><code>.agentlib/phoenix/.venv/Lib/site-packages</code> with the same Python; included by <code>start-local.bat</code> when enabled</td></tr>
+      <tr><td>Local Phoenix server, when enabled</td><td>Model/tool observations in a local SQLite database</td><td><code>.agentlib/phoenix/.venv/Lib/site-packages</code> with the same Python; included by <code>start-local.bat</code> when enabled</td></tr>
     </tbody>
   </table></div>
   <p>A saved UI message, a graph checkpoint, and a model input are different things.
@@ -481,7 +546,9 @@ def test_expiry_uses_the_supplied_clock() -&gt; None:
     <li><strong>Extend at the right boundary.</strong> Implement a port, register its
     factory and dependencies, describe its options, and run its contract and
     integration tests. The <a href="#architecture">extension walkthrough</a>
-    explains the registration and cleanup responsibilities.</li>
+    explains the registration and cleanup responsibilities, and release scope has a
+    short <a href="release-scope.md#using-the-new-extension-points"><code>ServiceProviders.register</code>
+    example</a>.</li>
   </ul>
   <details class="lesson">
   <summary>Read the library implementation after completing the tutorial</summary>
@@ -905,11 +972,11 @@ EAP_MODEL_PROVIDER=fake</code></pre>
   secrets. <code>options</code> lists accepted keys and defaults. <code>doctor</code>
   tries to build and validate the configured services; with cloud adapters, this can
   contact those services.</p>
-  <p>For optional Phoenix or Langfuse tracing, <code>explain</code> also shows the
-  source file or process variable for each setting and masks API keys.
-  <code>doctor</code> uses the same resolver as startup, checks the destination
-  and capture settings, and rejects enabling both backends together. These tracing
-  checks validate configuration without contacting the tracing server.</p>
+  <p>For optional Phoenix tracing, <code>explain</code> also shows the
+  source file or process variable for each setting and masks the API key.
+  <code>doctor</code> uses the same resolver as startup and checks the destination
+  and capture settings. These tracing checks validate configuration without
+  contacting the tracing server.</p>
   <h3>Optional: use a hosted model</h3>
   <p>Continue using the fake model while learning and testing. Follow these steps
   when your team has approved a model endpoint and supplied account access:</p>
@@ -1527,9 +1594,45 @@ async def classify(
 <pre><code class="language-bat">"%PYTHON%" -m ai_agent_lib_cli eval helper</code></pre>
   <p>This command selects tests marked <code>eval</code>. They require network access
   to the configured model and use your account's quota and billing. The generated
-  evaluation skips when the selected model is <code>fake</code>.</p>
-  <p>The evaluation package offers exact-match and model-judged scorers. Choose criteria
-  that reflect the task and inspect individual failures alongside the aggregate score.</p>
+  evaluation skips when the selected model is <code>fake</code>. Each run writes
+  <code>agents/helper/.agentlib/eval-report.json</code>, with the mean for each metric
+  and every case's score. The <code>.agentlib</code> folder is excluded from version
+  control, so open the file to inspect individual failures alongside the aggregate score.</p>
+
+  <h3 id="eval-baselines">Protect a baseline</h3>
+  <p>When the scores are ones you want to protect, accept them:</p>
+<pre><code class="language-bat">"%PYTHON%" -m ai_agent_lib_cli eval helper --accept</code></pre>
+  <p><code>--accept</code> runs the evaluation itself and, if it passes, saves the
+  report as <code>agents/helper/evals/baseline.json</code>. Commit that file with
+  <code>cases.jsonl</code>: both hold synthetic cases and aggregate scores, not
+  conversation content. From then on every run is also a regression gate. It fails
+  when any metric's mean falls more than 0.05 below the baseline, even if the score
+  still clears the absolute bar, and it names the regressed metrics and the cases
+  whose own score dropped. Run <code>--accept</code> again when a drop is intended,
+  such as a new model or a rewritten prompt; that run skips only the baseline
+  comparison, so it must still pass the absolute bar. Accept a new baseline after you
+  add or edit cases on purpose; the gate does not notice that the dataset changed.</p>
+
+  <h3 id="eval-judges">Judges</h3>
+  <p>Scorers range from exact-match checks to model-judged ones. Use a judge for
+  qualities that code cannot match, such as tone or faithfulness to evidence, and
+  build it from the <code>judge</code> model alias rather than a fixed model ID.
+  A judge is a model call that can be wrong, so run <code>calibrate</code> to compare
+  it with answers a person has already graded before you let its score gate anything.</p>
+
+  <h3 id="eval-online">Online evaluation</h3>
+  <p>Ordinary scorers such as judges also run over what your service has already
+  answered. Agent Lab records thumbs up or down beneath each accepted answer in
+  <code>feedback.jsonl</code>. <code>export_interactions</code> turns saved
+  conversations, joined with that feedback, into interaction records.
+  <code>sampled</code> then picks a reproducible slice, and
+  <code>score_interactions</code> scores it with ordinary scorers into an ordinary
+  report; it does not call the agent again. Exporting is a Python entry point, not
+  yet a CLI command. Feedback logs and exports hold real conversation content, so
+  keep them in private <code>.agentlib/</code> state and never commit them.</p>
+  <p>The <a href="evals.md">evals guide</a> covers the dataset and report formats,
+  the generated test, judges and calibration, the export and scoring scripts, and
+  privacy in full.</p>
 </section>
 
 <section id="security">
@@ -1726,10 +1829,18 @@ async def classify(
     <summary>Configuration variables: local and AWS</summary>
     <p>This is the complete list of environment variables bound by ai-agent-lib,
     followed by OpenTelemetry, Python/pip setup and rmprep context settings used in
-    this guide. <strong>Local</strong> means the Windows tutorial.
-    <strong>AWS</strong> means the team's Fargate deployment. Values are examples
-    unless labelled as defaults; replace service names, endpoints, IDs, and paths
-    with values supplied by your team. Set only the variables your service needs.</p>
+    this guide. <strong>Local</strong> is the zero-config default on any machine:
+    with nothing set, every provider is local (files, SQLite and in-process engines)
+    and no cloud infrastructure is needed (the model's local default is
+    <code>anthropic</code>, a hosted API; use <code>EAP_MODEL_PROVIDER=fake</code>
+    to stay fully offline). <strong>AWS</strong> is a per-variable opt-in:
+    <code>EAP_PROFILE=aws</code> switches every section, and a single
+    <code>EAP_&lt;SECTION&gt;_PROVIDER</code> moves just that section. The
+    <a href="#profiles">profile defaults</a> list what each side selects, and the
+    <a href="#environment-providers">one-way guard</a> keeps local-only adapters out
+    of deployed environments. Values are examples unless labelled as defaults;
+    replace service names, endpoints, IDs, and paths with values supplied by your
+    team. Set only the variables your service needs.</p>
 
     <h3 id="aws-platform-settings">How the settings fit the AWS design</h3>
     <p>Run agents and MCP servers as ECS Fargate services. The generated deployment
@@ -1866,7 +1977,7 @@ async def classify(
     <p>The default pattern guardrails check the output size before each live text
     update. Blocking PII checks and structured-output schemas wait for the complete
     response before releasing text. Live drafts are provisional; only the accepted
-    final answer is saved. Chat keeps metrics and the Phoenix or Langfuse trace
+    final answer is saved. Chat keeps metrics and the Phoenix trace
     link visible, with detailed evidence available through the trace and Logs page.</p>
     <p>In the MCP console, each admitted named query writes a <code>data_query</code>
     line: query name, duration, returned rows and columns, truncation and masked
@@ -1874,8 +1985,8 @@ async def classify(
     such as client UEN, date range and page offset. Returned records are not copied
     into these log lines. Deployed logging omits parameter values; use the request
     ID to connect queries with the MCP call and model trace.</p>
-    <p>The optional <a href="langfuse.md">library Langfuse integration</a> adds an
-    <strong>Open trace in Langfuse</strong> link to each accepted response. Langfuse
+    <p>The optional <a href="phoenix-trial.md">library Phoenix integration</a> adds an
+    <strong>Open trace in Agent Lab</strong> link to each accepted response. Phoenix
     runs as a separate service; developers connect with the existing Python and pip
     setup. Each request has its own trace, grouped with the thread's other requests.
     Model attempts and MCP calls appear in its timeline. Checkpoint IDs link back
@@ -1885,37 +1996,27 @@ async def classify(
     If the history read times out, the answer still returns and trace metadata
     marks the references unavailable. The checkpoint database remains the source
     of saved conversation state.</p>
-    <p>Newly generated agents include this integration in <code>service.py</code>.
-    The library owns export and shutdown; your response function owns what the
-    graph does. This is dependency injection: tests supply an in-memory exporter,
-    and deployed services use the same graph with the configured exporter.
+    <p>Newly generated agents get this integration from <code>run_agent</code> in
+    <code>service.py</code>, with no code to add. The library owns export and
+    shutdown; your response function owns what the graph does. This is dependency
+    injection: tests supply an in-memory exporter, and deployed services use the
+    same graph with the configured exporter.
     Existing graph callbacks are preserved, and governed native tools appear once
     in the trace. The adapter adds <code>output.trace</code> when enabled; existing
     answer, streaming and checkpoint interfaces keep their behavior.</p>
-    <p>Get the project URL and keys from the platform team, then put them in a
-    private settings file. From Command Prompt, select the agent's Python environment
-    and follow its generated <code>docs/langfuse.md</code>:</p>
-    <pre><code class="language-bat">set "EAP_LANGFUSE_ENV_FILE=F:\work\langfuse\agent.env"
-python -m your_agent.service</code></pre>
-    <p>Replace the path and module name with your own values. The file sets
-    <code>EAP_LANGFUSE_ENABLED=true</code> and the project settings listed in the
-    <a href="#variables">configuration table</a>.
-    <code>EAP_LANGFUSE_CAPTURE_CONTENT=false</code> records metadata and usage;
-    set it to <code>true</code> for approved test data to inspect messages and results.
-    The generated dependencies include the <code>otel</code> extra and install
-    with Python and pip. For an older service, follow the
-    <a href="langfuse.md#add-tracing-to-an-existing-service">integration steps</a>.
-    The <a href="langfuse-trial.md">verified rmprep walkthrough</a> shows a memo
-    and follow-ups with their MCP calls, token counts and checkpoint references.</p>
-    <p>For a desktop trial using Python and pip, follow the
-    <a href="phoenix-trial.md">local Phoenix walkthrough</a>. Run
+    <p>To run Phoenix on your own machine with Python and pip, follow
+    <a href="phoenix-trial.md">Trace agents with Phoenix</a>. Run
     <code>start-phoenix.bat setup</code> once, then enable Phoenix in the root
     <code>.env</code>. Run <code>start-local.bat</code> to start the local Phoenix server
     before the MCP, agent, and UI services. It keeps separate <code>.venv</code> packages and uses the default Python;
     <code>stop-local.bat</code> stops the stack and preserves SQLite traces. The agent
     adds an <strong>Open trace in Agent Lab</strong> link to each response, opening the configured Phoenix trace. The walkthrough
-    lists the opt-in settings and a verified Anthropic conversation. Enable one
-    tracing backend at a time. Existing Langfuse integrations remain supported.</p>
+    lists the opt-in settings and a verified Anthropic conversation. To send traces
+    to a Phoenix server your platform team runs instead, set
+    <code>PHOENIX_COLLECTOR_ENDPOINT</code> as described in its
+    <a href="phoenix-trial.md#send-traces-to-a-team-hosted-phoenix">team-hosted section</a>.
+    A generated agent's <code>docs/tracing.md</code> lists the same settings for its own
+    service; the <a href="#variables">configuration table</a> names each one.</p>
     <p>Blocking PII checks and structured-output schemas buffer text until they pass.
     Default pattern checks validate each growing text update, allowing early display. Drafts can still change during business validation; only the final
     accepted answer enters chat history. Keep <code>live_updates=False</code> when

@@ -17,9 +17,10 @@ from ai_agent_lib_core.config.bindings import (
     Binding,
     Key,
     ValueKind,
+    provider_key,
 )
-from ai_agent_lib_core.config.langfuse import LANGFUSE_VARIABLES, langfuse_env_example
-from ai_agent_lib_core.config.phoenix import PHOENIX_VARIABLES
+from ai_agent_lib_core.config.phoenix import PHOENIX_VARIABLES, phoenix_env_example
+from ai_agent_lib_core.contracts import Profile, Section
 
 __all__ = [
     "EnvSetting",
@@ -32,6 +33,18 @@ __all__ = [
 
 _HEADER = "<!-- Generated from the binding table. Do not edit by hand. -->"
 _SECRET_PATTERN = f"{SECRET_VARIABLE_PREFIX}<NAME>"
+_LOCAL_FIRST = (
+    "With nothing set, every provider is local: files, SQLite and in-process engines, with no "
+    "cloud infrastructure (the model's local default is `anthropic`, a hosted API; use "
+    "`EAP_MODEL_PROVIDER=fake` to stay fully offline). `EAP_PROFILE=aws` switches every section "
+    "to its AWS provider, and any single `EAP_<SECTION>_PROVIDER` opts one section in. A few "
+    "local adapters are local only: the one-way guard (`EAP_DEPLOYMENT_ENV`) refuses them "
+    "anywhere but local development."
+)
+_PROFILE_TABLE_INTRO = (
+    "What each profile selects when nothing else is set. `EAP_MODEL_PROVIDER` and each "
+    "`EAP_<SECTION>_PROVIDER` override one row."
+)
 _SECRET_PURPOSE = (
     "A named secret for the env secrets adapter. "
     f"`{SECRET_VARIABLE_PREFIX}RATES_TOKEN` supplies the secret `rates_token`."
@@ -55,7 +68,6 @@ def _profile_defaults() -> dict[str, dict[str, str]]:
     """What resolving an empty configuration gives under each profile, by key."""
     from ai_agent_lib_core.config.resolver import ConfigResolver
     from ai_agent_lib_core.config.sources import MappingConfigSource
-    from ai_agent_lib_core.contracts import Profile
 
     found: dict[str, dict[str, str]] = {}
     for profile in Profile:
@@ -92,15 +104,35 @@ def _table(bindings: Sequence[Binding]) -> list[str]:
     return lines
 
 
+def _profile_table() -> list[str]:
+    """One row per section, and the model, with what each profile selects."""
+    found = _profile_defaults()
+    rows = [("model", Key.MODEL_PROVIDER), *((s.value, provider_key(s)) for s in Section)]
+    lines = ["| Section | Local | AWS |", "| --- | --- | --- |"]
+    lines += [
+        f"| {label} | `{found[key][Profile.LOCAL.value]}` | `{found[key][Profile.AWS.value]}` |"
+        for label, key in rows
+    ]
+    return lines
+
+
 def render_reference(bindings: Sequence[Binding] = DEFAULT_BINDINGS) -> str:
     """Return the variable reference as Markdown."""
     owned = [binding for binding in bindings if binding.owned]
     external = [binding for binding in bindings if not binding.owned]
-    lines = [
-        _HEADER,
-        "",
-        "# Configuration variables",
-        "",
+    lines = [_HEADER, "", "# Configuration variables", ""]
+    if bindings is DEFAULT_BINDINGS:
+        lines += [
+            _LOCAL_FIRST,
+            "",
+            "## Profile defaults",
+            "",
+            _PROFILE_TABLE_INTRO,
+            "",
+            *_profile_table(),
+            "",
+        ]
+    lines += [
         "## Variables owned by the library",
         "",
         *_table(owned),
@@ -115,18 +147,10 @@ def render_reference(bindings: Sequence[Binding] = DEFAULT_BINDINGS) -> str:
     ]
     if bindings is DEFAULT_BINDINGS:
         lines += [
-            "## Optional Langfuse integration",
-            "",
-            "These settings are resolved by `load_langfuse_settings` at the service boundary, "
-            "separately from `ServiceConfig`. See [Langfuse setup](langfuse.md) for purposes, "
-            "defaults and precedence.",
-            "",
-            *[f"- `{name}`" for name in LANGFUSE_VARIABLES.values()],
-            "",
             "## Optional Phoenix integration",
             "",
             "These settings are resolved by `load_phoenix_settings` separately from "
-            "`ServiceConfig`. See the [local Phoenix trial](phoenix-trial.md) for "
+            "`ServiceConfig`. See [Trace agents with Phoenix](phoenix-trial.md) for "
             "purposes, defaults, precedence and the separate SQLite server setup.",
             "",
             *[f"- `{name}`" for name in PHOENIX_VARIABLES],
@@ -139,7 +163,8 @@ def render_env_example(bindings: Sequence[Binding] = DEFAULT_BINDINGS) -> str:
     """Return a commented ``.env.example`` listing every variable."""
     lines = [
         "# Generated from the binding table. Do not edit by hand.",
-        "# Copy to .env and uncomment what you need. Unset variables use the profile defaults.",
+        "# With nothing set, every provider is local: no cloud infrastructure. EAP_PROFILE=aws",
+        "# or one EAP_<SECTION>_PROVIDER opts into AWS. Copy to .env and uncomment what you need.",
         "",
     ]
     for binding in bindings:
@@ -148,7 +173,7 @@ def render_env_example(bindings: Sequence[Binding] = DEFAULT_BINDINGS) -> str:
         lines.append(f"# {binding.name}={binding.example}")
         lines.append("")
     lines += [f"# {_SECRET_PURPOSE.replace('`', '')}", f"# {_SECRET_PATTERN}=", ""]
-    return "\n".join(lines) + (langfuse_env_example() if bindings is DEFAULT_BINDINGS else "")
+    return "\n".join(lines) + (phoenix_env_example() if bindings is DEFAULT_BINDINGS else "")
 
 
 @dataclass(frozen=True, slots=True)

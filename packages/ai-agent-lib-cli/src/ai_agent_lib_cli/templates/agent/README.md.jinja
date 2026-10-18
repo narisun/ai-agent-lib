@@ -7,8 +7,8 @@ model and tool wrappers that apply permissions, limits, and audit recording,
 along with conversation storage and request context.
 
 Read this page in order to test and run the agent. For a real-model walkthrough,
-see [Anthropic](docs/anthropic-example.md); for centralized model/tool traces,
-see [Langfuse](docs/langfuse.md). Those are optional after the local tests pass.
+see [Anthropic](docs/anthropic-example.md); for model and tool traces,
+see [Phoenix tracing](docs/tracing.md). Those are optional after the local tests pass.
 
 ## Before you start
 
@@ -99,7 +99,7 @@ appears in a provisional draft while the agent works. The draft panel disappears
 the final answer is saved; each reply shows input/output token usage and elapsed
 time. Missing counts display as unavailable; fake-model counts are simulated.
 For per-response model/tool timelines and checkpoint references, follow
-[Connect Langfuse](docs/langfuse.md). The generated service includes the shared
+[Connect Phoenix](docs/tracing.md). The generated service includes the shared
 library adapter; tracing is disabled until you configure it.
 The UI requests `POST /invoke` with `Accept: text/event-stream`. Regular JSON
 requests keep their accepted-answer envelope. Default pattern guardrails check

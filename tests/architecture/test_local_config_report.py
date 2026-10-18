@@ -9,56 +9,52 @@ from tools.local_config_report import report_environment
 from ai_agent_lib_core.config import ConfigResolver, LayeredConfigSource, MappingConfigSource
 
 
-@pytest.mark.parametrize("backend", ["PHOENIX", "LANGFUSE"])
 @pytest.mark.parametrize("from_launcher", [False, True])
 def test_startup_uses_separate_tracing_file_and_child_working_directory(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-    backend: str,
     from_launcher: bool,
 ) -> None:
     from tools.local_environment import agent_environment
 
-    from ai_agent_lib_core.config.tracing import resolve_tracing_settings
+    from ai_agent_lib_core.config.phoenix import resolve_phoenix_settings
 
     monkeypatch.setattr("os.environ", {})
     folder = tmp_path / "agent"
     folder.mkdir()
     service, launcher = folder / ".env", tmp_path / ".env"
     trace_file = (tmp_path if from_launcher else folder) / "tracing.env"
-    endpoint = "PHOENIX_COLLECTOR_ENDPOINT" if backend == "PHOENIX" else "LANGFUSE_BASE_URL"
     service.write_text(
-        f"EAP_{backend}_ENABLED=true\nEAP_{backend}_CAPTURE_CONTENT=false\n"
-        f"{endpoint}=http://127.0.0.1:6006\n"
-        + ("" if from_launcher else f"EAP_{backend}_ENV_FILE=tracing.env\n"),
+        "EAP_PHOENIX_ENABLED=true\nEAP_PHOENIX_CAPTURE_CONTENT=false\n"
+        "PHOENIX_COLLECTOR_ENDPOINT=http://127.0.0.1:6006\n"
+        + ("" if from_launcher else "EAP_PHOENIX_ENV_FILE=tracing.env\n"),
         encoding="utf-8",
     )
     launcher.write_text(
-        f"EAP_{backend}_ENV_FILE=tracing.env\n" if from_launcher else "", encoding="utf-8"
+        "EAP_PHOENIX_ENV_FILE=tracing.env\n" if from_launcher else "", encoding="utf-8"
     )
     trace_file.write_text(
-        f"EAP_{backend}_CAPTURE_CONTENT=true\n{endpoint}=http://127.0.0.1:6007\n"
-        "PHOENIX_API_KEY=phoenix-private\nLANGFUSE_PROJECT_ID=trial\n"
-        "LANGFUSE_PUBLIC_KEY=langfuse-public-private\nLANGFUSE_SECRET_KEY=langfuse-private\n",
+        "EAP_PHOENIX_CAPTURE_CONTENT=true\nPHOENIX_COLLECTOR_ENDPOINT=http://127.0.0.1:6007\n"
+        "PHOENIX_API_KEY=phoenix-private\n",
         encoding="utf-8",
     )
     environment = agent_environment(service, launcher, required=True, working_dir=tmp_path)
-    resolved = resolve_tracing_settings(
+    resolved = resolve_phoenix_settings(
         service, environment=MappingConfigSource(environment), working_dir=tmp_path
     )
-    settings = getattr(resolved, backend.lower()).settings
+    settings = resolved.settings
+    assert settings is not None
     assert settings.capture_content
     assert settings.base_url == "http://127.0.0.1:6007"
     output = capsys.readouterr().out
-    assert f'{endpoint}="http://127.0.0.1:6007"  [{trace_file}' in output
-    assert f'EAP_{backend}_CAPTURE_CONTENT="true"  [{trace_file}' in output
+    assert f'PHOENIX_COLLECTOR_ENDPOINT="http://127.0.0.1:6007"  [{trace_file}' in output
+    assert f'EAP_PHOENIX_CAPTURE_CONTENT="true"  [{trace_file}' in output
     assert "http://127.0.0.1:6006" not in next(
-        line for line in output.splitlines() if f"{endpoint}=" in line
+        line for line in output.splitlines() if "PHOENIX_COLLECTOR_ENDPOINT=" in line
     )
+    assert "PHOENIX_API_KEY=********" in output
     assert "phoenix-private" not in output
-    assert "langfuse-private" not in output
-    assert "langfuse-public-private" not in output
 
 
 def show(shell: dict[str, str], launcher: dict[str, str], service: dict[str, str]) -> None:
@@ -98,8 +94,8 @@ def test_startup_summary_masks_credentials_but_shows_public_json_options(
 ) -> None:
     protected = {
         "ANTHROPIC_API_KEY": "anthropic-private-value",
-        "LANGFUSE_PUBLIC_KEY": "public-private-value",
-        "LANGFUSE_SECRET_KEY": "langfuse-private-value",
+        # A credential left over from an earlier setup is never shown, though never read.
+        "LANGFUSE_SECRET_KEY": "stale-private-value",
         "PHOENIX_API_KEY": "phoenix-private-value",
         "AWS_ACCESS_KEY_ID": "aws-private-id",
         "AWS_SESSION_TOKEN": "aws-private-token",
@@ -180,12 +176,12 @@ def test_startup_summary_handles_aliases_empty_values_and_unrelated_shell_data(
             "UNRELATED_SECRET": "not-for-this-process",
             "PATH": "private-path",
         },
-        {"LANGFUSE_SECRET_KEY": "", "HTTPS_PROXY": "http://user:private-proxy@proxy:8080"},
+        {"PHOENIX_API_KEY": "", "HTTPS_PROXY": "http://user:private-proxy@proxy:8080"},
         {},
     )
     output = capsys.readouterr().out
     assert 'AWS_DEFAULT_REGION="us-east-1"  [shell]' in output
-    assert "LANGFUSE_SECRET_KEY=(empty)" in output
+    assert "PHOENIX_API_KEY=(empty)" in output
     assert "HTTPS_PROXY=********" in output
     assert "private-proxy" not in output
     assert "UNRELATED_SECRET" not in output
@@ -205,14 +201,14 @@ def test_startup_summary_handles_aliases_empty_values_and_unrelated_shell_data(
 def test_startup_summary_hides_credentials_in_urls(
     value: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    show({}, {"LANGFUSE_BASE_URL": value}, {})
+    show({}, {"PHOENIX_COLLECTOR_ENDPOINT": value}, {})
     output = capsys.readouterr().out
-    assert "LANGFUSE_BASE_URL=********  [launcher .env]" in output
+    assert "PHOENIX_COLLECTOR_ENDPOINT=********  [launcher .env]" in output
     assert value not in output
 
 
 def test_startup_summary_escapes_control_characters(capsys: pytest.CaptureFixture[str]) -> None:
-    show({}, {"LANGFUSE_PROJECT_ID": "project\n\x1b[31msecond-line"}, {})
+    show({}, {"PHOENIX_PROJECT_NAME": "project\n\x1b[31msecond-line"}, {})
     output = capsys.readouterr().out
-    assert r'LANGFUSE_PROJECT_ID="project\n\u001b[31msecond-line"' in output
+    assert r'PHOENIX_PROJECT_NAME="project\n\u001b[31msecond-line"' in output
     assert "\x1b" not in output

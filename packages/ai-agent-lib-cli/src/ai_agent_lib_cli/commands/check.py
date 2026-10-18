@@ -82,11 +82,11 @@ def evals(tools: Toolbox, service: str | None, accept: bool, workspace: Path | N
     An eval skips itself until a real model is set in the service's .env. Each
     writes a report to the service's .agentlib/eval-report.json.
     --accept saves the passing report as evals/baseline.json; later runs fail
-    on regressions against it. --accept still enforces the absolute bar: while
-    the pytest run is in flight it leaves a marker beside the eval report, and
-    the generated test skips only the regression gate against the existing
-    baseline when that marker is there, moving the bar on purpose instead of
-    deadlocking on it. The marker is removed once the run ends.
+    on regressions against it. --accept still enforces the absolute bar. While
+    the pytest run is in flight it leaves a marker beside the eval report. The
+    generated test skips only the regression gate against the existing baseline
+    when that marker is there, so a deliberate change moves the baseline instead
+    of deadlocking on it. The marker is removed once the run ends.
     """
     if accept and not service:
         raise CliError("--accept needs a service", fix="agentlib eval SERVICE --accept")

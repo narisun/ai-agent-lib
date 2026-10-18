@@ -1,18 +1,33 @@
 # Run and test rmprep locally
 
 Use this guide to run **Agent Lab**, the **rmprep** agent, its **MCP data server**,
-and optional **Phoenix tracing** on your Windows desktop. The scripts use your
-normal user account and the same enterprise-approved Python executable for every
-service. Packages stay isolated in `.venv` folders; startup and installation
-use the default Python and its pip module.
+and optional **Phoenix tracing** on a Windows, macOS, or Linux desktop. The
+launchers use your normal user account and the same enterprise-approved Python
+executable for every service. Packages stay isolated in `.venv` folders; startup
+and installation use the default Python and its pip module.
 
 You need your team's Python 3.11+ and pip setup, an approved package index, a
 writable checkout, and a browser. For Anthropic answers, you also need an approved
 API key and model. Use a provider approved to receive the example business data.
 
-Run commands in **Command Prompt (cmd.exe)** from the repository root: the folder
-containing `start-local.bat`. Complete steps 1–4 once. On later days, run
-`start-local.bat`, test in the browser, then run `stop-local.bat`.
+Run commands from the repository root: the folder containing `start-local.bat`
+and `start-local.sh`. Commands are shown for **Command Prompt (cmd.exe)**. On
+macOS/Linux, open a bash or zsh terminal there and use the spelling in the right
+column. The `.sh` launchers take the same arguments as their `.bat` twins and run
+`python3` from your `PATH`, so that must be your approved Python 3.11+. Paths in
+the commands and prose use Windows separators; use `/` on macOS/Linux.
+
+| Command Prompt | macOS/Linux |
+| --- | --- |
+| `python …` | `python3 …` |
+| `setup-local.bat --model anthropic` | `./setup-local.sh --model anthropic` |
+| `start-local.bat` | `./start-local.sh` |
+| `type .agentlib\ui-rmprep\access-code` | `cat .agentlib/ui-rmprep/access-code` |
+| `stop-local.bat` | `./stop-local.sh` |
+| `start-phoenix.bat setup` | `./start-phoenix.sh setup` |
+
+Complete steps 1–4 once. On later days, run `start-local.bat`, test in the
+browser, then run `stop-local.bat`.
 
 ## 1. Set up once
 
@@ -26,16 +41,20 @@ Setup uses your existing pip index, proxy and certificate configuration. All pip
 commands run as `python -m pip` with the selected Python. Setup prints its path
 and the model provider whose dependencies it will install.
 
-| Component | Where its packages go | How it runs |
+| Component | Virtual-environment folder | How it runs |
 | --- | --- | --- |
-| Library, rmprep and MCP server | `.venv\Lib\site-packages` | The same `python` used for setup |
-| Agent Lab | `packages\ai-agent-lib-ui\.venv\Lib\site-packages` | The same Python, loading only the UI package set |
-| Phoenix, when installed | `.agentlib\phoenix\.venv\Lib\site-packages` | The same Python, loading only the Phoenix package set |
+| Library, rmprep and MCP server | `.venv` | The same `python` used for setup |
+| Agent Lab | `packages\ai-agent-lib-ui\.venv` | The same Python, loading only the UI package set |
+| Phoenix, when installed | `.agentlib\phoenix\.venv` | The same Python, loading only the Phoenix package set |
+
+Each folder holds its packages in `Lib\site-packages` on Windows and in
+`lib/python3.11/site-packages` on macOS/Linux; that folder name follows the
+major and minor version of the Python you run.
 
 These package folders resolve an upstream dependency conflict: Chainlit requires
 MCP 1.x, while the library's MCP server requires MCP 2.x. Services communicate
-over HTTP. The launchers load each folder's packages without running
-`.venv\Scripts\python.exe` or `pip.exe`. Setup uses the default Python's pip
+over HTTP. The launchers load each folder's packages without running the
+interpreter or `pip` inside any `.venv`. Setup uses the default Python's pip
 and preserves your enterprise package-source configuration. Compatible existing
 `.venv` packages can be reused; a different Python version or base installation
 requires setup again. Existing environment executables are left untouched.
@@ -67,17 +86,18 @@ use `--model bedrock` instead. If your root `.env` already selects the model,
 start-phoenix.bat setup
 ```
 
-Use the same approved Python for setup and startup, in a fresh Command Prompt
+Use the same approved Python for setup and startup, in a fresh terminal
 without activating `.venv`. In your team's prepared
-Command Prompt, `where python` and `python -m pip --version` show the selected
-installation. If your team provides an explicit path, use
+terminal, `where python` (`which python3` on macOS/Linux) and `python -m pip --version`
+show the selected installation. If your team provides an explicit path, use
 `"C:\path to approved Python\python.exe" tools\local_dev.py setup --model bedrock`
+(`/path/to/python3 tools/local_dev.py setup --model bedrock` on macOS/Linux)
 and that same executable with `tools\local_dev.py` to start services. Package
 access and native wheels must come from your approved index.
 
 ## 2. Set the model and tracing options
 
-Create or edit **`.env` beside `start-local.bat`**. Keep your existing settings;
+Create or edit **`.env` beside the launchers**. Keep your existing settings;
 add or update these entries, replacing the API-key placeholder:
 
 ```dotenv
@@ -109,7 +129,6 @@ To see model input/output and MCP calls in local Phoenix, add:
 
 ```dotenv
 EAP_TELEMETRY=off
-EAP_LANGFUSE_ENABLED=false
 EAP_PHOENIX_ENABLED=true
 EAP_PHOENIX_CAPTURE_CONTENT=true
 PHOENIX_COLLECTOR_ENDPOINT=http://127.0.0.1:6006
@@ -118,10 +137,10 @@ PHOENIX_PROJECT_NAME=rmprep-trial
 
 Content capture includes messages, client evidence and tool arguments/results.
 `EAP_TELEMETRY=off` disables the separate operational exporter; Phoenix still
-receives model/tool spans and usage. Enable one agent tracing backend at a time.
-See the [Phoenix guide](phoenix-trial.md) for settings and trace details.
+receives model/tool spans and usage. See the [Phoenix guide](phoenix-trial.md)
+for settings and trace details.
 
-The root file supplies rmprep's model and tracing settings to the batch launcher.
+The root file supplies rmprep's model and tracing settings to the launcher.
 Keep registry, identity and storage settings in each service's own `.env`.
 Manual `python tools\package_runtime.py agent -m rmprep` commands use the service's settings; they do not load
 the launcher's root file automatically.
@@ -142,7 +161,7 @@ Before sending a question, check the startup summary:
 
 Wait for **All selected services are ready**, then open
 [Agent Lab](http://127.0.0.1:8765). Keep the launcher window open. In a second
-Command Prompt at the repository root, read the local access code:
+terminal at the repository root, read the local access code:
 
 ```bat
 type .agentlib\ui-rmprep\access-code
@@ -203,17 +222,16 @@ Chat presents readable answers without long source references beside every
 figure. The original answer and memo documents retain their references for review.
 MCP service logs include the query, parameters and record statistics.
 
-rmprep defaults to 1,000 words for memos and 350 for Q&A. Ask `Keep it within
-450 words.` to change a limit. Heading text, figures and full citations count;
-Markdown heading/list markers and divider-only lines do not; code is counted
-literally. The agent preserves
-accepted text and checks exact references and known evidence-limit errors.
-A failing draft can be revised twice; rejected drafts remain in traces rather
-than accepted conversation history. See [context management](../examples/rmprep/docs/context-management.md).
+Ask `Keep it within 450 words.` to change an answer's length limit. The agent
+checks length and exact source references before it saves an answer. A failing
+draft can be revised twice; rejected drafts remain in traces rather than
+accepted conversation history. The [rmprep README](../examples/rmprep/README.md#3-generate-a-memo-with-your-configured-model)
+lists the default limits, how words are counted and every check; see also
+[context management](../examples/rmprep/docs/context-management.md).
 
 ## 4. Stop and restart
 
-In a second Command Prompt at the repository root:
+In a second terminal at the repository root:
 
 ```bat
 stop-local.bat
@@ -223,7 +241,8 @@ Wait for **Stopped gracefully**. The launcher stops Agent Lab, rmprep, MCP and
 local Phoenix in reverse order and preserves their data. Run `start-local.bat`
 again to resume testing. Restart after editing code or environment settings.
 **Ctrl+C** in the launcher window also stops its stack; use it before closing
-that window. If Command Prompt asks about terminating the batch job, answer `Y`.
+that window. On Windows, if Command Prompt asks about terminating the batch job,
+answer `Y`.
 
 | Saved data | Default location under the repository root |
 | --- | --- |
@@ -290,14 +309,21 @@ For another agent, follow [Agent Lab's manual setup](../packages/ai-agent-lib-ui
 Then use `start-local.bat ui --config .agentlib\ui\config.json` and start its
 agent/MCP services separately. Relative `--config` paths use the repository root.
 The default rmprep configuration is `.agentlib\ui-rmprep\config.json`.
-Langfuse is an alternative separately hosted backend; follow the
-[shared Langfuse guide](langfuse.md). `start-local.bat` does not start its backend.
 
 ## Which environment settings are used?
 
-Startup prints effective settings and sources. For rmprep, the order is:
+Startup prints effective settings and sources. For rmprep, a setting comes from
+the highest-priority source below that defines it:
 
-**Command Prompt environment → root `.env` → rmprep service `.env` → defaults.**
+| Priority | Source | How it is found |
+| --- | --- | --- |
+| 1 | Process environment | Variables set in the terminal that runs the launcher. They override every file below. |
+| 2 | Launcher file: the root `.env`, or the file passed with `--env-file` | The root file is found beside the launcher even when you start it from another folder. `--env-file` replaces it, and a relative path uses your current folder. A missing default root file keeps service settings; a missing explicit file stops startup. |
+| 3 | Separate Phoenix env file, `EAP_PHOENIX_ENV_FILE` (optional) | Adds one level for the tracing settings. Prefer an absolute path; a relative one resolves from `examples\rmprep`, or from the service folder when set in a service `.env`. |
+| 4 | rmprep service `.env` | `examples\rmprep\agents\rmprep\.env`, the rmprep service's own settings file. |
+| 5 | Defaults | The library's built-in values. |
+
+Wherever a value is set, library storage paths such as `EAP_MODEL_TRACE_PATH` resolve from the service folder.
 
 To select a different file instead of the root `.env`:
 
@@ -305,18 +331,8 @@ To select a different file instead of the root `.env`:
 start-local.bat --env-file "F:\path to your settings\.env"
 ```
 
-The root file is found beside the batch file even when launched from another
-folder. An explicit relative `--env-file` uses your current Command Prompt folder.
-A missing default root file keeps service settings; a missing explicit file stops
-startup. `rmprep` and `services` apply these overrides; UI and MCP keep separate
+`rmprep` and `services` apply the launcher file; UI and MCP keep separate
 settings, and `demo` uses scripted replies.
-
-For tracing, an optional separate file adds one level:
-**shell → launcher file → separate tracing file → service file → defaults**.
-Use absolute paths for `EAP_PHOENIX_ENV_FILE` or `EAP_LANGFUSE_ENV_FILE` in the
-root file. In a service `.env`, those paths are relative to that file; in shell
-or launcher settings, relative tracing-file paths use `examples\rmprep`.
-Library storage paths such as `EAP_MODEL_TRACE_PATH` resolve from the service folder.
 
 The summary masks credentials, sensitive JSON fields, database connection strings
 and unknown custom variables. Ordinary options such as caching, timeouts and
@@ -331,7 +347,7 @@ Capture starts with new turns; retain the file to inspect them later.
 | --- | --- |
 | Missing package or mismatched Python | Run `setup-local.bat`; for Phoenix, run `start-phoenix.bat setup`. Check your approved pip index and wheels. |
 | Login asks for a code | Run `type .agentlib\ui-rmprep\access-code`. Use `127.0.0.1:8765` consistently. |
-| Startup selects `fake` | Check the printed environment path. Set provider and model ID along with the key. Clear an unwanted shell override with `set EAP_MODEL_PROVIDER=`, then restart. |
+| Startup selects `fake` | Check the printed environment path. Set provider and model ID along with the key. Clear an unwanted shell override with `set EAP_MODEL_PROVIDER=` (`unset EAP_MODEL_PROVIDER` on macOS/Linux), then restart. |
 | A port is in use | Run `stop-local.bat` for managed runs, or Ctrl+C in a manually started service's window. Existing processes are left alone. |
 | No Phoenix trace or missing content | Check enabled/content-capture settings, restart, send a new question and allow time for ingestion. See [Phoenix troubleshooting](phoenix-trial.md#troubleshooting). |
 | Cache hit is 0% | Check cache writes. A cold request, changed prompt/context, or expired entry can write a prefix; a later matching request can read it. |

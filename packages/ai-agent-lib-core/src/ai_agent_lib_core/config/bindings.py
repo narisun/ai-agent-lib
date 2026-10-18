@@ -10,13 +10,15 @@ from __future__ import annotations
 
 import enum
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 
 from ai_agent_lib_core.contracts import Section
 
 __all__ = [
     "DEFAULT_BINDINGS",
+    "LOCAL_ONLY_ADAPTERS",
     "PREFIX",
     "SECRET_KEY_PREFIX",
     "SECRET_VARIABLE_PREFIX",
@@ -145,16 +147,54 @@ class Binding:
         return (self.name, *self.alternate_names, *self.deprecated_names)
 
 
+LOCAL_ONLY_ADAPTERS: Mapping[tuple[str, str], str] = MappingProxyType(
+    {
+        ("identity", "static"): "the development identity",
+        ("policy", "rules"): "the rules engine",
+        ("audit", "jsonl"): "JSONL audit",
+        ("checkpoint", "sqlite"): "SQLite",
+        ("data", "duckdb_csv"): "DuckDB over CSV",
+        ("model", "fake"): "the fake model",
+    }
+)
+"""The adapters registered as local only, by ``(port, name)``, with how the reference says them.
+
+The one-way guard refuses these outside local development. This module cannot
+ask the provider registry, because configuration may not import it, so the
+list is kept here and an architecture test compares it with the registry.
+"""
+
+_LOCAL_ONLY_PHRASES = ", ".join(LOCAL_ONLY_ADAPTERS.values())
+
 _SECTION_DETAILS = {
-    Section.SECRETS: "Where adapters get credentials by name.",
-    Section.AUDIT: "Where the audit trail of every governed call goes.",
-    Section.IDENTITY: (
-        "Who the caller is: a development identity locally, OAuth 2.0 JWTs when deployed."
+    Section.SECRETS: (
+        "Where adapters get credentials by name: `env` reads `EAP_SECRET_<NAME>` variables "
+        "locally, `secrets_manager` is the AWS option."
     ),
-    Section.CHECKPOINT: "Where LangGraph keeps conversation state between turns.",
-    Section.REGISTRY: "The agent and MCP tool registries.",
-    Section.POLICY: "Who may do what: the in-process rules engine locally, OPA when deployed.",
-    Section.GUARDRAILS: "Content checks on prompts, replies and tool results.",
+    Section.AUDIT: (
+        "Where the audit trail of every governed call goes: `jsonl` writes a local file and is "
+        "local-only, `firehose` is the AWS option."
+    ),
+    Section.IDENTITY: (
+        "Who the caller is: a development identity (`static`, local-only) locally, "
+        "OAuth 2.0 JWTs (`jwt`) when deployed."
+    ),
+    Section.CHECKPOINT: (
+        "Where LangGraph keeps conversation state between turns: `sqlite` is a local file and "
+        "is local-only, `postgres` is the AWS option."
+    ),
+    Section.REGISTRY: (
+        "The agent and MCP tool registries: `file` reads them from disk and can be deployed, "
+        "`s3_file` is the AWS option."
+    ),
+    Section.POLICY: (
+        "Who may do what: the in-process rules engine (`rules`, local-only) locally, "
+        "OPA (`opa`) when deployed."
+    ),
+    Section.GUARDRAILS: (
+        "Content checks on prompts, replies and tool results: `patterns` checks text patterns "
+        "in the process and can be deployed, `bedrock` is the AWS option."
+    ),
 }
 
 
@@ -209,9 +249,8 @@ def _default_bindings() -> tuple[Binding, ...]:
             example="local",
             details=(
                 "Says where the process runs. Anything other than `local` turns on the one-way "
-                "guard: adapters registered as local only (the development identity, the rules "
-                "engine, JSONL audit, SQLite, DuckDB over CSV, the fake model) refuse to start. "
-                "Inside ECS, Fargate or Lambda the value must be dev or prod."
+                f"guard: adapters registered as local only ({_LOCAL_ONLY_PHRASES}) refuse to "
+                "start. Inside ECS, Fargate or Lambda the value must be dev or prod."
             ),
         ),
         Binding(
@@ -222,9 +261,10 @@ def _default_bindings() -> tuple[Binding, ...]:
             details=(
                 "With `opentelemetry` every governed call is a span named after the GenAI "
                 "conventions, and the `agentlib.events` and `agentlib.duration` metrics are "
-                "recorded, through the OpenTelemetry API. The service sends them by calling "
-                "`configure_telemetry()`; where to is set with the standard `OTEL_` variables. "
-                "The audit option `tracing: true` also turns it on."
+                "recorded, through the OpenTelemetry API. A service entry point sends them by "
+                "calling `start_telemetry()` (`run_agent` does), which installs the providers "
+                "through `configure_telemetry()` when this is on; where to is set with the "
+                "standard `OTEL_` variables. The audit option `tracing: true` also turns it on."
             ),
         ),
         Binding(
@@ -278,7 +318,9 @@ def _default_bindings() -> tuple[Binding, ...]:
             example="anthropic",
             details=(
                 "The provider of the model behind the `default` alias, and of any alias that does "
-                "not name its own provider."
+                "not name its own provider. `anthropic` calls the Anthropic API, `bedrock` is the "
+                "AWS option, and `fake` replies from the process without a network call and is "
+                "local-only."
             ),
         ),
         Binding(
@@ -326,7 +368,8 @@ def _default_bindings() -> tuple[Binding, ...]:
             kind=ValueKind.JSON,
             details=(
                 "Named data sources for MCP tools. Each entry names its adapter with `kind`; the "
-                "other keys are that adapter's options. Code asks for "
+                "other keys are that adapter's options. `duckdb_csv` reads local CSV files and is "
+                "the local-only kind; `rest` and `redshift_data` can be deployed. Code asks for "
                 '`services.data_source("ledger")` and never sees the backend.'
             ),
             default="`{}`: no data sources",

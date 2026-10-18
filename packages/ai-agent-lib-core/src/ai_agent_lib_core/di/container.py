@@ -119,7 +119,7 @@ class ServiceContainer:
         clock: The clock port. Defaults to the system clock.
         ids: The identifier port. Defaults to random identifiers.
         telemetry: The telemetry port. By default, resolved telemetry settings
-            or the legacy audit ``tracing`` option enable OpenTelemetry;
+            or the audit option ``tracing: true`` enable OpenTelemetry;
             otherwise a no-op implementation is used.
         mcp_connector: Opens connections to MCP servers. Defaults to
             Streamable HTTP; a test passes an in-process connector.
@@ -793,11 +793,20 @@ class ServiceContainer:
             )
 
     def _selected(self) -> list[_Key]:
-        """Return selected adapters in legacy order, before dependency ordering."""
+        """Return selected adapters in legacy order, before dependency ordering.
+
+        Legacy order is the order that predates declared dependencies: one
+        adapter per ``Section``, in the order the ``Section`` enum lists them,
+        then each selected model provider, then each data-source instance.
+        ``build_order`` keeps it, only pulling a declared dependency ahead of
+        the adapter that needs it (see ``ProviderSpec.dependencies``).
+        """
         selected: list[_Key] = [
             (section.value, self._config.section(section).provider, "") for section in Section
         ]
-        # The same choice the permission plan makes: no model configured, no provider.
+        # Model providers come from ``di/access.selected_models``, which the access
+        # planner also uses, so the container builds the providers the plan grants
+        # access to. A service with no model configured gets no model provider.
         selected.extend((MODEL_PORT, name, "") for name in selected_models(self._config))
         selected.extend(
             (DATA_PORT, selection.provider, source)

@@ -373,6 +373,5 @@ def update(tools: Toolbox, show_diff: bool, plan_only: bool, workspace: Path | N
     if not (report.updated or report.created or report.kept):
         click.echo("  nothing to do: every generated file is up to date")
     elif report.kept and not show_diff:
-        click.echo(
-            "\nSee what the templates would change in the files you changed: agentlib update --diff"
-        )
+        command = "agentlib update --plan --diff" if plan_only else "agentlib update --diff"
+        click.echo(f"\nSee what the templates would change in the files you changed: {command}")

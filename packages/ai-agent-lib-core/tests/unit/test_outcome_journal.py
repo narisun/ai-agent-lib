@@ -1,6 +1,7 @@
 """Terminal outcomes survive lost responses without authorizing replay or cross-owner reads."""
 
 import json
+from collections.abc import AsyncIterator
 from dataclasses import replace
 from pathlib import Path
 
@@ -101,3 +102,55 @@ async def test_incomplete_reservation_never_becomes_a_confirmed_failure(tmp_path
     assert await journal.begin(context)
     assert not await journal.begin(context)
     assert await journal.read(context, "request") is None
+
+
+@pytest.mark.parametrize("route", ["/invoke", "/invoke/stream"])
+@pytest.mark.parametrize("headers", [{}, {"authorization": "Bearer stranger"}])
+async def test_a_refused_caller_never_reaches_the_journal(
+    tmp_path: Path, route: str, headers: dict[str, str]
+) -> None:
+    kit = Fakes(
+        identity=FakeIdentityVerifier(
+            {"owner": Principal(subject="owner", tenant="bank", roles=frozenset({"rm"}))}
+        )
+    )
+    executions = 0
+
+    async def ready() -> None:
+        pass
+
+    async def run(context: RequestContext, given: object) -> dict[str, str]:
+        nonlocal executions
+        executions += 1
+        return {"answer": "unreachable"}
+
+    async def stream(context: RequestContext, given: object) -> AsyncIterator[dict[str, str]]:
+        nonlocal executions
+        executions += 1
+        yield {"answer": "unreachable"}
+
+    path = tmp_path / "outcomes.sqlite"
+    async with kit.container() as services:
+        lifecycle = ServiceLifecycle(ready)
+        await lifecycle.start()
+        app = agent_app(
+            services,
+            run,
+            application="demo",
+            lifecycle=lifecycle,
+            stream=stream,
+            outcomes=SqliteOutcomeJournal(path),
+        )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            reply = await client.post(
+                route,
+                headers={**headers, "x-request-id": "request"},
+                json={"input": {}, "thread_id": "thread"},
+            )
+    assert reply.status_code == 401
+    assert reply.json()["error"] == "unauthorized"
+    assert executions == 0
+    # The journal creates its file on first use, so no file means no begin, finish or read.
+    assert not path.exists()
