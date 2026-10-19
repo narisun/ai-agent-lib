@@ -111,7 +111,7 @@ and mypy_path extended; designer's call — mirror rmprep's entries).
 ### D2 — schema document, rendered from data_model.csv (R1)
 
 A build script in the workspace (`tools/build_schema.py`, runnable as a
-module) renders `agents/rmqna/src/rmqna/prompts/schema/v1.md` from the
+module) renders `agents/rmqna/src/rmqna/prompts/schema_v1.md` from the
 data copy:
 
 - Per table: name, domain, a one-line role, then columns as
