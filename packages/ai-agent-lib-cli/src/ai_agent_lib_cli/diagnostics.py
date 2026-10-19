@@ -73,11 +73,13 @@ async def check_service(folder: Path) -> tuple[CheckResult, ...]:
     except AgentLibError as problem:
         return (CheckResult.failed("settings", problem),)
     config = resolution.config
+    phoenix_warnings: tuple[str, ...] = ()
     try:
         phoenix_resolution = resolve_phoenix_settings(dotenv)
     except AgentLibError as problem:
         phoenix = CheckResult.failed("phoenix", problem)
     else:
+        phoenix_warnings = phoenix_resolution.warnings
         phoenix = CheckResult(
             "phoenix",
             ok=True,
@@ -85,16 +87,18 @@ async def check_service(folder: Path) -> tuple[CheckResult, ...]:
             if phoenix_resolution.settings is None
             else "configuration valid (connectivity not checked)",
         )
-    # A deprecated spelling still works, so it is told, not failed.
-    deprecated = tuple(
-        CheckResult("warning", ok=True, detail=warning) for warning in resolution.warnings
-    )
     return (
         CheckResult("settings", ok=True, detail="resolved"),
-        *deprecated,
+        *_warnings(resolution.warnings),
         phoenix,
+        *_warnings(phoenix_warnings),
         *await diagnose(config),
     )
+
+
+def _warnings(texts: Sequence[str]) -> tuple[CheckResult, ...]:
+    """Tell each deprecated spelling as a passing check: it still works, so it does not fail."""
+    return tuple(CheckResult("warning", ok=True, detail=text) for text in texts)
 
 
 def _pins(
@@ -223,4 +227,4 @@ def explain_service(folder: Path) -> tuple[Sequence[Setting], Sequence[str]]:
         Setting(variable=name, value=redact(value)[:_MAX_VALUE], origin=phoenix.origins[name])
         for name, value in phoenix.shown.items()
     ]
-    return settings, resolution.warnings
+    return settings, (*resolution.warnings, *phoenix.warnings)

@@ -155,6 +155,33 @@ def test_doctor_tells_a_deprecated_spelling_and_still_passes(
     assert "Everything checked is usable." in out
 
 
+def test_doctor_tells_a_deprecated_phoenix_spelling_after_the_phoenix_check(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    env = workspace / "agents/hello-agent/.env"
+    env.write_text(
+        env.read_text(encoding="utf-8")
+        + "EAP_PHOENIX_ENABLED=true\nAC2_PHOENIX_CAPTURE_CONTENT=false\n",
+        encoding="utf-8",
+    )
+    capsys.readouterr()
+
+    assert run("doctor", "hello-agent", "--workspace", workspace) == 0
+    out = capsys.readouterr().out
+    assert (
+        "  ok    phoenix: configuration valid (connectivity not checked)\n"
+        "  ok    warning: EAP_PHOENIX_ENABLED is deprecated; use AC2_PHOENIX_ENABLED instead\n"
+    ) in out
+    assert out.count("is deprecated") == 1  # the canonical capture setting is not told
+    assert "FAIL" not in out
+
+    assert run("config", "explain", "hello-agent", "--workspace", workspace) == 0
+    assert (
+        "warning: EAP_PHOENIX_ENABLED is deprecated; use AC2_PHOENIX_ENABLED instead"
+        in capsys.readouterr().err
+    )
+
+
 def test_doctor_fails_a_setting_that_carries_both_spellings_with_different_values(
     workspace: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

@@ -208,6 +208,40 @@ def test_a_legacy_name_is_logged_once_per_process_however_often_it_is_read(
     ]
 
 
+def test_a_canonical_resolution_carries_no_warnings() -> None:
+    resolved = _resolve({"AC2_PHOENIX_ENABLED": "true", "AC2_PHOENIX_CAPTURE_CONTENT": "true"})
+    assert resolved.warnings == ()
+    assert _resolve({}).warnings == ()
+
+
+def test_a_legacy_resolution_carries_each_warning_every_time_it_is_resolved() -> None:
+    expected = (
+        "EAP_PHOENIX_ENABLED is deprecated; use AC2_PHOENIX_ENABLED instead",
+        "EAP_PHOENIX_CAPTURE_CONTENT is deprecated; use AC2_PHOENIX_CAPTURE_CONTENT instead",
+    )
+    legacy = {"EAP_PHOENIX_ENABLED": "true", "EAP_PHOENIX_CAPTURE_CONTENT": "true"}
+    # The log says each name once per process; every resolution still carries its own texts.
+    for _ in range(2):
+        assert sorted(_resolve(legacy).warnings) == sorted(expected)
+
+
+@pytest.mark.parametrize("holder", ["process", "service"])
+def test_a_legacy_separate_file_setting_is_carried_once_though_it_is_read_twice(
+    tmp_path: Path, holder: str
+) -> None:
+    # The setting is read once to find the file's layer and once with the rest.
+    folder = tmp_path / "agent"
+    folder.mkdir()
+    service = folder / ".env"
+    service.write_text("EAP_PHOENIX_ENV_FILE=traces.env\n" if holder == "service" else "")
+    (folder / "traces.env").write_text("AC2_PHOENIX_ENABLED=true\n")
+    environment = {"EAP_PHOENIX_ENV_FILE": "traces.env"} if holder == "process" else {}
+    resolved = _resolve(environment, service=service, working_dir=folder)
+    assert resolved.warnings == (
+        "EAP_PHOENIX_ENV_FILE is deprecated; use AC2_PHOENIX_ENV_FILE instead",
+    )
+
+
 def test_a_legacy_name_disables_tracing_too() -> None:
     assert (
         _resolve({"EAP_PHOENIX_ENABLED": "false", "EAP_PHOENIX_ENV_FILE": "x.env"}).settings is None

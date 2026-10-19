@@ -74,14 +74,17 @@ class PhoenixSettings:
         return f"{self.base_url.rstrip('/')}/redirects/traces/{trace_id}"
 
 
-def _lookup(layers: _Layers, name: str) -> tuple[str, str] | None:
+def _lookup(
+    layers: _Layers, name: str, deprecations: list[str] | None = None
+) -> tuple[str, str] | None:
     """Find a variable's value and origin in the first layer that sets it.
 
     An ``AC2_`` name is also read in its ``EAP_`` spelling, which keeps working
     for one minor release. Equal values in both spellings coexist silently. A
     different value is a conflict, wherever each spelling is set, because
     guessing which one was meant is the hazard. A legacy spelling that supplies
-    the value is logged as deprecated.
+    the value is logged as deprecated, and its message is added to
+    ``deprecations`` when the caller passes a list to collect them in.
 
     Raises:
         ConfigurationError: If the two spellings carry different values.
@@ -110,7 +113,10 @@ def _lookup(layers: _Layers, name: str) -> tuple[str, str] | None:
                 f"{old_name} is deprecated and conflicts with {name}; set only {name}"
             )
         return current
-    log_deprecation(f"{old_name} is deprecated; use {name} instead")
+    message = f"{old_name} is deprecated; use {name} instead"
+    log_deprecation(message)
+    if deprecations is not None:
+        deprecations.append(message)
     return old
 
 
@@ -136,11 +142,21 @@ def load_phoenix_settings(
 
 @dataclass(frozen=True)
 class PhoenixResolution:
-    """Validated optional settings and a credential-masked explanation of origins."""
+    """Validated optional settings and a credential-masked explanation of origins.
+
+    Attributes:
+        settings: The validated settings, or ``None`` when tracing is off.
+        shown: Each variable's value as it may be shown.
+        origins: Where each variable's value came from.
+        warnings: One message for each legacy spelling that supplied a value, such
+            as ``"EAP_PHOENIX_ENABLED is deprecated; use AC2_PHOENIX_ENABLED instead"``.
+            They are also logged, once per process, through the library logger.
+    """
 
     settings: PhoenixSettings | None
     shown: Mapping[str, str]
     origins: Mapping[str, str]
+    warnings: tuple[str, ...] = ()
 
 
 def resolve_phoenix_settings(
@@ -179,8 +195,11 @@ def resolve_phoenix_settings(
         "PHOENIX_PROJECT_NAME": "agent-lab",
     }
     values, origins = {}, {}
+    # Collected here only: the earlier reads of the enable and file settings merely decide
+    # which layers exist, and read the same names again below, so a name is told once.
+    deprecations: list[str] = []
     for name in PHOENIX_VARIABLES:
-        found = _lookup(layers, name)
+        found = _lookup(layers, name, deprecations)
         values[name], origins[name] = found or (defaults.get(name, ""), "default")
 
     def flag(name: str) -> bool:
@@ -200,7 +219,9 @@ def resolve_phoenix_settings(
         else None
     )
     shown = {**values, "PHOENIX_API_KEY": "********" if values["PHOENIX_API_KEY"] else ""}
-    return PhoenixResolution(settings, MappingProxyType(shown), MappingProxyType(origins))
+    return PhoenixResolution(
+        settings, MappingProxyType(shown), MappingProxyType(origins), tuple(deprecations)
+    )
 
 
 def phoenix_env_example(guide: str = "docs/phoenix-trial.md") -> str:
