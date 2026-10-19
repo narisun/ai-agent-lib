@@ -144,6 +144,33 @@ def test_an_unknown_legacy_name_suggests_the_canonical_vocabulary() -> None:
     assert "did you mean AC2_MODEL_PROVIDER" in str(caught.value)
 
 
+@pytest.mark.parametrize("vendor", ["API_KEY", "PROJECT_NAME", "COLLECTOR_ENDPOINT"])
+@pytest.mark.parametrize("prefix", [PREFIX, LEGACY_PREFIX])
+def test_a_prefixed_spelling_of_a_vendor_phoenix_name_is_unknown(prefix: str, vendor: str) -> None:
+    # The vendor's PHOENIX_* names are read as written; AC2_PHOENIX_API_KEY would be accepted
+    # and then ignored, which is how a setting silently vanishes.
+    name = f"{prefix}PHOENIX_{vendor}"
+    with pytest.raises(ConfigurationError, match="unknown configuration variable") as caught:
+        explain({name: "x"})
+    assert name in str(caught.value)
+    assert f"did you mean PHOENIX_{vendor}" in str(caught.value)
+
+
+def test_the_vendor_phoenix_names_themselves_are_not_policed() -> None:
+    explain(
+        {"PHOENIX_API_KEY": "k", "PHOENIX_PROJECT_NAME": "p", "PHOENIX_COLLECTOR_ENDPOINT": "e"}
+    )
+
+
+def test_the_librarys_own_phoenix_names_are_known_in_both_spellings() -> None:
+    names = {
+        f"{prefix}PHOENIX_{setting}"
+        for prefix in (PREFIX, LEGACY_PREFIX)
+        for setting in ("ENABLED", "CAPTURE_CONTENT", "ENV_FILE")
+    }
+    explain(dict.fromkeys(names, "false"))
+
+
 def test_a_legacy_name_whose_canonical_spelling_exists_is_pointed_at_it() -> None:
     # A table whose variable has no legacy alias: the canonical spelling is still suggested.
     table = [Binding("AC2_ONLY", "only", "A setting with no alias.")]

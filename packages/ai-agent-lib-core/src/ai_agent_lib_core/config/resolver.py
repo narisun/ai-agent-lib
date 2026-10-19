@@ -214,9 +214,14 @@ class ConfigResolver:
 
     def _reject_unknown_names(self) -> None:
         known = {name for binding in self._bindings for name in binding.all_names}
-        # Optional tracing is resolved by its own loader at the service boundary.
+        # Optional tracing is resolved by its own loader at the service boundary. Only the
+        # library's own names have a second spelling; the vendor's PHOENIX_* names have none, and
+        # inventing AC2_PHOENIX_API_KEY would accept a variable that nothing reads.
         for name in PHOENIX_VARIABLES:
-            known.update(_both_spellings(name))
+            if name.startswith(PREFIX):
+                known.update(_both_spellings(name))
+            else:
+                known.add(name)
         # An old spelling that nothing binds is policed like a current one: a legacy typo
         # or a removed variable must not be silently ignored while the old prefix is accepted.
         unknown = sorted(
@@ -229,13 +234,15 @@ class ConfigResolver:
         if not unknown:
             return
         owned = sorted(name for name in known if name.startswith(PREFIX))
+        # A name that borrows the vendor's tracing setting is best pointed at the vendor's own.
+        suggestions = [*owned, *(name for name in PHOENIX_VARIABLES if not name.startswith(PREFIX))]
         details = []
         for name in unknown:
             current = PREFIX + name.removeprefix(LEGACY_PREFIX)
             if name.startswith(LEGACY_PREFIX) and current in known:
                 details.append(f"{name} (did you mean {current}?)")
                 continue
-            close = difflib.get_close_matches(current, owned, n=1)
+            close = difflib.get_close_matches(current, suggestions, n=1)
             details.append(f"{name} (did you mean {close[0]}?)" if close else name)
         raise ConfigurationError(
             f"unknown configuration variable{'s' if len(details) != 1 else ''}: "

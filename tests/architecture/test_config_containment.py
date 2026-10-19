@@ -131,11 +131,33 @@ def _templates() -> list[Path]:
     return sorted(REPO_ROOT.glob("packages/*/src/**/templates/**/*.jinja"))
 
 
-def test_every_variable_a_document_names_exists() -> None:
+def _variables_a_document_may_name() -> set[str]:
     known = {name for binding in DEFAULT_BINDINGS for name in binding.all_names}
     for phoenix in PHOENIX_VARIABLES:
-        stem = phoenix.removeprefix(PREFIX).removeprefix(LEGACY_PREFIX)
-        known.update({PREFIX + stem, LEGACY_PREFIX + stem})
+        # Only the library's own names have two spellings; the vendor's PHOENIX_* names have none.
+        if phoenix.startswith(PREFIX):
+            stem = phoenix.removeprefix(PREFIX)
+            known.update({PREFIX + stem, LEGACY_PREFIX + stem})
+    return known
+
+
+def test_the_vocabulary_scan_does_not_invent_prefixed_spellings_of_vendor_names() -> None:
+    known = _variables_a_document_may_name()
+    assert {"AC2_PHOENIX_ENABLED", "EAP_PHOENIX_ENABLED"} <= known
+    assert not {
+        name
+        for name in known
+        if name.endswith(("PHOENIX_API_KEY", "PHOENIX_PROJECT_NAME"))
+        and name.startswith((PREFIX, LEGACY_PREFIX))
+    }
+    assert (
+        not {PREFIX + "PHOENIX_COLLECTOR_ENDPOINT", LEGACY_PREFIX + "PHOENIX_COLLECTOR_ENDPOINT"}
+        & known
+    )
+
+
+def test_every_variable_a_document_names_exists() -> None:
+    known = _variables_a_document_may_name()
     documents = _documents()
     assert any(path.name == "getting-started.md" for path in documents)
     unknown = sorted(
