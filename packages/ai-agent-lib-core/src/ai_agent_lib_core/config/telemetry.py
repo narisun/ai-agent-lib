@@ -21,7 +21,7 @@ __all__ = ["telemetry_enabled"]
 
 
 def telemetry_enabled(config: ServiceConfig) -> bool:
-    """Whether telemetry is on: ``EAP_TELEMETRY=opentelemetry``, or the older audit option.
+    """Whether telemetry is on: ``AC2_TELEMETRY=opentelemetry``, or the older audit option.
 
     The audit option ``tracing: true`` predates the telemetry setting and still
     turns telemetry on.
