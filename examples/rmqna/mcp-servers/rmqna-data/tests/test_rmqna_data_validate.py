@@ -331,6 +331,19 @@ def test_table_functions_are_refused(sql: str, function: str) -> None:
         ("SELECT len(list_resize([1], 3000000000))", "list_resize"),
         ("SELECT len(array_resize([1], 3000000000))", "array_resize"),
         ("SELECT length(repeat('a', 3000000000))", "repeat"),
+        # A string of any width out of one number: 8 GB, 25 seconds past the timeout, in review.
+        ("SELECT rpad(name, 20000000, 'y') FROM accounts", "rpad"),
+        (
+            "SELECT length(rpad(a.name, 20000000, 'y')) FROM accounts a JOIN contacts c "
+            "ON c.uen = a.uen",
+            "rpad",
+        ),
+        ("SELECT lpad(name, 20000000, 'y') FROM accounts", "lpad"),
+        ("SELECT rpad('', 1900000, chr(1))", "rpad"),  # 11 MB of JSON escapes in review
+        ("SELECT printf('%2000000000d', 1)", "printf"),
+        ("SELECT PRINTF('%5d', employees) FROM accounts", "printf"),
+        ("SELECT format('{:>2000000000}', 1)", "format"),
+        ("SELECT \"rpad\"(name, 5, 'y') FROM accounts", "rpad"),
         ("SELECT * FROM accounts WHERE length(name) > length(repeat('x', 3))", "repeat"),
     ],
 )
@@ -343,6 +356,17 @@ def test_a_generator_of_rows_or_memory_is_refused_anywhere_in_the_statement(
     assert error.error_kind == "forbidden_function"
     assert any(name in error.message for name in function.split("|"))
     assert time.perf_counter() - started < 1  # refused at validation, never handed to DuckDB
+
+
+def test_the_named_generators_are_not_a_blanket_bound_on_integer_arguments() -> None:
+    # A large literal is not itself the problem: an epoch is ordinary, and so are wide limits.
+    for sql in [
+        "SELECT to_timestamp(1750000000)",
+        "SELECT epoch_ms(1750000000000)",
+        "SELECT * FROM accounts WHERE employees < 4000000000",
+        "SELECT left(name, 2000000000), substr(name, 1, 3000000000) FROM accounts",
+    ]:
+        assert limit_of(accepted(sql)) == CAP + 1, sql
 
 
 def test_ordinary_functions_are_not_in_the_way() -> None:
@@ -520,8 +544,60 @@ def test_a_self_join_of_hundreds_of_sources_is_refused_before_duckdb_sees_it() -
     error = refused(sql)
 
     assert error.error_kind == "parse_error"
-    assert "400 sources" in error.message
+    assert "399 joins" in error.message
     assert time.perf_counter() - started < 1
+
+
+def paren_group(index: int, size: int) -> str:
+    """``(accounts gNa0 JOIN accounts gNa1 ON ... )``: sqlglot hangs the joins on the group's table."""
+    joins = " ".join(
+        f"JOIN accounts g{index}a{i} ON g{index}a{i}.uen = g{index}a0.uen" for i in range(1, size)
+    )
+    return f"(accounts g{index}a0 {joins})"
+
+
+def test_parenthesized_join_groups_do_not_hide_how_many_joins_there_are() -> None:
+    # The reviewer's shape: 16 top-level groups of 25 relations each, 400 relations in all. Each
+    # SELECT has 15 joins of its own and the groups carry the rest, so a per-SELECT count passed it.
+    sql = "SELECT count(*) FROM " + ", ".join(paren_group(g, 25) for g in range(16))
+    assert len(sql) < MAX_SQL_CHARS
+    started = time.perf_counter()
+
+    error = refused(sql)
+
+    assert error.error_kind == "parse_error"
+    assert "joins; the limit is" in error.message
+    assert time.perf_counter() - started < 1
+
+
+def test_a_single_parenthesized_group_of_hundreds_is_refused_too() -> None:
+    sql = "SELECT count(*) FROM " + paren_group(0, 400)
+
+    assert len(sql) < MAX_SQL_CHARS
+    assert refused(sql).error_kind == "parse_error"
+
+
+def test_comma_layouts_cannot_hide_the_joins_either() -> None:
+    top_level = "SELECT 1 FROM " + ", ".join(f"accounts a{i}" for i in range(400))
+    in_a_group = "SELECT 1 FROM (" + ", ".join(f"accounts a{i}" for i in range(400)) + ")"
+    in_a_subquery = (
+        "SELECT 1 FROM accounts WHERE uen IN (SELECT a0.uen FROM " + paren_group(0, 40) + ")"
+    )
+
+    for sql in (top_level, in_a_group, in_a_subquery):
+        assert refused(sql).error_kind == "parse_error", sql[:60]
+
+
+def test_joins_spread_over_ctes_are_counted_together() -> None:
+    ctes = ", ".join(
+        f"c{i} AS (SELECT a.uen FROM accounts a "
+        + " ".join(f"JOIN contacts k{j} ON k{j}.uen = a.uen" for j in range(4))
+        + ")"
+        for i in range(9)
+    )
+
+    assert refused(f"WITH {ctes} SELECT * FROM c0").error_kind == "parse_error"  # 36 joins
+    assert limit_of(accepted("WITH " + ctes.split(", c3 AS")[0] + " SELECT * FROM c0")) == CAP + 1
 
 
 def test_the_join_cap_counts_comma_joins_and_applies_per_select() -> None:
@@ -575,6 +651,25 @@ def test_subqueries_count_toward_the_same_cap() -> None:
     )
 
     assert refused(sql).error_kind == "parse_error"
+
+
+def test_naming_a_refused_statement_cannot_be_made_to_take_forever() -> None:
+    # A regular expression for "comments, then a word" backtracked exponentially on this input:
+    # 28 block comments before a character that is not a letter took 19 seconds, on the event loop,
+    # before the call could even be given a timeout.
+    started = time.perf_counter()
+    for sql in [
+        "/*a*/ " * 28 + "1",
+        "/*a*/ " * 400 + "1",
+        "/**/ " * 400 + "'x'",
+        "-- a\n" * 400 + "1",
+        "/* " * 400,
+        "/*" * 2000 + "1",
+    ]:
+        error = refused(sql)
+        assert error.error_kind in {"not_a_select", "parse_error"}, sql[:30]
+
+    assert time.perf_counter() - started < 1
 
 
 @pytest.mark.parametrize(

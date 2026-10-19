@@ -90,8 +90,8 @@ def add_tools(server: MCPServer[Any], engine: SqlEngine, schema: str) -> None:
 
         Write a single SELECT; it may begin with WITH. Name tables bare, as the schema document
         lists them (FROM accounts, never FROM crm.accounts). Set operations (UNION, EXCEPT,
-        INTERSECT), PIVOT, row generators (range, generate_series, unnest, repeat), table and file
-        functions, and any statement that changes something are refused. At most 200 rows and 2 MB
+        INTERSECT), PIVOT, row and string generators (range, generate_series, unnest, repeat, rpad,
+        lpad, printf, format), table and file functions, and any statement that changes something are refused. At most 200 rows and 2 MB
         come back: truncated=true means the rows were cut, so filter or aggregate instead of
         listing everything. A refused or failing statement returns {error_kind, message}; the
         message says what to change, so repair the SQL and try again.

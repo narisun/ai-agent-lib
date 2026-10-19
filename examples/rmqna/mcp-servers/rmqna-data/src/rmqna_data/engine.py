@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import math
 import re
 import threading
@@ -325,11 +326,11 @@ class _Budget:
 
     def __init__(self, ceiling: int) -> None:
         self.ceiling = ceiling
-        self._left = ceiling
+        self.left = ceiling
 
     def spend(self, size: int) -> None:
-        self._left -= size
-        if self._left < 0:
+        self.left -= size
+        if self.left < 0:
             raise _TooLarge
 
 
@@ -464,7 +465,12 @@ def _load(
 
 
 def _json_safe(value: object, budget: _Budget) -> object:
-    """Return ``value`` as something JSON can carry, spending its size from ``budget``."""
+    """Return ``value`` as something JSON can carry, spending its serialized size from ``budget``.
+
+    The size is what the value weighs as compact JSON with every non-ASCII and control character
+    escaped (a control character is six bytes, ``\\u0001``): the most it can weigh on the wire,
+    whichever encoder sends it. Each value also pays a byte for the comma after it.
+    """
     if value is None:
         budget.spend(5)
         return None
@@ -475,23 +481,19 @@ def _json_safe(value: object, budget: _Budget) -> object:
         budget.spend(len(str(value)) + 1)
         return value
     if isinstance(value, str):
-        budget.spend(len(value) + 3)
+        budget.spend(_string_size(value, budget) + 1)
         return value
     if isinstance(value, float):
-        budget.spend(len(repr(value)) + 1)
-        if math.isfinite(value):
-            return value
-        return "NaN" if math.isnan(value) else ("Infinity" if value > 0 else "-Infinity")
+        return _number(value, budget)
     if isinstance(value, Decimal):
-        budget.spend(len(str(value)) + 1)
-        return float(value) if value.is_finite() else str(value)
+        return _number(float(value), budget) if value.is_finite() else _number(math.nan, budget)
     if isinstance(value, datetime | date | clock_time):
         text = value.isoformat()
-        budget.spend(len(text) + 3)
+        budget.spend(_string_size(text, budget) + 1)
         return text
     if isinstance(value, timedelta | UUID):
         text = str(value)
-        budget.spend(len(text) + 3)
+        budget.spend(_string_size(text, budget) + 1)
         return text
     if isinstance(value, bytes | bytearray):
         budget.spend(2 * len(value) + 3)
@@ -503,9 +505,26 @@ def _json_safe(value: object, budget: _Budget) -> object:
         budget.spend(2)
         converted: dict[str, object] = {}
         for key, item in value.items():
-            budget.spend(len(str(key)) + 4)
+            budget.spend(_string_size(str(key), budget) + 1)
             converted[str(key)] = _json_safe(item, budget)
         return converted
     text = str(value)
-    budget.spend(len(text) + 3)
+    budget.spend(_string_size(text, budget) + 1)
     return text
+
+
+def _number(value: float, budget: _Budget) -> object:
+    """Return a float as JSON carries it; NaN and the infinities, which it cannot, as text."""
+    if math.isfinite(value):
+        budget.spend(len(repr(value)) + 1)
+        return value
+    text = "NaN" if math.isnan(value) else ("Infinity" if value > 0 else "-Infinity")
+    budget.spend(_string_size(text, budget) + 1)
+    return text
+
+
+def _string_size(text: str, budget: _Budget) -> int:
+    """Return the bytes ``text`` takes as a JSON string, quotes and escapes included."""
+    if len(text) + 2 > budget.left:
+        raise _TooLarge  # it cannot fit, so it is not worth escaping to find out by how much
+    return len(json.dumps(text))

@@ -496,6 +496,61 @@ async def test_the_byte_ceiling_is_the_engines_to_set(tmp_path: Path) -> None:
         tight.close()
 
 
+async def test_the_byte_ceiling_counts_what_the_json_weighs_not_characters(
+    tmp_path: Path,
+) -> None:
+    # A control character is one character and six bytes of JSON (\\u0001), so a string of them
+    # weighs six times what a count of its characters says. In review, 1.9 million of them passed
+    # a 2 MB ceiling counted in characters and serialized to about 11 MB.
+    for name in ("accounts", "contacts"):
+        shutil.copy(DATA_DIR / f"{name}.csv", tmp_path / f"{name}.csv")
+    tight = RmqnaEngine(tmp_path, max_result_bytes=20_000)
+    try:
+        # 5,474 rows from the cross join: 5,474 characters either way, 32,844 bytes as escapes.
+        plain = await tight.execute("SELECT string_agg('a', '') AS s FROM accounts a, contacts c")
+        assert len(str(plain.rows[0][0])) == 5474
+
+        # Six bytes each as an escape (a control character; a non-ASCII one, in the escaped form
+        # that is the most it can weigh): over the ceiling.
+        for text in ("chr(1)", "chr(233)"):
+            error = await refusal(
+                tight, f"SELECT string_agg({text}, '') FROM accounts a, contacts c"
+            )
+            assert error.error_kind == "execution_error", text
+            assert "larger than" in error.message, text
+        # Two bytes each (a newline is \\n): 10,948 bytes, under it.
+        newlines = await tight.execute("SELECT string_agg(chr(10), '') FROM accounts a, contacts c")
+        assert len(str(newlines.rows[0][0])) == 5474
+    finally:
+        tight.close()
+
+
+def test_what_the_budget_spends_is_never_less_than_what_the_json_weighs() -> None:
+    values: list[object] = [
+        None,
+        True,
+        12345678901234567890,
+        1.5,
+        float("nan"),
+        Decimal("12.50"),
+        "plain",
+        'quote" and \\ backslash and \n newline',
+        "\x01\x02\x1f control",
+        "caf\u00e9 \u2014 \U0001f600",
+        date(2026, 6, 30),
+        datetime(2026, 6, 30, 12, 30),
+        [1, "two", None, [3.5, "\x01"]],
+        {"k\x01": [1, 2], "plain": {"nested": "\u00e9"}},
+        b"\x00\xff",
+    ]
+    for value in values:
+        budget = engine_module._Budget(1_000_000)
+        converted = engine_module._json_safe(value, budget)
+        spent = 1_000_000 - budget.left
+        weight = len(json.dumps(converted, separators=(",", ":"), allow_nan=False)) + 1  # + comma
+        assert spent >= weight, (value, spent, weight)
+
+
 async def test_an_ordinary_wide_result_is_far_under_the_byte_ceiling(engine: RmqnaEngine) -> None:
     for table in sorted(engine.tables):
         result = await engine.execute(f"SELECT * FROM {table}")

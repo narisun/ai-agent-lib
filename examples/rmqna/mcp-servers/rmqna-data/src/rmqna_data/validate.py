@@ -17,11 +17,13 @@ do instead (the agent's repair loop reads these):
    table that does not exist are ``unknown_table``.
 4. No function that reads a file, the environment or the system catalog, no function in a
    ``FROM`` position at all (``read_csv``, ``glob``...), and no row or memory generator anywhere
-   (``range``, ``generate_series``, ``unnest``, ``repeat``, ``list_resize``): ``forbidden_function``.
+   (``range``, ``generate_series``, ``unnest``, ``repeat``, ``list_resize``, ``rpad``, ``lpad``,
+   ``printf``, ``format``): ``forbidden_function``.
 5. No PIVOT or UNPIVOT in any form: ``not_a_select``. DuckDB expands a statement-form PIVOT into
    more than one statement, one of which creates a type.
-6. Structural caps on the shape of the statement (:data:`MAX_JOIN_SOURCES` and
-   :data:`MAX_CTE_AND_SUBQUERY_REFERENCES`), answered as ``parse_error``: a statement that is too
+6. Structural caps on the shape of the statement (:data:`MAX_JOIN_SOURCES`,
+   :data:`MAX_JOINS_IN_STATEMENT` and :data:`MAX_CTE_AND_SUBQUERY_REFERENCES`), answered as
+   ``parse_error``: a statement that is too
    tangled to plan is refused before DuckDB's binder and optimizer, which a timeout cannot interrupt.
 7. The row limit is set at the syntax tree to ``row_cap + 1``, or lowered to it, so that a result
    one row longer than the cap tells the engine the output was cut. A smaller limit and the
@@ -37,7 +39,6 @@ from __future__ import annotations
 
 import difflib
 import logging
-import re
 from collections.abc import Collection, Iterator
 from contextlib import contextmanager
 from typing import Final, Literal
@@ -49,6 +50,7 @@ from sqlglot.optimizer.scope import Scope, ScopeType, traverse_scope
 
 __all__ = [
     "MAX_CTE_AND_SUBQUERY_REFERENCES",
+    "MAX_JOINS_IN_STATEMENT",
     "MAX_JOIN_SOURCES",
     "MAX_SQL_CHARS",
     "ErrorKind",
@@ -74,6 +76,13 @@ MAX_SQL_CHARS: Final = 20_000
 
 MAX_JOIN_SOURCES: Final = 16
 """The most sources (tables and subqueries) one SELECT may join. Analytic SQL joins a handful."""
+
+MAX_JOINS_IN_STATEMENT: Final = 32
+"""The most JOINs (comma joins included) in a whole statement, however they are grouped.
+
+sqlglot hangs the joins of a parenthesized group on the group's table, not on the SELECT, so a
+count per SELECT misses ``FROM (a JOIN b JOIN c ...), (d JOIN e ...)``; this counts every join.
+"""
 
 MAX_CTE_AND_SUBQUERY_REFERENCES: Final = 32
 """The most references to a CTE, plus subqueries, in one statement.
@@ -147,6 +156,7 @@ _FORBIDDEN_SUFFIXES: Final = ("_scan",)
 # Functions that make rows or memory out of a number. There is no use for one over this data, and
 # the engine's memory limit does not stop them (measured: repeat('a', 3e9) and unnest(range(0, 3e9))
 # both grow past 5 GB under a 1 GB limit). A table function that makes rows is also refused in FROM.
+# The list is the ones measured; replace() on a huge string and its kind are not on it.
 _GENERATORS: Final = frozenset(
     {
         "range",
@@ -156,6 +166,13 @@ _GENERATORS: Final = frozenset(
         "repeat",
         "list_resize",
         "array_resize",
+        # A string of any width out of one number: rpad(name, 20000000, 'y') over a join took
+        # 8 GB and ran 25 seconds past its timeout. A blanket bound on integer arguments is not
+        # the answer (to_timestamp(1750000000) is ordinary), so these are named.
+        "rpad",
+        "lpad",
+        "printf",
+        "format",
     }
 )
 
@@ -288,9 +305,6 @@ def _single_select(sql: str) -> exp.Select:
     return root
 
 
-_FIRST_WORD: Final = re.compile(r"\s*(?:(?:--[^\n]*\n|/\*.*?\*/)\s*)*([A-Za-z]+)", re.S)
-
-
 def _statement_name(statement: exp.Expr, sql: str = "") -> str:
     """Name a statement for a message: its kind if known, otherwise the word it starts with."""
     if isinstance(statement, exp.Pivot):
@@ -301,9 +315,19 @@ def _statement_name(statement: exp.Expr, sql: str = "") -> str:
     if isinstance(statement, exp.Command):
         return str(statement.this).upper()
     # sqlglot reads some statements it has no node for as an expression (CHECKPOINT as a column,
-    # TABLE accounts as an alias); what the model wrote first names it better than the node does.
-    first = _FIRST_WORD.match(sql)
-    return first.group(1).upper() if first else "This statement"
+    # TABLE accounts as an alias); the word the model wrote first names it better than the node
+    # does. The word comes from sqlglot's tokenizer, which skips comments in one linear pass: a
+    # regular expression for "comments, then a word" backtracks exponentially on nested comments.
+    return _first_word(sql)
+
+
+def _first_word(sql: str) -> str:
+    try:
+        tokens = sqlglot.tokenize(sql, read=_DIALECT)
+    except (SqlglotError, RecursionError):
+        return "This statement"
+    word = tokens[0].text if tokens else ""
+    return word.upper() if word.isalpha() else "This statement"
 
 
 def _not_a_select(name: str) -> SqlRefused:
@@ -344,6 +368,8 @@ def _refuse_nested_statements(root: exp.Select) -> None:
 def _function_name(function: exp.Func) -> str:
     if isinstance(function, exp.Anonymous | exp.AnonymousAggFunc):
         return function.name.lower()
+    if isinstance(function, exp.Pad):  # sqlglot reads lpad and rpad as one node
+        return "lpad" if function.args.get("is_left") else "rpad"
     return function.sql_name().lower()
 
 
@@ -381,8 +407,8 @@ def _refuse_functions(root: exp.Select) -> None:
             raise SqlRefused(
                 "forbidden_function",
                 f"The function {_generator_name(function, name)}() is not available: it makes "
-                "rows or memory out of a number, and nothing over these tables needs it. "
-                "Aggregate or join the loaded tables instead.",
+                "rows, or a string of any width, out of a number, and nothing over these tables "
+                "needs it. Aggregate or join the loaded tables instead.",
             )
         if _forbidden(name):
             raise SqlRefused(
@@ -406,6 +432,13 @@ def _table_function(name: str) -> SqlRefused:
 
 
 def _refuse_too_many_joins(root: exp.Select) -> None:
+    total = sum(1 for _ in root.find_all(exp.Join))
+    if total > MAX_JOINS_IN_STATEMENT:
+        raise SqlRefused(
+            "parse_error",
+            f"This statement has {total} joins; the limit is {MAX_JOINS_IN_STATEMENT}. "
+            "Join only the tables the question needs, or compute part of it in a CTE.",
+        )
     for select in root.find_all(exp.Select):
         sources = 1 + len(select.args.get("joins") or [])
         if sources > MAX_JOIN_SOURCES:
