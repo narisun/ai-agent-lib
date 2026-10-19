@@ -25,7 +25,7 @@ def test_setup_installs_packages_with_the_current_python(
     commands = Mock()
     monkeypatch.setattr(package_runtime, "install", commands)
     phoenix_dev.setup(tmp_path)
-    commands.assert_called_once_with(tmp_path, "phoenix", ["arize-phoenix==20.22.0"])
+    commands.assert_called_once_with(tmp_path, "phoenix", ["arize-phoenix==20.21.1"])
 
 
 def test_server_environment_uses_local_sqlite_and_excludes_credentials(
