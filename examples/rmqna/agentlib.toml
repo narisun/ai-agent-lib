@@ -12,7 +12,7 @@ path = "../.."
 [[mcp_servers]]
 name = "rmqna-data"
 server_id = "rmqna-data"
-description = "A greeting and a people directory, over sample data."
+description = "Read-only SQL over the relationship-manager data: a contained engine behind three tools."
 port = 8300
 
 [[agents]]

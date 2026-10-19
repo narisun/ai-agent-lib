@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 from ai_agent_lib_core import ServiceContainer
-from ai_agent_lib_core.contracts import MASK
 from ai_agent_lib_core.testing import (
     audit_records,
     calls_tool,
@@ -52,21 +51,23 @@ async def ask_as(roles: list[str], tmp_path: Path, question: str, *replies: Any)
             return last_shown_to_model(services)
 
 
-async def test_the_agent_answers_from_the_server_and_an_analyst_sees_no_email(
+CANADIAN = "SELECT uen, name FROM accounts WHERE country = 'Canada' ORDER BY name LIMIT 3"
+
+
+async def test_the_agent_answers_from_the_server_with_the_rows_the_sql_selected(
     tmp_path: Path,
 ) -> None:
     shown = await ask_as(
         ["analyst"],
         tmp_path,
-        "Who is in payments?",
-        calls_tool("rmqna-data.people_by_team", team="payments"),
-        "Two people.",
+        "Which Canadian clients are there?",
+        calls_tool("rmqna-data.execute_sql", sql=CANADIAN),
+        "Three of them.",
     )
-    # The model was shown the table as data, with the column the caller may not see masked.
-    assert shown.startswith('<untrusted_tool_result tool="rmqna-data.people_by_team">')
-    assert "Cleo Carr" in shown
-    assert MASK in shown
-    assert "cleo.carr" not in shown
+    # The model was shown the table as data: the columns and the rows the statement selected.
+    assert shown.startswith('<untrusted_tool_result tool="rmqna-data.execute_sql">')
+    assert "Boston Pizza International Inc." in shown
+    assert "Canada Goose Holdings Inc." in shown
 
     # Each side keeps its own audit log, for the same person and the same request.
     agent_call = audit_records(tmp_path / "agent")[1]
@@ -77,16 +78,30 @@ async def test_the_agent_answers_from_the_server_and_an_analyst_sees_no_email(
         assert record["request_id"] == agent_call["request_id"]
 
 
-async def test_a_manager_is_shown_the_email(tmp_path: Path) -> None:
+async def test_a_manager_is_shown_the_same_rows(tmp_path: Path) -> None:
+    # No per-role mask applies to the model's own SQL (docs/sql-governance.md).
     shown = await ask_as(
         ["manager"],
         tmp_path,
-        "Who is in payments?",
-        calls_tool("rmqna-data.people_by_team", team="payments"),
-        "Two people.",
+        "Which Canadian clients are there?",
+        calls_tool("rmqna-data.execute_sql", sql=CANADIAN),
+        "Three of them.",
     )
-    assert "cleo.carr@example.test" in shown
-    assert MASK not in shown
+    assert "Boston Pizza International Inc." in shown
+
+
+async def test_a_refused_statement_reaches_the_model_as_data_it_can_repair_from(
+    tmp_path: Path,
+) -> None:
+    shown = await ask_as(
+        ["analyst"],
+        tmp_path,
+        "Remove every client.",
+        calls_tool("rmqna-data.execute_sql", sql="DELETE FROM accounts"),
+        "I can only read data.",
+    )
+    assert "not_a_select" in shown
+    assert "Boston Pizza" not in shown
 
 
 async def test_a_caller_the_server_does_not_allow_gets_a_refusal_the_model_can_explain(
@@ -95,9 +110,9 @@ async def test_a_caller_the_server_does_not_allow_gets_a_refusal_the_model_can_e
     shown = await ask_as(
         ["intern"],
         tmp_path,
-        "Who is in payments?",
-        calls_tool("rmqna-data.people_by_team", team="payments"),
+        "Which Canadian clients are there?",
+        calls_tool("rmqna-data.execute_sql", sql=CANADIAN),
         "I may not.",
     )
     assert "The call was denied" in shown
-    assert "Cleo Carr" not in shown
+    assert "Boston Pizza" not in shown

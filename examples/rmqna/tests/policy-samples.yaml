@@ -8,11 +8,29 @@
 # changes or removes one that is here.
 schema: agentlib.policy-samples/v1
 samples:
-  - name: an analyst calls a tool of rmqna-data
+  - name: an analyst runs SQL at rmqna-data
     action: tool.call
     application: rmqna-data
-    resource: "rmqna-data/rmqna-data.people_by_team"
+    resource: "rmqna-data/rmqna-data.execute_sql"
     classification: confidential
+    roles: [analyst]
+    expect: allow
+    reason: rmqna-data-staff-call-the-tools
+
+  - name: a manager looks up values at rmqna-data
+    action: tool.call
+    application: rmqna-data
+    resource: "rmqna-data/rmqna-data.search_column_values"
+    classification: confidential
+    roles: [manager]
+    expect: allow
+    reason: rmqna-data-staff-call-the-tools
+
+  - name: an analyst reads the schema at rmqna-data
+    action: tool.call
+    application: rmqna-data
+    resource: "rmqna-data/rmqna-data.get_schema"
+    classification: internal
     roles: [analyst]
     expect: allow
     reason: rmqna-data-staff-call-the-tools
@@ -20,29 +38,29 @@ samples:
   - name: anyone else is denied at rmqna-data
     action: tool.call
     application: rmqna-data
-    resource: "rmqna-data/rmqna-data.people_by_team"
+    resource: "rmqna-data/rmqna-data.execute_sql"
     classification: confidential
     roles: [intern]
     expect: deny
     reason: no_matching_rule
 
-  - name: a manager sees every column of rmqna-data
-    action: data.query
+  - name: a caller with no role is denied at rmqna-data
+    action: tool.call
     application: rmqna-data
-    resource: people.people_by_team
+    resource: "rmqna-data/rmqna-data.execute_sql"
     classification: confidential
-    roles: [manager]
-    expect: allow
-    reason: rmqna-data-managers-see-everything
+    roles: []
+    expect: deny
+    reason: no_matching_rule
 
-  - name: an analyst sees rmqna-data without email
-    action: data.query
+  - name: rmqna-data allows only tools that live under its own name
+    action: tool.call
     application: rmqna-data
-    resource: people.people_by_team
+    resource: "other-server/rmqna-data.execute_sql"
     classification: confidential
     roles: [analyst]
-    expect: allow
-    reason: rmqna-data-analysts-see-no-email
+    expect: deny
+    reason: no_matching_rule
 
   - name: rmqna uses its default model
     action: model.route
@@ -68,7 +86,15 @@ samples:
   - name: rmqna calls a tool of rmqna-data
     action: tool.call
     application: rmqna
-    resource: "rmqna-data/rmqna-data.people_by_team"
+    resource: "rmqna-data/rmqna-data.execute_sql"
     classification: confidential
     expect: allow
     reason: rmqna-calls-rmqna-data
+
+  - name: rmqna may not see restricted data through rmqna-data
+    action: tool.call
+    application: rmqna
+    resource: "rmqna-data/rmqna-data.execute_sql"
+    classification: restricted
+    expect: deny
+    reason: no_matching_rule

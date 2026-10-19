@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import logging
 from collections.abc import Sequence
 
 from ai_agent_lib_core import ServiceConfig, ServiceContainer
@@ -57,6 +58,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         # is built so that nothing else sets up logging first. On a developer's
         # machine a line about an error also says what the error said.
         configure_logging(APPLICATION, details=shows_details(config))
+        # Loggers outside the library are quiet below WARNING. This server's one line per call
+        # (counts, duration and error kind; never SQL) is INFO, so it asks to be heard.
+        logging.getLogger("rmqna_data").setLevel(logging.INFO)
         log_resolution_warnings(resolution)
         # Traces and metrics go to the collector when the settings turn them on.
         stop_telemetry = start_telemetry(APPLICATION, config)
