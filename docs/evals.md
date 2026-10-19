@@ -131,7 +131,7 @@ async def test_helper_meets_its_bar(tmp_path: Path) -> None:
 
 This test is marked `@pytest.mark.eval` and excluded from the default
 `pytest`/`agentlib check` run, so it never blocks on a model nor incurs
-charges by accident. With `EAP_MODEL_PROVIDER=fake` it skips itself.
+charges by accident. With `AC2_MODEL_PROVIDER=fake` it skips itself.
 `dataset_digest(CASES)` is a sha256 of the file's bytes, recorded in the
 report's metadata. It is a record for people: it tells you whether two reports
 ran the same cases. The baseline gate does not check it (see below).
@@ -199,11 +199,11 @@ alias to the service's `.env` so `services.model("judge")` resolves, typically
 to a cheaper or faster model than `default`:
 
 ```dotenv
-EAP_MODEL_ALIASES={"judge": {"model_id": "your-judge-model-id"}}
+AC2_MODEL_ALIASES={"judge": {"model_id": "your-judge-model-id"}}
 ```
 
 See the [searchable configuration table](developer-guide.html#variables) for
-`EAP_MODEL_ALIASES` and every other variable.
+`AC2_MODEL_ALIASES` and every other variable.
 
 A judge is itself a model call and can be wrong or inconsistent. Check it
 against a few answers a person has already graded before trusting its score

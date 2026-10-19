@@ -101,10 +101,10 @@ Create or edit **`.env` beside the launchers**. Keep your existing settings;
 add or update these entries, replacing the API-key placeholder:
 
 ```dotenv
-EAP_MODEL_PROVIDER=anthropic
-EAP_MODEL_ID=claude-sonnet-4-5
+AC2_MODEL_PROVIDER=anthropic
+AC2_MODEL_ID=claude-sonnet-4-5
 ANTHROPIC_API_KEY=your-approved-key
-EAP_MODEL_OPTIONS={"anthropic":{"prompt_caching":true,"cache_ttl":"5m"}}
+AC2_MODEL_OPTIONS={"anthropic":{"prompt_caching":true,"cache_ttl":"5m"}}
 ```
 
 Use a model enabled for your account. Keep the file private and out of Git.
@@ -114,8 +114,8 @@ echoes questions. Business memos and natural-language follow-ups need a real mod
 For **Amazon Bedrock**, use these model settings instead:
 
 ```dotenv
-EAP_MODEL_PROVIDER=bedrock
-EAP_MODEL_ID=your-enabled-model-or-inference-profile-id
+AC2_MODEL_PROVIDER=bedrock
+AC2_MODEL_ID=your-enabled-model-or-inference-profile-id
 AWS_REGION=your-aws-region
 ```
 
@@ -128,15 +128,15 @@ model access and authentication still come from your AWS account. See the
 To see model input/output and MCP calls in local Phoenix, add:
 
 ```dotenv
-EAP_TELEMETRY=off
-EAP_PHOENIX_ENABLED=true
-EAP_PHOENIX_CAPTURE_CONTENT=true
+AC2_TELEMETRY=off
+AC2_PHOENIX_ENABLED=true
+AC2_PHOENIX_CAPTURE_CONTENT=true
 PHOENIX_COLLECTOR_ENDPOINT=http://127.0.0.1:6006
 PHOENIX_PROJECT_NAME=rmprep-trial
 ```
 
 Content capture includes messages, client evidence and tool arguments/results.
-`EAP_TELEMETRY=off` disables the separate operational exporter; Phoenix still
+`AC2_TELEMETRY=off` disables the separate operational exporter; Phoenix still
 receives model/tool spans and usage. See the [Phoenix guide](phoenix-trial.md)
 for settings and trace details.
 
@@ -319,11 +319,11 @@ the highest-priority source below that defines it:
 | --- | --- | --- |
 | 1 | Process environment | Variables set in the terminal that runs the launcher. They override every file below. |
 | 2 | Launcher file: the root `.env`, or the file passed with `--env-file` | The root file is found beside the launcher even when you start it from another folder. `--env-file` replaces it, and a relative path uses your current folder. A missing default root file keeps service settings; a missing explicit file stops startup. |
-| 3 | Separate Phoenix env file, `EAP_PHOENIX_ENV_FILE` (optional) | Adds one level for the tracing settings. Prefer an absolute path; a relative one resolves from `examples\rmprep`, or from the service folder when set in a service `.env`. |
+| 3 | Separate Phoenix env file, `AC2_PHOENIX_ENV_FILE` (optional) | Adds one level for the tracing settings. Prefer an absolute path; a relative one resolves from `examples\rmprep`, or from the service folder when set in a service `.env`. |
 | 4 | rmprep service `.env` | `examples\rmprep\agents\rmprep\.env`, the rmprep service's own settings file. |
 | 5 | Defaults | The library's built-in values. |
 
-Wherever a value is set, library storage paths such as `EAP_MODEL_TRACE_PATH` resolve from the service folder.
+Wherever a value is set, library storage paths such as `AC2_MODEL_TRACE_PATH` resolve from the service folder.
 
 To select a different file instead of the root `.env`:
 
@@ -338,7 +338,7 @@ The summary masks credentials, sensitive JSON fields, database connection string
 and unknown custom variables. Ordinary options such as caching, timeouts and
 token budgets remain readable. It also names the MCP and UI settings files.
 For optional file-based model inspection, add
-`EAP_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl` to rmprep's settings and restart.
+`AC2_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl` to rmprep's settings and restart.
 Capture starts with new turns; retain the file to inspect them later.
 
 ## Troubleshooting
@@ -347,7 +347,7 @@ Capture starts with new turns; retain the file to inspect them later.
 | --- | --- |
 | Missing package or mismatched Python | Run `setup-local.bat`; for Phoenix, run `start-phoenix.bat setup`. Check your approved pip index and wheels. |
 | Login asks for a code | Run `type .agentlib\ui-rmprep\access-code`. Use `127.0.0.1:8765` consistently. |
-| Startup selects `fake` | Check the printed environment path. Set provider and model ID along with the key. Clear an unwanted shell override with `set EAP_MODEL_PROVIDER=` (`unset EAP_MODEL_PROVIDER` on macOS/Linux), then restart. |
+| Startup selects `fake` | Check the printed environment path. Set provider and model ID along with the key. Clear an unwanted shell override with `set AC2_MODEL_PROVIDER=` (`unset AC2_MODEL_PROVIDER` on macOS/Linux), then restart. A shell that still exports the old `EAP_MODEL_PROVIDER` spelling needs it cleared the same way. |
 | A port is in use | Run `stop-local.bat` for managed runs, or Ctrl+C in a manually started service's window. Existing processes are left alone. |
 | No Phoenix trace or missing content | Check enabled/content-capture settings, restart, send a new question and allow time for ingestion. See [Phoenix troubleshooting](phoenix-trial.md#troubleshooting). |
 | Cache hit is 0% | Check cache writes. A cold request, changed prompt/context, or expired entry can write a prefix; a later matching request can read it. |

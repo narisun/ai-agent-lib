@@ -539,8 +539,8 @@ def main() -&gt; int:
   Telemetry, clocks, and ID generators have their own configuration or injection
   points outside these profiles. Tests inject a
   recording telemetry implementation, frozen time, and predictable IDs.</p>
-  <p><code>EAP_PROFILE</code> chooses defaults; per-concern settings such as
-  <code>EAP_AUDIT_PROVIDER</code> override them. <code>EAP_DEPLOYMENT_ENV</code>
+  <p><code>AC2_PROFILE</code> chooses defaults; per-concern settings such as
+  <code>AC2_AUDIT_PROVIDER</code> override them. <code>AC2_DEPLOYMENT_ENV</code>
   describes where the process runs and controls checks such as rejecting local-only
   adapters outside local development. To use the AWS profile, install its packages
   and supply the required endpoints, credentials, permissions, and storage.
@@ -964,17 +964,17 @@ async def test_agent_uses_farewell() -&gt; None:
   <p>A <code>.env</code> file contains <code>NAME=value</code> lines. Options ending
   in <code>_OPTIONS</code> are JSON objects: use double quotes around keys and strings,
   and keep each JSON value on one line.</p>
-<pre><code>EAP_PROFILE=local
-EAP_DEPLOYMENT_ENV=local
-EAP_MODEL_PROVIDER=fake</code></pre>
+<pre><code>AC2_PROFILE=local
+AC2_DEPLOYMENT_ENV=local
+AC2_MODEL_PROVIDER=fake</code></pre>
   <p>Update these three entries in <code>.env</code> and retain the other generated
   settings for the registry, policy, and services.</p>
   <div class="table-wrap"><table>
     <thead><tr><th>Setting</th><th>What it means</th></tr></thead>
     <tbody>
-      <tr><td><code>EAP_PROFILE</code></td><td>A starting set of adapter choices: <code>local</code> or <code>aws</code>. You can override individual choices.</td></tr>
-      <tr><td><code>EAP_DEPLOYMENT_ENV</code></td><td>Where this process actually runs. Non-local environments reject adapters intended only for local development. It is a separate setting from the profile.</td></tr>
-      <tr><td><code>EAP_MODEL_PROVIDER</code></td><td>The model adapter to use. <code>fake</code> runs in-process; a hosted model requires its adapter dependencies and credentials.</td></tr>
+      <tr><td><code>AC2_PROFILE</code></td><td>A starting set of adapter choices: <code>local</code> or <code>aws</code>. You can override individual choices.</td></tr>
+      <tr><td><code>AC2_DEPLOYMENT_ENV</code></td><td>Where this process actually runs. Non-local environments reject adapters intended only for local development. It is a separate setting from the profile.</td></tr>
+      <tr><td><code>AC2_MODEL_PROVIDER</code></td><td>The model adapter to use. <code>fake</code> runs in-process; a hosted model requires its adapter dependencies and credentials.</td></tr>
     </tbody>
   </table></div>
   <p><strong>Precedence:</strong> process environment variables win over the service's
@@ -1101,7 +1101,7 @@ EAP_MODEL_PROVIDER=fake</code></pre>
       <tr><td>Access denied when installing packages</td><td>Check that the folder is writable and that <code>"%PYTHON%" -c "import sys; print(sys.executable)"</code> points to your approved Python. For an application-policy block, provide the blocked tool's name and path to desktop support.</td></tr>
       <tr><td><code>"%PYTHON%"</code> cannot run, or <code>agentlib.toml</code> cannot be found</td><td>Use <a href="#new-terminal">the new-terminal recipe</a>. Python selection and the current folder are separate: select the environment and run workspace commands from <code>tutorial</code>.</td></tr>
       <tr><td>HTTP 401/403 or a proxy error during pip installation</td><td>Repeat the enterprise sign-in or proxy setup for this terminal. Confirm the pip repository endpoint with your team; use the same approved package source for each installation step.</td></tr>
-      <tr><td><code>CERTIFICATE_VERIFY_FAILED</code></td><td>Ask for the enterprise CA configuration for this Python/pip environment. Pip supports a team-provided certificate bundle through <code>PIP_CERT</code>. Keep certificate verification enabled; the agent's <code>EAP_TLS_CA_BUNDLE</code> setting does not configure pip.</td></tr>
+      <tr><td><code>CERTIFICATE_VERIFY_FAILED</code></td><td>Ask for the enterprise CA configuration for this Python/pip environment. Pip supports a team-provided certificate bundle through <code>PIP_CERT</code>. Keep certificate verification enabled; the agent's <code>AC2_TLS_CA_BUNDLE</code> setting does not configure pip.</td></tr>
       <tr><td><code>No matching distribution found</code>, missing <code>hatchling</code>, or a compiler requirement</td><td>Share the package name, Python version, and Windows architecture with the package-maintenance team. They need to make compatible releases, build dependencies, and prebuilt wheels available. Use a team-supported build environment for dependencies that need compilation.</td></tr>
       <tr><td><code>langchain_aws</code> is missing for Bedrock</td><td>For the local stack, run <code>setup-local.bat --model bedrock</code>. For generated agents, select Bedrock in the CLI and rerun <code>"%PYTHON%" -m ai_agent_lib_cli install</code>. This installs the AWS package's <code>bedrock</code> extra.</td></tr>
       <tr><td>Ruff or a local test process is blocked by desktop policy</td><td>Have the approved tool package or local execution permission enabled by your support team. Use your team's approved development runner for checks your desktop cannot run, and record which checks still need to pass.</td></tr>
@@ -1196,7 +1196,7 @@ EAP_MODEL_PROVIDER=fake</code></pre>
 
   <h3 id="model-debugging">How do I see what the model receives and returns?</h3>
   <p>Add this setting to <code>agents/helper/.env</code>, then restart the agent:</p>
-<pre><code>EAP_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl</code></pre>
+<pre><code>AC2_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl</code></pre>
   <p>Run a question in Command Prompt. Start any linked MCP servers first.</p>
 <pre><code class="language-bat">"%PYTHON%" -m helper "My name is Ada. Please greet me." --thread debug-ada
 "%PYTHON%" -m helper "What is my name?" --thread debug-ada</code></pre>
@@ -1213,7 +1213,8 @@ EAP_MODEL_PROVIDER=fake</code></pre>
   enabled. Use a separate path for each concurrently running service process.</p>
   <p>To stop capture, remove or comment out the setting and restart. If you set a
   process override in Command Prompt, clear it with
-  <code>set "EAP_MODEL_TRACE_PATH="</code> as well. Archive or delete the trace file
+  <code>set "AC2_MODEL_TRACE_PATH="</code> (and <code>set "EAP_MODEL_TRACE_PATH="</code>
+  if you set the old spelling) as well. Archive or delete the trace file
   when you finish the investigation.</p>
 
   <h3>What does a model trace contain?</h3>
@@ -1250,7 +1251,7 @@ with Path(sys.argv[1]).open(encoding="utf-8") as trace:
 
   <h3>Does setting the log level to DEBUG show prompts?</h3>
   <p>The log level controls operational messages. Model content capture has its own
-  explicit setting, <code>EAP_MODEL_TRACE_PATH</code>. For additional operational
+  explicit setting, <code>AC2_MODEL_TRACE_PATH</code>. For additional operational
   detail in a custom entry point, configure Python logging before starting services:</p>
 <pre><code class="language-python">from ai_agent_lib_core.observability import configure_logging
 
@@ -1365,7 +1366,7 @@ Trace: .../agents/helper/.agentlib/react-demo.jsonl</code></pre>
   <h3>How do I enable Anthropic prompt caching?</h3>
   <p>Add this line to the agent's <code>.env</code> and restart the agent. It applies
   to the direct <code>anthropic</code> provider and all aliases using that provider:</p>
-<pre><code>EAP_MODEL_OPTIONS={"anthropic":{"prompt_caching":true,"cache_ttl":"5m"}}</code></pre>
+<pre><code>AC2_MODEL_OPTIONS={"anthropic":{"prompt_caching":true,"cache_ttl":"5m"}}</code></pre>
   <p>Keep reusable instructions first and per-request context afterwards. The
   LangGraph helper <code>static_system_prompt(instructions, request_context)</code>
   builds two text blocks. When caching is enabled, the Anthropic adapter marks
@@ -1528,7 +1529,7 @@ reply = await services.model().ainvoke(messages)</code></pre>
   <code>invocation(context)</code> when invoking it, as the generated code does. These
   connect checkpoint state and request context to the graph. A
   <strong>checkpoint</strong> stores conversation state so later calls can continue it.</p>
-  <p><code>EAP_LIMITS</code> controls timeouts, retries, and request budgets. Read-only
+  <p><code>AC2_LIMITS</code> controls timeouts, retries, and request budgets. Read-only
   tools can retry transient failures. For write operations, design retry behavior
   around the possibility that the remote action completed before a timeout.</p>
   <p>Audit or output-validation failures can happen after an external action succeeds;
@@ -1596,7 +1597,7 @@ async def classify(
       <tr><td>Audit record</td><td>Who attempted which action, and was it allowed?</td><td>Locally, check the service's <code>.agentlib/audit.jsonl</code>.</td></tr>
       <tr><td>Trace</td><td>Which calls made up this request, and where was time spent?</td><td>Enable OpenTelemetry and inspect the request's connected spans.</td></tr>
       <tr><td>Metric</td><td>How often does something happen, or how slow is it overall?</td><td>Inspect counts and durations in your telemetry backend.</td></tr>
-      <tr><td>Model diagnostic trace</td><td>Which messages and tools reached the model, and what did it return?</td><td>Enable <code>EAP_MODEL_TRACE_PATH</code> with test data; follow the <a href="#model-debugging">debugging recipe</a>.</td></tr>
+      <tr><td>Model diagnostic trace</td><td>Which messages and tools reached the model, and what did it return?</td><td>Enable <code>AC2_MODEL_TRACE_PATH</code> with test data; follow the <a href="#model-debugging">debugging recipe</a>.</td></tr>
     </tbody>
   </table></div>
   <p>A <strong>span</strong> records one operation within a trace. Model, tool, query,
@@ -1605,7 +1606,7 @@ async def classify(
   <p>Generated HTTP services initialize logging and telemetry. To export telemetry,
   install the core <code>otel</code> extra and obtain a collector endpoint from your
   platform team. A collector receives telemetry and forwards it to your monitoring
-  backend. Set <code>EAP_TELEMETRY=opentelemetry</code> in the service's
+  backend. Set <code>AC2_TELEMETRY=opentelemetry</code> in the service's
   <code>.env</code>. For a collector running at <code>http://localhost:4318</code>,
   set the SDK's endpoint in Command Prompt before starting the service:</p>
 <pre><code class="language-bat">set "OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318"</code></pre>
@@ -1692,7 +1693,7 @@ async def classify(
     <li><strong>Review remote connections.</strong> Use HTTPS and the intended certificate
     trust. Keep schema pins current through reviewed changes.</li>
     <li><strong>Set the deployment environment.</strong> Configure
-    <code>EAP_DEPLOYMENT_ENV</code> for the target environment. Non-local startup
+    <code>AC2_DEPLOYMENT_ENV</code> for the target environment. Non-local startup
     checks reject development-only adapters.</li>
   </ul>
   <p>If your deployment uses OPA (Open Policy Agent, an external policy engine), run
@@ -1882,15 +1883,19 @@ async def classify(
     this guide. <strong>Local</strong> is the zero-config default on any machine:
     with nothing set, every provider is local (files, SQLite and in-process engines)
     and no cloud infrastructure is needed (the model's local default is
-    <code>anthropic</code>, a hosted API; use <code>EAP_MODEL_PROVIDER=fake</code>
+    <code>anthropic</code>, a hosted API; use <code>AC2_MODEL_PROVIDER=fake</code>
     to stay fully offline). <strong>AWS</strong> is a per-variable opt-in:
-    <code>EAP_PROFILE=aws</code> switches every section, and a single
-    <code>EAP_&lt;SECTION&gt;_PROVIDER</code> moves just that section. The
+    <code>AC2_PROFILE=aws</code> switches every section, and a single
+    <code>AC2_&lt;SECTION&gt;_PROVIDER</code> moves just that section. The
     <a href="#profiles">profile defaults</a> list what each side selects, and the
     <a href="#environment-providers">one-way guard</a> keeps local-only adapters out
     of deployed environments. Values are examples unless labelled as defaults;
     replace service names, endpoints, IDs, and paths with values supplied by your
-    team. Set only the variables your service needs.</p>
+    team. Set only the variables your service needs. Variables were previously
+    spelled <code>EAP_*</code>; the old spellings keep working for one minor
+    release and warn in the service log and in <code>agentlib config explain</code>.
+    Each row names the old spelling it replaces, so Find on an old name lands on
+    its replacement.</p>
 
     <h3 id="aws-platform-settings">How the settings fit the AWS design</h3>
     <p>Run agents and MCP servers as ECS Fargate services. The generated deployment
@@ -1940,14 +1945,16 @@ async def classify(
     <p>Fargate CPU, memory, images, networking, task roles, databases, log delivery,
     S3 retention, and OPA bundle distribution are infrastructure settings. The
     deployment team configures them through the generated Terraform files and
-    platform services; they are not additional <code>EAP_</code> variables.</p>
+    platform services; they are not additional <code>AC2_</code> variables.</p>
 
     <h3>Where to put a value</h3>
     <p>For library settings, edit the service's <code>.env</code> locally. For AWS,
     put non-secret settings in the service's <code>.env.aws</code> used by the
     deployment generator; it writes them into the task environment. Use Secrets
     Manager for runtime secrets. Restart a service after changing its settings.
-    Unknown <code>EAP_</code> names and unknown JSON option keys stop startup.</p>
+    Unknown <code>AC2_</code> names and unknown JSON option keys stop startup. So
+    do unknown names in the old <code>EAP_</code> spelling, and a variable set in
+    both spellings with different values.</p>
     <p id="otel-variables">The <code>OTEL_</code> and <code>PIP_</code> rows are
     owned by their SDK/tool: set them in the <strong>process environment</strong>
     (or the tool's supported configuration), not just in a service's
@@ -2003,11 +2010,11 @@ async def classify(
 <tr><td><span class="var" id="var-ac2_data_sources">AC2_DATA_SOURCES</span></td><td>JSON map of named data sources, e.g. {&quot;accounts&quot;: {&quot;kind&quot;: &quot;duckdb_csv&quot;, &quot;data_dir&quot;: &quot;data&quot;, &quot;queries_dir&quot;: &quot;queries&quot;}}.<div class="more">Default: <code>{}</code>: no data sources. <span class="tag">JSON</span> replaces <code>EAP_DATA_SOURCES</code></div></td><td><code>{&quot;ledger&quot;:{&quot;kind&quot;:&quot;duckdb_csv&quot;,&quot;data_dir&quot;:&quot;data&quot;,&quot;queries_dir&quot;:&quot;queries&quot;}}</code></td><td><code>{&quot;ledger&quot;:{&quot;kind&quot;:&quot;redshift_data&quot;,&quot;database&quot;:&quot;curated&quot;,&quot;cluster_id&quot;:&quot;&lt;existing-cluster-id&gt;&quot;,&quot;db_user&quot;:&quot;agent_reader&quot;,&quot;queries_dir&quot;:&quot;queries&quot;}}</code></td><td>Set on the MCP that owns the queries. Query existing curated Redshift tables; the upstream data lake is outside this library&#x27;s scope. For Serverless, replace <code>cluster_id</code> and <code>db_user</code> with <code>workgroup</code>. <code>secret_arn</code> is an alternative credential source. Keep named SQL files in the image&#x27;s <code>queries_dir</code>; this is a directory path, not an S3 URI. The task role needs Data API permissions and the database user needs table grants. Entra users are authorized by policy; the adapter connects as the configured database identity.</td></tr>
 <tr><td><span class="var" id="var-aws_profile">AWS_PROFILE</span></td><td>AWS named profile, for example one signed in through SSO.<div class="more">Default: <span class="muted">not set</span>. </div></td><td>Unset for the tutorial; team profile for optional AWS work</td><td>Unset: use the ECS task role</td><td>A local profile requires your team&#x27;s approved AWS credential setup. Do not copy desktop credentials into a container. The task execution role pulls images; the task role grants application access to AWS services.</td></tr>
 <tr><td><span class="var" id="var-aws_region">AWS_REGION</span></td><td>AWS region.<div class="more">Default: <span class="muted">not set</span>. also <code>AWS_DEFAULT_REGION</code></div></td><td>Unset for the tutorial; target region for AWS work</td><td>The deployment region, e.g. <code>us-east-1</code></td><td>Use the region of the provisioned services. The Fargate template supplies it.</td></tr>
-<tr><td><span class="var" id="var-aws_ca_bundle">AWS_CA_BUNDLE</span></td><td>CA file for AWS clients.<div class="more">Default: <span class="muted">not set</span>. </div></td><td>Team CA file if the AWS SDK needs it</td><td>Unset with standard AWS trust</td><td>AWS SDK CA setting. <code>EAP_TLS_CA_BUNDLE</code> takes precedence for Bedrock clients. Neither setting configures pip or the checkpoint database.</td></tr>
-<tr><td><span class="var" id="var-aws_execution_env">AWS_EXECUTION_ENV</span></td><td>Set by AWS inside ECS, Fargate and Lambda. A process that has it must name its deployment environment as dev or prod.<div class="more">Default: <span class="muted">not set</span>. </div></td><td>Unset</td><td>Set by AWS, e.g. <code>AWS_ECS_FARGATE</code></td><td>Runtime marker, not a user-selected provider. Its presence prevents accidental startup with <code>EAP_DEPLOYMENT_ENV=local</code>.</td></tr>
+<tr><td><span class="var" id="var-aws_ca_bundle">AWS_CA_BUNDLE</span></td><td>CA file for AWS clients.<div class="more">Default: <span class="muted">not set</span>. </div></td><td>Team CA file if the AWS SDK needs it</td><td>Unset with standard AWS trust</td><td>AWS SDK CA setting. <code>AC2_TLS_CA_BUNDLE</code> takes precedence for Bedrock clients. Neither setting configures pip or the checkpoint database.</td></tr>
+<tr><td><span class="var" id="var-aws_execution_env">AWS_EXECUTION_ENV</span></td><td>Set by AWS inside ECS, Fargate and Lambda. A process that has it must name its deployment environment as dev or prod.<div class="more">Default: <span class="muted">not set</span>. </div></td><td>Unset</td><td>Set by AWS, e.g. <code>AWS_ECS_FARGATE</code></td><td>Runtime marker, not a user-selected provider. Its presence prevents accidental startup with <code>AC2_DEPLOYMENT_ENV=local</code>.</td></tr>
 <tr><td><span class="var" id="var-https_proxy">HTTPS_PROXY</span></td><td>Outbound proxy.<div class="more">Default: <span class="muted">not set</span>. <span class="tag warn">sensitive</span> also <code>https_proxy</code></div></td><td>Team-supplied proxy, if required</td><td>Unset or the approved outbound proxy</td><td>AWS and Anthropic use it. JWT and REST require their <code>use_proxy</code> option. Proxy URLs can contain credentials; supply them through approved secret handling.</td></tr>
 <tr><td><span class="var" id="var-no_proxy">NO_PROXY</span></td><td>Hosts that bypass the proxy.<div class="more">Default: <span class="muted">not set</span>. also <code>no_proxy</code></div></td><td><code>localhost,127.0.0.1</code> when using a proxy</td><td>Team bypass list including local services and task credential endpoints</td><td>For the SDK, include <code>169.254.170.2</code> when a proxy would intercept ECS task credentials. Add internal hosts according to network policy.</td></tr>
-<tr><td><span class="var" id="var-anthropic_api_key">ANTHROPIC_API_KEY</span></td><td>API key for the anthropic model provider.<div class="more">Default: <span class="muted">not set</span>. <span class="tag warn">sensitive</span></div></td><td>API key for the optional Anthropic example</td><td>Unset with Bedrock</td><td>The env secrets provider accepts this name or <code>EAP_SECRET_ANTHROPIC_API_KEY</code>; set only one. With Secrets Manager, store the value as <code>&lt;prefix&gt;anthropic_api_key</code> instead.</td></tr>
+<tr><td><span class="var" id="var-anthropic_api_key">ANTHROPIC_API_KEY</span></td><td>API key for the anthropic model provider.<div class="more">Default: <span class="muted">not set</span>. <span class="tag warn">sensitive</span></div></td><td>API key for the optional Anthropic example</td><td>Unset with Bedrock</td><td>The env secrets provider accepts this name or <code>AC2_SECRET_ANTHROPIC_API_KEY</code>; set only one. With Secrets Manager, store the value as <code>&lt;prefix&gt;anthropic_api_key</code> instead.</td></tr>
 <tr><td><span class="var">AC2_SECRET_&lt;NAME&gt;</span></td><td>A named secret for the env secrets provider. <span class="tag warn">sensitive</span></td><td>Supply secrets as needed, e.g. <code>AC2_SECRET_RATES_TOKEN</code>.</td><td>Use Secrets Manager with the configured prefix.</td><td>The example supplies <code>rates_token</code>. Options such as <code>auth_secret</code> name the secret, never its value. Keep values out of source control and images.</td></tr>
 <tr><td><span class="var" id="var-otel_exporter_otlp_endpoint">OTEL_EXPORTER_OTLP_ENDPOINT</span></td><td>OpenTelemetry SDK: Base address of the collector. Traces go to /v1/traces and metrics to /v1/metrics.</td><td>Unset for the tutorial. SDK default: <code>http://localhost:4318</code>.</td><td><code>http://localhost:4318</code> for the collector sidecar.</td><td>Set in the process environment; the SDK does not read the service's .env file. The library uses OTLP over HTTP, not gRPC. S3 is not an OTLP endpoint.</td></tr>
 <tr><td><span class="var" id="var-otel_exporter_otlp_traces_endpoint">OTEL_EXPORTER_OTLP_TRACES_ENDPOINT</span></td><td>OpenTelemetry SDK: Full traces address, when traces go somewhere else.</td><td>Unset for the tutorial. SDK default: <code>not set</code>.</td><td>Use the SDK default: <code>not set</code>.</td><td>Set in the process environment; the SDK does not read the service's .env file.</td></tr>
@@ -2086,7 +2093,7 @@ async def classify(
   <details class="lesson" id="options">
     <summary>Adapter options</summary>
     <p>Accepted keys for each adapter's JSON options. Data-source options sit beside
-    <code>"kind"</code> in <code>EAP_DATA_SOURCES</code>. Unknown keys are rejected.</p>
+    <code>"kind"</code> in <code>AC2_DATA_SOURCES</code>. Unknown keys are rejected.</p>
 <h4 id="opt-model-anthropic"><code>model</code> Â· <code>anthropic</code></h4>
 <p class="small">Anthropic prompt caching; every call still runs the model pipeline. <span class="muted">(AnthropicModelOptions)</span></p>
 <div class="table-wrap"><table class="opts">
@@ -2096,7 +2103,7 @@ async def classify(
 <tr><td><span class="var">cache_ttl</span></td><td>&quot;5m&quot; | &quot;1h&quot;</td><td><code>5m</code></td><td></td></tr>
 </tbody></table></div>
 <h4 id="opt-model-bedrock"><code>model</code> Â· <code>bedrock</code></h4>
-<p class="small">No options. Uses the AWS session settings (<code>AWS_PROFILE</code>, <code>AWS_REGION</code>) and <code>EAP_TLS_CA_BUNDLE</code>.</p>
+<p class="small">No options. Uses the AWS session settings (<code>AWS_PROFILE</code>, <code>AWS_REGION</code>) and <code>AC2_TLS_CA_BUNDLE</code>.</p>
 <h4 id="opt-model-fake"><code>model</code> Â· <code>fake</code> <span class="tag warn">local only</span></h4>
 <p class="small">No options. Echoes the question as <code>fake: &lt;question&gt;</code>; tests script its replies.</p>
 <h4 id="opt-secrets-env"><code>secrets</code> Â· <code>env</code></h4>

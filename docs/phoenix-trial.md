@@ -40,7 +40,7 @@ and to the HTTP app, and closes it after the container so spans flush last. Turn
 tracing on in the service's `.env`:
 
 ```dotenv
-EAP_PHOENIX_ENABLED=true
+AC2_PHOENIX_ENABLED=true
 ```
 
 That is the whole integration. With nothing else set, the agent exports to
@@ -49,7 +49,7 @@ must be listening there: start the local one (steps 1 to 4 below) or set
 `PHOENIX_COLLECTOR_ENDPOINT` to a team-hosted one. **Content capture stays
 off**: traces carry metadata, token counts, and checkpoint IDs, not conversation
 text. Set `PHOENIX_PROJECT_NAME` to group one agent's traces, and
-`EAP_PHOENIX_CAPTURE_CONTENT=true` only with approved test data (see [Privacy and
+`AC2_PHOENIX_CAPTURE_CONTENT=true` only with approved test data (see [Privacy and
 content capture](#privacy-and-content-capture)). Restart after changing a
 setting. Tracing covers `POST /invoke`, including Agent Lab's live response
 mode; the standalone CLI and the `/invoke/stream` graph-step endpoint keep their
@@ -88,20 +88,21 @@ Add these settings to **`.env` beside the launchers**. Keep your existing model
 provider and API key in that file.
 
 ```dotenv
-EAP_TELEMETRY=off
-EAP_PHOENIX_ENABLED=true
-EAP_PHOENIX_CAPTURE_CONTENT=true
+AC2_TELEMETRY=off
+AC2_PHOENIX_ENABLED=true
+AC2_PHOENIX_CAPTURE_CONTENT=true
 PHOENIX_COLLECTOR_ENDPOINT=http://127.0.0.1:6006
 PHOENIX_PROJECT_NAME=rmprep-trial
 ```
 
-For this local setup, `EAP_TELEMETRY=off` disables the separate operational OTLP
+For this local setup, `AC2_TELEMETRY=off` disables the separate operational OTLP
 trace/metric exporter. Phoenix still receives agent/model/tool spans and token
 metrics. Enable operational telemetry only when you have configured its own
-collector; Phoenix is not the general OTLP metrics endpoint. If you use legacy
-`EAP_AUDIT_OPTIONS`, remove `"tracing": true` or set it to `false` as well.
+collector; Phoenix is not the general OTLP metrics endpoint. If your
+`AC2_AUDIT_OPTIONS` still sets the older `"tracing": true`, remove it or set it
+to `false` as well.
 
-`EAP_PHOENIX_CAPTURE_CONTENT=true` records model messages and tool
+`AC2_PHOENIX_CAPTURE_CONTENT=true` records model messages and tool
 arguments/results, so use approved test data; its default is `false`. The agent's
 existing JSONL traces, audit records, and checkpoint database continue to work
 independently of Phoenix.
@@ -292,13 +293,13 @@ Run `python -m ai_agent_lib_cli doctor rmprep` to validate them before startup.
 These tracing checks do not contact Phoenix. Startup, `doctor`, `config explain`,
 and the launcher's summary all resolve the settings through the same function,
 `resolve_phoenix_settings`, so a check shows what startup will use, including a
-separate `EAP_PHOENIX_ENV_FILE` when one is configured.
+separate `AC2_PHOENIX_ENV_FILE` when one is configured.
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
-| `EAP_PHOENIX_ENABLED` | Enable tracing; `start-local.bat` also starts the local server | `false` |
-| `EAP_PHOENIX_CAPTURE_CONTENT` | Include model and tool input/output | `false` |
-| `EAP_PHOENIX_ENV_FILE` | Optional separate agent tracing settings file | Unset |
+| `AC2_PHOENIX_ENABLED` | Enable tracing; `start-local.bat` also starts the local server | `false` |
+| `AC2_PHOENIX_CAPTURE_CONTENT` | Include model and tool input/output | `false` |
+| `AC2_PHOENIX_ENV_FILE` | Optional separate agent tracing settings file | Unset |
 | `PHOENIX_COLLECTOR_ENDPOINT` | HTTP loopback or HTTPS origin, without `/v1/traces` | `http://127.0.0.1:6006` |
 | `PHOENIX_PROJECT_NAME` | Project for this agent's spans: 1 to 128 letters, digits, `_` or `-` | `agent-lab` |
 | `PHOENIX_API_KEY` | Optional key for an authenticated Phoenix server, sent as a bearer token | Empty for the local server; masked in startup output |
@@ -306,12 +307,13 @@ separate `EAP_PHOENIX_ENV_FILE` when one is configured.
 Agent settings resolve in this order: process environment, separate tracing file,
 then service `.env`. A separate file path in service `.env` is relative to that
 file. Use an absolute path when setting it in the root `.env` or the process
-environment. Setting `EAP_PHOENIX_ENABLED=false` in the process environment also
+environment. Setting `AC2_PHOENIX_ENABLED=false` in the process environment also
 bypasses a separate tracing file. The Phoenix server uses its own fixed local
 settings and does not load agent credentials.
 
 These variables are read by Phoenix's own loader, not by the configuration
-binding table. The validator accepts the three settings that start with `EAP_`;
+binding table. The validator accepts the three settings that start with `AC2_`
+(and, for one minor release, their old `EAP_` spellings, with a warning);
 the `PHOENIX_*` names are the vendor's own and are not checked for typos. [ADR
 0004](adr/0004-tracing-configuration.md) records registering all six in the
 binding table as future work.
@@ -326,7 +328,7 @@ its hosting, authentication, storage, backups, and retention.
 On the agent side, set:
 
 ```dotenv
-EAP_PHOENIX_ENABLED=true
+AC2_PHOENIX_ENABLED=true
 PHOENIX_COLLECTOR_ENDPOINT=https://phoenix.your-company.example
 PHOENIX_PROJECT_NAME=your-agent
 ```
@@ -346,7 +348,7 @@ PHOENIX_PROJECT_NAME=your-agent
 **Where the API key lives.** `PHOENIX_API_KEY` is read from the process
 environment (or the separate tracing file, or the service `.env`), like every
 Phoenix setting. It does not go through the secrets provider, so
-`EAP_SECRETS_PROVIDER` does not apply to it. On AWS Fargate, define it as a
+`AC2_SECRETS_PROVIDER` does not apply to it. On AWS Fargate, define it as a
 secret in the ECS task definition so the platform injects it into the container's
 environment as `PHOENIX_API_KEY`; keep it out of the image, the repository, and
 any committed `.env`.
@@ -360,7 +362,7 @@ next section.
 Content capture is the one setting here with a privacy cost, so it is off unless
 you turn it on.
 
-| `EAP_PHOENIX_CAPTURE_CONTENT` | What a trace holds |
+| `AC2_PHOENIX_CAPTURE_CONTENT` | What a trace holds |
 | --- | --- |
 | `false` (default) | Includes, for example, span names and timings, token counts, request and thread IDs, a scoped session hash, checkpoint references, model and provider names, tool and MCP server names, artifact IDs, and error types. |
 | `true` | All of the above plus model messages, tool arguments and results, and the request and accepted answer. For rmprep that includes client evidence. |
@@ -377,7 +379,7 @@ real conversations such as feedback logs and exported interactions:
   secret is retained verbatim.
 - **Keep them private.** Local Phoenix keeps traces in
   `.agentlib\phoenix\data\phoenix.db`, and the optional model-trace JSONL
-  (`EAP_MODEL_TRACE_PATH`) usually sits in a service's `.agentlib` folder; Git
+  (`AC2_MODEL_TRACE_PATH`) usually sits in a service's `.agentlib` folder; Git
   ignores `.agentlib`. Never commit them, and restrict access to them the way
   you would restrict access to the Phoenix server.
 - **Use approved test data locally.** Enable capture only for data you are
@@ -462,13 +464,13 @@ agents keep their own model dependencies and can still send traces to Phoenix.
 | Package installation fails | Ask your package administrators for `arize-phoenix==20.22.0` and compatible wheels for your Python version and platform. |
 | Phoenix environment is missing | Run `start-phoenix.bat setup` once, then retry `start-local.bat`. |
 | Port 6006 is in use | Stop a standalone Phoenix window before starting the combined stack. The launcher fails before starting services and leaves the existing process alone. |
-| Repeated connection errors on port 4318 | Set `EAP_TELEMETRY=off` for this local setup, or configure your separate operational collector. Restart the stack. |
+| Repeated connection errors on port 4318 | Set `AC2_TELEMETRY=off` for this local setup, or configure your separate operational collector. Restart the stack. |
 | Startup says tracing needs `ai-agent-lib-core[otel]` | Install the extra with pip, as shown in [Compose tracing by hand](#compose-tracing-by-hand), then restart. |
 | Startup rejects `PHOENIX_COLLECTOR_ENDPOINT` | Use an HTTPS origin, or HTTP for loopback only, with no path, query, or credentials. |
 | Startup fails with `unknown configuration variable` naming a Langfuse setting | Langfuse support was removed. Delete those lines from the `.env`, or unset the variables in the process environment; see [Since the October review](release-scope.md#since-the-october-review). |
-| No trace link | Check `EAP_PHOENIX_ENABLED` in the agent startup output and restart after changing settings. |
+| No trace link | Check `AC2_PHOENIX_ENABLED` in the agent startup output and restart after changing settings. |
 | Link opens before a trace appears | Allow a few seconds, then reload. Check the agent log for exporter connection errors. |
-| Inputs and outputs are missing | Set `EAP_PHOENIX_CAPTURE_CONTENT=true` for approved test data, restart the agent, and send a new question. |
+| Inputs and outputs are missing | Set `AC2_PHOENIX_CAPTURE_CONTENT=true` for approved test data, restart the agent, and send a new question. |
 | The response succeeds while Phoenix is stopped | Expected: diagnostic export failures do not resend or fail an accepted agent response. Local inspection remains available. |
 
 ### Browse saved traces without starting the agent

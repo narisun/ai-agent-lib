@@ -43,7 +43,7 @@ chats, read [Measure an agent with evals](../../docs/evals.md).
 
 Phoenix is the only agent-tracing backend. It records model and tool calls,
 usage and checkpoint references, and `run_agent` wires it: a service turns it
-on with `EAP_PHOENIX_ENABLED=true` in its `.env`, with the `otel` extra
+on with `AC2_PHOENIX_ENABLED=true` in its `.env`, with the `otel` extra
 installed. [Trace agents with Phoenix](../../docs/phoenix-trial.md) covers the
 settings, privacy and a team-hosted server.
 

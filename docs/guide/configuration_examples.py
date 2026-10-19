@@ -257,14 +257,14 @@ def configuration_examples() -> dict[str, EnvironmentExample]:
         Key.AWS_CA_BUNDLE: EnvironmentExample(
             "Team CA file if the AWS SDK needs it",
             "Unset with standard AWS trust",
-            "AWS SDK CA setting. `EAP_TLS_CA_BUNDLE` takes precedence for Bedrock clients. "
+            "AWS SDK CA setting. `AC2_TLS_CA_BUNDLE` takes precedence for Bedrock clients. "
             "Neither setting configures pip or the checkpoint database.",
         ),
         Key.AWS_EXECUTION_ENV: EnvironmentExample(
             "Unset",
             "Set by AWS, e.g. `AWS_ECS_FARGATE`",
             "Runtime marker, not a user-selected provider. Its presence prevents accidental "
-            "startup with `EAP_DEPLOYMENT_ENV=local`.",
+            "startup with `AC2_DEPLOYMENT_ENV=local`.",
         ),
         Key.HTTPS_PROXY: EnvironmentExample(
             "Team-supplied proxy, if required",
@@ -281,7 +281,7 @@ def configuration_examples() -> dict[str, EnvironmentExample]:
         secret_key("anthropic_api_key"): EnvironmentExample(
             "API key for the optional Anthropic example",
             "Unset with Bedrock",
-            "The env secrets provider accepts this name or `EAP_SECRET_ANTHROPIC_API_KEY`; "
+            "The env secrets provider accepts this name or `AC2_SECRET_ANTHROPIC_API_KEY`; "
             "set only one. "
             "With Secrets Manager, store the value as `<prefix>anthropic_api_key` instead.",
         ),

@@ -75,7 +75,7 @@ PORTS: tuple[str, ...] = (MODEL_PORT, *(section.value for section in Section), D
 NO_OPTIONS_NOTES: Mapping[tuple[str, str], str] = {
     (MODEL_PORT, "bedrock"): (
         "No options. Uses the AWS session settings (<code>AWS_PROFILE</code>, "
-        "<code>AWS_REGION</code>) and <code>EAP_TLS_CA_BUNDLE</code>."
+        "<code>AWS_REGION</code>) and <code>AC2_TLS_CA_BUNDLE</code>."
     ),
     (MODEL_PORT, "fake"): (
         "No options. Echoes the question as <code>fake: &lt;question&gt;</code>; "

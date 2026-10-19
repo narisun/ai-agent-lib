@@ -204,7 +204,7 @@ updates for debugging. See [live responses and metrics](packages/ai-agent-lib-ui
 To inspect an agent's model calls, add this to its `.env` and restart:
 
 ```dotenv
-EAP_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl
+AC2_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl
 ```
 
 The file is written under that service's `.agentlib/` folder. It records the

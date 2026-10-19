@@ -48,23 +48,53 @@ These changes landed afterward; each is documented where it is used and covered 
 | POSIX launchers | `setup-local.sh`, `start-local.sh`, `stop-local.sh` and `start-phoenix.sh` run the same tools as their `.bat` twins on macOS and Linux. | `tests/architecture/test_local_launchers.py`. |
 | `agentlib update --plan` | A true dry run: it previews every change an update would make and writes nothing. | CLI `test_cli_diagnostics.py`. |
 | Phoenix is the only agent-tracing backend | Langfuse support is removed: its integration, settings, guides and trace-link provider. `agent_tracing` is the single composition name, and `run_agent` wires it. [ADR 0004](adr/0004-tracing-configuration.md) records the decision. | Core `test_phoenix.py` and `test_http_composition.py`; CLI `test_phoenix_agents.py`; `tests/architecture/test_config_containment.py`. |
+| Library variables are spelled `AC2_*` | `AC2_` replaces `EAP_` as the prefix of every library-owned variable, including the secrets family (`AC2_SECRET_<NAME>`), the Phoenix settings and Agent Lab's reads. The generated reference, templates, examples and guides use it. The old spellings keep working for one minor release and warn; see the migration note below. | Core `test_config_legacy_prefix.py`, `test_phoenix.py` and `test_http_composition.py`; CLI `test_cli_deploy.py`; UI `test_agent_environment_prefix.py`; `tests/architecture/test_config_containment.py` and `test_local_dev.py`. |
+
+**Migrating to the `AC2_` prefix.**
+
+- Rename `EAP_` variables to `AC2_` wherever you set them: `.env` files, task
+  definitions and `deploy.env`, shell profiles. Only the prefix changes
+  (`EAP_MODEL_PROVIDER` is now `AC2_MODEL_PROVIDER`). The `agentlib` command, the
+  `.agentlib/` state folder, the `agentlib.*/v*` schema identifiers, span
+  attributes and the deploy resource-name defaults (such as `eap-audit`) keep
+  their names.
+- The old `EAP_*` spellings keep working for one minor release and warn. A
+  service logs one `WARNING` line per name that names its replacement (for
+  example `EAP_MODEL_ID is deprecated; use AC2_MODEL_ID instead`), and
+  `agentlib config explain` prints the same line. This covers every spelling the
+  library reads: the bound variables, the `SECRET_<NAME>` family, the Phoenix
+  settings, Agent Lab's settings and the local launchers.
+- A value set in both spellings is safe only when the values are equal: equal
+  values coexist silently. Different values fail startup with a message that
+  names both spellings, because guessing which one you meant is the hazard. The
+  same rule holds across `.env` files and the process environment.
+- Unknown names fail in either prefix. An `AC2_*` name the library does not define
+  stops startup, and so does an `EAP_*` name that is not an old spelling of a
+  defined variable (the message suggests the closest `AC2_` name). A typo or a
+  variable that was removed is never silently ignored.
+- `agentlib deploy` passes names through as your `deploy.env` writes them, so a
+  legacy spelling reaches the task definition unchanged. The plan lists each one
+  under "Deprecated spellings" with its `AC2_` replacement and says that the old
+  spelling stops working after one minor release. A new `deploy.env` is generated
+  with `AC2_` names.
 
 **Migrating from Langfuse.**
 
-- A service that still sets a Langfuse variable with the `EAP_` prefix (its
-  enable, content-capture, or env-file setting), in its `.env` or its process
-  environment, fails startup with `unknown configuration variable`. Delete the
-  lines, or unset the variables.
+- A service that still sets a Langfuse variable (its enable, content-capture, or
+  env-file setting) with either the `EAP_` or the `AC2_` prefix, in its `.env` or
+  its process environment, fails startup with `unknown configuration variable`.
+  Delete the lines, or unset the variables.
 - Bare `LANGFUSE_*` and `RMPREP_LANGFUSE_*` names are inert: nothing reads them.
   Delete them too.
-- `run_agent` now honors `EAP_PHOENIX_ENABLED`, so a generated service traces with
-  no code. `EAP_PHOENIX_CAPTURE_CONTENT` defaults to `false`, so content stays out
-  of traces unless you opt in. Before this release, generated agents and
-  accounts-agent ignored `EAP_PHOENIX_ENABLED`; only rmprep honored it. If
-  `EAP_PHOENIX_ENABLED=true` is already set in a service's environment (exported
-  in a shell profile, or shared with the rmprep trial setup), that service starts
-  exporting traces on upgrade with no `.env` change. Unset it where tracing is not
-  wanted. See [Trace agents with Phoenix](phoenix-trial.md).
+- `run_agent` now honors `AC2_PHOENIX_ENABLED` (spelled `EAP_PHOENIX_ENABLED` before
+  the prefix change), so a generated service traces with no code.
+  `AC2_PHOENIX_CAPTURE_CONTENT` defaults to `false`, so content stays out of traces
+  unless you opt in. Before this release, generated agents and accounts-agent
+  ignored the variable; only rmprep honored it. If `AC2_PHOENIX_ENABLED=true`, or
+  the old `EAP_PHOENIX_ENABLED=true`, is already set in a service's environment
+  (exported in a shell profile, or shared with the rmprep trial setup), that
+  service starts exporting traces on upgrade with no `.env` change. Unset it where
+  tracing is not wanted. See [Trace agents with Phoenix](phoenix-trial.md).
 - Agent Lab conversations saved with a Langfuse trace link still open. The link is
   dropped and the answer and metrics are kept (UI `test_trace_links.py`).
 

@@ -321,17 +321,21 @@ connection. Configuration selects adapters without changing the graph.
 Your local settings are in `agents/helper/.env`:
 
 ```dotenv
-EAP_PROFILE=local
-EAP_DEPLOYMENT_ENV=local
-EAP_MODEL_PROVIDER=fake
+AC2_PROFILE=local
+AC2_DEPLOYMENT_ENV=local
+AC2_MODEL_PROVIDER=fake
 ```
 
 Check these entries and keep the file's other generated settings.
 
-- `EAP_PROFILE` chooses defaults: `local` or `aws`.
-- `EAP_DEPLOYMENT_ENV` says where this process runs: `local`, `dev`, or `prod`.
+- `AC2_PROFILE` chooses defaults: `local` or `aws`.
+- `AC2_DEPLOYMENT_ENV` says where this process runs: `local`, `dev`, or `prod`.
   Non-local environments reject development-only adapters.
-- `EAP_MODEL_PROVIDER` chooses the model implementation. `fake` runs in process.
+- `AC2_MODEL_PROVIDER` chooses the model implementation. `fake` runs in process.
+
+Library variables start with `AC2_`, such as `AC2_<SECTION>_PROVIDER`. Older
+projects may still use `EAP_*` spellings; those keep working for one minor
+release and warn. See the [migration note](release-scope.md#since-the-october-review).
 
 Process environment variables override `.env`; `.env` overrides profile
 defaults. Relative file paths are resolved from the folder containing
@@ -584,11 +588,11 @@ optional dependency group in brackets. Install the updated dependencies:
 "%PYTHON%" -m ai_agent_lib_cli install
 ```
 
-In `agents/helper/.env`, set `EAP_MODEL_PROVIDER` to your choice and
-`EAP_MODEL_ID` to your enabled model ID. Preserve the other settings.
+In `agents/helper/.env`, set `AC2_MODEL_PROVIDER` to your choice and
+`AC2_MODEL_ID` to your enabled model ID. Preserve the other settings.
 Provide credentials through your team's approved method. For local Anthropic
 use, the environment-backed secret provider accepts
-`EAP_SECRET_ANTHROPIC_API_KEY`. For AWS, the SDK can use your configured
+`AC2_SECRET_ANTHROPIC_API_KEY`. For AWS, the SDK can use your configured
 `AWS_PROFILE` and `AWS_REGION`. Do not commit credentials.
 
 Start any MCP servers linked to the agent, then check and ask:
@@ -711,7 +715,7 @@ files. Read `deploy/helper/README.md` for the next steps: locking dependencies,
 building images, and applying infrastructure on the deployment host.
 
 For shared deployments, configure real authentication, narrow permissions,
-and the correct `EAP_DEPLOYMENT_ENV`. See the
+and the correct `AC2_DEPLOYMENT_ENV`. See the
 [deployment guide](developer-guide.html#deploy) and
 [release scope](release-scope.md) for supported behavior and operational limits.
 
@@ -721,7 +725,7 @@ To see the messages sent to the model and its responses, add this to
 `agents/helper/.env`, then restart the agent:
 
 ```dotenv
-EAP_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl
+AC2_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl
 ```
 
 Run your questions with the same `--thread` value to continue a conversation.

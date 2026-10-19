@@ -15,7 +15,7 @@ python -m pip install -e packages/ai-agent-lib-aws
 ```
 
 For the rmprep/Agent Lab stack, `setup-local.bat --model bedrock` installs the
-Bedrock dependencies, including `langchain-aws`. Set `EAP_MODEL_PROVIDER=bedrock`
+Bedrock dependencies, including `langchain-aws`. Set `AC2_MODEL_PROVIDER=bedrock`
 and your model ID in the root `.env` before starting. All services use the same
 Python; the launcher isolates UI/Phoenix packages. See [local setup](../../docs/local-startup.md).
 
@@ -50,10 +50,10 @@ uses boto3; setup does not install or require the AWS CLI.
 ```dotenv
 AWS_PROFILE=dev-sso
 AWS_REGION=us-east-1
-EAP_MODEL_PROVIDER=bedrock
-EAP_MODEL_ID=<model or inference-profile ID>
+AC2_MODEL_PROVIDER=bedrock
+AC2_MODEL_ID=<model or inference-profile ID>
 # Only behind a TLS-inspecting proxy, and only Bedrock uses it:
-EAP_TLS_CA_BUNDLE=/path/to/enterprise-ca.pem
+AC2_TLS_CA_BUNDLE=/path/to/enterprise-ca.pem
 ```
 
 ## What every adapter has in common

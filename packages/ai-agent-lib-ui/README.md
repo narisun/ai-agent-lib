@@ -126,9 +126,9 @@ python3 tools/package_runtime.py ui -m ai_agent_lib_ui init --env-file examples/
 python3 tools/package_runtime.py ui -m ai_agent_lib_ui check
 ```
 
-`init` reads `EAP_REGISTRY_OPTIONS` and `EAP_IDENTITY_OPTIONS` from that agent's
+`init` reads `AC2_REGISTRY_OPTIONS` and `AC2_IDENTITY_OPTIONS` from that agent's
 `.env`. Relative registry paths resolve from the file's directory. Local setup
-uses `EAP_PROFILE=local`, the `file` registry and `static` identity providers. Model API
+uses `AC2_PROFILE=local`, the `file` registry and `static` identity providers. Model API
 keys and shell overrides are not imported. Confirm the file matches the running
 service's settings.
 
@@ -243,7 +243,7 @@ file-based diagnostics and saved checkpoint state. They load only when opened;
 inspection never reruns the agent or calls an MCP tool.
 
 The local rmprep service supplies the diagnostic reader. Set
-`EAP_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl` in the agent's `.env`, then
+`AC2_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl` in the agent's `.env`, then
 restart the agent to capture model exchanges for new turns. For the batch stack,
 run `stop-local.bat`, then `start-local.bat` (`./stop-local.sh`, then `./start-local.sh`
 on POSIX).
