@@ -24,7 +24,7 @@ conventions = [
     "Value lists are profiled from the loaded data: 'Values (all)' is the complete set of distinct values, 'Values (e.g.)' is three samples spread across the sorted distinct values, and 'free text' means prose with no list. Where a description's 'Allowed:' prose disagrees with a complete list, the list is what is stored.",
     "Booleans are true/false (a description that says Yes|No quotes the source system); benchmarks.higher_is_better is 1/0. An empty cell is NULL. Columns ending _pct are on a 0-100 scale, not 0-1.",
     "Money: facilities, opportunities, relationship, product_profitability and the benchmarks usd rows are USD. balances, working_capital, borrowing_base, transactions and payment_summaries carry a currency column; never add amounts across currencies without converting through fx (USD/CAD is CAD per 1 USD).",
-    "Risk ratings are a word scale in credit_metrics (risk_rating, prior_risk_rating) and facilities (facility_risk_rating), and a number in catalog.max_risk_rating. xref maps one to the other: xref_type = 'risk_rating', xref_name is the word, xref_value the number as text, where 1 is best.",
+    "Risk ratings are a word scale in credit_metrics (risk_rating, prior_risk_rating) and facilities (facility_risk_rating), and a number in catalog.max_risk_rating. xref maps one to the other, with xref_type = 'risk_rating', xref_name the word and xref_value the number as text, where 1 is best. xref keeps one row per accepted spelling, so each word has several rows (the word, a lowercase form, alternates such as 'Pass-1', and the number): a plain join on xref_name multiplies rows several times. Join on xref_name and keep only the number row with TRY_CAST(xref_value AS INT) IS NOT NULL, which leaves one row per rating; a plain CAST raises on the word rows.",
     "A client's NAICS code is 6 digits in accounts.naics_code and 5 digits in benchmarks.naics_industry, both loaded as BIGINT: join on accounts.naics_code // 10 = benchmarks.naics_industry. A client with no naics_code has no benchmark rows. Descriptions that show substr(naics_code,1,5) or a domain-qualified name such as crm.accounts describe the dictionary, not the loaded tables.",
 ]
 
@@ -35,6 +35,14 @@ join_rule = "Join only along the paths declared in the [Relationships] sections.
 date_column = "utilization.as_of"
 
 [sampling]
+# How the document grounds a column in its data. A column with at most 24 distinct values lists
+# them all, unless the complete list would run past max_list_chars: it is then prose, marked
+# free text, and no list is given. A column with more distinct values gets three samples, unless
+# one of its values is longer than max_sample_chars (prose again, marked free text). Long labels
+# in a short list (benchmarks.sector) therefore still list whole.
+max_list_chars = 1200
+max_sample_chars = 60
+
 # Columns that are never sampled, so no value of them reaches the document. Any column named
 # email, phone, first_name or last_name is excluded by name as well, in every table. These are
 # the person-name columns that rule does not reach.

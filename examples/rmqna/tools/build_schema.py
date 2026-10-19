@@ -41,12 +41,11 @@ VERSION = 1
 # row is dropped here and the copy of the data does not carry the file.
 DICTIONARY_ONLY = frozenset({"rm_scenarios"})
 
-# A column with at most this many distinct values is categorical: the document lists them all.
+# A column with at most this many distinct values is categorical: the document lists them all,
+# unless the list is too long to be one (prose). Others get SAMPLE_COUNT samples. The two length
+# limits that separate a label from prose are the notes' [sampling] settings.
 MAX_LISTED_VALUES = 24
 SAMPLE_COUNT = 3
-# A value longer than this is prose, not a code. A column holding any is described as free text,
-# so no sentence is cut short or quoted as if it were a value to filter on.
-MAX_VALUE_CHARS = 60
 
 # Person contact details are never sampled, wherever the column appears. Person-name columns of
 # another kind are listed in the notes ([sampling] no_values).
@@ -110,6 +109,14 @@ class Edge:
             return f"xref.xref_name (xref_type = '{self.qualifier}')"
         where = self.target_table + (f".{self.target_column}" if self.target_column else "")
         return where + (f" ({self.qualifier})" if self.qualifier else "")
+
+
+@dataclass(frozen=True)
+class Limits:
+    """The notes' length limits that tell a label from prose."""
+
+    max_list_chars: int
+    max_sample_chars: int
 
 
 @dataclass(frozen=True)
@@ -228,6 +235,11 @@ def _read_notes(
     if absent:
         raise ValueError(f"schema_notes.toml has no [{']/['.join(absent)}] section")
     problems = [
+        *(
+            f"[sampling] {key} must be a positive integer"
+            for key in ("max_list_chars", "max_sample_chars")
+            if not isinstance(notes["sampling"].get(key), int) or notes["sampling"][key] < 1
+        ),
         *_mismatch("[tables.*]", set(notes["tables"]), set(tables)),
         *_mismatch("[domains.*]", set(notes["domains"]), set(domains)),
         *(
@@ -278,6 +290,7 @@ def _profile(
     column: Column,
     loaded_type: str,
     private: bool,
+    limits: Limits,
 ) -> Profile:
     quoted = f'"{column.name}"'
     if private:
@@ -288,13 +301,16 @@ def _profile(
     ).fetchone() or (0, 0, 0)
     if present == 0:
         return Profile(loaded_type, "Values: all NULL")
-    if longest > MAX_VALUE_CHARS:
-        return Profile(loaded_type, "Values: free text")
     if distinct <= MAX_LISTED_VALUES:
         rows = connection.execute(
             f'SELECT DISTINCT {quoted} FROM "{table}" WHERE {quoted} IS NOT NULL ORDER BY 1'
         ).fetchall()
-        return Profile(loaded_type, "Values (all): " + ", ".join(_literal(r[0]) for r in rows))
+        listed = ", ".join(_literal(r[0]) for r in rows)
+        if len(listed) > limits.max_list_chars:
+            return Profile(loaded_type, "Values: free text")
+        return Profile(loaded_type, "Values (all): " + listed)
+    if longest > limits.max_sample_chars:
+        return Profile(loaded_type, "Values: free text")
     # Samples are spread over the sorted distinct values (first, middle, last), so numbers and
     # dates show their range and not just their low end.
     ranks = sorted({1, (distinct + 1) // 2, distinct})[:SAMPLE_COUNT]
@@ -334,6 +350,7 @@ def _render_table(
         raise ValueError(f"{table}: the dictionary's columns are not the CSV's columns")
     count = connection.execute(f'SELECT count(*) FROM "{table}"').fetchone()
     no_values = set(notes["sampling"]["no_values"])
+    limits = Limits(notes["sampling"]["max_list_chars"], notes["sampling"]["max_sample_chars"])
     edge_of = {edge.source_column: edge for edge in edges}
 
     keys = [column.name for column in columns if column.primary_key]
@@ -351,7 +368,7 @@ def _render_table(
     ]
     for column in columns:
         private = column.name in PERSON_COLUMNS or f"{table}.{column.name}" in no_values
-        profile = _profile(connection, table, column, loaded[column.name], private)
+        profile = _profile(connection, table, column, loaded[column.name], private, limits)
         lines.append(_render_column(column, profile, edge_of.get(column.name)))
     return "\n".join(lines)
 

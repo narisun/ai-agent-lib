@@ -166,6 +166,12 @@ def test_low_cardinality_columns_list_all_values() -> None:
         ("contacts", "is_primary"),
         ("catalog", "family"),
         ("service_requests", "status"),
+        # Long labels in a short list still list whole (the sector names run to 90 characters,
+        # and some have commas); so do short sentences, as long as the list stays modest.
+        ("benchmarks", "sector"),
+        ("catalog", "eligibility_criteria"),
+        ("source_readiness", "issue"),
+        ("catalog", "description"),
     ]:
         line = _column_line(document, table, column)
         assert "Values (all): " in line, (table, column)
@@ -177,6 +183,11 @@ def test_low_cardinality_columns_list_all_values() -> None:
     name_line = _column_line(document, "accounts", "name")
     assert "Values (e.g.): " in name_line
     assert "Values (all)" not in name_line
+
+    # Prose whose complete list would run past the notes' limit is marked, not listed.
+    priorities = _column_line(document, "relationship", "strategic_priorities")
+    assert priorities.endswith("Values: free text")
+    assert "Values (" not in priorities
 
 
 def test_sensitive_columns_carry_no_samples() -> None:
@@ -230,6 +241,36 @@ def test_the_as_of_rule_names_the_snapshot_date_of_the_data() -> None:
     assert "{snapshot_date}" not in document
 
 
+def test_the_risk_rating_convention_names_a_join_that_does_not_fan_out() -> None:
+    document = COMMITTED.read_text(encoding="utf-8")
+    convention = next(
+        line
+        for line in _section(document, "Conventions").splitlines()
+        if line.startswith("- Risk ratings")
+    )
+    assert "TRY_CAST(xref_value AS INT) IS NOT NULL" in convention
+
+    # xref keeps a row per accepted spelling, so the plain join multiplies a client's rows;
+    # with the numeric-row filter the convention names, each client matches exactly once.
+    clients = duckdb.sql(
+        f"SELECT count(*) FROM read_csv('{DATA / 'credit_metrics.csv'}')"
+    ).fetchone()
+    assert clients is not None
+
+    def joined(extra: str) -> tuple[int, int]:
+        row = duckdb.sql(
+            f"SELECT count(*), count(DISTINCT m.uen) "
+            f"FROM read_csv('{DATA / 'credit_metrics.csv'}') m "
+            f"JOIN read_csv('{DATA / 'xref.csv'}') x "
+            f"ON x.xref_type = 'risk_rating' AND x.xref_name = m.risk_rating{extra}"
+        ).fetchone()
+        assert row is not None
+        return row
+
+    assert joined("")[0] > clients[0]
+    assert joined(" AND TRY_CAST(x.xref_value AS INT) IS NOT NULL") == (clients[0], clients[0])
+
+
 def test_a_table_without_notes_fails_the_build(tmp_path: Path) -> None:
     # The notes are hand-authored: a table added to the data without a role must not render
     # silently with a blank one.
@@ -242,13 +283,23 @@ def test_a_table_without_notes_fails_the_build(tmp_path: Path) -> None:
         _render(DATA, trimmed)
 
 
+def test_the_sampling_limits_must_be_numbers(tmp_path: Path) -> None:
+    notes = NOTES.read_text(encoding="utf-8")
+    assert "max_list_chars = 1200" in notes
+    broken = tmp_path / "schema_notes.toml"
+    broken.write_text(notes.replace("max_list_chars = 1200", 'max_list_chars = "lots"'))
+
+    with pytest.raises(ValueError, match="max_list_chars"):
+        _render(DATA, broken)
+
+
 def _mini_workspace(tmp_path: Path, rows: list[dict[str, str]]) -> tuple[Path, Path]:
     """A one-table data directory and notes, to exercise the rendering rules directly."""
     data = tmp_path / "data"
     data.mkdir()
     header = "domain,table,column,datatype,nullable,pk,uk,fk,description\n"
-    columns = ["id", "label", "email", "story", "gone", "n"]
-    types = ["string", "string", "string", "string", "string", "integer"]
+    columns = ["id", "label", "email", "story", "gone", "n", "tag", "essay"]
+    types = ["string", "string", "string", "string", "string", "integer", "string", "string"]
     (data / "data_model.csv").write_text(
         header
         + "".join(
@@ -272,6 +323,8 @@ def _mini_workspace(tmp_path: Path, rows: list[dict[str, str]]) -> tuple[Path, P
                 "[snapshot]",
                 'date_column = "things.n"',
                 "[sampling]",
+                "max_list_chars = 400",
+                "max_sample_chars = 60",
                 "no_values = []",
                 "[domains.demo]",
                 'overview = "Demo domain."',
@@ -290,15 +343,16 @@ def _mini_workspace(tmp_path: Path, rows: list[dict[str, str]]) -> tuple[Path, P
 
 
 def test_value_rules_on_a_small_table(tmp_path: Path) -> None:
-    long_text = "x" * 61
     rows = [
         {
             "id": f"id-{number:02d}",
             "label": "O'Brien, Inc." if number == 1 else f"label-{number:02d}",
             "email": f"person{number}@example.com",
-            "story": long_text,
+            "story": f"{'x' * 61}{number}",
             "gone": "",
             "n": str(number),
+            "tag": f"{'t' * 70}{number % 3}",
+            "essay": f"{'e' * 200}{number % 3}",
         }
         for number in range(1, 26)  # 25 distinct ids and numbers, 24 labels after the next line
     ]
@@ -315,7 +369,14 @@ def test_value_rules_on_a_small_table(tmp_path: Path) -> None:
     assert _column_line(document, "things", "id").endswith(
         "Values (e.g.): 'id-01', 'id-13', 'id-25'"
     )
-    # Prose, an empty column and contact details never show a value.
+    # Long labels in a short list still list whole: three 71-character tags fit the 400-character
+    # limit, three 201-character essays do not.
+    tag = _column_line(document, "things", "tag")
+    assert "Values (all): " in tag
+    assert tag.count("'ttt") == 3
+    assert _column_line(document, "things", "essay").endswith("Values: free text")
+    # Prose (a value past the sample limit with many distinct values), an empty column and
+    # contact details never show a value.
     assert _column_line(document, "things", "story").endswith("Values: free text")
     assert _column_line(document, "things", "gone").endswith("Values: all NULL")
     assert _column_line(document, "things", "email").endswith(
