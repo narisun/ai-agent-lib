@@ -116,14 +116,16 @@ keys, aggregations, windows measured from 2026-06-30, name lookups, results that
 empty, two ambiguities the agent should ask about, and refusals. None is one of the prompt's worked
 examples (a test checks). A case with a `reference_sql` is scored by **execution result**, not by SQL
 text: the case's statement and the agent's last statement run through the same engine and the
-results are compared (rows in any order, columns by name or by value, numbers within 1e-9, a date
-equals its midnight timestamp, extra columns ignored). A case without one expects a clarifying
-question or a refusal, so it passes only if the agent sent no SQL, and its `answer_contains` checks
-the words. Two metrics come out: `result_match` and `answer_contains`.
+results are compared (rows in any order, a column by its name or, when the agent aliased it, by its
+values and in the reference's relative order, numbers within 1e-9, a date equals its midnight
+timestamp, extra columns ignored). A case without one expects a clarifying question or a refusal, so
+it passes only if the agent sent no SQL, and its `answer_contains` checks the words. Two metrics come
+out: `result_match` and `answer_contains`.
 
 ```bash
 python -m ai_agent_lib_cli eval rmqna            # real model, tools in process; no server to start
-python -m ai_agent_lib_cli eval rmqna --accept   # after it passes, save the report as the baseline
+python -m ai_agent_lib_cli eval rmqna --accept   # re-runs the whole eval (a second billable live run)
+                                                 # and saves that fresh passing report as the baseline
 ```
 
 The model is real and live (set `AC2_MODEL_ID` and the key in `agents/rmqna/.env`; without a real
@@ -138,7 +140,7 @@ call or several each, so it costs tokens.
   by a maintainer's live `eval rmqna --accept` and committed. After that every run also fails when a
   metric drops more than 0.05 below the baseline; `--accept` again moves the bar on purpose. The
   absolute bars (`result_match` 0.5, `answer_contains` 0.8) are starting values in
-  `tests/test_rmqna_eval.py`: raise them once a baseline run shows what the agent reaches.
+  `agents/rmqna/tests/test_rmqna_eval.py`: raise them once a baseline run shows what the agent reaches.
 - The eval itself is tested on every CI run, with a scripted model:
   `tests/test_eval_harness.py` (the task, the scorers and a table of results that do and do not
   match) and `tests/test_eval_cases.py` (every `reference_sql` runs on the engine and returns what

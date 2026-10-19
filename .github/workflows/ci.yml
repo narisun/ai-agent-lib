@@ -63,6 +63,8 @@ jobs:
           --cov-branch --cov-report=term --cov-fail-under=90
       - name: Relationship manager example policy samples
         run: python -m ai_agent_lib_cli policy test --workspace examples/rmprep
+      - name: Relationship manager data-question example policy samples
+        run: python -m ai_agent_lib_cli policy test --workspace examples/rmqna
       - name: The developer guide matches the code
         run: python docs/guide/build_guide.py --check
 

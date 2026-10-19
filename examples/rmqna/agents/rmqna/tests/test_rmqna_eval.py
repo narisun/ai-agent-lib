@@ -144,23 +144,54 @@ def _same_rows(left: list[list[Cell]], right: list[list[Cell]]) -> bool:
     )
 
 
+_LABELS = ("text", "null")
+"""The kinds of cell that say what a row is about and are not a figure."""
+
+
+def _is_lone_figure(wanted: list[list[Cell]]) -> bool:
+    return len(wanted) == 1 and len(wanted[0]) == 1
+
+
+def _stands_alone(figure: Cell, row: list[Cell], at: int) -> bool:
+    """Whether ``row[at]`` is the only figure in the row: the rest are labels or the same figure."""
+    return all(
+        cell[0] in _LABELS or _same_cell(cell, figure)
+        for other, cell in enumerate(row)
+        if other != at
+    )
+
+
 def _choices(
     index: int,
     name: str,
     wanted: list[list[Cell]],
     columns: Sequence[str],
     got: list[list[Cell]],
-) -> list[int]:
+) -> tuple[list[int], bool]:
     """The columns of the agent's result that could be the reference's column ``index``.
 
     A column with the reference's name is the column, whatever it holds. A column the agent named
-    differently is the same column when it holds the same values.
+    differently is the same column when it holds the same values; the second item of the answer is
+    False for these, because a name did not bind them.
+
+    A reference that is one cell is evidence of little: any column of a wide row may hold the same
+    figure by chance. Such a cell is found by value only in a row with no other figure in it.
     """
     named = [at for at, other in enumerate(columns) if other.lower() == name.lower()]
     if named:
-        return named
+        return named, True
     column = [[row[index]] for row in wanted]
-    return [at for at in range(len(columns)) if _same_rows(column, [[row[at]] for row in got])]
+    found = [at for at in range(len(columns)) if _same_rows(column, [[row[at]] for row in got])]
+    if _is_lone_figure(wanted):
+        figure = wanted[0][index]
+        found = [at for at in found if _stands_alone(figure, got[0], at)]
+    return found, False
+
+
+def _in_reference_order(chosen: tuple[int, ...], named: Sequence[bool]) -> bool:
+    """Whether the columns found by value are in the order the reference has them."""
+    by_value = [at for at, bound in zip(chosen, named, strict=True) if not bound]
+    return all(earlier < later for earlier, later in itertools.pairwise(by_value))
 
 
 def results_match(expected: Table, actual: Table) -> bool:
@@ -169,9 +200,14 @@ def results_match(expected: Table, actual: Table) -> bool:
     This is a match of what the statements returned, not of how they were written:
 
     * rows are compared as a multiset, in any order, so a repeated row has to be repeated;
-    * columns are matched by name, in any order, and a column the agent named differently (an alias)
-      is matched by its values; columns the reference does not have are ignored, because the agent
-      is asked to show the readable name beside an id and to say what a figure is;
+    * a column of the reference is the agent's column of the same name, wherever it stands. A
+      column the agent named differently (an alias) is matched by its values, and the columns
+      matched this way keep the reference's relative order: two aliased figures that are crossed
+      (a "before" that holds the later figure) are not the reference's. Columns the reference does
+      not have are ignored, because the agent is asked to show the readable name beside an id and
+      to say what a figure is;
+    * a reference of one cell is found by value only where it is the one figure in its row, so a
+      wide row does not match because one of its columns holds the number by chance;
     * numbers are equal within a relative and absolute 1e-9, an integer equals the same float, and a
       date equals the timestamp at midnight UTC that DuckDB makes of it;
     * two empty results match, whatever their columns, and an empty result matches nothing else.
@@ -186,21 +222,24 @@ def results_match(expected: Table, actual: Table) -> bool:
         _choices(index, name, wanted, actual.columns, got)
         for index, name in enumerate(expected.columns)
     ]
+    named = [bound for _, bound in options]
     return any(
         len(set(chosen)) == len(chosen)
+        and _in_reference_order(chosen, named)
         and _same_rows(wanted, [[row[at] for at in chosen] for row in got])
-        for chosen in itertools.product(*options)
+        for chosen in itertools.product(*(found for found, _ in options))
     )
 
 
 def expected_table(case: EvalCase, reference: Table) -> Table:
     """The table a case wants: what its reference statement returned.
 
-    A case whose pinned result is a scalar wants one value, and its column name says nothing the
-    agent should have to guess, so the column is left unnamed and is found by its value.
+    A case whose pinned result is a scalar wants one cell, the reference's first. It keeps the
+    reference's column name, so an agent that used the name is held to it, and one that aliased
+    the figure is found by its value, where it stands alone in its row (see :func:`_choices`).
     """
     if "scalar" in case.expected.get("result", {}) and reference.rows:
-        return Table([""], [[reference.rows[0][0]]])
+        return Table(reference.columns[:1], [[reference.rows[0][0]]])
     return reference
 
 

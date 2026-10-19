@@ -74,6 +74,10 @@ def test_the_eval_finds_its_files() -> None:
 # ---------------------------------------------------------------------------------------------
 
 CLIENTS = table(["client", "n"], ["Ada", 1], ["Bob", 2], ["Cy", 3])
+# The shape of the dso-rose case: a client and a figure at each of two dates.
+DSO = table(
+    ["client", "dso_2026_03_31", "dso_2026_06_30"], ["Ada", 41, 42], ["Bob", 65, 72], ["Cy", 24, 26]
+)
 
 SAME = [
     pytest.param(CLIENTS, CLIENTS, id="identical"),
@@ -132,6 +136,43 @@ SAME = [
         table(["b", "a"], [4, 3], [2, 1]),
         id="two-columns-reordered-and-sorted",
     ),
+    pytest.param(
+        DSO,
+        table(
+            ["client", "dso_before", "dso_after"], ["Ada", 41, 42], ["Bob", 65, 72], ["Cy", 24, 26]
+        ),
+        id="aliased-figures-in-the-references-order",
+    ),
+    pytest.param(
+        DSO,
+        table(
+            ["note", "dso_before", "client", "dso_after"],
+            ["x", 41, "Ada", 42],
+            ["y", 65, "Bob", 72],
+            ["z", 24, "Cy", 26],
+        ),
+        id="a-named-column-anywhere-and-aliased-figures-in-order",
+    ),
+    pytest.param(
+        table(["client", "n", "m"], ["Ada", 1, 10], ["Bob", 2, 20]),
+        table(["m", "client", "count"], [10, "Ada", 1], [20, "Bob", 2]),
+        id="named-columns-are-free-of-the-order-the-aliased-one-keeps",
+    ),
+    pytest.param(
+        table(["clients"], [46]),
+        table(["clients", "canada"], [46, 8]),
+        id="a-scalar-with-its-name-beside-other-figures",
+    ),
+    pytest.param(
+        table(["clients"], [46]),
+        table(["segment", "how_many"], ["Mid-Market", 46]),
+        id="a-scalar-aliased-beside-a-label",
+    ),
+    pytest.param(
+        table(["clients"], [46]),
+        table(["how_many", "of_which"], [46, 46.0]),
+        id="a-scalar-twice-is-still-the-one-figure",
+    ),
 ]
 
 DIFFERENT = [
@@ -175,6 +216,43 @@ DIFFERENT = [
     pytest.param(
         table([""], [46]), table(["how_many"], [46], [46]), id="a-scalar-repeated-is-two-rows"
     ),
+    pytest.param(
+        DSO,
+        table(
+            ["client", "dso_before", "dso_after"], ["Ada", 42, 41], ["Bob", 72, 65], ["Cy", 26, 24]
+        ),
+        id="before-and-after-crossed-by-their-aliases",
+    ),
+    pytest.param(
+        DSO,
+        table(["who", "latest", "earlier"], ["Ada", 42, 41], ["Bob", 72, 65], ["Cy", 26, 24]),
+        id="before-and-after-crossed-with-the-client-aliased-too",
+    ),
+    pytest.param(
+        table(["a", "b"], [1, 2], [3, 4]),
+        table(["x", "y"], [2, 1], [4, 3]),
+        id="two-aliased-columns-in-the-other-order",
+    ),
+    pytest.param(
+        table([""], [46]),
+        table(["canada", "employees"], [8, 46]),
+        id="a-scalar-in-the-wrong-column-of-a-wide-row",
+    ),
+    pytest.param(
+        table(["clients"], [46]),
+        table(["canada", "employees"], [8, 46]),
+        id="a-named-scalar-in-the-wrong-column-of-a-wide-row",
+    ),
+    pytest.param(
+        table(["clients"], [46]),
+        table(["clients", "employees"], [8, 46]),
+        id="a-scalar-whose-own-name-holds-another-figure",
+    ),
+    pytest.param(
+        table(["clients"], [46]),
+        table(["segment", "growth", "how_many"], ["Mid-Market", 0.5, 46]),
+        id="a-scalar-beside-a-competing-figure",
+    ),
 ]
 
 
@@ -186,6 +264,21 @@ def test_results_that_hold_the_same_figures_match(expected: Any, actual: Any) ->
 @pytest.mark.parametrize(("expected", "actual"), DIFFERENT)
 def test_results_that_hold_other_figures_do_not(expected: Any, actual: Any) -> None:
     assert not evals.results_match(expected, actual)
+
+
+def test_a_scalar_case_wants_the_references_first_cell_under_its_own_name() -> None:
+    reference = table(["clients"], [46])
+    scalar = case("s", "SELECT 1", result={"scalar": 46})
+    listed = case("l", "SELECT 1", result={"columns": ["clients"], "rows": [[46]]})
+
+    assert evals.expected_table(scalar, reference) == table(["clients"], [46])
+    assert evals.expected_table(scalar, table(["a", "b"], [1, 2], [3, 4])) == table(["a"], [1])
+    # Only a case that pins a scalar is narrowed; the others want everything the reference holds.
+    assert evals.expected_table(listed, table(["a", "b"], [1, 2], [3, 4])) == table(
+        ["a", "b"], [1, 2], [3, 4]
+    )
+    # A scalar case whose reference is empty has no cell to narrow to; the scorer treats it as empty.
+    assert evals.expected_table(scalar, table(["clients"])) == table(["clients"])
 
 
 def test_a_cell_is_compared_as_what_it_holds() -> None:
@@ -263,6 +356,10 @@ def test_a_result_that_arrives_without_its_frame_is_read_too() -> None:
 # ---------------------------------------------------------------------------------------------
 
 SEGMENTS = "SELECT segment, COUNT(*) AS clients FROM accounts GROUP BY segment ORDER BY segment"
+SPREAD = (
+    "SELECT segment, MIN(employees) AS fewest, MAX(employees) AS most FROM accounts "
+    "GROUP BY segment ORDER BY segment"
+)
 NOBODY = "SELECT name FROM accounts WHERE name = 'Nobody'"
 
 
@@ -282,10 +379,48 @@ SCENARIOS: list[tuple[EvalCase, list[Any], dict[str, float]]] = [
         [
             calls_tool(
                 EXECUTE,
-                sql="SELECT COUNT(*) AS how_many, segment AS bank_segment FROM accounts "
-                "GROUP BY segment ORDER BY how_many",
+                sql="SELECT COUNT(*) AS clients, segment AS bank_segment FROM accounts "
+                "GROUP BY segment ORDER BY clients",
             ),
             "Mid-Market has 24.",
+        ],
+        {"result_match": 1.0, "answer_contains": 1.0},
+    ),
+    (
+        case("aliased-in-order", SEGMENTS),
+        # Both columns aliased, in the reference's order: found by their values.
+        [
+            calls_tool(
+                EXECUTE,
+                sql="SELECT segment AS bank_segment, COUNT(*) AS how_many FROM accounts "
+                "GROUP BY segment ORDER BY how_many DESC",
+            ),
+            "Mid-Market has 24.",
+        ],
+        {"result_match": 1.0, "answer_contains": 1.0},
+    ),
+    (
+        case("crossed-aliases", SPREAD),
+        # The same figures under labels that swap what they are: a low that holds the high.
+        [
+            calls_tool(
+                EXECUTE,
+                sql="SELECT segment AS bank_segment, MAX(employees) AS low, MIN(employees) AS high "
+                "FROM accounts GROUP BY segment ORDER BY segment",
+            ),
+            "Here is the spread.",
+        ],
+        {"result_match": 0.0, "answer_contains": 1.0},
+    ),
+    (
+        case("spread", SPREAD),
+        [
+            calls_tool(
+                EXECUTE,
+                sql="SELECT segment AS bank_segment, MIN(employees) AS low, MAX(employees) AS high "
+                "FROM accounts GROUP BY segment ORDER BY segment",
+            ),
+            "Here is the spread.",
         ],
         {"result_match": 1.0, "answer_contains": 1.0},
     ),
@@ -329,6 +464,23 @@ SCENARIOS: list[tuple[EvalCase, list[Any], dict[str, float]]] = [
         case("scalar", "SELECT COUNT(*) AS clients FROM accounts", result={"scalar": 46}),
         [calls_tool(EXECUTE, sql="SELECT COUNT(*) AS how_many FROM accounts"), "46."],
         {"result_match": 1.0, "answer_contains": 1.0},
+    ),
+    (
+        case(
+            "scalar-in-a-wide-row",
+            "SELECT COUNT(*) AS clients FROM accounts",
+            result={"scalar": 46},
+        ),
+        # 46 is in the row, in a column of its own, beside another figure: which is the answer?
+        [
+            calls_tool(
+                EXECUTE,
+                sql="SELECT COUNT(*) FILTER (WHERE country = 'Canada') AS canada, "
+                "COUNT(*) AS everyone FROM accounts",
+            ),
+            "Eight in Canada, 46 in all.",
+        ],
+        {"result_match": 0.0, "answer_contains": 1.0},
     ),
     (
         case("wrong-scalar", "SELECT COUNT(*) AS clients FROM accounts", result={"scalar": 46}),
