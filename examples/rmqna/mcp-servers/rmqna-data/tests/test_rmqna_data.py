@@ -21,9 +21,13 @@ from ai_agent_lib_core.integrations.mcp import mcp_result_text, verify_registrat
 from ai_agent_lib_core.testing import TEST_AGENT, audit_records, load_test_config
 from ai_agent_lib_core.testing.mcp import call_tool_as
 from mcp.server.mcpserver import MCPServer
+from mcp_types import CallToolResult
 
 from rmqna_data import APPLICATION, SERVER_ID, build_server
+from rmqna_data.engine import ExecuteResult, ValuesResult
+from rmqna_data.server import add_tools
 from rmqna_data.settings import SCHEMA_PATH
+from rmqna_data.validate import ErrorKind, SqlRefused
 
 SERVICE = Path(__file__).resolve().parents[1]
 Running = tuple[ServiceContainer, MCPServer[Any]]
@@ -101,6 +105,13 @@ async def test_a_long_result_is_cut_at_the_cap_and_says_so(running: Running) -> 
     assert (table["row_count"], len(table["rows"]), table["truncated"]) == (200, 200, True)
 
 
+async def test_now_is_returned_as_a_utc_timestamp_over_the_wire(running: Running) -> None:
+    result = await sql_as(running, "SELECT now() AS n", ["analyst"])
+
+    assert not result.is_error
+    assert result.structured_content["rows"][0][0].endswith("+00:00")
+
+
 async def test_a_query_nobody_matches_is_an_empty_table_not_an_error(running: Running) -> None:
     result = await sql_as(running, "SELECT uen FROM accounts WHERE name = 'Nobody'", ["manager"])
 
@@ -119,6 +130,9 @@ async def test_a_query_nobody_matches_is_an_empty_table_not_an_error(running: Ru
         ("SELECT * FROM read_csv('accounts.csv')", "forbidden_function"),
         ("SELEC 1", "parse_error"),
         ("SELECT no_such_column FROM accounts", "execution_error"),
+        ("SELECT * FROM accounts PIVOT (count(*) FOR country IN ('USA'))", "not_a_select"),
+        ("SELECT sum(x) FROM (SELECT unnest(range(0, 3000000000)) AS x)", "forbidden_function"),
+        ("SELECT list(t) FROM transactions t", "execution_error"),  # one row, over the byte ceiling
     ],
 )
 async def test_a_refusal_is_a_normal_result_the_agent_can_read(
@@ -255,3 +269,65 @@ async def test_the_server_logs_hold_counts_and_error_kinds_and_never_the_sql(
     first = lines[0]
     assert (first["row_count"], first["column_count"], first["truncated"]) == (46, 2, False)
     assert isinstance(first["duration_ms"], int)
+
+
+async def call_stub(server: MCPServer[Any], tool: str, arguments: dict[str, Any]) -> CallToolResult:
+    result = await server.call_tool(tool, arguments)
+    assert isinstance(result, CallToolResult)
+    return result
+
+
+class StubEngine:
+    """An engine that answers from a script: all the tools need is the protocol."""
+
+    def __init__(self, error: SqlRefused | None = None) -> None:
+        self.error = error
+        self.seen: list[str] = []
+
+    async def execute(self, sql: str) -> ExecuteResult:
+        self.seen.append(sql)
+        if self.error is not None:
+            raise self.error
+        return ExecuteResult(columns=["n"], rows=[[1]], row_count=1, truncated=False, elapsed_ms=3)
+
+    async def values(self, table: str, column: str, search: str) -> ValuesResult:
+        self.seen.append(f"{table}.{column}:{search}")
+        if self.error is not None:
+            raise self.error
+        return ValuesResult(values=["A"], truncated=True)
+
+
+async def test_the_tools_depend_on_the_engine_protocol_alone() -> None:
+    engine = StubEngine()
+    server: MCPServer[Any] = MCPServer("stub")
+    add_tools(server, engine, "# a schema")
+
+    ran = await call_stub(server, EXECUTE, {"sql": "SELECT 1"})
+    found = await call_stub(server, VALUES, {"table": "t", "column": "c", "search": "s"})
+    schema = await call_stub(server, SCHEMA, {})
+
+    assert ran.structured_content == {
+        "columns": ["n"],
+        "rows": [[1]],
+        "row_count": 1,
+        "truncated": False,
+        "elapsed_ms": 3,
+    }
+    assert found.structured_content == {"values": ["A"], "truncated": True}
+    assert schema.structured_content == {"schema": "# a schema"}
+    assert engine.seen == ["SELECT 1", "t.c:s"]
+
+
+@pytest.mark.parametrize("kind", ["timeout", "execution_error", "parse_error"])
+async def test_any_refusal_the_engine_raises_becomes_a_normal_result(kind: ErrorKind) -> None:
+    engine = StubEngine(SqlRefused(kind, "say what to change"))
+    server: MCPServer[Any] = MCPServer("stub")
+    add_tools(server, engine, "# a schema")
+
+    for tool, arguments in [
+        (EXECUTE, {"sql": "SELECT 1"}),
+        (VALUES, {"table": "t", "column": "c", "search": "s"}),
+    ]:
+        result = await call_stub(server, tool, arguments)
+        assert not result.is_error
+        assert result.structured_content == {"error_kind": kind, "message": "say what to change"}

@@ -9,6 +9,8 @@ dependencies = [
     # The validator reads the statement with sqlglot's syntax tree (exp.Expr, SetOperation) and
     # resolves CTE names with its scope analysis; the library itself allows older versions.
     "sqlglot>=30.0",
+    # DuckDB hands a TIMESTAMPTZ (what now() returns) to Python only with pytz installed.
+    "pytz",
 ]
 
 [project.scripts]

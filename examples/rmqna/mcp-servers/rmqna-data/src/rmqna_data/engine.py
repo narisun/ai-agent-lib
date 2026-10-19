@@ -10,11 +10,16 @@ What this module adds to that discipline, because the SQL here is written by a m
 
 * every statement goes through :func:`rmqna_data.validate.validate_sql` first, and only the
   rewritten statement is run;
-* the configuration is locked after loading, so nothing can turn external access back on;
+* the configuration is locked after loading, so nothing can turn external access back on, and
+  DuckDB is given a memory limit (which it does not always honour);
 * each call runs on its own cursor, in a worker thread, under a timeout that interrupts the
-  query rather than abandoning it;
+  query. Interrupting does not reach everything: DuckDB's binder and optimizer, and a single huge
+  scalar, run to completion. :attr:`RmqnaEngine.running` counts the workers still going, including
+  any whose caller has already been told "timeout";
 * a result is cut at the row cap; asking DuckDB for one row more than the cap is how the cut is
-  known, and the extra row is never returned;
+  known, and the extra row is never returned. A result is also refused if it would serialize to
+  more than a byte ceiling, which a single value holding a whole table could otherwise reach in one
+  row. The conversion runs in the worker, inside the timeout;
 * an error is a value, not a crash: a refusal or a DuckDB error is raised as
   :class:`~rmqna_data.validate.SqlRefused`, which the server returns as a normal tool result.
 
@@ -28,8 +33,10 @@ import asyncio
 import contextlib
 import math
 import re
+import threading
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from datetime import time as clock_time
@@ -44,6 +51,8 @@ from ai_agent_lib_core.contracts import ConfigurationError, describe
 from rmqna_data.validate import SqlRefused, close_matches, validate_sql
 
 __all__ = [
+    "DEFAULT_MAX_RESULT_BYTES",
+    "DEFAULT_MEMORY_LIMIT",
     "DEFAULT_ROW_CAP",
     "DEFAULT_TIMEOUT_SECONDS",
     "NOT_QUERYABLE",
@@ -58,6 +67,15 @@ DEFAULT_ROW_CAP: Final = 200
 
 DEFAULT_TIMEOUT_SECONDS: Final = 30.0
 """How long one statement may run before it is interrupted."""
+
+DEFAULT_MAX_RESULT_BYTES: Final = 2 * 1024 * 1024
+"""The most a result may weigh once serialized. The row cap alone does not bound it: one row can
+hold a whole table as a list."""
+
+DEFAULT_MEMORY_LIMIT: Final = "1GB"
+"""DuckDB's memory limit. A backstop only: DuckDB does not account for every allocation (measured:
+``repeat('a', 3e9)`` and ``unnest(range(0, 3e9))`` pass 5 GB under it), so the validator refuses
+those and the ADR says what remains."""
 
 VALUES_CAP: Final = 25
 """The most values a lookup returns."""
@@ -124,6 +142,8 @@ class RmqnaEngine:
         data_dir: The folder of CSV files. Each content file becomes a table.
         row_cap: The most rows a result carries.
         timeout_seconds: How long one statement may run.
+        max_result_bytes: The most a result may weigh once serialized.
+        memory_limit: DuckDB's memory limit, for example ``"1GB"``.
 
     Raises:
         ConfigurationError: If the folder is missing, or a file is not a valid table.
@@ -135,14 +155,21 @@ class RmqnaEngine:
         *,
         row_cap: int = DEFAULT_ROW_CAP,
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+        max_result_bytes: int = DEFAULT_MAX_RESULT_BYTES,
+        memory_limit: str = DEFAULT_MEMORY_LIMIT,
     ) -> None:
         if row_cap < 1:
             raise ValueError("row_cap must be at least 1")
         if timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
+        if max_result_bytes < 1:
+            raise ValueError("max_result_bytes must be at least 1")
         self._row_cap = row_cap
         self._timeout = timeout_seconds
-        self._connection, self._column_types = _load(data_dir)
+        self._max_result_bytes = max_result_bytes
+        self._executing: set[duckdb.DuckDBPyConnection] = set()
+        self._executing_lock = threading.Lock()
+        self._connection, self._column_types = _load(data_dir, memory_limit)
 
     @property
     def tables(self) -> frozenset[str]:
@@ -154,6 +181,17 @@ class RmqnaEngine:
         """Each table's columns, in file order, with the DuckDB type each was loaded as."""
         return self._column_types
 
+    @property
+    def running(self) -> int:
+        """How many statements are still executing in a worker thread.
+
+        A call that timed out or was cancelled has been interrupted, but DuckDB does not stop
+        everywhere it is interrupted (its binder and optimizer, and one huge scalar, run to the
+        end), so the worker of an abandoned call can outlive the call. This counts them.
+        """
+        with self._executing_lock:
+            return len(self._executing)
+
     async def execute(self, sql: str) -> ExecuteResult:
         """Validate ``sql`` and run it.
 
@@ -161,18 +199,18 @@ class RmqnaEngine:
             SqlRefused: With ``error_kind`` ``not_a_select``, ``multiple_statements``,
                 ``set_operation``, ``unknown_table``, ``forbidden_function`` or ``parse_error``
                 if the validator refuses the statement; ``execution_error`` with DuckDB's own
-                message if the engine fails on it; ``timeout`` if it ran too long.
+                message if the engine fails on it or the result is too large to return;
+                ``timeout`` if it ran too long.
         """
         rewritten = validate_sql(sql, self.tables, self._row_cap)
         started = time.perf_counter()
-        columns, rows = await self._run(rewritten, None, self._row_cap + 1)
+        fetched = await self._run(rewritten, None, self._row_cap)
         elapsed_ms = round((time.perf_counter() - started) * 1000)
-        kept = rows[: self._row_cap]
         return ExecuteResult(
-            columns=columns,
-            rows=[[_json_safe(cell) for cell in row] for row in kept],
-            row_count=len(kept),
-            truncated=len(rows) > self._row_cap,
+            columns=fetched.columns,
+            rows=fetched.rows,
+            row_count=len(fetched.rows),
+            truncated=fetched.fetched > self._row_cap,
             elapsed_ms=elapsed_ms,
         )
 
@@ -195,14 +233,19 @@ class RmqnaEngine:
             f"WHERE CAST({quoted} AS VARCHAR) ILIKE ? ESCAPE '\\' ORDER BY v LIMIT {VALUES_CAP + 1}"
         )
         pattern = "%" + re.sub(r"([\\%_])", r"\\\1", search.strip()) + "%"
-        _, rows = await self._run(statement, [pattern], VALUES_CAP + 1)
+        fetched = await self._run(statement, [pattern], VALUES_CAP)
         return ValuesResult(
-            values=[str(row[0]) for row in rows[:VALUES_CAP]],
-            truncated=len(rows) > VALUES_CAP,
+            values=[str(row[0]) for row in fetched.rows],
+            truncated=fetched.fetched > VALUES_CAP,
         )
 
     def close(self) -> None:
-        """Close the engine. Safe to call more than once."""
+        """Interrupt anything still executing, then close the engine. Safe to call more than once."""
+        with self._executing_lock:
+            cursors = list(self._executing)
+        for cursor in cursors:
+            with contextlib.suppress(Exception):
+                cursor.interrupt()
         with contextlib.suppress(duckdb.Error):
             self._connection.close()
 
@@ -230,14 +273,17 @@ class RmqnaEngine:
             )
         return found
 
-    async def _run(
-        self, sql: str, parameters: Sequence[object] | None, count: int
-    ) -> tuple[list[str], list[tuple[object, ...]]]:
+    async def _run(self, sql: str, parameters: Sequence[object] | None, keep: int) -> _Fetched:
+        """Run ``sql`` on its own cursor in a worker thread, under the timeout."""
         # A cursor is its own connection to the same database, so calls can overlap.
         cursor = self._connection.cursor()
-        work = asyncio.to_thread(_execute_on, cursor, sql, parameters, count)
+
+        def work() -> _Fetched:
+            with self._tracking(cursor):
+                return _execute_on(cursor, sql, parameters, keep, self._max_result_bytes)
+
         try:
-            return await asyncio.wait_for(work, self._timeout)
+            return await asyncio.wait_for(asyncio.to_thread(work), self._timeout)
         except TimeoutError:
             _interrupt(cursor)
             raise SqlRefused(
@@ -249,22 +295,73 @@ class RmqnaEngine:
             _interrupt(cursor)
             raise
 
+    @contextmanager
+    def _tracking(self, cursor: duckdb.DuckDBPyConnection) -> Iterator[None]:
+        with self._executing_lock:
+            self._executing.add(cursor)
+        try:
+            yield
+        finally:
+            with self._executing_lock:
+                self._executing.discard(cursor)
+
+
+@dataclass(frozen=True, slots=True)
+class _Fetched:
+    """What a worker brings back: JSON-safe rows, at most the ones to keep."""
+
+    columns: list[str]
+    rows: list[list[object]]
+    fetched: int
+    """How many rows DuckDB returned: one more than ``rows`` when the result was cut."""
+
+
+class _TooLarge(Exception):
+    """The result would serialize to more than the byte ceiling."""
+
+
+class _Budget:
+    """A running estimate of a result's serialized size, spent as the result is converted."""
+
+    def __init__(self, ceiling: int) -> None:
+        self.ceiling = ceiling
+        self._left = ceiling
+
+    def spend(self, size: int) -> None:
+        self._left -= size
+        if self._left < 0:
+            raise _TooLarge
+
 
 def _execute_on(
     cursor: duckdb.DuckDBPyConnection,
     sql: str,
     parameters: Sequence[object] | None,
-    count: int,
-) -> tuple[list[str], list[tuple[object, ...]]]:
+    keep: int,
+    max_bytes: int,
+) -> _Fetched:
+    """Run one statement and convert its first ``keep`` rows; runs in a worker thread."""
     try:
         statement = _the_one_select(cursor, sql)
         cursor.execute(statement, list(parameters) if parameters is not None else None)
         columns = [str(column[0]) for column in cursor.description or ()]
-        return columns, cursor.fetchmany(count)
+        fetched = cursor.fetchmany(keep + 1)
+        budget = _Budget(max_bytes)
+        budget.spend(sum(len(column) + 3 for column in columns))
+        rows = [[_json_safe(cell, budget) for cell in row] for row in fetched[:keep]]
+        return _Fetched(columns, rows, len(fetched))
     except duckdb.Error as error:
         # DuckDB's own text: it names the candidates for a misspelt column or function, which is
         # what the model needs to repair the statement. It goes to the caller, never to a log.
         raise SqlRefused("execution_error", str(error)) from error
+    except _TooLarge:
+        raise SqlRefused(
+            "execution_error",
+            f"The result is larger than {max_bytes / 2**20:g} MB once serialized. Narrow the "
+            "selection: fewer columns, a filter, an aggregate or a smaller LIMIT. Collecting a "
+            "whole table into one value (list, array_agg, string_agg, a struct per row) is too "
+            "large too.",
+        ) from None
     except (OverflowError, ValueError, UnicodeError) as error:
         raise SqlRefused(
             "execution_error", f"A value in the result could not be read: {error}"
@@ -311,10 +408,15 @@ def _quote(identifier: str) -> str:
     return '"' + identifier.replace('"', '""') + '"'
 
 
+_MEMORY_LIMIT = re.compile(r"^[0-9]+(\.[0-9]+)? ?[A-Za-z]+$")
+
+
 def _load(
-    data_dir: Path,
+    data_dir: Path, memory_limit: str
 ) -> tuple[duckdb.DuckDBPyConnection, dict[str, dict[str, str]]]:
     """Load every content CSV of ``data_dir`` into DuckDB, then lock the engine down."""
+    if not _MEMORY_LIMIT.match(memory_limit):
+        raise ValueError(f"memory_limit {memory_limit!r} is not a size such as '1GB'")
     if not data_dir.is_dir():
         raise ConfigurationError(
             "rmqna-data: the data folder does not exist",
@@ -350,6 +452,10 @@ def _load(
         # From here on the engine can read only what was loaded above, and nothing can say
         # otherwise: the configuration is locked, so a statement cannot re-enable file access.
         connection.execute("SET enable_external_access = false")
+        connection.execute(f"SET memory_limit = '{memory_limit}'")
+        # A time zone with an offset (now(), a TIMESTAMPTZ) is shown in the session's zone, which
+        # DuckDB takes from the machine. UTC makes an answer the same wherever the server runs.
+        connection.execute("SET GLOBAL TimeZone = 'UTC'")
         connection.execute("SET lock_configuration = true")
     except BaseException:
         connection.close()
@@ -357,24 +463,49 @@ def _load(
     return connection, column_types
 
 
-def _json_safe(value: object) -> object:
-    """Return ``value`` as something JSON can carry, losing nothing a reader needs."""
-    if value is None or isinstance(value, bool | int | str):
+def _json_safe(value: object, budget: _Budget) -> object:
+    """Return ``value`` as something JSON can carry, spending its size from ``budget``."""
+    if value is None:
+        budget.spend(5)
+        return None
+    if isinstance(value, bool):
+        budget.spend(6)
+        return value
+    if isinstance(value, int):
+        budget.spend(len(str(value)) + 1)
+        return value
+    if isinstance(value, str):
+        budget.spend(len(value) + 3)
         return value
     if isinstance(value, float):
+        budget.spend(len(repr(value)) + 1)
         if math.isfinite(value):
             return value
         return "NaN" if math.isnan(value) else ("Infinity" if value > 0 else "-Infinity")
     if isinstance(value, Decimal):
+        budget.spend(len(str(value)) + 1)
         return float(value) if value.is_finite() else str(value)
     if isinstance(value, datetime | date | clock_time):
-        return value.isoformat()
+        text = value.isoformat()
+        budget.spend(len(text) + 3)
+        return text
     if isinstance(value, timedelta | UUID):
-        return str(value)
+        text = str(value)
+        budget.spend(len(text) + 3)
+        return text
     if isinstance(value, bytes | bytearray):
+        budget.spend(2 * len(value) + 3)
         return bytes(value).hex()
     if isinstance(value, list | tuple):
-        return [_json_safe(item) for item in value]
+        budget.spend(2)
+        return [_json_safe(item, budget) for item in value]
     if isinstance(value, dict):
-        return {str(key): _json_safe(item) for key, item in value.items()}
-    return str(value)
+        budget.spend(2)
+        converted: dict[str, object] = {}
+        for key, item in value.items():
+            budget.spend(len(str(key)) + 4)
+            converted[str(key)] = _json_safe(item, budget)
+        return converted
+    text = str(value)
+    budget.spend(len(text) + 3)
+    return text

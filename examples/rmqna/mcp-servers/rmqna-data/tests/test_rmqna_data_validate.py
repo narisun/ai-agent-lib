@@ -10,12 +10,19 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import time
 
 import pytest
 import sqlglot
 from sqlglot import exp
 
-from rmqna_data.validate import MAX_SQL_CHARS, SqlRefused, validate_sql
+from rmqna_data.validate import (
+    MAX_CTE_AND_SUBQUERY_REFERENCES,
+    MAX_JOIN_SOURCES,
+    MAX_SQL_CHARS,
+    SqlRefused,
+    validate_sql,
+)
 
 TABLES = frozenset({"accounts", "contacts", "facilities", "utilization", "xref"})
 CAP = 200
@@ -312,6 +319,32 @@ def test_table_functions_are_refused(sql: str, function: str) -> None:
     assert function in error.message.lower()
 
 
+@pytest.mark.parametrize(
+    ("sql", "function"),
+    [
+        # The reviewer's exact runaway: a 3-billion-element list unnested inside a subquery.
+        ("SELECT sum(x) FROM (SELECT unnest(range(0, 3000000000)) AS x)", "unnest|range"),
+        ("SELECT unnest([1, 2, 3])", "unnest"),
+        ("SELECT range(5)", "range"),
+        ("SELECT generate_series(1, 10)", "generate_series"),
+        ("SELECT [x * 2 FOR x IN range(5)]", "range"),
+        ("SELECT len(list_resize([1], 3000000000))", "list_resize"),
+        ("SELECT len(array_resize([1], 3000000000))", "array_resize"),
+        ("SELECT length(repeat('a', 3000000000))", "repeat"),
+        ("SELECT * FROM accounts WHERE length(name) > length(repeat('x', 3))", "repeat"),
+    ],
+)
+def test_a_generator_of_rows_or_memory_is_refused_anywhere_in_the_statement(
+    sql: str, function: str
+) -> None:
+    started = time.perf_counter()
+    error = refused(sql)
+
+    assert error.error_kind == "forbidden_function"
+    assert any(name in error.message for name in function.split("|"))
+    assert time.perf_counter() - started < 1  # refused at validation, never handed to DuckDB
+
+
 def test_ordinary_functions_are_not_in_the_way() -> None:
     # A denylist that caught everyday SQL would be a denial of service on the model.
     for sql in [
@@ -319,8 +352,6 @@ def test_ordinary_functions_are_not_in_the_way() -> None:
         "SELECT strftime(customer_since, '%Y') FROM accounts",
         "SELECT regexp_matches(name, 'Inc') FROM accounts",
         "SELECT list_aggregate([1, 2, 3], 'sum')",
-        "SELECT unnest([1, 2, 3])",
-        "SELECT range(5)",
         "SELECT arg_max(name, annual_revenue) FROM accounts",
         "SELECT json_extract_string('{\"a\": 1}', '$.a')",
         "SELECT uen FROM accounts QUALIFY row_number() OVER (ORDER BY name) = 1",
@@ -454,9 +485,122 @@ def test_a_parenthesised_select_is_unwrapped() -> None:
     assert limit_of(accepted("(SELECT uen FROM accounts)")) == CAP + 1
 
 
+@pytest.mark.parametrize(
+    ("sql", "word"),
+    [
+        ("PIVOT accounts ON country USING count(*)", "PIVOT"),
+        ("SELECT * FROM accounts PIVOT (count(*) FOR country IN ('USA', 'Canada'))", "PIVOT"),
+        ("SELECT * FROM accounts UNPIVOT (v FOR k IN (country, segment))", "UNPIVOT"),
+        (
+            "WITH p AS (PIVOT (SELECT 'x' AS c FROM accounts) ON c USING count(*)) SELECT * FROM p",
+            "PIVOT",
+        ),
+        ("SELECT * FROM accounts, LATERAL (PIVOT accounts ON country USING count(*))", "PIVOT"),
+        ("WITH u AS (UNPIVOT accounts ON country INTO NAME k VALUE v) SELECT * FROM u", "UNPIVOT"),
+        ("SELECT * FROM (PIVOT accounts ON country USING count(*)) q", "PIVOT"),
+    ],
+)
+def test_pivot_and_unpivot_are_refused_in_every_form(sql: str, word: str) -> None:
+    error = refused(sql)
+
+    assert error.error_kind == "not_a_select"
+    assert word in error.message
+    assert "not supported" in error.message
+    assert "CASE" in error.message  # and says what to do instead
+
+
+def test_a_self_join_of_hundreds_of_sources_is_refused_before_duckdb_sees_it() -> None:
+    # The reviewer's second runaway: 400 sources in one SELECT, well under the length cap.
+    sql = "SELECT count(*) FROM accounts a1 " + " ".join(
+        f"JOIN accounts a{i} ON a{i}.uen = a1.uen" for i in range(2, 401)
+    )
+    assert len(sql) < MAX_SQL_CHARS
+    started = time.perf_counter()
+
+    error = refused(sql)
+
+    assert error.error_kind == "parse_error"
+    assert "400 sources" in error.message
+    assert time.perf_counter() - started < 1
+
+
+def test_the_join_cap_counts_comma_joins_and_applies_per_select() -> None:
+    at_cap = "SELECT 1 FROM " + ", ".join(f"accounts a{i}" for i in range(MAX_JOIN_SOURCES))
+    over = "SELECT 1 FROM " + ", ".join(f"accounts a{i}" for i in range(MAX_JOIN_SOURCES + 1))
+    nested = (
+        "SELECT 1 FROM accounts a1 JOIN contacts c ON c.uen = a1.uen "
+        "WHERE a1.uen IN (SELECT uen FROM " + ", ".join(f"xref x{i}" for i in range(17)) + ")"
+    )
+
+    assert limit_of(accepted(at_cap)) == CAP + 1
+    assert refused(over).error_kind == "parse_error"
+    assert refused(nested).error_kind == "parse_error"  # the subquery's own SELECT is over
+
+
+def doubling_chain(levels: int) -> str:
+    """A chain of CTEs, each reading the one before it twice: a plan that doubles per level."""
+    ctes = ["c0 AS (SELECT 1 AS x)"] + [
+        f"c{i} AS (SELECT a.x FROM c{i - 1} a, c{i - 1} b)" for i in range(1, levels + 1)
+    ]
+    return "WITH " + ", ".join(ctes) + f" SELECT count(*) FROM c{levels}"
+
+
+def test_a_doubling_cte_chain_is_refused_by_the_structural_cap() -> None:
+    # The reviewer's first runaway: 26 levels, each reading the previous one twice (52 references,
+    # and one more from the final SELECT).
+    started = time.perf_counter()
+
+    error = refused(doubling_chain(26))
+
+    assert error.error_kind == "parse_error"
+    assert "53 times" in error.message
+    assert str(MAX_CTE_AND_SUBQUERY_REFERENCES) in error.message
+    assert time.perf_counter() - started < 1
+
+
+def test_an_ordinary_cte_heavy_query_is_under_the_cap() -> None:
+    # 8 levels read twice each is 16 references: ordinary analytic SQL, nowhere near the cap.
+    assert limit_of(accepted(doubling_chain(8))) == CAP + 1
+    subqueries = (
+        "SELECT * FROM accounts WHERE uen IN (SELECT uen FROM contacts) "
+        "AND uen IN (SELECT uen FROM facilities) AND EXISTS (SELECT 1 FROM xref)"
+    )
+    assert limit_of(accepted(subqueries)) == CAP + 1
+
+
+def test_subqueries_count_toward_the_same_cap() -> None:
+    sql = "SELECT * FROM accounts WHERE " + " AND ".join(
+        f"uen IN (SELECT uen FROM contacts WHERE title = 't{i}')"
+        for i in range(MAX_CTE_AND_SUBQUERY_REFERENCES + 1)
+    )
+
+    assert refused(sql).error_kind == "parse_error"
+
+
+@pytest.mark.parametrize(
+    ("sql", "word"),
+    [
+        ("CHECKPOINT", "CHECKPOINT"),
+        ("TABLE accounts", "TABLE"),
+        ("ANALYZE", "ANALYZE"),
+        ("-- note\nCHECKPOINT", "CHECKPOINT"),
+        ("EXPLAIN SELECT 1", "EXPLAIN"),
+        ("VACUUM", "VACUUM"),
+    ],
+)
+def test_a_refused_statement_is_named_for_what_it_is(sql: str, word: str) -> None:
+    error = refused(sql)
+
+    assert error.error_kind == "not_a_select"
+    assert error.message.startswith(f"{word} is not allowed")
+    for odd in ("Column", "Alias", "Analyze statement", " a "):
+        assert odd not in error.message.split(" is not allowed")[0]
+
+
 def test_validation_writes_nothing_to_the_log(caplog: pytest.LogCaptureFixture) -> None:
-    # sqlglot warns when it falls back to a raw command or drops a clause, and the warning quotes
-    # the statement. This server's logs never carry SQL, so validation must not provoke it.
+    # sqlglot warns when it falls back to a raw command, cannot traverse a scope or drops a clause,
+    # and the warning quotes the statement. This server's logs never carry SQL, so validation must
+    # not let any of them through, whatever the statement provokes.
     caplog.set_level(logging.DEBUG)
     marker = "zqloggingmarker4417"
 
@@ -465,12 +609,57 @@ def test_validation_writes_nothing_to_the_log(caplog: pytest.LogCaptureFixture) 
         f"EXECUTE {marker}",
         f"SELECT '{marker}' FROM accounts FOR UPDATE",
         f"SELECT * FROM {marker}",
+        # The reviewer's leak inputs: sqlglot's scope traversal logs "Cannot traverse scope ...".
+        f"WITH p AS (PIVOT (SELECT '{marker}' AS c FROM accounts) ON c USING count(*)) "
+        "SELECT * FROM p",
+        f"SELECT * FROM accounts, LATERAL (PIVOT (SELECT '{marker}' AS c FROM accounts) "
+        "ON c USING count(*))",
+        f"WITH u AS (UNPIVOT (SELECT '{marker}' AS c, 1 AS n FROM accounts) ON c, n) "
+        "SELECT * FROM u",
+        f"SELECT '{marker}' AS c FROM accounts PIVOT (count(*) FOR c IN ('a'))",
     ]:
         with contextlib.suppress(SqlRefused):
             accepted(sql)
 
     assert marker not in caplog.text
     assert caplog.records == []
+
+
+def test_sqlglots_scope_warning_is_silenced_without_leaning_on_the_pivot_refusal(
+    caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The PIVOT refusal comes before scope analysis, so the reviewer's inputs no longer reach the
+    # step that warned. Take that refusal away and the warning is provoked; the filter must hold.
+    monkeypatch.setattr("rmqna_data.validate._refuse_nested_statements", lambda _root: None)
+    caplog.set_level(logging.DEBUG)
+    marker = "zqscopemarker2208"
+    sql = f"WITH p AS (PIVOT (SELECT '{marker}' AS c FROM accounts) ON c USING count(*)) SELECT * FROM p"
+
+    with contextlib.suppress(SqlRefused):
+        accepted(sql)
+
+    assert marker not in caplog.text
+    assert caplog.records == []
+
+    # Without the filter the same input does log the statement (proof the test can fail).
+    monkeypatch.setattr("rmqna_data.validate._sqlglot_silenced", contextlib.nullcontext)
+    with contextlib.suppress(SqlRefused):
+        accepted(sql)
+    assert marker in caplog.text
+
+
+def test_the_silence_is_scoped_to_validation() -> None:
+    # Outside validate_sql sqlglot logs as it always did; the filter is gone when the call ends.
+    accepted("SELECT 1")
+
+    assert logging.getLogger("sqlglot").filters == []
+
+
+def test_the_silence_is_lifted_even_when_the_statement_is_refused() -> None:
+    with pytest.raises(SqlRefused):
+        validate_sql("DROP TABLE accounts", TABLES, CAP)
+
+    assert logging.getLogger("sqlglot").filters == []
 
 
 def test_the_rewrite_is_idempotent() -> None:

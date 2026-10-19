@@ -8,9 +8,11 @@ lock it puts on the engine after loading, and the results it hands back.
 from __future__ import annotations
 
 import asyncio
+import json
 import math
 import re
 import shutil
+import threading
 import time
 from collections.abc import Iterator
 from datetime import date, datetime
@@ -21,6 +23,7 @@ import duckdb
 import pytest
 from ai_agent_lib_core.contracts import ConfigurationError
 
+from rmqna_data import engine as engine_module
 from rmqna_data.engine import ExecuteResult, RmqnaEngine, ValuesResult
 from rmqna_data.settings import DATA_DIR, SCHEMA_PATH
 from rmqna_data.validate import SqlRefused
@@ -279,49 +282,113 @@ async def test_quotes_and_backslashes_in_a_string_cannot_break_out(engine: Rmqna
     assert scalar(await engine.execute("SELECT count(*) FROM accounts")) > 0
 
 
-async def test_a_timeout_interrupts_the_query(tmp_path: Path) -> None:
+# A 4-way cross join with a predicate DuckDB cannot turn into a hash join: about 10^17 row pairs,
+# so it never finishes, but its executor checks for an interrupt every few thousand rows.
+TORTURE = (
+    "SELECT count(*) FROM transactions a, transactions b, transactions c, transactions d "
+    "WHERE (a.amount * b.amount + c.amount) % 7 = d.amount % 5"
+)
+
+
+async def settled(engine: RmqnaEngine, within: float) -> bool:
+    """Wait until no worker thread is executing a statement; say whether that happened in time."""
+    deadline = time.perf_counter() + within
+    while engine.running and time.perf_counter() < deadline:
+        await asyncio.sleep(0.02)
+    return engine.running == 0
+
+
+@pytest.fixture
+def transactions_only(tmp_path: Path) -> Path:
     shutil.copy(DATA_DIR / "transactions.csv", tmp_path / "transactions.csv")
-    quick = RmqnaEngine(tmp_path, timeout_seconds=0.5)
+    return tmp_path
+
+
+async def test_a_timeout_interrupts_the_query(transactions_only: Path) -> None:
+    quick = RmqnaEngine(transactions_only, timeout_seconds=0.5)
     try:
         started = time.perf_counter()
-        error = await refusal(
-            quick,
-            "SELECT count(*) FROM transactions a, transactions b, transactions c, "
-            "transactions d WHERE (a.amount * b.amount + c.amount) % 7 = d.amount % 5",
-        )
+        error = await refusal(quick, TORTURE)
         elapsed = time.perf_counter() - started
 
         assert error.error_kind == "timeout"
         assert "0.5 seconds" in error.message
-        assert elapsed < 5  # interrupted, not left to run to the end of a 10^17-row join
+        assert elapsed < 5  # the caller was answered, not left to wait for the join
 
-        # The interrupted query left the engine usable.
+        # The point of the interrupt: the worker thread has really finished, soon after the
+        # caller was told. (Without the interrupt it would still be joining 10^17 row pairs.)
+        assert await settled(quick, within=3)
+        assert quick.running == 0
+
+        # And the interrupted query left the engine usable.
         result = await quick.execute("SELECT count(*) AS n FROM transactions")
         assert scalar(result) > 0
     finally:
         quick.close()
 
 
-async def test_a_cancelled_call_interrupts_the_query(tmp_path: Path) -> None:
-    shutil.copy(DATA_DIR / "transactions.csv", tmp_path / "transactions.csv")
-    patient = RmqnaEngine(tmp_path, timeout_seconds=60)
+async def test_a_cancelled_call_interrupts_the_query(transactions_only: Path) -> None:
+    patient = RmqnaEngine(transactions_only, timeout_seconds=60)
     try:
-        task = asyncio.create_task(
-            patient.execute(
-                "SELECT count(*) FROM transactions a, transactions b, transactions c, "
-                "transactions d WHERE (a.amount * b.amount + c.amount) % 7 = d.amount % 5"
-            )
-        )
+        task = asyncio.create_task(patient.execute(TORTURE))
         await asyncio.sleep(0.3)
+        assert patient.running == 1  # it is really executing
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
-        # If the query were still running, this would wait behind it.
-        started = time.perf_counter()
-        await patient.execute("SELECT 1")
-        assert time.perf_counter() - started < 5
+
+        assert await settled(patient, within=3)
+        assert (await patient.execute("SELECT 1")).rows == [[1]]
     finally:
         patient.close()
+
+
+async def test_the_interrupt_tests_can_fail_when_nothing_is_interrupted(
+    transactions_only: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A test that passes whatever the code does proves nothing. Take the interrupt away and the
+    # worker keeps going after the caller was answered: the same check the two tests above make
+    # (settled) now says no. The cursors are kept so that the test can stop the worker itself.
+    cursors: list[duckdb.DuckDBPyConnection] = []
+    monkeypatch.setattr("rmqna_data.engine._interrupt", cursors.append)
+    quick = RmqnaEngine(transactions_only, timeout_seconds=0.3)
+    try:
+        error = await refusal(quick, TORTURE)
+        assert error.error_kind == "timeout"
+
+        assert not await settled(quick, within=1.0)
+        assert quick.running == 1
+    finally:
+        for cursor in cursors:
+            cursor.interrupt()
+        assert await settled(quick, within=3)
+        quick.close()
+
+
+async def test_the_runaways_the_timeout_cannot_stop_never_reach_duckdb(
+    engine: RmqnaEngine,
+) -> None:
+    # Each of these ran for 20 seconds or more and took 5 to 12 GB after the timeout had fired:
+    # DuckDB's binder, optimizer and one huge scalar do not honour an interrupt. They are refused
+    # before DuckDB is asked, so no worker thread is ever started for them.
+    chain = ", ".join(f"c{i} AS (SELECT a.x FROM c{i - 1} a, c{i - 1} b)" for i in range(1, 27))
+    runaways = [
+        ("forbidden_function", "SELECT sum(x) FROM (SELECT unnest(range(0, 3000000000)) AS x)"),
+        (
+            "parse_error",
+            "SELECT count(*) FROM accounts a1 "
+            + " ".join(f"JOIN accounts a{i} ON a{i}.uen = a1.uen" for i in range(2, 401)),
+        ),
+        ("parse_error", f"WITH c0 AS (SELECT 1 AS x), {chain} SELECT count(*) FROM c26"),
+    ]
+
+    started = time.perf_counter()
+    for kind, sql in runaways:
+        error = await refusal(engine, sql)
+        assert error.error_kind == kind
+        assert engine.running == 0
+
+    assert time.perf_counter() - started < 1
 
 
 async def test_calls_overlap_each_on_its_own_cursor(engine: RmqnaEngine) -> None:
@@ -384,6 +451,125 @@ async def test_results_are_json_safe(engine: RmqnaEngine) -> None:
     import json
 
     json.dumps(result.to_payload(), allow_nan=False)  # a strict JSON consumer can read it
+
+
+async def test_a_timestamp_with_a_time_zone_is_returned_not_an_import_error(
+    engine: RmqnaEngine,
+) -> None:
+    # DuckDB needs pytz to hand a TIMESTAMPTZ to Python; without it SELECT now() failed.
+    result = await engine.execute(
+        "SELECT now() AS n, current_timestamp AS c, TIMESTAMPTZ '2026-06-30 12:00:00+00' AS fixed"
+    )
+
+    row = dict(zip(result.columns, result.rows[0], strict=True))
+    assert row["fixed"] == "2026-06-30T12:00:00+00:00"  # UTC, whatever the machine's zone is
+    assert isinstance(row["n"], str)
+    assert row["n"].endswith("+00:00")
+    assert isinstance(row["c"], str)
+    json.dumps(result.to_payload(), allow_nan=False)
+
+
+async def test_a_result_that_is_one_huge_row_is_refused_by_size_not_returned(
+    engine: RmqnaEngine,
+) -> None:
+    # One row, 30,771 rows' worth: the row cap cannot see it, the byte ceiling can.
+    started = time.perf_counter()
+    error = await refusal(engine, "SELECT list(t) FROM transactions t")
+    elapsed = time.perf_counter() - started
+
+    assert error.error_kind == "execution_error"
+    assert "larger than 2 MB" in error.message
+    assert "Narrow the selection" in error.message
+    assert elapsed < 10
+    assert await settled(engine, within=3)
+
+
+async def test_the_byte_ceiling_is_the_engines_to_set(tmp_path: Path) -> None:
+    shutil.copy(DATA_DIR / "accounts.csv", tmp_path / "accounts.csv")
+    tight = RmqnaEngine(tmp_path, max_result_bytes=2_000)
+    try:
+        assert (await tight.execute("SELECT uen FROM accounts LIMIT 5")).row_count == 5
+        error = await refusal(tight, "SELECT * FROM accounts")
+        assert error.error_kind == "execution_error"
+        assert "larger than 0.00190735 MB" in error.message
+    finally:
+        tight.close()
+
+
+async def test_an_ordinary_wide_result_is_far_under_the_byte_ceiling(engine: RmqnaEngine) -> None:
+    for table in sorted(engine.tables):
+        result = await engine.execute(f"SELECT * FROM {table}")
+        assert result.row_count > 0, table
+        assert len(json.dumps(result.to_payload(), default=str)) < 2 * 1024 * 1024, table
+
+
+async def test_rows_are_converted_in_the_worker_thread_not_on_the_event_loop(
+    engine: RmqnaEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    threads: set[int] = set()
+    original = engine_module._json_safe
+
+    def recording(value: object, budget: object) -> object:
+        threads.add(threading.get_ident())
+        return original(value, budget)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(engine_module, "_json_safe", recording)
+
+    await engine.execute("SELECT uen, name FROM accounts LIMIT 3")
+
+    assert threads
+    assert threading.get_ident() not in threads
+
+
+async def test_the_session_time_zone_is_utc_so_answers_do_not_depend_on_the_machine(
+    engine: RmqnaEngine,
+) -> None:
+    raw = raw_cursor(engine)
+    try:
+        assert raw.execute("SELECT current_setting('TimeZone')").fetchone() == ("UTC",)
+    finally:
+        raw.close()
+
+
+async def test_the_memory_limit_is_set_and_locked(engine: RmqnaEngine) -> None:
+    raw = raw_cursor(engine)
+    try:
+        assert raw.execute("SELECT current_setting('memory_limit')").fetchone() == ("953.6 MiB",)
+        with pytest.raises(duckdb.Error, match="configuration has been locked"):
+            raw.execute("SET memory_limit = '64GB'")
+    finally:
+        raw.close()
+
+
+async def test_a_statement_that_runs_out_of_memory_comes_back_as_an_error(
+    tmp_path: Path,
+) -> None:
+    # Doubling a string 30 times asks for gigabytes from a scalar; the limit stops it cleanly.
+    shutil.copy(DATA_DIR / "accounts.csv", tmp_path / "accounts.csv")
+    small = RmqnaEngine(tmp_path, memory_limit="256MB")
+    try:
+        chain = ", ".join(f"c{i} AS (SELECT x || x AS x FROM c{i - 1})" for i in range(1, 29))
+        error = await refusal(
+            small, f"WITH c0 AS (SELECT 'abcdefgh' AS x), {chain} SELECT length(x) FROM c28"
+        )
+
+        assert error.error_kind == "execution_error"
+        assert "Out of Memory" in error.message
+        assert await settled(small, within=3)
+        assert (await small.execute("SELECT 1")).rows == [[1]]
+    finally:
+        small.close()
+
+
+def test_a_memory_limit_that_is_not_a_size_is_refused_at_construction(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="memory_limit"):
+        RmqnaEngine(tmp_path, memory_limit="1GB'; DROP TABLE accounts; --")
+
+
+async def test_running_counts_workers_and_returns_to_zero(engine: RmqnaEngine) -> None:
+    assert engine.running == 0
+    await asyncio.gather(*(engine.execute("SELECT count(*) FROM accounts") for _ in range(4)))
+    assert await settled(engine, within=3)
 
 
 async def test_the_columns_keep_the_names_the_query_gave(engine: RmqnaEngine) -> None:
@@ -575,7 +761,6 @@ CORPUS = [
     "SELECT a.uen, b.sector FROM accounts a JOIN benchmarks b "
     "ON a.naics_code // 10 = b.naics_industry ORDER BY a.uen, b.sector",
     # More of the DuckDB a model will write.
-    "SELECT * FROM accounts PIVOT (count(*) FOR country IN ('USA', 'Canada')) ORDER BY ALL",
     "SELECT country, segment, count(*) FROM accounts GROUP BY ROLLUP (country, segment) "
     "ORDER BY ALL",
     "SELECT country, segment, count(*) FROM accounts "

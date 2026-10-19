@@ -36,16 +36,16 @@ A statement that is refused or fails is **not** a tool error. It comes back as
 
 | `error_kind` | When |
 | --- | --- |
-| `not_a_select` | Anything but one SELECT: a write, DDL, PRAGMA, ATTACH, COPY, SET, `SELECT ... INTO` |
+| `not_a_select` | Anything but one SELECT: a write, DDL, PRAGMA, ATTACH, COPY, SET, `SELECT ... INTO`, and PIVOT or UNPIVOT in any form |
 | `multiple_statements` | More than one statement in the input |
 | `set_operation` | `UNION`, `EXCEPT` or `INTERSECT`, anywhere in the statement |
 | `unknown_table` | A table that is not loaded (also a schema prefix, or an unknown column in `search_column_values`) |
-| `forbidden_function` | A file, environment or catalog function, or any function in FROM |
-| `parse_error` | Text sqlglot cannot read as SQL, or a LIMIT that is not a plain row count |
-| `execution_error` | DuckDB failed on the statement; the message is DuckDB's own text |
+| `forbidden_function` | A file, environment or catalog function, any function in FROM, or a row or memory generator anywhere (`range`, `generate_series`, `unnest`, `repeat`, `list_resize`) |
+| `parse_error` | Text sqlglot cannot read as SQL, a LIMIT that is not a plain row count, or a statement too tangled to plan (over 16 joined sources in a SELECT, or over 32 CTE and subquery references) |
+| `execution_error` | DuckDB failed on the statement (the message is DuckDB's own text), or the result is over 2 MB once serialized |
 | `timeout` | The statement ran longer than 30 seconds and was interrupted |
 
-A result is cut at 200 rows (`truncated: true`). Tables are named bare: `FROM accounts`.
+A result is cut at 200 rows (`truncated: true`) and refused over 2 MB. Tables are named bare: `FROM accounts`. A statement that times out is interrupted, but DuckDB's planner and a single huge value cannot be interrupted, so one can keep running briefly after the caller is told; `docs/sql-governance.md` says what that means.
 
 ## Test it
 

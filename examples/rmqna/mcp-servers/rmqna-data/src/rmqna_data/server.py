@@ -10,18 +10,18 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Annotated, Any
+from typing import Annotated, Any, Protocol
 
 from ai_agent_lib_core import ServiceContainer
 from ai_agent_lib_core.contracts import ConfigurationError
 from mcp.server.mcpserver import MCPServer
 from pydantic import Field
 
-from rmqna_data.engine import RmqnaEngine
+from rmqna_data.engine import ExecuteResult, RmqnaEngine, ValuesResult
 from rmqna_data.settings import DATA_DIR, SCHEMA_PATH
 from rmqna_data.validate import SqlRefused
 
-__all__ = ["APPLICATION", "SERVER_ID", "build_server"]
+__all__ = ["APPLICATION", "SERVER_ID", "SqlEngine", "add_tools", "build_server"]
 
 APPLICATION = "rmqna-data"
 """The server's application name: its token audience, and its name in policy and audit."""
@@ -39,6 +39,22 @@ INSTRUCTIONS = (
 )
 
 _LOG = logging.getLogger(__name__)
+
+
+class SqlEngine(Protocol):
+    """The only engine the tools need: SQL or a lookup in, a result or a ``SqlRefused`` out.
+
+    The tools depend on this, not on DuckDB; ``build_server`` is the one place that builds the real
+    engine (rmprep's layering, where its evidence service sees only a ``QuerySource``).
+    """
+
+    async def execute(self, sql: str) -> ExecuteResult:
+        """Validate and run one SELECT."""
+        ...
+
+    async def values(self, table: str, column: str, search: str) -> ValuesResult:
+        """Find the stored values of a column that contain some text."""
+        ...
 
 
 def build_server(services: ServiceContainer) -> MCPServer[Any]:
@@ -59,6 +75,12 @@ def build_server(services: ServiceContainer) -> MCPServer[Any]:
         # identity provider, the token check at the door.
         **services.mcp_server_kwargs(SERVER_ID, application=APPLICATION),
     )
+    add_tools(server, engine, schema)
+    return server
+
+
+def add_tools(server: MCPServer[Any], engine: SqlEngine, schema: str) -> None:
+    """Register the three tools on ``server``, over any engine that speaks the protocol."""
 
     @server.tool(name="rmqna-data.execute_sql")
     async def execute_sql(
@@ -68,10 +90,11 @@ def build_server(services: ServiceContainer) -> MCPServer[Any]:
 
         Write a single SELECT; it may begin with WITH. Name tables bare, as the schema document
         lists them (FROM accounts, never FROM crm.accounts). Set operations (UNION, EXCEPT,
-        INTERSECT), table and file functions, and any statement that changes something are
-        refused. At most 200 rows come back: truncated=true means the result was cut, so filter
-        or aggregate instead of listing everything. A refused or failing statement returns
-        {error_kind, message}; the message says what to change, so repair the SQL and try again.
+        INTERSECT), PIVOT, row generators (range, generate_series, unnest, repeat), table and file
+        functions, and any statement that changes something are refused. At most 200 rows and 2 MB
+        come back: truncated=true means the rows were cut, so filter or aggregate instead of
+        listing everything. A refused or failing statement returns {error_kind, message}; the
+        message says what to change, so repair the SQL and try again.
         """
         started = time.perf_counter()
         try:
@@ -122,8 +145,6 @@ def build_server(services: ServiceContainer) -> MCPServer[Any]:
         started = time.perf_counter()
         _log_call("get_schema", started)
         return {"schema": schema}
-
-    return server
 
 
 def _read_schema() -> str:

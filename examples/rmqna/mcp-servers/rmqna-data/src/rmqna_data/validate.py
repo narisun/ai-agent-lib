@@ -15,21 +15,31 @@ do instead (the agent's repair loop reads these):
    resolved by scope, so it is not an unknown table where it is visible and is one where it is not.
    A qualified name (``main.accounts``, ``information_schema.tables``), a quoted file name and a
    table that does not exist are ``unknown_table``.
-4. No function that reads a file, the environment or the system catalog, and no function in a
-   ``FROM`` position at all (``read_csv``, ``glob``, ``range``, ``unnest``...): ``forbidden_function``.
-5. The row limit is set at the syntax tree to ``row_cap + 1``, or lowered to it, so that a result
+4. No function that reads a file, the environment or the system catalog, no function in a
+   ``FROM`` position at all (``read_csv``, ``glob``...), and no row or memory generator anywhere
+   (``range``, ``generate_series``, ``unnest``, ``repeat``, ``list_resize``): ``forbidden_function``.
+5. No PIVOT or UNPIVOT in any form: ``not_a_select``. DuckDB expands a statement-form PIVOT into
+   more than one statement, one of which creates a type.
+6. Structural caps on the shape of the statement (:data:`MAX_JOIN_SOURCES` and
+   :data:`MAX_CTE_AND_SUBQUERY_REFERENCES`), answered as ``parse_error``: a statement that is too
+   tangled to plan is refused before DuckDB's binder and optimizer, which a timeout cannot interrupt.
+7. The row limit is set at the syntax tree to ``row_cap + 1``, or lowered to it, so that a result
    one row longer than the cap tells the engine the output was cut. A smaller limit and the
    ``OFFSET`` are kept.
 
-The engine adds two further layers, which do not depend on this module being right: DuckDB is told
-to touch no file or network once the tables are loaded, and every call has a row cap and a timeout.
+The engine adds further layers, which do not depend on this module being right: DuckDB is told to
+touch no file or network once the tables are loaded, has a memory limit, and every call has a row
+cap, a byte ceiling and a timeout. None of them makes a pathological statement impossible; see the
+decision record (``docs/sql-governance.md``).
 """
 
 from __future__ import annotations
 
 import difflib
 import logging
-from collections.abc import Collection
+import re
+from collections.abc import Collection, Iterator
+from contextlib import contextmanager
 from typing import Final, Literal
 
 import sqlglot
@@ -37,7 +47,15 @@ from sqlglot import exp
 from sqlglot.errors import ErrorLevel, ParseError, SqlglotError
 from sqlglot.optimizer.scope import Scope, ScopeType, traverse_scope
 
-__all__ = ["MAX_SQL_CHARS", "ErrorKind", "SqlRefused", "close_matches", "validate_sql"]
+__all__ = [
+    "MAX_CTE_AND_SUBQUERY_REFERENCES",
+    "MAX_JOIN_SOURCES",
+    "MAX_SQL_CHARS",
+    "ErrorKind",
+    "SqlRefused",
+    "close_matches",
+    "validate_sql",
+]
 
 ErrorKind = Literal[
     "not_a_select",
@@ -53,6 +71,16 @@ ErrorKind = Literal[
 
 MAX_SQL_CHARS: Final = 20_000
 """The longest statement accepted. Analytic SQL is a few hundred characters; this is a backstop."""
+
+MAX_JOIN_SOURCES: Final = 16
+"""The most sources (tables and subqueries) one SELECT may join. Analytic SQL joins a handful."""
+
+MAX_CTE_AND_SUBQUERY_REFERENCES: Final = 32
+"""The most references to a CTE, plus subqueries, in one statement.
+
+A CTE referenced twice by each of a chain of CTEs makes a plan that grows as a power of two, and
+DuckDB's binder and optimizer, unlike its executor, do not stop when interrupted.
+"""
 
 _DIALECT: Final = "duckdb"
 
@@ -78,13 +106,16 @@ _STATEMENT_NAMES: Final[dict[type[exp.Expr], str]] = {
     exp.Summarize: "SUMMARIZE",
     exp.Values: "VALUES",
     exp.Pivot: "PIVOT",
+    exp.Analyze: "ANALYZE",
     exp.Transaction: "BEGIN",
     exp.Commit: "COMMIT",
     exp.Rollback: "ROLLBACK",
 }
-# The same kinds, looked for inside a statement that starts as a SELECT.
+# The same kinds, looked for inside a statement that starts as a SELECT. A PIVOT is one of them in
+# every form: the operator form (FROM t PIVOT (...)) is refused with the statement form, because
+# DuckDB expands a dynamic pivot into a CREATE TYPE and a SELECT.
 _NESTED_STATEMENTS: Final[tuple[type[exp.Expr], ...]] = (
-    *(kind for kind in _STATEMENT_NAMES if kind not in {exp.Values, exp.Pivot}),
+    *(kind for kind in _STATEMENT_NAMES if kind is not exp.Values),
     exp.Command,
 )
 
@@ -113,21 +144,44 @@ _FORBIDDEN_FUNCTIONS: Final = frozenset(
 _FORBIDDEN_PREFIXES: Final = ("read_", "duckdb_", "pragma_", "parquet_")
 _FORBIDDEN_SUFFIXES: Final = ("_scan",)
 
-_COMMAND_FALLBACK: Final = "Falling back to parsing as a 'Command'"
+# Functions that make rows or memory out of a number. There is no use for one over this data, and
+# the engine's memory limit does not stop them (measured: repeat('a', 3e9) and unnest(range(0, 3e9))
+# both grow past 5 GB under a 1 GB limit). A table function that makes rows is also refused in FROM.
+_GENERATORS: Final = frozenset(
+    {
+        "range",
+        "generate_series",
+        "generate_subscripts",
+        "unnest",
+        "repeat",
+        "list_resize",
+        "array_resize",
+    }
+)
 
 
-class _QuietCommandFallback(logging.Filter):
-    """Drop sqlglot's warning that quotes a statement it could not parse.
-
-    The warning repeats the statement's text, and this server's logs never carry SQL. The
-    statement is refused either way; the refusal goes to the caller, not to the log.
-    """
+class _DropAll(logging.Filter):
+    """Drop every record of the logger it is attached to."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        return _COMMAND_FALLBACK not in record.getMessage()
+        return False
 
 
-logging.getLogger("sqlglot").addFilter(_QuietCommandFallback())
+@contextmanager
+def _sqlglot_silenced() -> Iterator[None]:
+    """Keep sqlglot's own log records out of the log while a statement is read.
+
+    sqlglot warns about a statement it cannot place (falling back to a raw command, a scope it
+    cannot traverse) and the warning quotes the statement. This server's logs never carry SQL, and
+    a refusal goes to the caller, not the log. The filter lives only for the one synchronous call.
+    """
+    quiet = _DropAll()
+    logger = logging.getLogger("sqlglot")
+    logger.addFilter(quiet)
+    try:
+        yield
+    finally:
+        logger.removeFilter(quiet)
 
 
 class SqlRefused(Exception):
@@ -166,18 +220,22 @@ def validate_sql(sql: str, tables: Collection[str], row_cap: int) -> str:
     Raises:
         SqlRefused: With the ``error_kind`` and message of the first rule the statement breaks.
     """
-    root = _single_select(sql)
-    _refuse_set_operations(root)
-    _refuse_nested_statements(root)
-    _refuse_functions(root)
-    _refuse_unknown_tables(root, tables)
-    _cap_rows(root, row_cap)
-    try:
-        # Comments are dropped so that nothing the model wrote in one can reach the engine, and an
-        # unsupported clause is dropped quietly: sqlglot's warning for it is a log line.
-        return root.sql(dialect=_DIALECT, comments=False, unsupported_level=ErrorLevel.IGNORE)
-    except RecursionError:
-        raise _too_deep() from None
+    with _sqlglot_silenced():
+        root = _single_select(sql)
+        _refuse_set_operations(root)
+        _refuse_nested_statements(root)
+        _refuse_functions(root)
+        _refuse_too_many_joins(root)
+        references = _cte_references(root)
+        _refuse_too_tangled(root, references)
+        _refuse_unknown_tables(root, tables, references)
+        _cap_rows(root, row_cap)
+        try:
+            # Comments are dropped so that nothing the model wrote in one can reach the engine, and
+            # an unsupported clause is dropped quietly rather than warned about.
+            return root.sql(dialect=_DIALECT, comments=False, unsupported_level=ErrorLevel.IGNORE)
+        except RecursionError:
+            raise _too_deep() from None
 
 
 def _single_select(sql: str) -> exp.Select:
@@ -224,22 +282,37 @@ def _single_select(sql: str) -> exp.Select:
     if isinstance(root, exp.SetOperation):
         raise _set_operation(root)
     if not isinstance(root, exp.Select):
-        raise _not_a_select(_statement_name(root))
+        raise _not_a_select(_statement_name(root, sql))
     if root.args.get("into") is not None:
         raise _not_a_select("SELECT ... INTO")
     return root
 
 
-def _statement_name(statement: exp.Expr) -> str:
+_FIRST_WORD: Final = re.compile(r"\s*(?:(?:--[^\n]*\n|/\*.*?\*/)\s*)*([A-Za-z]+)", re.S)
+
+
+def _statement_name(statement: exp.Expr, sql: str = "") -> str:
+    """Name a statement for a message: its kind if known, otherwise the word it starts with."""
+    if isinstance(statement, exp.Pivot):
+        return "UNPIVOT" if statement.args.get("unpivot") else "PIVOT"
     for kind, name in _STATEMENT_NAMES.items():
         if isinstance(statement, kind):
             return name
     if isinstance(statement, exp.Command):
         return str(statement.this).upper()
-    return f"a {type(statement).__name__} statement"
+    # sqlglot reads some statements it has no node for as an expression (CHECKPOINT as a column,
+    # TABLE accounts as an alias); what the model wrote first names it better than the node does.
+    first = _FIRST_WORD.match(sql)
+    return first.group(1).upper() if first else "This statement"
 
 
 def _not_a_select(name: str) -> SqlRefused:
+    if name in {"PIVOT", "UNPIVOT"}:
+        return SqlRefused(
+            "not_a_select",
+            f"{name} is not supported in any form. Reshape rows into columns with conditional "
+            "aggregation (SUM(CASE WHEN ... THEN ... END)) and columns into rows with a join.",
+        )
     return SqlRefused(
         "not_a_select",
         f"{name} is not allowed: this tool runs one read-only SELECT statement "
@@ -297,13 +370,20 @@ def _refuse_functions(root: exp.Select) -> None:
             raise _table_function(_table_function_name(source))
         if not isinstance(source, exp.Identifier):
             raise SqlRefused("unknown_table", "A table must be named by a plain name.")
-    if root.find(exp.Unnest) is not None:
-        raise _table_function("unnest")
     for lateral in root.find_all(exp.Lateral):
         if isinstance(lateral.this, exp.Func):
             raise _table_function(_table_function_name(lateral.this))
     for function in root.find_all(exp.Func):
         name = _function_name(function)
+        if isinstance(function, exp.Unnest | exp.Explode):
+            name = "unnest"
+        if name in _GENERATORS or isinstance(function, exp.GenerateSeries):
+            raise SqlRefused(
+                "forbidden_function",
+                f"The function {_generator_name(function, name)}() is not available: it makes "
+                "rows or memory out of a number, and nothing over these tables needs it. "
+                "Aggregate or join the loaded tables instead.",
+            )
         if _forbidden(name):
             raise SqlRefused(
                 "forbidden_function",
@@ -312,17 +392,43 @@ def _refuse_functions(root: exp.Select) -> None:
             )
 
 
+def _generator_name(function: exp.Func, name: str) -> str:
+    # sqlglot reads range() and generate_series() as one node, so name both.
+    return "range/generate_series" if isinstance(function, exp.GenerateSeries) else name
+
+
 def _table_function(name: str) -> SqlRefused:
     return SqlRefused(
         "forbidden_function",
         f"The table function {name}() is not available in FROM: a table here is one of the "
-        "loaded tables, named by its bare name. (A function may appear in the select list.)",
+        "loaded tables, named by its bare name.",
     )
 
 
-def _refuse_unknown_tables(root: exp.Select, tables: Collection[str]) -> None:
+def _refuse_too_many_joins(root: exp.Select) -> None:
+    for select in root.find_all(exp.Select):
+        sources = 1 + len(select.args.get("joins") or [])
+        if sources > MAX_JOIN_SOURCES:
+            raise SqlRefused(
+                "parse_error",
+                f"This SELECT joins {sources} sources; the limit is {MAX_JOIN_SOURCES}. "
+                "Join only the tables the question needs, or compute part of it in a CTE.",
+            )
+
+
+def _refuse_too_tangled(root: exp.Select, cte_references: set[int]) -> None:
+    count = len(cte_references) + sum(1 for _ in root.find_all(exp.Subquery))
+    if count > MAX_CTE_AND_SUBQUERY_REFERENCES:
+        raise SqlRefused(
+            "parse_error",
+            f"This statement refers to CTEs and subqueries {count} times; the limit is "
+            f"{MAX_CTE_AND_SUBQUERY_REFERENCES}. Reference each CTE once where you can, or split "
+            "the question into separate queries.",
+        )
+
+
+def _refuse_unknown_tables(root: exp.Select, tables: Collection[str], ctes: set[int]) -> None:
     known = {name.lower() for name in tables}
-    ctes = _cte_references(root)
     for table in root.find_all(exp.Table):
         if id(table) in ctes:
             continue
