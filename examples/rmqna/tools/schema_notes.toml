@@ -1,0 +1,186 @@
+# The hand-authored half of the schema document.
+#
+# `python -m tools.build_schema` renders agents/rmqna/src/rmqna/prompts/schema_v1.md from
+# data/data_model.csv (columns, keys, edges, descriptions), the CSVs (types, value lists) and
+# this file (everything the column-level dictionary cannot say: what a table is for, how a
+# domain hangs together, what a metric means). Review it here; the rendered document is a
+# generated file and is never edited.
+#
+# The build fails when a content table has no [tables.*] entry (or a [tables.*] entry has no
+# table), so this file cannot fall out of step with the data. rm_scenarios and data_model are
+# not content tables and are not documented.
+#
+# Sources: the dictionary's column prose and the queries that rmprep reviewed
+# (examples/rmprep/mcp-servers/rmprep-data/queries), consulted while writing. Nothing in this
+# file is read at run time other than through the rendered document.
+
+[document]
+intro = "These are all the tables and columns the SQL can read. A name that is not listed here does not exist."
+
+conventions = [
+    "Tables are named by their file: write FROM accounts, never FROM crm.accounts. A domain is only a grouping label.",
+    "uen is the client key, text such as 'ALLO-0001', shared by every client-level table. Look a client up by name in accounts.name first; never guess a uen.",
+    "Types are the types DuckDB gives the loaded data. Where the dictionary names another type it is shown as (dictionary: ...); write each comparison for the type shown, for example cast a BIGINT code before substr().",
+    "Value lists are profiled from the loaded data: 'Values (all)' is the complete set of distinct values, 'Values (e.g.)' is three samples spread across the sorted distinct values, and 'free text' means prose with no list. Where a description's 'Allowed:' prose disagrees with a complete list, the list is what is stored.",
+    "Booleans are true/false (a description that says Yes|No quotes the source system); benchmarks.higher_is_better is 1/0. An empty cell is NULL. Columns ending _pct are on a 0-100 scale, not 0-1.",
+    "Money: facilities, opportunities, relationship, product_profitability and the benchmarks usd rows are USD. balances, working_capital, borrowing_base, transactions and payment_summaries carry a currency column; never add amounts across currencies without converting through fx (USD/CAD is CAD per 1 USD).",
+    "Risk ratings are a word scale in credit_metrics (risk_rating, prior_risk_rating) and facilities (facility_risk_rating), and a number in catalog.max_risk_rating. xref maps one to the other: xref_type = 'risk_rating', xref_name is the word, xref_value the number as text, where 1 is best.",
+    "A client's NAICS code is 6 digits in accounts.naics_code and 5 digits in benchmarks.naics_industry, both loaded as BIGINT: join on accounts.naics_code // 10 = benchmarks.naics_industry. A client with no naics_code has no benchmark rows. Descriptions that show substr(naics_code,1,5) or a domain-qualified name such as crm.accounts describe the dictionary, not the loaded tables.",
+]
+
+join_rule = "Join only along the paths declared in the [Relationships] sections. A bare edge is a join key (equal values). A 'soft reference' joins on equal text but is not enforced, so expect unmatched rows. 'reconciliation' and 'consistency' edges say that two stored figures agree: compare them, never join on them. 'eligibility gate' edges compare a client figure with a product threshold. 'via first 5 digits' is a calculated join (see the NAICS convention). An edge to xref.xref_name names the vocabulary (xref_type) whose canonical names the column holds. Every client-level table has an edge to accounts.uen, but utilization and covenants carry no uen: reach their client through facilities.facility_id. Two many-row tables joined on uen multiply rows, so aggregate each to one row per client before joining. If no declared path links two tables, there is no join: say so rather than inventing one."
+
+[snapshot]
+# The column whose maximum is the snapshot date rendered into the as-of rule.
+date_column = "utilization.as_of"
+
+[sampling]
+# Columns that are never sampled, so no value of them reaches the document. Any column named
+# email, phone, first_name or last_name is excluded by name as well, in every table. These are
+# the person-name columns that rule does not reach.
+no_values = [
+    "accounts.relationship_manager",
+    "opportunities.owner",
+    "activities.owner",
+    "commitments.owner",
+    "credit_exceptions.owner",
+    "relationship.coverage_team",
+]
+
+[metrics]
+"exposure" = "Exposure is committed credit exposure: our bank's share of the commitment, not the drawn balance. Per facility it is facilities.our_hold, which the dictionary calls the true exposure; per client it is SUM(facilities.our_hold) over the client's facilities. relationship.total_exposure is the credit system's client-level aggregate, at least that sum and often more, so name which of the two an answer uses. Drawn amounts are a different measure: facilities.outstanding and utilization.drawn cover the whole facility, not our share. Facility amounts are USD."
+"utilization" = "Utilization is drawn divided by committed, on a 0-100 scale. The stored measure is utilization.utilization_pct, one row per facility per month-end; current utilization is the row at MAX(as_of) for that facility. For a client or a portfolio, divide summed drawn by summed commitment (utilization.drawn with facilities.commitment) and never average the percentages. utilization.available is commitment less drawn, adjusted for borrowing-base limits. facilities.outstanding is a separate balance and can differ from the latest utilization.drawn."
+"weighted pipeline" = "Weighted pipeline is SUM(amount * probability / 100) over open opportunities only, that is stage IN ('Prospecting', 'Qualification', 'Proposal', 'Negotiation'). probability is already 0-100 with no % sign. Closed Won (probability 100) is booked business and Closed Lost (0) is gone: both are excluded from pipeline, weighted or not. Unweighted pipeline is SUM(amount) over the same open stages. Amounts are USD."
+"covenant breach" = "A covenant breach is a covenants row with in_compliance = false. That is the compliance workflow's tested verdict: use it as stored and do not re-derive it from threshold (text that includes the operator, such as '>= 1.25') and current_value. Covenants attach to facilities, so a client's covenants are reached through facilities.uen; a client is in breach when any covenant on any of its facilities has in_compliance = false. Count breaches per covenants row unless asked per client. next_test_date is the next scheduled test, not a breach date."
+"cash conversion cycle" = "Cash conversion cycle in days is DSO + DIO - DPO. working_capital stores it as cash_conversion_cycle_days beside dso_days, dio_days and dpo_days, one row per client per quarter-end (period_end): use the stored value. A client's current cycle is its row at MAX(period_end); a lengthening cycle is a higher value than at an earlier period_end. Not every client has working_capital rows. dio_days is 0 for a business with no inventory."
+"as-of rule" = "The data is one frozen snapshot whose latest month-end is {snapshot_date}. Every balance and metric row is as of that snapshot: 'current' and 'latest' mean the row with the greatest date for its key (MAX(as_of) per facility, per account and account type, MAX(period_end) per client), never CURRENT_DATE or now(), and balances are never added across months. Date filters and trends use the row's own date columns (as_of, period_end, value_date, due_date and so on). utilization, balances and payment_summaries keep 24 month-ends per key; rates, fx, commodities and forward_curve hold one dated observation per name, not a history. Some tables hold rows dated shortly after the month-end (borrowing_base, credit_exceptions, source_readiness, commitments): they are part of the snapshot, not the future. A relative window such as overdue, next 90 days or last quarter is measured from the date the user gives, or else from {snapshot_date}; say which date was used."
+
+# One entry per domain, in the order the dictionary lists them.
+
+[domains.crm]
+overview = "The client master and the relationship record around it. accounts holds one row per client (a legal entity) and is the root every client-level table joins to through uen. relationship is the one-row-per-client summary of revenue, deposits, exposure and engagement. The remaining tables are the coverage team's working record: contacts, the sales pipeline, logged activities, service tickets and promises made in meetings."
+
+[domains.lending]
+overview = "Credit exposure and its monitoring. facilities holds each credit line. utilization (24 month-ends), covenants, borrowing_base and credit_exceptions hang off a facility through facility_id. credit_metrics (one row per client) carries the obligor rating, spread financial ratios and risk-model outputs, and working_capital holds quarterly receivable, inventory and payable days for some clients. Facility amounts are USD; borrowing_base and working_capital carry a currency column."
+
+[domains.payments]
+overview = "How clients move money. payment_summaries is the pre-aggregated monthly view (client, rail, direction, month, currency; 24 months), transactions is the payment-level ledger beneath it, and counterparties lists the named parties and corridors. Direction is relative to the client: inbound is receivables, outbound is payables. Amounts are in each row's own currency; a summary's total_value is notional across the currencies in its bucket (currency is the modal one), so per-currency totals come from transactions."
+
+[domains.deposits]
+overview = "Monthly deposit balances per client, account type and currency, 24 month-ends. avg_balance is the average collected balance for the month, period_end_balance the month-end ledger balance, and idle_estimate the bank's estimate of cash not needed for operations."
+
+[domains.financials]
+overview = "Client financial statements as facts rather than ratios. company gives each client's name on filings and SEC identifier; financial_facts is a long layout of one row per client, concept (an XBRL US-GAAP tag), statement and fiscal year, so filter on concept and fiscal_year and compute margins and growth in SQL."
+
+[domains.industry]
+overview = "Peer benchmarks by 5-digit NAICS industry rather than by client: one row per industry and indicator, covering financial ratios and payment-method adoption. A client reaches its rows through naics_code."
+
+[domains.market]
+overview = "Market reference data from external sources, one dated observation per name: rates, fx pairs, commodities and the SOFR forward_curve by tenor. These are snapshots, not time series, and no market table links to a client."
+
+[domains.products]
+overview = "The bank's product catalog: one row per product with the eligibility thresholds a client must meet (minimum annual revenue, minimum DSCR, worst acceptable risk rating) and indicative pricing."
+
+[domains.profitability]
+overview = "What each relationship earns the bank. product_profitability attributes net interest income and fee revenue, direct expense, risk cost and allocated capital to client, period, line of business and product, for a trailing-twelve-month period and the prior fiscal year. These are the bank's figures, not the client's."
+
+[domains.operations]
+overview = "Housekeeping the coverage team acts on. source_readiness records whether each data domain is complete, reconciled and usable for a client; treasury_controls records control findings and implementation items on a client's treasury products."
+
+[domains.reference]
+overview = "The vocabulary map. xref lists, for each vocabulary (xref_type), the canonical names and the alternative spellings that map to them. Values in the data tables are already canonical, so queries rarely need it; use it to translate a user's wording or a risk-rating number."
+
+# One entry per content table.
+
+[tables.accounts]
+role = "The client master: one row per client (legal entity), with its uen, name, industry, location, currency, segment and relationship manager."
+
+[tables.contacts]
+role = "People at each client: several rows per client, with title, buying role, department and contact details, and a primary-contact flag."
+
+[tables.opportunities]
+role = "The sales pipeline: one row per deal, with product, stage, amount, win probability, expected close date, competitor and owner."
+
+[tables.activities]
+role = "Logged client interactions (calls, emails, meetings): one row per activity, with date, subject, owner and notes."
+
+[tables.service_requests]
+role = "Client service tickets: one row per request, with product, category, priority, status, and opened and closed dates. Open means a status other than 'Closed'."
+
+[tables.relationship]
+role = "One row per client summarizing the relationship: bank revenue (nii, nir), deposits, credit exposure, product-depth flags, ROE and RAROC, and review dates."
+
+[tables.commitments]
+role = "Promises made in client meetings: what was promised, by which side (client or bank), who owns it, when it is due and whether it is open."
+
+[tables.operational_service_cases]
+role = "Operational service cases severe enough to be surfaced to the relationship manager, with product, category, priority, status and dates. Open means a status other than 'Closed'."
+
+[tables.facilities]
+role = "Credit facilities (revolving, term_loan, equipment_finance): commitment, outstanding balance, our_hold share, pricing, maturity and collateral, one row per facility."
+
+[tables.utilization]
+role = "Monthly utilization history of each facility: drawn, available and utilization_pct at each month-end, 24 rows per facility."
+
+[tables.covenants]
+role = "Financial covenants on facilities: threshold, last tested value, the compliance verdict and the next test date, one row per facility and covenant."
+
+[tables.credit_metrics]
+role = "One row per client of credit risk: obligor risk rating and prior rating, outlook, watch status, spread ratios (DSCR, leverage, current ratio) and PD and LGD."
+
+[tables.borrowing_base]
+role = "Borrowing-base certificates of asset-based revolvers: eligible receivables and inventory, advance rates and the remaining availability."
+
+[tables.credit_exceptions]
+role = "Credit and documentation exceptions (missing certificates and statements, waivers, covenant defaults) with due date, status, severity and cure plan."
+
+[tables.working_capital]
+role = "Quarterly working-capital metrics for some clients: DSO, DIO, DPO, cash conversion cycle, aged receivables and inventory, and net working capital."
+
+[tables.payment_summaries]
+role = "Monthly payment totals per client, rail, direction and currency: transaction count, total value and gross rail fees."
+
+[tables.transactions]
+role = "The payment ledger: one row per payment, with rail, direction, value date, amount and currency, fee, counterparty and memo."
+
+[tables.counterparties]
+role = "Named customers and suppliers a client pays or is paid by, with direction, rail, corridor country and currency, annual value and the counterparty's bank. The table is populated, although a column description calls it optional and undelivered."
+
+[tables.balances]
+role = "Monthly deposit balances per client, account type and currency: average and month-end balance, idle estimate, rate paid, earnings credit rate and sweep enrollment."
+
+[tables.company]
+role = "One row per client with its name as it appears on filings and its SEC CIK (empty for private companies)."
+
+[tables.financial_facts]
+role = "Annual financial statement facts per client as concept and value rows (revenue, gross profit, operating and net income, cash, debt, inventory) by fiscal year."
+
+[tables.benchmarks]
+role = "Peer benchmarks per 5-digit NAICS industry and indicator: external macro value, internal cohort average, unit and direction of goodness."
+
+[tables.rates]
+role = "Latest market interest rates (SOFR, Fed Funds, Prime, Treasuries), one row per rate."
+
+[tables.fx]
+role = "Latest FX spot rates with year-to-date change, forward points and implied volatility, one row per currency pair."
+
+[tables.commodities]
+role = "Latest commodity prices with unit and quarter-over-quarter change, one row per commodity."
+
+[tables.forward_curve]
+role = "The SOFR forward curve: one forward rate per tenor, latest observation."
+
+[tables.catalog]
+role = "The bank's product catalog: product family, description, client benefit, eligibility thresholds, revenue band and typical pricing."
+
+[tables.product_profitability]
+role = "Bank-attributed economics per client, period, line of business and product: net interest income, fee revenue, direct expense, risk cost and allocated capital."
+
+[tables.source_readiness]
+role = "Data-readiness checks per client and data domain: freshness date, completeness, reconciliation and quality status, and the issue found."
+
+[tables.treasury_controls]
+role = "Treasury control findings and implementation items per client and product: type, status, severity, observation, owner and target date."
+
+[tables.xref]
+role = "The vocabulary map: canonical names (xref_name) and accepted spellings (xref_value) per vocabulary (xref_type)."
