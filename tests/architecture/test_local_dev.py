@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import signal
 import socket
 import subprocess
 import sys
 import tomllib
+import warnings
+from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -16,12 +19,14 @@ from tools import local_dev, local_processes, package_runtime
 from tools.local_environment import agent_environment
 from tools.local_processes import RunningService, Service
 
+from ai_agent_lib_core.config import deprecations as deprecations_module
+
 
 def test_copy_settings_preserves_existing_file(tmp_path: Path) -> None:
     path = tmp_path / ".env"
-    (tmp_path / ".env.example").write_text("EAP_MODEL_PROVIDER=fake\n", encoding="utf-8")
+    (tmp_path / ".env.example").write_text("AC2_MODEL_PROVIDER=fake\n", encoding="utf-8")
     local_dev.copy_settings(path)
-    assert path.read_text(encoding="utf-8") == "EAP_MODEL_PROVIDER=fake\n"
+    assert path.read_text(encoding="utf-8") == "AC2_MODEL_PROVIDER=fake\n"
     path.write_text("existing private settings\n", encoding="utf-8")
     local_dev.copy_settings(path)
     assert path.read_text(encoding="utf-8") == "existing private settings\n"
@@ -147,16 +152,16 @@ def test_setup_installs_the_selected_model_extra(
 def test_setup_model_matches_shell_root_and_service_precedence(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.delenv("EAP_MODEL_PROVIDER", raising=False)
+    monkeypatch.delenv("AC2_MODEL_PROVIDER", raising=False)
     service = tmp_path / local_dev.AGENT_ENV
     service.parent.mkdir(parents=True)
-    service.with_name(".env.example").write_text("EAP_MODEL_PROVIDER=fake\n")
+    service.with_name(".env.example").write_text("AC2_MODEL_PROVIDER=fake\n")
     assert local_dev.setup_model(tmp_path) == "fake"
-    service.write_text("EAP_MODEL_PROVIDER=anthropic\n")
+    service.write_text("AC2_MODEL_PROVIDER=anthropic\n")
     assert local_dev.setup_model(tmp_path) == "anthropic"
-    (tmp_path / ".env").write_text('export EAP_MODEL_PROVIDER="bedrock" # approved provider\n')
+    (tmp_path / ".env").write_text('export AC2_MODEL_PROVIDER="bedrock" # approved provider\n')
     assert local_dev.setup_model(tmp_path) == "bedrock"
-    monkeypatch.setenv("EAP_MODEL_PROVIDER", "anthropic")
+    monkeypatch.setenv("AC2_MODEL_PROVIDER", "anthropic")
     assert local_dev.setup_model(tmp_path) == "anthropic"
     assert local_dev.setup_model(tmp_path, "bedrock") == "bedrock"
 
@@ -370,20 +375,20 @@ def test_agent_environment_precedence_and_secret_isolation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     service = tmp_path / "service.env"
-    service.write_text("EAP_MODEL_PROVIDER=fake\nEAP_MODEL_ID=fake-model\n")
+    service.write_text("AC2_MODEL_PROVIDER=fake\nAC2_MODEL_ID=fake-model\n")
     overrides = tmp_path / ".env"
     overrides.write_text(
-        "EAP_MODEL_PROVIDER=anthropic\nEAP_MODEL_ID=file-model\n"
+        "AC2_MODEL_PROVIDER=anthropic\nAC2_MODEL_ID=file-model\n"
         'ANTHROPIC_API_KEY="literal-${DO_NOT_EXPAND}-key"\n'
     )
-    monkeypatch.delenv("EAP_MODEL_PROVIDER", raising=False)
+    monkeypatch.delenv("AC2_MODEL_PROVIDER", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.setenv("EAP_MODEL_ID", "shell-model")
+    monkeypatch.setenv("AC2_MODEL_ID", "shell-model")
     monkeypatch.setenv("DO_NOT_EXPAND", "expanded")
     before = dict(os.environ)
     environment = agent_environment(service, overrides, required=True)
-    assert environment["EAP_MODEL_PROVIDER"] == "anthropic"
-    assert environment["EAP_MODEL_ID"] == "shell-model"
+    assert environment["AC2_MODEL_PROVIDER"] == "anthropic"
+    assert environment["AC2_MODEL_ID"] == "shell-model"
     assert environment["ANTHROPIC_API_KEY"] == "literal-${DO_NOT_EXPAND}-key"
     assert dict(os.environ) == before
     output = capsys.readouterr().out
@@ -398,12 +403,12 @@ def test_agent_environment_precedence_and_secret_isolation(
 def test_no_launcher_dotenv_preserves_service_defaults(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    for name in ("EAP_MODEL_PROVIDER", "EAP_MODEL_ID"):
+    for name in ("AC2_MODEL_PROVIDER", "AC2_MODEL_ID"):
         monkeypatch.delenv(name, raising=False)
     service = tmp_path / "service.env"
-    service.write_text("EAP_MODEL_PROVIDER=fake\nEAP_MODEL_ID=fake-model\n")
+    service.write_text("AC2_MODEL_PROVIDER=fake\nAC2_MODEL_ID=fake-model\n")
     environment = agent_environment(service, tmp_path / ".env", required=False)
-    assert "EAP_MODEL_PROVIDER" not in environment
+    assert "AC2_MODEL_PROVIDER" not in environment
     assert "fake / fake-model" in capsys.readouterr().out
 
 
@@ -419,10 +424,10 @@ def test_launcher_passes_selected_file_only_to_agent(
         target = root / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.touch()
-    for name in ("EAP_MODEL_PROVIDER", "ANTHROPIC_API_KEY"):
+    for name in ("AC2_MODEL_PROVIDER", "ANTHROPIC_API_KEY"):
         monkeypatch.delenv(name, raising=False)
-    (root / ".env").write_text("EAP_MODEL_PROVIDER=anthropic\nANTHROPIC_API_KEY=root-secret\n")
-    (caller / "custom.env").write_text("EAP_MODEL_PROVIDER=fake\nANTHROPIC_API_KEY=custom-secret\n")
+    (root / ".env").write_text("AC2_MODEL_PROVIDER=anthropic\nANTHROPIC_API_KEY=root-secret\n")
+    (caller / "custom.env").write_text("AC2_MODEL_PROVIDER=fake\nANTHROPIC_API_KEY=custom-secret\n")
     start = Mock()
     monkeypatch.setattr(local_dev, "serve", start)
     monkeypatch.setattr(local_dev, "prepare_ui", Mock(return_value=8765))
@@ -433,7 +438,7 @@ def test_launcher_passes_selected_file_only_to_agent(
     assert agent.environment["ANTHROPIC_API_KEY"] == (
         "custom-secret" if explicit else "root-secret"
     )
-    assert agent.environment["EAP_MODEL_PROVIDER"] == ("fake" if explicit else "anthropic")
+    assert agent.environment["AC2_MODEL_PROVIDER"] == ("fake" if explicit else "anthropic")
     assert mcp.environment is None
     assert ui.environment is None
     assert "secret" not in repr(agent)
@@ -452,11 +457,11 @@ def test_invalid_explicit_env_file_fails_before_startup(
     monkeypatch.setattr(local_dev, "serve", start)
     overrides = tmp_path / "settings.env"
     if exists:
-        overrides.write_text("EAP_TELEMETRY=on\nANTHROPIC_API_KEY=private-test-key\n")
+        overrides.write_text("AC2_TELEMETRY=on\nANTHROPIC_API_KEY=private-test-key\n")
     assert local_dev.main(["services", "--env-file", str(overrides)], root=tmp_path) == 1
     start.assert_not_called()
     output = capsys.readouterr().out
-    assert ("EAP_TELEMETRY" if exists else str(overrides)) in output
+    assert ("AC2_TELEMETRY" if exists else str(overrides)) in output
     assert "private-test-key" not in output
 
 
@@ -482,3 +487,135 @@ def test_supervisor_supplies_the_child_environment(
     local_processes.serve([service], tmp_path / "logs", smoke_test=True)
     assert spawn.call_args.kwargs["env"] == environment
     assert "private-test-key" not in (tmp_path / "logs/agent.log").read_text()
+
+
+# ------------------------------------------------- the EAP_ spellings, for one minor release
+#
+# Every test below is a dedicated legacy-alias test: it spells variables with the old
+# ``EAP_`` prefix on purpose. The rest of this file speaks ``AC2_``.
+
+
+@pytest.fixture
+def fresh_deprecation_channel() -> Iterator[None]:
+    deprecations_module._LOGGED.clear()
+    yield
+    deprecations_module._LOGGED.clear()
+
+
+@pytest.fixture
+def provider_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
+    for name in ("AC2_MODEL_PROVIDER", "EAP_MODEL_PROVIDER"):
+        monkeypatch.delenv(name, raising=False)
+    service = tmp_path / local_dev.AGENT_ENV
+    service.parent.mkdir(parents=True)
+    return service, tmp_path / ".env"
+
+
+def test_setup_model_reads_the_legacy_spelling_from_each_source_and_says_so(
+    provider_files: tuple[Path, Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    service, root_env = provider_files
+    service.with_name(".env.example").write_text("EAP_MODEL_PROVIDER=fake\n")
+    assert local_dev.setup_model(tmp_path) == "fake"
+    service.write_text("EAP_MODEL_PROVIDER=anthropic\n")
+    assert local_dev.setup_model(tmp_path) == "anthropic"
+    root_env.write_text('export EAP_MODEL_PROVIDER="bedrock" # approved provider\n')
+    assert local_dev.setup_model(tmp_path) == "bedrock"
+    monkeypatch.setenv("EAP_MODEL_PROVIDER", "anthropic")
+    assert local_dev.setup_model(tmp_path) == "anthropic"
+    output = capsys.readouterr().out
+    assert "EAP_MODEL_PROVIDER is deprecated; use AC2_MODEL_PROVIDER instead" in output
+
+
+def test_setup_model_stays_silent_for_the_canonical_spelling(
+    provider_files: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    service, _ = provider_files
+    service.write_text("AC2_MODEL_PROVIDER=anthropic\n")
+    assert local_dev.setup_model(tmp_path) == "anthropic"
+    assert "deprecated" not in capsys.readouterr().out
+
+
+def test_setup_model_accepts_both_spellings_when_they_agree(
+    provider_files: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    service, root_env = provider_files
+    service.write_text("EAP_MODEL_PROVIDER=anthropic\n")
+    root_env.write_text("AC2_MODEL_PROVIDER=anthropic\n")
+    assert local_dev.setup_model(tmp_path) == "anthropic"
+    assert "deprecated" not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("where", ["one_file", "two_files", "shell"])
+def test_setup_model_refuses_two_spellings_that_disagree_naming_both(
+    provider_files: tuple[Path, Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    where: str,
+) -> None:
+    service, root_env = provider_files
+    if where == "one_file":
+        service.write_text("AC2_MODEL_PROVIDER=anthropic\nEAP_MODEL_PROVIDER=bedrock\n")
+    elif where == "two_files":
+        service.write_text("EAP_MODEL_PROVIDER=fake\n")
+        root_env.write_text("AC2_MODEL_PROVIDER=anthropic\n")
+    else:
+        service.write_text("AC2_MODEL_PROVIDER=fake\n")
+        monkeypatch.setenv("EAP_MODEL_PROVIDER", "anthropic")
+    with pytest.raises(ValueError, match=r"EAP_MODEL_PROVIDER.*AC2_MODEL_PROVIDER"):
+        local_dev.setup_model(tmp_path)
+
+
+def test_a_conflict_in_the_provider_files_stops_setup_with_a_message(
+    provider_files: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    service, _ = provider_files
+    service.write_text("AC2_MODEL_PROVIDER=anthropic\nEAP_MODEL_PROVIDER=bedrock\n")
+    assert local_dev.main(["setup"], root=tmp_path) == 1
+    assert "set only AC2_MODEL_PROVIDER" in capsys.readouterr().out
+
+
+def test_agent_environment_applies_legacy_names_and_logs_each_deprecation_once(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+    fresh_deprecation_channel: None,
+) -> None:
+    for name in ("AC2_MODEL_PROVIDER", "EAP_MODEL_PROVIDER", "AC2_MODEL_ID", "EAP_MODEL_ID"):
+        monkeypatch.delenv(name, raising=False)
+    service = tmp_path / "service.env"
+    service.write_text("AC2_MODEL_PROVIDER=fake\n")
+    overrides = tmp_path / ".env"
+    overrides.write_text("EAP_MODEL_PROVIDER=fake\nEAP_MODEL_ID=file-model\n")
+    # Python's own DeprecationWarning is still raised for programs that call the resolver.
+    with (
+        caplog.at_level(logging.WARNING, logger="ai_agent_lib_core.config"),
+        pytest.warns(DeprecationWarning, match="EAP_MODEL_ID is deprecated"),
+    ):
+        environment = agent_environment(service, overrides, required=True)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        agent_environment(service, overrides, required=True)
+    assert environment["EAP_MODEL_ID"] == "file-model"
+    assert "fake / file-model" in capsys.readouterr().out
+    # A launcher is a resolution point: the notice reaches its log once, as the agent's will.
+    assert [r.getMessage() for r in caplog.records if r.name == "ai_agent_lib_core.config"] == [
+        "EAP_MODEL_ID is deprecated; use AC2_MODEL_ID instead"
+    ]
+
+
+def test_agent_environment_refuses_two_spellings_that_disagree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name in ("AC2_MODEL_ID", "EAP_MODEL_ID"):
+        monkeypatch.delenv(name, raising=False)
+    service = tmp_path / "service.env"
+    service.write_text("AC2_MODEL_ID=service-model\n")
+    overrides = tmp_path / ".env"
+    overrides.write_text("EAP_MODEL_ID=launcher-model\n")
+    with pytest.raises(ValueError, match=r"EAP_MODEL_ID.*AC2_MODEL_ID"):
+        agent_environment(service, overrides, required=True)

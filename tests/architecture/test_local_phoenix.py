@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
 from tools import local_dev, local_processes, package_runtime
 
+from ai_agent_lib_core.config import deprecations as deprecations_module
+from ai_agent_lib_core.config.bindings import legacy_spelling
 from ai_agent_lib_core.config.phoenix import PHOENIX_VARIABLES
 
 
@@ -17,6 +21,7 @@ from ai_agent_lib_core.config.phoenix import PHOENIX_VARIABLES
 def checkout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     for name in PHOENIX_VARIABLES:
         monkeypatch.delenv(name, raising=False)
+        monkeypatch.delenv(legacy_spelling(name), raising=False)
     root = tmp_path / "checkout with spaces"
     for relative in (local_dev.AGENT_ENV, local_dev.MCP_ENV):
         path = root / relative
@@ -24,7 +29,7 @@ def checkout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         path.write_text("")
     package_runtime.package_folder(root, "phoenix").mkdir(parents=True)
     (root / ".env").write_text(
-        "EAP_MODEL_PROVIDER=fake\nEAP_PHOENIX_ENABLED=true\nANTHROPIC_API_KEY=root-private-key\n"
+        "AC2_MODEL_PROVIDER=fake\nAC2_PHOENIX_ENABLED=true\nANTHROPIC_API_KEY=root-private-key\n"
     )
     monkeypatch.setattr(local_dev, "prepare_ui", Mock(return_value=8765))
     return root
@@ -63,14 +68,14 @@ def test_disabled_or_unset_phoenix_needs_no_extra_environment(
     package_runtime.package_folder(checkout, "phoenix").rmdir()
     args = ["services"]
     if disabled_by == "shell":
-        monkeypatch.setenv("EAP_PHOENIX_ENABLED", "false")
+        monkeypatch.setenv("AC2_PHOENIX_ENABLED", "false")
     elif disabled_by == "selected_file":
         custom = checkout / "selected.env"
-        custom.write_text("EAP_MODEL_PROVIDER=fake\n")
+        custom.write_text("AC2_MODEL_PROVIDER=fake\n")
         args += ["--env-file", str(custom)]
     else:
         (checkout / ".env").write_text(
-            "EAP_PHOENIX_ENABLED=false\n" if disabled_by == "root" else ""
+            "AC2_PHOENIX_ENABLED=false\n" if disabled_by == "root" else ""
         )
     start = Mock()
     monkeypatch.setattr(local_dev, "serve", start)
@@ -104,10 +109,10 @@ def test_invalid_phoenix_setup_fails_before_starting_children(
         package_runtime.package_folder(checkout, "phoenix").rmdir()
         expected = "start-phoenix.bat setup"
     elif failure == "invalid_flag":
-        monkeypatch.setenv("EAP_PHOENIX_ENABLED", "yes")
+        monkeypatch.setenv("AC2_PHOENIX_ENABLED", "yes")
         expected = "must be true or false"
     else:
-        monkeypatch.setenv("EAP_PHOENIX_ENV_FILE", str(checkout / "missing.env"))
+        monkeypatch.setenv("AC2_PHOENIX_ENV_FILE", str(checkout / "missing.env"))
         expected = "missing.env"
     start = Mock()
     monkeypatch.setattr(local_dev, "serve", start)
@@ -124,10 +129,10 @@ def test_separate_settings_file_is_resolved_as_the_agent_would_resolve_it(
 ) -> None:
     (checkout / ".env").write_text("")
     owner = checkout / (local_dev.AGENT_ENV if file_owner == "service" else ".env")
-    owner.write_text("EAP_PHOENIX_ENV_FILE=phoenix.env\n")
+    owner.write_text("AC2_PHOENIX_ENV_FILE=phoenix.env\n")
     base = owner.parent if file_owner == "service" else checkout / local_dev.WORKSPACE
     (base / "phoenix.env").write_text(
-        "EAP_PHOENIX_ENABLED=true\nPHOENIX_COLLECTOR_ENDPOINT=http://localhost:6006/\n"
+        "AC2_PHOENIX_ENABLED=true\nPHOENIX_COLLECTOR_ENDPOINT=http://localhost:6006/\n"
     )
     monkeypatch.chdir(checkout.parent)
     start = Mock()
@@ -191,3 +196,99 @@ def test_supervisor_owns_phoenix_lifecycle_and_stops_it_last(
     )
     assert all(child.wait.called for child in children)
     assert all(not child.kill.called for child in children)
+
+
+# ------------------------------------------------- the EAP_ spellings, for one minor release
+#
+# Every test below is a dedicated legacy-alias test: it spells Phoenix variables with the
+# old ``EAP_`` prefix on purpose. The rest of this file speaks ``AC2_``.
+
+
+@pytest.fixture
+def fresh_deprecation_channel() -> Iterator[None]:
+    deprecations_module._LOGGED.clear()
+    yield
+    deprecations_module._LOGGED.clear()
+
+
+def test_a_legacy_enabled_root_setting_still_starts_phoenix_first_and_warns(
+    checkout: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    fresh_deprecation_channel: None,
+) -> None:
+    (checkout / ".env").write_text("AC2_MODEL_PROVIDER=fake\nEAP_PHOENIX_ENABLED=true\n")
+    start = Mock()
+    monkeypatch.setattr(local_dev, "serve", start)
+    with caplog.at_level(logging.WARNING, logger="ai_agent_lib_core.config"):
+        assert local_dev.main(["services"], root=checkout) == 0
+    assert [s.name for s in start.call_args.args[0]] == ["phoenix", "rmprep-data", "rmprep"]
+    assert [r.getMessage() for r in caplog.records if r.name == "ai_agent_lib_core.config"] == [
+        "EAP_PHOENIX_ENABLED is deprecated; use AC2_PHOENIX_ENABLED instead"
+    ]
+
+
+def test_a_legacy_shell_disable_still_wins_over_an_enabled_root_file(
+    checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    package_runtime.package_folder(checkout, "phoenix").rmdir()
+    monkeypatch.setenv("EAP_PHOENIX_ENABLED", "false")
+    (checkout / ".env").write_text("EAP_PHOENIX_ENABLED=false\n")
+    start = Mock()
+    monkeypatch.setattr(local_dev, "serve", start)
+    assert local_dev.main(["services"], root=checkout) == 0
+    assert [s.name for s in start.call_args.args[0]] == ["rmprep-data", "rmprep"]
+
+
+@pytest.mark.parametrize("file_owner", ["service", "launcher"])
+def test_a_legacy_separate_settings_file_is_resolved_as_the_agent_would_resolve_it(
+    checkout: Path, monkeypatch: pytest.MonkeyPatch, file_owner: str
+) -> None:
+    (checkout / ".env").write_text("")
+    owner = checkout / (local_dev.AGENT_ENV if file_owner == "service" else ".env")
+    owner.write_text("EAP_PHOENIX_ENV_FILE=phoenix.env\n")
+    base = owner.parent if file_owner == "service" else checkout / local_dev.WORKSPACE
+    (base / "phoenix.env").write_text(
+        "EAP_PHOENIX_ENABLED=true\nPHOENIX_COLLECTOR_ENDPOINT=http://localhost:6006/\n"
+    )
+    monkeypatch.chdir(checkout.parent)
+    start = Mock()
+    monkeypatch.setattr(local_dev, "serve", start)
+    assert local_dev.main(["services"], root=checkout) == 0
+    assert start.call_args.args[0][0].name == "phoenix"
+
+
+def test_a_legacy_shell_file_path_is_relative_to_the_agent_like_the_canonical_one(
+    checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (checkout / ".env").write_text("")
+    workspace = checkout / local_dev.WORKSPACE
+    (workspace / "phoenix.env").write_text("AC2_PHOENIX_ENABLED=true\n")
+    monkeypatch.setenv("EAP_PHOENIX_ENV_FILE", "phoenix.env")
+    monkeypatch.chdir(checkout.parent)
+    start = Mock()
+    monkeypatch.setattr(local_dev, "serve", start)
+    assert local_dev.main(["services"], root=checkout) == 0
+    assert start.call_args.args[0][0].name == "phoenix"
+
+
+@pytest.mark.parametrize("variable", ["ENABLED", "ENV_FILE"])
+def test_two_phoenix_spellings_that_disagree_stop_startup_naming_both(
+    checkout: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    variable: str,
+) -> None:
+    (checkout / ".env").write_text(
+        f"AC2_PHOENIX_{variable}={'true' if variable == 'ENABLED' else 'one.env'}\n"
+        f"EAP_PHOENIX_{variable}={'false' if variable == 'ENABLED' else 'two.env'}\n"
+    )
+    start = Mock()
+    monkeypatch.setattr(local_dev, "serve", start)
+    assert local_dev.main(["services"], root=checkout) == 1
+    start.assert_not_called()
+    output = capsys.readouterr().out
+    assert (
+        f"EAP_PHOENIX_{variable} is deprecated and conflicts with AC2_PHOENIX_{variable}" in output
+    )
+    assert "root-private-key" not in output

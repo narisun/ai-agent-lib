@@ -189,8 +189,8 @@ def test_config_explain_shows_each_setting_its_origin_and_no_secret(
     ("broken", "expected"),
     [
         ("PHOENIX_COLLECTOR_ENDPOINT=not-an-origin\n", "HTTPS origin"),
-        ("EAP_PHOENIX_CAPTURE_CONTENT=yes\n", "true or false"),
-        ("EAP_PHOENIX_ENV_FILE=missing.env\n", "configuration file not found"),
+        ("AC2_PHOENIX_CAPTURE_CONTENT=yes\n", "true or false"),
+        ("AC2_PHOENIX_ENV_FILE=missing.env\n", "configuration file not found"),
     ],
 )
 def test_phoenix_configuration_errors_fail_diagnostics(
@@ -201,7 +201,7 @@ def test_phoenix_configuration_errors_fail_diagnostics(
 ) -> None:
     env = workspace / "agents/hello-agent/.env"
     env.write_text(
-        env.read_text(encoding="utf-8") + "EAP_PHOENIX_ENABLED=true\n"
+        env.read_text(encoding="utf-8") + "AC2_PHOENIX_ENABLED=true\n"
         "PHOENIX_API_KEY=phoenix-test-secret\n" + broken,
         encoding="utf-8",
     )
@@ -226,12 +226,12 @@ def test_phoenix_explanation_matches_file_precedence_and_disabled_override(
     folder = workspace / "agents/hello-agent"
     env = folder / ".env"
     env.write_text(
-        env.read_text(encoding="utf-8") + "EAP_PHOENIX_ENV_FILE=traces.env\n", encoding="utf-8"
+        env.read_text(encoding="utf-8") + "AC2_PHOENIX_ENV_FILE=traces.env\n", encoding="utf-8"
     )
     extra = folder / "traces.env"
     extra.write_text(
-        "EAP_PHOENIX_ENABLED=true\nPHOENIX_PROJECT_NAME=from-file\n"
-        "PHOENIX_API_KEY=private-key\nEAP_PHOENIX_CAPTURE_CONTENT=true\n",
+        "AC2_PHOENIX_ENABLED=true\nPHOENIX_PROJECT_NAME=from-file\n"
+        "PHOENIX_API_KEY=private-key\nAC2_PHOENIX_CAPTURE_CONTENT=true\n",
         encoding="utf-8",
     )
     monkeypatch.setenv("PHOENIX_PROJECT_NAME", "from-shell")
@@ -239,10 +239,10 @@ def test_phoenix_explanation_matches_file_precedence_and_disabled_override(
     assert settings is not None
     entries = {entry.variable: entry for entry in explain_service(folder)[0]}
     assert entries["PHOENIX_PROJECT_NAME"].value == settings.project_name == "from-shell"
-    assert str(extra) in entries["EAP_PHOENIX_CAPTURE_CONTENT"].origin
+    assert str(extra) in entries["AC2_PHOENIX_CAPTURE_CONTENT"].origin
     assert entries["PHOENIX_API_KEY"].value == "********"
-    monkeypatch.setenv("EAP_PHOENIX_ENABLED", "false")
-    monkeypatch.setenv("EAP_PHOENIX_ENV_FILE", "missing.env")
+    monkeypatch.setenv("AC2_PHOENIX_ENABLED", "false")
+    monkeypatch.setenv("AC2_PHOENIX_ENV_FILE", "missing.env")
     assert run("doctor", "hello-agent", "--workspace", workspace) == 0
     assert "phoenix: disabled" in capsys.readouterr().out
 

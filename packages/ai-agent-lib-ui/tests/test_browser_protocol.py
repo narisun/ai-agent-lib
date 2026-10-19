@@ -192,7 +192,7 @@ class LocalServer:
         )
         (path / "tools.json").write_text('{"schema":"agentlib.registry/v1","servers":[]}')
         (path / "agent.env").write_text(
-            'EAP_REGISTRY_OPTIONS={"agents_path":"agents.json","tools_path":"tools.json"}\n'
+            'AC2_REGISTRY_OPTIONS={"agents_path":"agents.json","tools_path":"tools.json"}\n'
         )
         self.config = path / ".agentlib/ui/config.json"
         self.env = {key: value for key, value in os.environ.items() if key != "LITERAL_API_KEY"}

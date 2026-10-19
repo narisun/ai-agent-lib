@@ -23,6 +23,10 @@ _VISIBLE_EXTRAS = frozenset(
         "RMPREP_CONTEXT_QUESTION_TOKENS",
         "RMPREP_CONTEXT_RECENT_TOKENS",
         "RMPREP_CONTEXT_TOOL_SCHEMA_TOKENS",
+        "AC2_PHOENIX_ENABLED",
+        "AC2_PHOENIX_CAPTURE_CONTENT",
+        "AC2_PHOENIX_ENV_FILE",
+        # The earlier EAP_ spellings stay visible for the deprecation window.
         "EAP_PHOENIX_ENABLED",
         "EAP_PHOENIX_CAPTURE_CONTENT",
         "EAP_PHOENIX_ENV_FILE",
@@ -100,8 +104,9 @@ def report_environment(
         name
         for name in layers[0][1].names()
         # LANGFUSE_ is defense for stale environments: shown masked, never read.
+        # EAP_ is the earlier prefix of the library's variables (deprecation window).
         if name.startswith(
-            ("EAP_", "RMPREP_", "LANGFUSE_", "PHOENIX_", "OTEL_", "AWS_", "ANTHROPIC_")
+            ("AC2_", "EAP_", "RMPREP_", "LANGFUSE_", "PHOENIX_", "OTEL_", "AWS_", "ANTHROPIC_")
         )
     )
     for name in sorted(names - rows.keys()):

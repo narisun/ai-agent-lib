@@ -70,9 +70,9 @@ These keep their own names. The library reads them and never renames them.
 
 These settings are resolved by `load_phoenix_settings` separately from `ServiceConfig`. See [Trace agents with Phoenix](phoenix-trial.md) for purposes, defaults, precedence and the separate SQLite server setup.
 
-- `EAP_PHOENIX_ENABLED`
-- `EAP_PHOENIX_CAPTURE_CONTENT`
-- `EAP_PHOENIX_ENV_FILE`
+- `AC2_PHOENIX_ENABLED`
+- `AC2_PHOENIX_CAPTURE_CONTENT`
+- `AC2_PHOENIX_ENV_FILE`
 - `PHOENIX_COLLECTOR_ENDPOINT`
 - `PHOENIX_PROJECT_NAME`
 - `PHOENIX_API_KEY`

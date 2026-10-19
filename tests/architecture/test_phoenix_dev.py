@@ -52,6 +52,30 @@ def test_server_environment_uses_local_sqlite_and_excludes_credentials(
     assert values["PHOENIX_DISABLE_AGENT_ASSISTANT"] == "true"
 
 
+@pytest.mark.parametrize(
+    "name",
+    [
+        "AC2_MODEL_PROVIDER",
+        "AC2_PHOENIX_ENABLED",
+        # The earlier prefix is still isolated while its spellings are accepted.
+        "EAP_MODEL_PROVIDER",
+        "EAP_PHOENIX_ENV_FILE",
+        "RMPREP_CONTEXT_INPUT_TOKENS",
+        "OPENAI_API_KEY",
+        "AWS_SECRET_ACCESS_KEY",
+    ],
+)
+def test_server_environment_isolates_agent_settings_in_both_prefixes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    monkeypatch.setenv(name, "private-value")
+    monkeypatch.setenv("PIP_CERT", "enterprise-cert.pem")
+    values = phoenix_dev.server_environment(tmp_path)
+    assert name not in values
+    assert "private-value" not in str(values)
+    assert values["PIP_CERT"] == "enterprise-cert.pem"
+
+
 def test_foreground_start_preserves_existing_database(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

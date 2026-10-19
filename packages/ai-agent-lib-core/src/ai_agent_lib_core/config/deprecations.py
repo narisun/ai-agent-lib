@@ -10,14 +10,35 @@ from __future__ import annotations
 
 import logging
 import threading
+from typing import TYPE_CHECKING
 
-from ai_agent_lib_core.config.resolver import Resolution
+if TYPE_CHECKING:
+    from ai_agent_lib_core.config.resolver import Resolution
 
-__all__ = ["log_resolution_warnings"]
+__all__ = ["log_deprecation", "log_resolution_warnings"]
 
 _LOG = logging.getLogger("ai_agent_lib_core.config")
 _LOGGED: set[str] = set()
 _LOCK = threading.Lock()
+
+
+def log_deprecation(message: str) -> None:
+    """Log one deprecation message as a WARNING line, once per process.
+
+    A message names the deprecated variable it is about, so it is logged the
+    first time it is seen and not again, however often configuration is read.
+    The Phoenix loader, which resolves outside the binding table, reports
+    through this function; the resolver's own warnings arrive through
+    :func:`log_resolution_warnings`.
+
+    Args:
+        message: The warning, such as ``"EAP_X is deprecated; use AC2_X instead"``.
+    """
+    with _LOCK:
+        if message in _LOGGED:
+            return
+        _LOGGED.add(message)
+    _LOG.warning("%s", message)
 
 
 def log_resolution_warnings(resolution: Resolution) -> None:
@@ -31,8 +52,4 @@ def log_resolution_warnings(resolution: Resolution) -> None:
         resolution: The result of ``ConfigResolver.explain()``.
     """
     for message in resolution.warnings:
-        with _LOCK:
-            if message in _LOGGED:
-                continue
-            _LOGGED.add(message)
-        _LOG.warning("%s", message)
+        log_deprecation(message)

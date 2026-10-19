@@ -2,8 +2,10 @@
 
 import asyncio
 import json
+import logging
 import subprocess
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Annotated, Any, TypedDict
@@ -18,12 +20,20 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.trace import StatusCode
 
 from ai_agent_lib_core import RequestContext, ServiceConfig, ServiceContainer
-from ai_agent_lib_core.config import MappingConfigSource, load_service_config
+from ai_agent_lib_core.config import (
+    LEGACY_PREFIX,
+    PREFIX,
+    MappingConfigSource,
+    load_service_config,
+)
+from ai_agent_lib_core.config import deprecations as deprecations_module
+from ai_agent_lib_core.config.bindings import legacy_spelling
 from ai_agent_lib_core.config.phoenix import (
     PHOENIX_VARIABLES,
     PhoenixSettings,
     load_phoenix_settings,
     phoenix_env_example,
+    resolve_phoenix_settings,
 )
 from ai_agent_lib_core.contracts import ConfigurationError, Principal
 from ai_agent_lib_core.integrations.langgraph._agent_tracing import _content
@@ -34,18 +44,24 @@ from ai_agent_lib_core.testing import calls_tool, fake_providers
 
 
 @pytest.fixture(autouse=True)
-def clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+def clean_environment(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     for name in PHOENIX_VARIABLES:
         monkeypatch.delenv(name, raising=False)
+        if name.startswith(PREFIX):
+            monkeypatch.delenv(legacy_spelling(name), raising=False)
+    # A deprecation is logged once per process; each test starts from a fresh channel.
+    deprecations_module._LOGGED.clear()
+    yield
+    deprecations_module._LOGGED.clear()
 
 
 def test_settings_precedence_explicit_disable_and_secret_repr(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     service = tmp_path / ".env"
-    service.write_text("EAP_PHOENIX_ENV_FILE=traces.env\nPHOENIX_PROJECT_NAME=service\n")
+    service.write_text("AC2_PHOENIX_ENV_FILE=traces.env\nPHOENIX_PROJECT_NAME=service\n")
     (tmp_path / "traces.env").write_text(
-        "EAP_PHOENIX_ENABLED=true\nPHOENIX_PROJECT_NAME=separate\nPHOENIX_API_KEY=private-key\n"
+        "AC2_PHOENIX_ENABLED=true\nPHOENIX_PROJECT_NAME=separate\nPHOENIX_API_KEY=private-key\n"
     )
     loaded = load_phoenix_settings(service)
     assert loaded
@@ -56,13 +72,13 @@ def test_settings_precedence_explicit_disable_and_secret_repr(
     loaded = load_phoenix_settings(service)
     assert loaded is not None
     assert loaded.project_name == "shell"
-    monkeypatch.setenv("EAP_PHOENIX_ENABLED", "true")
+    monkeypatch.setenv("AC2_PHOENIX_ENABLED", "true")
     assert load_service_config(service).profile.value == "local"
-    monkeypatch.setenv("EAP_PHOENIX_CAPTURE_CONTENT", "yes")
+    monkeypatch.setenv("AC2_PHOENIX_CAPTURE_CONTENT", "yes")
     with pytest.raises(ConfigurationError, match="true or false"):
         load_phoenix_settings(service)
-    monkeypatch.setenv("EAP_PHOENIX_ENABLED", "false")
-    monkeypatch.setenv("EAP_PHOENIX_ENV_FILE", "missing.env")
+    monkeypatch.setenv("AC2_PHOENIX_ENABLED", "false")
+    monkeypatch.setenv("AC2_PHOENIX_ENV_FILE", "missing.env")
     assert load_phoenix_settings(service) is None
 
 
@@ -75,8 +91,8 @@ def test_env_example_comments_every_variable_with_its_default() -> None:
     shown = dict(line.removeprefix("# ").split("=", 1) for line in lines[1:])
     assert tuple(shown) == PHOENIX_VARIABLES
     defaults = PhoenixSettings()
-    assert shown["EAP_PHOENIX_ENABLED"] == "false"
-    assert shown["EAP_PHOENIX_CAPTURE_CONTENT"] == "false"
+    assert shown["AC2_PHOENIX_ENABLED"] == "false"
+    assert shown["AC2_PHOENIX_CAPTURE_CONTENT"] == "false"
     assert shown["PHOENIX_COLLECTOR_ENDPOINT"] == defaults.base_url
     assert shown["PHOENIX_PROJECT_NAME"] == defaults.project_name
     assert shown["PHOENIX_API_KEY"] != defaults.api_key
@@ -102,11 +118,11 @@ def test_planned_child_environment_uses_the_same_file_layers_without_mutation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     service = tmp_path / ".env"
-    service.write_text("EAP_PHOENIX_ENV_FILE=traces.env\nPHOENIX_PROJECT_NAME=service\n")
+    service.write_text("AC2_PHOENIX_ENV_FILE=traces.env\nPHOENIX_PROJECT_NAME=service\n")
     (tmp_path / "traces.env").write_text(
-        "EAP_PHOENIX_ENABLED=true\nPHOENIX_PROJECT_NAME=separate\n"
+        "AC2_PHOENIX_ENABLED=true\nPHOENIX_PROJECT_NAME=separate\n"
     )
-    monkeypatch.setenv("EAP_PHOENIX_ENABLED", "false")
+    monkeypatch.setenv("AC2_PHOENIX_ENABLED", "false")
     environment = MappingConfigSource({"PHOENIX_PROJECT_NAME": "child"})
     settings = load_phoenix_settings(service, environment=environment)
     assert settings is not None
@@ -116,13 +132,201 @@ def test_planned_child_environment_uses_the_same_file_layers_without_mutation(
         load_phoenix_settings(
             service,
             environment=MappingConfigSource(
-                {"EAP_PHOENIX_ENABLED": "false", "EAP_PHOENIX_ENV_FILE": "missing.env"}
+                {"AC2_PHOENIX_ENABLED": "false", "AC2_PHOENIX_ENV_FILE": "missing.env"}
             ),
         )
         is None
     )
     with pytest.raises(ValueError, match="either source or environment"):
         load_phoenix_settings(source=environment, environment=environment)
+
+
+# ------------------------------------------------- the EAP_ spellings, for one minor release
+#
+# Every test in this section is a dedicated legacy-alias test: it spells Phoenix
+# variables with the old ``EAP_`` prefix on purpose. The rest of the file speaks ``AC2_``.
+
+
+def _config_messages(caplog: pytest.LogCaptureFixture) -> list[str]:
+    return [r.getMessage() for r in caplog.records if r.name == "ai_agent_lib_core.config"]
+
+
+def _resolve(
+    values: dict[str, str], *, service: Path | None = None, working_dir: Path | None = None
+) -> Any:
+    return resolve_phoenix_settings(
+        service, environment=MappingConfigSource(values), working_dir=working_dir
+    )
+
+
+def test_the_canonical_names_are_ac2_and_each_has_an_eap_spelling() -> None:
+    owned = [name for name in PHOENIX_VARIABLES if name.startswith(PREFIX)]
+    assert owned == ["AC2_PHOENIX_ENABLED", "AC2_PHOENIX_CAPTURE_CONTENT", "AC2_PHOENIX_ENV_FILE"]
+    assert [legacy_spelling(name) for name in owned] == [
+        "EAP_PHOENIX_ENABLED",
+        "EAP_PHOENIX_CAPTURE_CONTENT",
+        "EAP_PHOENIX_ENV_FILE",
+    ]
+    assert all(legacy_spelling(name).startswith(LEGACY_PREFIX) for name in owned)
+
+
+def test_a_canonical_name_enables_tracing_without_a_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.WARNING, logger="ai_agent_lib_core.config"):
+        resolved = _resolve({"AC2_PHOENIX_ENABLED": "true", "AC2_PHOENIX_CAPTURE_CONTENT": "true"})
+    assert resolved.settings is not None
+    assert resolved.settings.capture_content
+    assert resolved.origins["AC2_PHOENIX_ENABLED"] == "process environment: AC2_PHOENIX_ENABLED"
+    assert _config_messages(caplog) == []
+
+
+def test_a_legacy_name_still_enables_tracing_and_the_warning_names_its_replacement(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.WARNING, logger="ai_agent_lib_core.config"):
+        resolved = _resolve({"EAP_PHOENIX_ENABLED": "true", "EAP_PHOENIX_CAPTURE_CONTENT": "true"})
+    assert resolved.settings is not None
+    assert resolved.settings.capture_content
+    # Values and origins are keyed by the canonical name; the origin says which spelling won.
+    assert resolved.shown["AC2_PHOENIX_ENABLED"] == "true"
+    assert resolved.origins["AC2_PHOENIX_ENABLED"] == "process environment: EAP_PHOENIX_ENABLED"
+    assert sorted(_config_messages(caplog)) == [
+        "EAP_PHOENIX_CAPTURE_CONTENT is deprecated; use AC2_PHOENIX_CAPTURE_CONTENT instead",
+        "EAP_PHOENIX_ENABLED is deprecated; use AC2_PHOENIX_ENABLED instead",
+    ]
+
+
+def test_a_legacy_name_is_logged_once_per_process_however_often_it_is_read(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.WARNING, logger="ai_agent_lib_core.config"):
+        for _ in range(3):
+            assert _resolve({"EAP_PHOENIX_ENABLED": "true"}).settings is not None
+    assert _config_messages(caplog) == [
+        "EAP_PHOENIX_ENABLED is deprecated; use AC2_PHOENIX_ENABLED instead"
+    ]
+
+
+def test_a_legacy_name_disables_tracing_too() -> None:
+    assert (
+        _resolve({"EAP_PHOENIX_ENABLED": "false", "EAP_PHOENIX_ENV_FILE": "x.env"}).settings is None
+    )
+
+
+def test_both_spellings_with_equal_values_coexist_silently(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    both = {
+        "AC2_PHOENIX_ENABLED": "true",
+        "EAP_PHOENIX_ENABLED": "true",
+        "AC2_PHOENIX_CAPTURE_CONTENT": "true",
+        "EAP_PHOENIX_CAPTURE_CONTENT": "true",
+    }
+    with caplog.at_level(logging.WARNING, logger="ai_agent_lib_core.config"):
+        resolved = _resolve(both)
+    assert resolved.settings is not None
+    assert resolved.settings.capture_content
+    assert resolved.origins["AC2_PHOENIX_ENABLED"] == "process environment: AC2_PHOENIX_ENABLED"
+    assert _config_messages(caplog) == []
+
+
+@pytest.mark.parametrize(
+    ("name", "canonical_value", "legacy_value"),
+    [
+        ("ENABLED", "true", "false"),
+        ("CAPTURE_CONTENT", "true", "false"),
+        ("ENV_FILE", "one.env", "two.env"),
+    ],
+)
+def test_both_spellings_with_different_values_stop_startup_naming_both(
+    name: str, canonical_value: str, legacy_value: str
+) -> None:
+    values = {
+        "AC2_PHOENIX_ENABLED": "true",
+        f"AC2_PHOENIX_{name}": canonical_value,
+        f"EAP_PHOENIX_{name}": legacy_value,
+    }
+    with pytest.raises(ConfigurationError) as error:
+        _resolve(values)
+    message = str(error.value)
+    assert f"EAP_PHOENIX_{name}" in message
+    assert f"AC2_PHOENIX_{name}" in message
+    assert canonical_value not in message.replace(f"AC2_PHOENIX_{name}", "")
+    assert legacy_value not in message.replace(f"EAP_PHOENIX_{name}", "")
+
+
+def test_the_conflict_rule_holds_across_layers(tmp_path: Path) -> None:
+    service = tmp_path / ".env"
+    service.write_text("EAP_PHOENIX_CAPTURE_CONTENT=false\n")
+    environment = {"AC2_PHOENIX_ENABLED": "true", "AC2_PHOENIX_CAPTURE_CONTENT": "true"}
+    with pytest.raises(ConfigurationError, match=r"EAP_PHOENIX_CAPTURE_CONTENT.*AC2_PHOENIX_"):
+        _resolve(environment, service=service)
+    # The same value in both layers is no conflict, and the canonical spelling is not warned about.
+    service.write_text("EAP_PHOENIX_CAPTURE_CONTENT=true\n")
+    resolved = _resolve(environment, service=service)
+    assert resolved.settings is not None
+    assert resolved.settings.capture_content
+
+
+@pytest.mark.parametrize("canonical", [False, True])
+@pytest.mark.parametrize("holder", ["process", "service"])
+def test_the_separate_file_is_found_through_either_spelling_in_either_layer(
+    tmp_path: Path, canonical: bool, holder: str
+) -> None:
+    variable = ("AC2" if canonical else "EAP") + "_PHOENIX_ENV_FILE"
+    folder = tmp_path / "agent"
+    folder.mkdir()
+    service = folder / ".env"
+    service.write_text(f"{variable}=traces.env\n" if holder == "service" else "")
+    (folder / "traces.env").write_text("AC2_PHOENIX_ENABLED=true\nPHOENIX_PROJECT_NAME=separate\n")
+    environment = {variable: "traces.env"} if holder == "process" else {}
+    resolved = _resolve(environment, service=service, working_dir=folder)
+    assert resolved.settings is not None
+    assert resolved.settings.project_name == "separate"
+    # The separate file is reported as the origin of the settings it supplied.
+    assert str((folder / "traces.env").resolve()) in resolved.origins["AC2_PHOENIX_ENABLED"]
+
+
+def test_a_legacy_disable_in_the_process_skips_the_separate_file_like_the_canonical_one(
+    tmp_path: Path,
+) -> None:
+    service = tmp_path / ".env"
+    service.write_text("AC2_PHOENIX_ENV_FILE=missing.env\n")
+    assert _resolve({"EAP_PHOENIX_ENABLED": "false"}, service=service).settings is None
+    with pytest.raises(ConfigurationError, match="configuration file not found"):
+        _resolve({"EAP_PHOENIX_ENABLED": "true"}, service=service)
+
+
+def test_a_legacy_name_in_the_service_file_enables_tracing_and_warns(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    service = tmp_path / ".env"
+    service.write_text("EAP_PHOENIX_ENABLED=true\n")
+    with caplog.at_level(logging.WARNING, logger="ai_agent_lib_core.config"):
+        settings = load_phoenix_settings(service)
+    assert settings is not None
+    assert _config_messages(caplog) == [
+        "EAP_PHOENIX_ENABLED is deprecated; use AC2_PHOENIX_ENABLED instead"
+    ]
+
+
+def test_a_legacy_invalid_value_is_reported_under_the_canonical_name() -> None:
+    with pytest.raises(ConfigurationError, match="AC2_PHOENIX_ENABLED must be true or false"):
+        _resolve({"EAP_PHOENIX_ENABLED": "yes"})
+
+
+def test_the_resolver_accepts_a_canonical_phoenix_name_and_the_loader_honours_it(
+    tmp_path: Path,
+) -> None:
+    service = tmp_path / ".env"
+    service.write_text("AC2_PHOENIX_ENABLED=true\nPHOENIX_PROJECT_NAME=from-file\n")
+    # The service resolver accepts the name (it would stop startup otherwise) ...
+    assert load_service_config(service).profile.value == "local"
+    # ... and the loader that owns it must not ignore it.
+    settings = load_phoenix_settings(service)
+    assert settings is not None
+    assert settings.project_name == "from-file"
 
 
 async def test_agent_tracing_yields_nothing_until_phoenix_is_enabled(tmp_path: Path) -> None:
@@ -138,7 +342,7 @@ async def test_agent_tracing_starts_phoenix_from_the_service_file_or_given_setti
     tmp_path: Path,
 ) -> None:
     service = tmp_path / ".env"
-    service.write_text("EAP_PHOENIX_ENABLED=true\nPHOENIX_PROJECT_NAME=from-file\n")
+    service.write_text("AC2_PHOENIX_ENABLED=true\nPHOENIX_PROJECT_NAME=from-file\n")
     config = ServiceConfig.for_testing()
     async with agent_tracing("test", config, dotenv_path=service) as tracing:
         assert isinstance(tracing, PhoenixTracing)

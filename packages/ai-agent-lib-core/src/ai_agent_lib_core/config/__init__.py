@@ -19,7 +19,7 @@ from ai_agent_lib_core.config.bindings import (
     provider_key,
     secret_key,
 )
-from ai_agent_lib_core.config.deprecations import log_resolution_warnings
+from ai_agent_lib_core.config.deprecations import log_deprecation, log_resolution_warnings
 from ai_agent_lib_core.config.profiles import PROFILE_DEFAULTS, ProfileDefaults
 from ai_agent_lib_core.config.reference import (
     EnvSetting,
@@ -56,6 +56,7 @@ __all__ = [
     "Resolution",
     "ValueKind",
     "load_service_config",
+    "log_deprecation",
     "log_resolution_warnings",
     "options_key",
     "provider_key",

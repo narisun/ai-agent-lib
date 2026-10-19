@@ -1,12 +1,14 @@
 """Opt-in Phoenix tracing settings, separate from service and operational telemetry."""
 
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
 from urllib.parse import urlsplit
 
+from ai_agent_lib_core.config.bindings import PREFIX, legacy_spelling
+from ai_agent_lib_core.config.deprecations import log_deprecation
 from ai_agent_lib_core.config.sources import (
     DotenvConfigSource,
     EnvironConfigSource,
@@ -16,9 +18,9 @@ from ai_agent_lib_core.contracts import ConfigSource, ConfigurationError
 
 PHOENIX_LABELS = MappingProxyType(
     {
-        "enabled": "EAP_PHOENIX_ENABLED",
-        "capture_content": "EAP_PHOENIX_CAPTURE_CONTENT",
-        "env_file": "EAP_PHOENIX_ENV_FILE",
+        "enabled": "AC2_PHOENIX_ENABLED",
+        "capture_content": "AC2_PHOENIX_CAPTURE_CONTENT",
+        "env_file": "AC2_PHOENIX_ENV_FILE",
         "endpoint": "PHOENIX_COLLECTOR_ENDPOINT",
         "project": "PHOENIX_PROJECT_NAME",
         "api_key": "PHOENIX_API_KEY",
@@ -27,6 +29,8 @@ PHOENIX_LABELS = MappingProxyType(
 """Variable names by the short label generated documents refer to them by."""
 
 PHOENIX_VARIABLES = tuple(PHOENIX_LABELS.values())
+
+_Layers = Sequence[tuple[str, ConfigSource]]
 
 
 @dataclass(frozen=True)
@@ -70,6 +74,51 @@ class PhoenixSettings:
         return f"{self.base_url.rstrip('/')}/redirects/traces/{trace_id}"
 
 
+def _lookup(layers: _Layers, name: str) -> tuple[str, str] | None:
+    """Find a variable's value and origin in the first layer that sets it.
+
+    An ``AC2_`` name is also read in its ``EAP_`` spelling, which keeps working
+    for one minor release. Equal values in both spellings coexist silently. A
+    different value is a conflict, wherever each spelling is set, because
+    guessing which one was meant is the hazard. A legacy spelling that supplies
+    the value is logged as deprecated.
+
+    Raises:
+        ConfigurationError: If the two spellings carry different values.
+    """
+
+    def first(variable: str) -> tuple[str, str] | None:
+        return next(
+            (
+                (value, f"{label}: {variable}")
+                for label, layer in layers
+                if (value := layer.get(variable)) is not None
+            ),
+            None,
+        )
+
+    current = first(name)
+    if not name.startswith(PREFIX):
+        return current
+    old_name = legacy_spelling(name)
+    old = first(old_name)
+    if old is None:
+        return current
+    if current is not None:
+        if current[0] != old[0]:
+            raise ConfigurationError(
+                f"{old_name} is deprecated and conflicts with {name}; set only {name}"
+            )
+        return current
+    log_deprecation(f"{old_name} is deprecated; use {name} instead")
+    return old
+
+
+def _value(layers: _Layers, name: str) -> str | None:
+    found = _lookup(layers, name)
+    return found[0] if found else None
+
+
 def load_phoenix_settings(
     dotenv_path: Path | None = Path(".env"),
     *,
@@ -108,11 +157,13 @@ def resolve_phoenix_settings(
         environment = environment if environment is not None else EnvironConfigSource()
         service = DotenvConfigSource(dotenv_path) if dotenv_path else MappingConfigSource({})
         layers: list[tuple[str, ConfigSource]] = [("process environment", environment)]
-        if (environment.get("EAP_PHOENIX_ENABLED") or "").lower() != "false":
-            extra = environment.get("EAP_PHOENIX_ENV_FILE")
+        from_process = layers[:1]
+        enabled, env_file = PHOENIX_LABELS["enabled"], PHOENIX_LABELS["env_file"]
+        if (_value(from_process, enabled) or "").lower() != "false":
+            extra = _value(from_process, env_file)
             if extra and working_dir is not None:
                 extra = str(working_dir / extra)
-            if not extra and (extra := service.get("EAP_PHOENIX_ENV_FILE")):
+            if not extra and (extra := _value([("service settings", service)], env_file)):
                 extra = str((dotenv_path.parent if dotenv_path else Path.cwd()) / extra)
             if extra:
                 layers.append(
@@ -122,21 +173,14 @@ def resolve_phoenix_settings(
     else:
         layers = [("injected source", source)]
     defaults = {
-        "EAP_PHOENIX_ENABLED": "false",
-        "EAP_PHOENIX_CAPTURE_CONTENT": "false",
+        "AC2_PHOENIX_ENABLED": "false",
+        "AC2_PHOENIX_CAPTURE_CONTENT": "false",
         "PHOENIX_COLLECTOR_ENDPOINT": "http://127.0.0.1:6006",
         "PHOENIX_PROJECT_NAME": "agent-lab",
     }
     values, origins = {}, {}
     for name in PHOENIX_VARIABLES:
-        found = next(
-            (
-                (value, f"{label}: {name}")
-                for label, layer in layers
-                if (value := layer.get(name)) is not None
-            ),
-            None,
-        )
+        found = _lookup(layers, name)
         values[name], origins[name] = found or (defaults.get(name, ""), "default")
 
     def flag(name: str) -> bool:
@@ -149,10 +193,10 @@ def resolve_phoenix_settings(
         PhoenixSettings(
             base_url=values["PHOENIX_COLLECTOR_ENDPOINT"] or defaults["PHOENIX_COLLECTOR_ENDPOINT"],
             project_name=values["PHOENIX_PROJECT_NAME"] or defaults["PHOENIX_PROJECT_NAME"],
-            capture_content=flag("EAP_PHOENIX_CAPTURE_CONTENT"),
+            capture_content=flag("AC2_PHOENIX_CAPTURE_CONTENT"),
             api_key=values["PHOENIX_API_KEY"],
         )
-        if flag("EAP_PHOENIX_ENABLED")
+        if flag("AC2_PHOENIX_ENABLED")
         else None
     )
     shown = {**values, "PHOENIX_API_KEY": "********" if values["PHOENIX_API_KEY"] else ""}
