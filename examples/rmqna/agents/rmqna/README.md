@@ -202,10 +202,6 @@ to continue a saved conversation. This example builds the graph without MCP tool
 the model answers from the schema document in its prompt; the normal CLI and HTTP entry
 points also discover the linked MCP tools.
 
-The [annotated verified run](../../docs/verified-anthropic-run.md) explains how
-the tool result and saved first turn became model input in a real Anthropic run.
-Its sample files are included in the workspace for local inspection.
-
 To capture calls from the normal CLI or HTTP entry point, use the following steps.
 Add this setting to `agents/rmqna/.env`, then restart the agent:
 
@@ -269,6 +265,11 @@ evaluation is a separate, explicit command:
 ```bat
 "%PYTHON%" -m ai_agent_lib_cli eval rmqna
 ```
+
+It asks the 33 questions of `evals/cases.jsonl` with the real model and the `rmqna-data` tools in
+process (no server to start), and scores each by whether its SQL returned what the case's reference
+statement returns. The [workspace README](../../README.md#4-measure-the-agent-with-the-evals) says how
+to read the report and mint the baseline.
 
 ## Prepare a deployment
 

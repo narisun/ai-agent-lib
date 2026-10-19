@@ -10,11 +10,8 @@ You need Python 3.11 or newer, pip, access to Anthropic's API, an API key, and
 a model ID available to your account. Running this example sends the sample
 questions and the thread's history to Anthropic and uses billable API tokens.
 
-The [annotated captured run](../../../docs/verified-anthropic-run.md) was made with the
-workspace template's sample greeting agent, before this agent replaced it. It is kept to show how a
-tool result and saved history become model input: actual responses, selected-field JSON samples,
-and the checkpoint checks. Its tool is the template's `greet`, not one of rmqna's. That page can
-be followed using the included files before making an API call.
+To see a tool result and the saved history become model input without an API call, run the
+scripted tool-loop example, `rmqna.examples.trace_react` (see this agent's README).
 
 ## 1. Select Python and install dependencies
 
@@ -87,9 +84,8 @@ The script prints:
 
 If the model answers both questions directly, you will see two checkpoint messages after
 turn 1 and four after turn 2. The model requests will contain 2 and 4 messages respectively.
-The model chooses its wording, so these counts can vary. For a run with a tool call, see
-the [verified run](../../../docs/verified-anthropic-run.md#what-we-verified) of the template
-agent, or run the scripted tool-loop example, `rmqna.examples.trace_react`.
+The model chooses its wording, so these counts can vary. For a run with a tool call, run the
+scripted tool-loop example, `rmqna.examples.trace_react`.
 
 In the trace, find the `model.request` for the second turn's `request_id`.
 Its `messages` should include the first question, the first answer, any tool

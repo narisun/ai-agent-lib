@@ -1,4 +1,5 @@
-"""The two-question walkthroughs pass tool results and saved history to the model."""
+"""The two-question walkthroughs pass tool results and saved history to the model, and the SQL the
+model writes shows on the tool's span in Phoenix, and only when content capture is on."""
 
 from __future__ import annotations
 
@@ -7,15 +8,29 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+import pytest
 from ai_agent_lib_core import ServiceContainer
+from ai_agent_lib_core.config.phoenix import PhoenixSettings
+from ai_agent_lib_core.integrations.langgraph.phoenix import PhoenixTracing
+from ai_agent_lib_core.observability.model_trace import JsonlModelTraceSink
 from ai_agent_lib_core.pipeline import bind_request_context
-from ai_agent_lib_core.testing import audit_records, load_test_config, scripted_providers
+from ai_agent_lib_core.testing import (
+    audit_records,
+    calls_tool,
+    load_test_config,
+    scripted_providers,
+)
+from ai_agent_lib_core.testing.mcp import InProcessMcpConnector
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
+from rmqna import service
 from rmqna.examples import trace_react
 from rmqna.examples.trace_anthropic import QUESTIONS, run_two_turns
 from rmqna.graph import APPLICATION, build_graph
+from rmqna_data import SERVER_ID, build_server
 
 SERVICE = Path(__file__).resolve().parents[1]
+SERVER_ENV = SERVICE.parents[1] / "mcp-servers" / "rmqna-data" / ".env.example"
 
 
 def read_events(path: Path) -> list[dict[str, Any]]:
@@ -96,3 +111,84 @@ async def test_the_tool_loop_walkthrough_runs_the_sql_it_scripts_and_saves_both_
     ]
     assert len(runs) == 2
     assert {record["subject"] for record in runs} == {"dev-user"}
+
+
+CANADIAN = "SELECT uen, name FROM accounts WHERE country = 'Canada' ORDER BY name LIMIT 3"
+
+
+@pytest.mark.parametrize("content", [False, True])
+async def test_the_sql_is_on_the_tool_span_only_when_content_capture_is_on(
+    tmp_path: Path, content: bool
+) -> None:
+    exporter = InMemorySpanExporter()
+    trial = PhoenixTracing(
+        PhoenixSettings(capture_content=content),
+        application=APPLICATION,
+        exporter=exporter,
+        local_sink=JsonlModelTraceSink(tmp_path / "local.jsonl"),
+    )
+    agent_config = load_test_config(SERVICE / ".env.example", state_dir=tmp_path / "agent")
+    server_config = load_test_config(SERVER_ENV, state_dir=tmp_path / "server")
+    replies = scripted_providers(calls_tool("rmqna-data.execute_sql", sql=CANADIAN), "Three.")
+    try:
+        # The real server, in process: the span is made on the agent's side of a real MCP call.
+        async with ServiceContainer(server_config) as server_services:
+            connector = InProcessMcpConnector({SERVER_ID: build_server(server_services)})
+            async with ServiceContainer(
+                agent_config, replies, mcp_connector=connector, model_trace=trial
+            ) as services:
+                graph = build_graph(services, await services.mcp_tools(SERVER_ID))
+                context = await services.authenticate(
+                    None, application=APPLICATION, thread_id="debug-canada"
+                )
+                output = await trial.run(
+                    graph,
+                    services,
+                    context,
+                    "Which Canadian clients?",
+                    respond=service.SERVICE.respond,
+                )
+        assert trial.provider.force_flush()
+        spans = exporter.get_finished_spans()
+    finally:
+        trial.close()
+    assert output["answer"] == "Three."
+
+    # One tool span, named for the tool and tagged with the server it was called on.
+    tools = [
+        s for s in spans if s.attributes and s.attributes.get("openinference.span.kind") == "TOOL"
+    ]
+    assert [s.name for s in tools] == ["rmqna-data.execute_sql"]
+    attributes = dict(tools[0].attributes or {})
+    assert attributes["agentlib.mcp_server"] == SERVER_ID
+    # The model spans are the two provider calls: the one that wrote the SQL, and the answer.
+    assert [s.name for s in spans if s.name == "model"] == ["model", "model"]
+
+    everything = str([dict(s.attributes or {}) for s in spans])
+    if content:
+        # The statement the model wrote is the span's input, and what the server returned its output.
+        assert json.loads(str(attributes["input.value"])) == {"sql": CANADIAN}
+        assert "Boston Pizza International Inc." in str(attributes["output.value"])
+        # It is also the argument of the tool call the model span records.
+        model_spans = [dict(s.attributes or {}) for s in spans if s.name == "model"]
+        arguments = model_spans[0][
+            "llm.output_messages.0.message.tool_calls.0.tool_call.function.arguments"
+        ]
+        assert json.loads(str(arguments)) == {"sql": CANADIAN}
+    else:
+        # Metadata only: nothing the model wrote or the server returned, on any span.
+        assert all("input.value" not in (s.attributes or {}) for s in spans)
+        assert all("output.value" not in (s.attributes or {}) for s in spans)
+        assert "accounts" not in everything
+        assert "Boston Pizza" not in everything
+
+    # The local model trace records the same calls whatever the capture setting says: it is the
+    # other way to read the SQL, and it holds content, so it stays in the service's private folder.
+    events = read_events(tmp_path / "local.jsonl")
+    sent = [
+        call
+        for event in events
+        if event["event"] == "model.response"
+        for call in event["response"]["tool_calls"]
+    ]
+    assert [call["args"] for call in sent] == [{"sql": CANADIAN}]

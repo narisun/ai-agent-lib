@@ -1,221 +1,172 @@
-# rmqna
+# rmqna: relationship-manager questions answered with SQL
 
-A workspace for Python agents and shared MCP tools built on `ai-agent-lib`.
-Owner: commercial-banking.
+An RM asks a quantitative question about the book ("which clients' utilization rose last quarter?",
+"what is our weighted pipeline by product?"). The agent writes one read-only DuckDB SELECT over the
+bank's tables, a server validates and runs it, and the agent answers from the rows, saying which
+tables, filters and as-of date it used. The data is the same synthetic snapshot rmprep uses: 46
+clients and 31 tables of relationships, credit, deposits, payments, service issues, pipeline and
+market rates, frozen at **2026-06-30**. It contains real company names; the figures are supplied
+examples, not verified facts about those companies.
 
-Run the commands below from **this workspace's root folder**, where
-`agentlib.toml` lives. Local development needs Python 3.11 or newer and pip.
-Installing packages requires access to your approved package index or a
-folder of Python wheels. The default tests use scripted models and local fixtures.
-
-## Select Python
-
-Use your team's approved Python and pip for this workspace's agents and MCP servers.
-Packages install into that Python's configured location. The commands run pip as
-a Python module. On Windows, use **Command Prompt (cmd.exe)** and run
-one line at a time. `set` stores a variable; `%PYTHON%` reads it. Keep the quotes
-around paths so they work when a folder name contains spaces.
-
-Agent Lab, if used, runs with the same Python and a separate package folder and calls these agents
-over HTTP. Follow its package README to register your generated agent; the
-library checkout's launcher starts the included rmprep example. That
-launcher's root `.env` configures rmprep. For this workspace, put model settings
-in each agent's `.env` and use the service commands below.
-
-This workspace uses the library checkout recorded in `agentlib.toml`. Select
-your approved Python (use its full path if your team supplies one):
-
-**Windows Command Prompt (cmd.exe):**
-
-```bat
-set "LIBRARY=../.."
-set "PYTHON=python"
-"%PYTHON%" -c "import sys; print(sys.executable)"
+```text
+Question -> rmqna (agent) -> model -> execute_sql / search_column_values -> rmqna-data -> DuckDB
+                                ^                                                          |
+                                +------------ rows, or {error_kind, message} -------------+
 ```
 
-**macOS/Linux, using bash or zsh:**
+- **`agents/rmqna`** is one LangGraph agent. Its behaviour is its prompt, not extra graph nodes:
+  clarify only when the answer would change, look a typed name up before filtering on it, write the
+  SQL, repair from the server's error at most twice, look once more at an empty result, then answer
+  with a `Basis:` line. It declines writes, questions the tables cannot answer, decisions, and bulk
+  listings of personal data. The prompt carries the schema document and twelve worked examples, one
+  static block, so the provider can cache it.
+- **`mcp-servers/rmqna-data`** offers three tools: `execute_sql`, `search_column_values` and
+  `get_schema`. It decides whether SQL may run and runs it in a contained in-memory engine.
+
+## Model-written SQL is a deliberate departure
+
+The library governs data through named, reviewed queries (rmprep does). rmqna lets the model write
+the statement, so the server, not the model, is the boundary: an AST allowlist (one SELECT, known
+tables, a function denylist, no set operations), a 200-row and 2 MB cap, a 30-second timeout, a
+memory limit, external access and disk spill switched off, and content-free server logs, on top of
+the library's tool-level policy, audit and pins. What this gives up, why it is acceptable for
+synthetic data on one machine, and what graduating it would take are in the ADR,
+[`docs/sql-governance.md`](docs/sql-governance.md). Read it before changing the server, and before
+pointing the engine at anything real.
+
+## 1. Install
+
+Use Python 3.11 or newer in a virtual environment. From this workspace's folder, with the library
+checkout two levels up (see `agentlib.toml`):
 
 ```bash
-LIBRARY='../..'
-PYTHON=python3
-"$PYTHON" -c "import sys; print(sys.executable)"
+python -m pip install -e ../../packages/ai-agent-lib-core -e ../../packages/ai-agent-lib-cli
+python -m ai_agent_lib_cli install
+python -m ai_agent_lib_cli check
 ```
 
-If this checkout moved, update its path in `agentlib.toml` and the variable
-above. Install the CLI once using the selected Python:
+`install` installs both services and the development tools; `check` runs lint, format, types, the
+tests and the policy samples. Every command below runs from this folder, and works the same in
+Command Prompt (set a variable there with `set NAME=value`, in bash with `export NAME=value`).
+The tests and `check` use scripted models and the local data; none needs a key or a network.
 
-```bat
-"%PYTHON%" -m pip install -e "%LIBRARY%/packages/ai-agent-lib-core" -e "%LIBRARY%/packages/ai-agent-lib-cli"
-```
+## 2. Run it
+
+Set the model in `agents/rmqna/.env` (`AC2_MODEL_ID`, and `ANTHROPIC_API_KEY` or your approved
+credential mechanism). Running the agent calls the real model and uses billable tokens.
 
 ```bash
-"$PYTHON" -m pip install -e "$LIBRARY/packages/ai-agent-lib-core" -e "$LIBRARY/packages/ai-agent-lib-cli"
+python -m ai_agent_lib_cli run rmqna-data     # terminal 1: MCP server on :8300, wait for "ready"
+python -m ai_agent_lib_cli run rmqna          # terminal 2: agent on :8200 (also: rmqna-serve)
+python -m rmqna "Which clients have a covenant in breach?" --thread demo    # terminal 3, one question
 ```
 
-For every new terminal, open the workspace root and select the same Python
-again. The commands below use Command Prompt's `"%PYTHON%"`. In bash/zsh, replace
-that prefix with `"$PYTHON"` to use the selected Python.
+The agent's own README, [`agents/rmqna/README.md`](agents/rmqna/README.md), has the HTTP request
+and the live chat UI. With no model and no servers, `python -m rmqna.examples.trace_react` runs the
+real server and engine in process under a scripted model and writes its trace to
+`agents/rmqna/.agentlib/react-demo/`; read it with `python examples/read_trace.py <file>`.
 
-## Install and check
+Good first questions: *Which clients are using more than 80% of their credit lines?*, *What is our
+weighted pipeline for the next 90 days, by product?*, *What deals does Wawona have open?* (a name
+lookup) and *How many open service tickets does Vermont have?* (two clients match, so it asks).
 
-```bat
-"%PYTHON%" -m ai_agent_lib_cli install
-"%PYTHON%" -m ai_agent_lib_cli check
-```
+## 3. Debug the SQL in Phoenix
 
-`install` uses this Python's pip to install the services and development tools.
-Run it again after adding a service or changing dependencies. `check` runs lint,
-formatting, type checks, tests, and policy samples. To run only the tests:
+The model writes the SQL as the argument of its `execute_sql` call, so the call's trace span is where
+a wrong answer is traced to a wrong statement. No code is needed, only settings.
 
-```bat
-"%PYTHON%" -m pytest
-```
+1. Start Phoenix on your machine with the library's launcher (`start-phoenix.bat` on Windows,
+   `./start-phoenix.sh` elsewhere: `setup` once, then `start`; see `docs/phoenix-trial.md` at the
+   library root). It serves `http://127.0.0.1:6006`.
+2. In `agents/rmqna/.env`, turn tracing on **and** content capture on, then restart the agent:
 
-## Add services
-
-These commands create a server and an agent, then connect them. Choose names
-that are available in `agentlib.toml`. To work on an existing service, start
-with its README under `agents/` or `mcp-servers/`.
-
-```bat
-"%PYTHON%" -m ai_agent_lib_cli new mcp hello-mcp
-"%PYTHON%" -m ai_agent_lib_cli new agent hello-agent --model fake
-"%PYTHON%" -m ai_agent_lib_cli link hello-agent hello
-"%PYTHON%" -m ai_agent_lib_cli install
-"%PYTHON%" -m ai_agent_lib_cli check
-```
-
-For your own data, add `--from-csv`, `--from-openapi`, or `--from-redshift` to
-`new mcp`, followed by the folder, file, or schema. Add `--propose` to review
-the proposed tools first. Redshift discovery needs access to that database.
-
-The generators write code, tests, registry entries, and policy rules. The fake
-model echoes input when run interactively; scripted test replies exercise tool
-calls. Start a behavior change with a failing test, then implement it and rerun
-the checks.
-
-## Inspect model input, output, and conversation history
-
-Read the [verified Anthropic walkthrough](docs/verified-anthropic-run.md) to
-follow a real greeting tool call and a second question on the same thread.
-The model received 2, 4, then 6 messages as the tool result and saved history
-joined its input. These included samples can be read locally:
-
-```bat
-"%PYTHON%" examples\read_trace.py docs\samples\verified-anthropic\model-trace.jsonl
-"%PYTHON%" -m json.tool docs\samples\verified-anthropic\checkpoint-history.json
-```
-
-Each generated agent includes two runnable examples. Open its README under
-`agents/` for the exact commands and Anthropic setup instructions:
-
-- `examples.trace_react` uses scripted model replies to demonstrate the tool
-  loop and checkpoints, with the services stopped.
-- `examples.trace_anthropic` uses the agent's configured Anthropic model and
-  SQLite checkpoints. It asks two questions, prints their history and trace,
-  and accepts `--thread` to continue a saved conversation.
-
-For example, an agent called `hello-agent` uses the module
-`hello_agent.examples.trace_anthropic`. Anthropic calls use API tokens;
-its README links to instructions for the dependency, model ID, and key.
-The examples write diagnostics into that agent's `.agentlib/` folder.
-
-## Run and troubleshoot
-
-Open `agents/<name>/README.md` or `mcp-servers/<name>/README.md` for the exact
-startup order. Each server keeps its terminal busy until you press Ctrl+C.
-Start an agent's required MCP servers before starting the agent.
-
-For the example agent above:
-
-```bat
-"%PYTHON%" -m ai_agent_lib_cli doctor hello-agent
-"%PYTHON%" -m ai_agent_lib_cli graph hello-agent
-"%PYTHON%" -m ai_agent_lib_cli policy test
-```
-
-`doctor` checks configured dependencies and explains failures. With cloud
-adapters it can contact external services. `graph` prints a Mermaid diagram.
-The policy command checks which actions your rules allow and deny.
-
-Run `"%PYTHON%" -m ai_agent_lib_cli --help` to see other commands, including
-`config`, `update`, `eval`, and `deploy`. Evals use the configured real model;
-they are excluded from the default test run.
-
-## Configure CI
-
-CI means running the same checks on GitHub after a push or pull request.
-See [GitHub's secrets guide](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets)
-for private-index credentials. Secrets may be unavailable to fork pull requests;
-the platform maintainer must account for that when configuring index access.
-**CI is not configured yet.** This workspace installs the library from a
-desktop path. GitHub's machines cannot access that folder, so the generated
-workflow stops at **Configure the library source for CI**. Complete the steps
-below to make the library available to the runner.
-
-To use a release published to your team's approved Python package index:
-
-1. Confirm that the core, CLI, and any required AWS packages are published.
-   Choose an available release and use it in place of `0.1.0` in these examples.
-2. Replace the `[library]` section of `agentlib.toml` with the following,
-   using your chosen version and removing the old `path` entry:
-
-   ```toml
-   [library]
-   source = "index"
-   version = "==0.1.0"
+   ```dotenv
+   AC2_PHOENIX_ENABLED=true
+   AC2_PHOENIX_CAPTURE_CONTENT=true
+   PHOENIX_COLLECTOR_ENDPOINT=http://127.0.0.1:6006
+   PHOENIX_PROJECT_NAME=rmqna
    ```
 
-3. In the root `pyproject.toml`, pin the `ai-agent-lib-cli` development
-   dependency to the same release. In each service's `pyproject.toml`, pin
-   its library dependencies too, keeping their extras. For example,
-   `ai-agent-lib-core[jwt,mcp,otel,serve]==0.1.0`.
-4. Edit `.github/workflows/check.yml`: remove the step named **Configure the
-   library source for CI**, and pin its CLI installation to your release:
+3. Ask a question and open the project `rmqna` in Phoenix. Each question is one trace whose root is
+   `rmqna.turn`. Filter the spans by `name == 'rmqna-data.execute_sql'` to see every statement the
+   agent sent. On such a span, **Input** is `{"sql": "..."}`, **Output** is the framed result
+   (columns and rows, or `{error_kind, message}`), and `agentlib.mcp_server` is `rmqna-data`. A
+   repair reads as two consecutive spans: the first's output is the error, the next one's input is
+   the changed statement. The `model` spans before and after hold the same call in their messages.
+   `agentlib.model_calls` and `agentlib.tool_calls` on the root count them.
 
-   ```yaml
-   - run: python -m pip install "ai-agent-lib-cli==0.1.0"
-   ```
+Content capture is **all or nothing for the process**. With `AC2_PHOENIX_CAPTURE_CONTENT=false` (the
+default) a trace has names, timings, token counts and ids, and no SQL on any span. With `true` it also
+has every model message, which here means the whole prompt (instructions, schema document and
+examples, about 27,000 tokens) on every model span, and every tool result, which means client names
+and figures. There is no setting that captures the SQL alone. That is acceptable for this synthetic
+data on a developer's machine; do not turn it on for real data, and turn it off when you finish.
 
-5. Configure index access on the runner. For a private index, store the
-   complete authenticated index URL in a GitHub Actions secret named
-   `PIP_INDEX_URL`; add this under the `check` job alongside `runs-on`.
-   Do not put credentials in the workflow file:
+`AC2_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl` is the alternative with no Phoenix at all: it
+records every model request and response, tool-call arguments (the SQL) included, to a JSONL file
+under the agent's `.agentlib/`, whatever the Phoenix settings say. It holds content too, so keep it
+private. `agents/rmqna/docs/tracing.md` has the rest of the Phoenix settings. The server's own log
+never holds SQL by design: one line per call with its duration, row and column counts, truncated
+flag and error kind.
 
-   ```yaml
-   env:
-     PIP_INDEX_URL: ${{ secrets.PIP_INDEX_URL }}
-   ```
+## 4. Measure the agent with the evals
 
-6. Test the index installation on your team's clean CI runner before pushing.
-   This verifies that the published packages include everything the workspace
-   needs. Then run `python -m ai_agent_lib_cli check` on the runner.
+`agents/rmqna/evals/cases.jsonl` is a golden set of 33 synthetic questions: joins along the foreign
+keys, aggregations, windows measured from 2026-06-30, name lookups, results that are legitimately
+empty, two ambiguities the agent should ask about, and refusals. None is one of the prompt's worked
+examples (a test checks). A case with a `reference_sql` is scored by **execution result**, not by SQL
+text: the case's statement and the agent's last statement run through the same engine and the
+results are compared (rows in any order, columns by name or by value, numbers within 1e-9, a date
+equals its midnight timestamp, extra columns ignored). A case without one expects a clarifying
+question or a refusal, so it passes only if the agent sent no SQL, and its `answer_contains` checks
+the words. Two metrics come out: `result_match` and `answer_contains`.
 
-To use a library checkout in CI, ask a platform maintainer to configure the
-runner to check out a fixed revision, install its packages with pip, and set
-the path in the runner's `agentlib.toml` to that checkout. Remove the setup gate
-after both the package installation and workspace path are configured.
+```bash
+python -m ai_agent_lib_cli eval rmqna            # real model, tools in process; no server to start
+python -m ai_agent_lib_cli eval rmqna --accept   # after it passes, save the report as the baseline
+```
 
-## What is here
+The model is real and live (set `AC2_MODEL_ID` and the key in `agents/rmqna/.env`; without a real
+provider the eval skips itself); the `rmqna-data` tools are connected in process through the
+library's `InProcessMcpConnector`, over the real engine. A run asks all 33 questions with a model
+call or several each, so it costs tokens.
+
+- A run writes `agents/rmqna/.agentlib/eval-report.json` (scores per case) and
+  `.agentlib/eval-outputs.json` (the answer and every statement the agent sent, per case). Both are
+  private to your machine. For a failed case, compare its statements with the case's `reference_sql`.
+- There is no `evals/baseline.json` yet. A baseline depends on the model, so the first one is minted
+  by a maintainer's live `eval rmqna --accept` and committed. After that every run also fails when a
+  metric drops more than 0.05 below the baseline; `--accept` again moves the bar on purpose. The
+  absolute bars (`result_match` 0.5, `answer_contains` 0.8) are starting values in
+  `tests/test_rmqna_eval.py`: raise them once a baseline run shows what the agent reaches.
+- The eval itself is tested on every CI run, with a scripted model:
+  `tests/test_eval_harness.py` (the task, the scorers and a table of results that do and do not
+  match) and `tests/test_eval_cases.py` (every `reference_sql` runs on the engine and returns what
+  its case pins, follows the schema document's conventions, and is disjoint from the examples).
+- To add a case, write the question and a `reference_sql` that returns at most 20 rows (the agent's
+  own `LIMIT 20` must not cut it) and does not end on a tie, then run
+  `python -m pytest tests/test_eval_cases.py`. It names the case and shows what the statement
+  returned, to put in `expected.result`. Write window questions as an RM would; the snapshot date
+  is 2026-06-30.
+
+## 5. What is here
 
 | Path | What it contains |
 | --- | --- |
-| `agents/` | One folder per agent, with its own README |
-| `mcp-servers/` | One folder per MCP server, with its own README |
-| `registry/agents.yaml` | Agents and the MCP servers each may call |
-| `registry/mcp-tools.yaml` | Servers, tools, and pins of their input schemas |
-| `policies/agentlib/rules/data.yaml` | Allow rules; unmatched requests are denied |
-| `tests/` | Workspace tests and tests of agents together with servers |
-| `examples/read_trace.py` | Read a model trace as formatted JSON |
-| `docs/verified-anthropic-run.md` | Annotated real model calls and checkpoint snapshots |
-| `docs/samples/verified-anthropic/` | Selected-field samples from the verified run |
-| `tests/policy-samples.yaml` | Examples the rules must allow or deny |
-| `.github/workflows/check.yml` | CI checks; complete the setup above before relying on them |
-| `agentlib.toml` | Workspace generation inputs and the library installation source |
-| `agentlib.lock` | Generated-file fingerprints used by the update command; commit this file |
-| `deploy/` | Deployment files, after running the deployment generator |
+| `agents/rmqna/` | The agent: `src/rmqna/prompts/` (instructions, schema document and examples, versioned), `graph.py`, `service.py`, `evals/`, tests and its own README |
+| `mcp-servers/rmqna-data/` | The server: `validate.py` (what may run), `engine.py` (how it runs), `server.py` (the three tools), tests and its own README |
+| `data/` | The CSV snapshot, one file per table, read in place. `data_model.csv` is the dictionary and is never loaded |
+| `tools/` | `build_schema.py` and `schema_notes.toml`: renders the committed schema document from the data and the notes |
+| `docs/sql-governance.md` | The ADR: the controls, the tests that pin them, the residual risks |
+| `registry/`, `policies/` | The agent's allowed servers, the tools and their pins, and the rules (analysts and managers may call the tools; everyone else is denied) |
+| `tests/` | Workspace tests: the prompt's examples run on the real engine, what the prompt says about the server is true, agent and server together, the eval harness and its cases |
+| `examples/read_trace.py` | Reads a model trace as formatted JSON |
 
-Every service has a committed `.env.example` used by its tests and an ignored
-`.env` for local settings. Relative paths in those files resolve from the file's
-folder. Audit logs and checkpoints go in each service's `.agentlib/` folder.
-Services share the workspace's registry and policy files.
+To change what the agent does, copy the prompt file to a new version (`system_v2.md`), change the
+copy and move the pin in `src/rmqna/prompts/__init__.py`; then run `check`. To change what the server
+allows, start from a failing test in `mcp-servers/rmqna-data/tests/` and read the ADR first. The
+local development identity has the `analyst` role; change `AC2_IDENTITY_OPTIONS` in the agent's `.env`
+to see the policy deny another.
+
+rmqna is local only: the server loads this workspace's `data/` folder and the agent's schema document
+by their place in the repository, and `agentlib deploy` is not set up for it.
