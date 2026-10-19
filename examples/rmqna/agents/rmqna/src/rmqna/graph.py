@@ -1,4 +1,10 @@
-"""The agent graph: ordinary LangGraph, with five touchpoints into the library."""
+"""The agent graph: ordinary LangGraph over the library's seams.
+
+The graph is the template's: one model node, one tool node, the tools of ``rmqna-data``. The flow
+that makes it an analyst (clarify, resolve a name, write SQL, repair from the server's error,
+re-examine an empty result, answer with its basis) lives in the system prompt, ``rmqna.prompts``,
+not in extra nodes: there is one generation step and a bounded repair loop, as the design asks.
+"""
 
 from __future__ import annotations
 
@@ -6,14 +12,15 @@ from collections.abc import AsyncIterator, Sequence
 from typing import Annotated, Any, TypedDict
 
 from ai_agent_lib_core import RequestContext, ServiceContainer
-from langchain_core.messages import AnyMessage, HumanMessage, SystemMessage
+from ai_agent_lib_core.integrations.langgraph import static_system_prompt
+from langchain_core.messages import AnyMessage, HumanMessage
 from langchain_core.tools import BaseTool
 from langgraph.graph import START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
-from rmqna.tools import greet
+from rmqna.prompts import system_prompt
 
 __all__ = [
     "APPLICATION",
@@ -27,11 +34,6 @@ __all__ = [
 
 APPLICATION = "rmqna"
 """The agent's name in the registry, in policy and in the audit log."""
-
-SYSTEM_PROMPT = (
-    "You are a friendly assistant. Use your tools when they help and never guess "
-    "what a tool would say. If a tool refuses, or finds nothing, say so."
-)
 
 
 class State(TypedDict):
@@ -58,12 +60,17 @@ def build_graph(
         services: A started service container.
         mcp_tools: Governed tools of registered MCP servers, already loaded.
     """
-    tools = services.tools([greet], read_only=["greet"])  # touchpoint 1
-    tools += mcp_tools
+    # Touchpoint 1, the agent's own tools, is unused: everything this agent can do is a tool of
+    # rmqna-data, loaded by registered_mcp_tools (touchpoint 2) and governed like any other.
+    tools = list(mcp_tools)
     model = services.model("default").bind_tools(tools)  # touchpoint 3
 
     async def agent(state: State) -> dict[str, list[AnyMessage]]:
-        reply = await model.ainvoke([SystemMessage(SYSTEM_PROMPT), *state["messages"]])
+        # The whole prompt (instructions, schema document, examples) is one static block, the same
+        # on every request: the provider can cache it, and nothing in it varies by caller or
+        # question. A new message each time, so no request shares a message object with another.
+        instructions = static_system_prompt(system_prompt())
+        reply = await model.ainvoke([instructions, *state["messages"]])
         return {"messages": [reply]}
 
     builder = StateGraph(State, context_schema=RequestContext)

@@ -20,17 +20,13 @@ rules:
     resources: ["rmqna-data/*"]
     max_classification: confidential
 
-  # rmqna: the models and tools it may use. A tool of an MCP server is
-  # named <server>/<tool>; the server decides for itself what the caller may see.
+  # rmqna: the models and tools it may use. It has no tools of its own: all it can do is ask
+  # rmqna-data. A tool of an MCP server is named <server>/<tool>; the server decides for itself
+  # what the caller may see.
   - id: rmqna-uses-its-models
     actions: [model.route]
     applications: [rmqna]
     resources: [default]
-
-  - id: rmqna-calls-its-own-tools
-    actions: [tool.call]
-    applications: [rmqna]
-    resources: [greet]
 
   - id: rmqna-calls-rmqna-data
     actions: [tool.call]

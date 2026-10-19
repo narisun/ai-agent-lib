@@ -1,7 +1,7 @@
 [project]
 name = "rmqna"
 version = "0.1.0"
-description = "Greets people by name."
+description = "Answers relationship-manager questions by writing and running read-only SQL over the client data."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

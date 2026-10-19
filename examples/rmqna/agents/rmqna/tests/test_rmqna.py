@@ -1,17 +1,26 @@
-"""The agent's tools and behaviour, tested with the library's fakes.
+"""The agent's behaviour, tested with the library's fakes.
 
-These are the fastest tests: nothing is real except your own code. Script the
-model with the replies it should give, run the agent, and check what happened.
+These are the fastest tests: nothing is real except the graph. The model is scripted with the
+replies it should give, and the one tool the agent works with, ``execute_sql``, is a stub that
+returns the payloads the rmqna-data server returns. The real server, and what a caller is
+allowed to do with it, are exercised by ``tests/test_rmqna_with_rmqna_data.py`` in the workspace.
 """
 
 from __future__ import annotations
 
-from ai_agent_lib_core import Principal, RequestContext
-from ai_agent_lib_core.pipeline import frame_untrusted
-from ai_agent_lib_core.testing import FakeChatModelProvider, Fakes, calls_tool
+import json
+from typing import Any
 
-from rmqna import APPLICATION, ask
-from rmqna.tools import greet
+from ai_agent_lib_core import Principal, RequestContext
+from ai_agent_lib_core.testing import FakeChatModelProvider, Fakes, calls_tool
+from langchain_core.messages import AIMessage
+from langchain_core.tools import StructuredTool
+
+from rmqna import APPLICATION, answer, ask, build_graph
+from rmqna.prompts import EXAMPLES_VERSION, load_prompt, schema_document, system_prompt
+
+EXECUTE = "rmqna-data.execute_sql"
+"""The tool as the registry names it; a model API lists it as ``rmqna-data_execute_sql``."""
 
 
 def context(subject: str = "u-1", thread: str = "th-1") -> RequestContext:
@@ -23,40 +32,129 @@ def context(subject: str = "u-1", thread: str = "th-1") -> RequestContext:
     )
 
 
-# ---------------------------------------------------------------------- tools
+class StubServer:
+    """Stands in for rmqna-data's ``execute_sql``: each call gets the next canned payload."""
+
+    def __init__(self, *payloads: dict[str, Any]) -> None:
+        self._payloads = list(payloads)
+        self.statements: list[str] = []
+
+    def tool(self) -> StructuredTool:
+        async def execute_sql(sql: str) -> str:
+            self.statements.append(sql)
+            return json.dumps(self._payloads[len(self.statements) - 1])
+
+        return StructuredTool.from_function(
+            coroutine=execute_sql,
+            name="rmqna-data_execute_sql",
+            description="Run one validated, read-only SQL SELECT over the RM tables.",
+        )
 
 
-def test_greet_greets_by_name() -> None:
-    assert greet("Ada") == "Hello, Ada!"
-    assert greet("  Grace ") == "Hello, Grace!"
+BREACHES = (
+    "SELECT a.name AS client, c.name AS covenant, c.current_value "
+    "FROM covenants c JOIN facilities f ON f.facility_id = c.facility_id "
+    "JOIN accounts a ON a.uen = f.uen WHERE c.in_compliance = false ORDER BY a.name"
+)
+RESULT = {
+    "columns": ["client", "covenant", "current_value"],
+    "rows": [["Jones Dairy Farm", "DSCR", 1.08], ["Life is Good, Inc.", "Current Ratio", 1.19]],
+    "row_count": 2,
+    "truncated": False,
+    "elapsed_ms": 3,
+}
+ANSWER = (
+    "Two clients have a covenant in breach: Jones Dairy Farm (DSCR 1.08) and Life is Good, Inc. "
+    "(Current Ratio 1.19).\n\nBasis: covenants joined to facilities and accounts, in_compliance = "
+    "false, as of the 2026-06-30 snapshot. Ask me to show the SQL."
+)
 
 
-def test_greet_says_so_when_there_is_no_name() -> None:
-    assert greet("   ") == "There is nobody to greet: the name is empty."
+def text_of(message: Any) -> str:
+    """The text of a message, whether its content is a string or a list of blocks."""
+    content = message.content
+    if isinstance(content, str):
+        return content
+    return "".join(block["text"] for block in content if isinstance(block, dict))
 
 
-# ---------------------------------------------------------------------- agent
+async def test_the_agent_executes_sql_and_answers_with_provenance() -> None:
+    server = StubServer(RESULT)
+    fakes = Fakes(model=FakeChatModelProvider([calls_tool(EXECUTE, sql=BREACHES), ANSWER]))
+    async with fakes.container() as services:
+        graph = build_graph(services, [server.tool()])
+        reply = await answer(graph, services, context(), "Which clients have a covenant in breach?")
+
+    # The model's last message is the answer, passed through untouched.
+    assert reply == ANSWER
+    assert server.statements == [BREACHES]
+    prompts = fakes.model.models[0].calls
+    assert len(prompts) == 2
+    # Before answering the model was shown the rows the statement selected.
+    shown = prompts[1][-1]
+    assert shown.type == "tool"
+    assert json.loads(text_of(shown)) == RESULT
+    # What the answer must state is in the instructions the model was given, on every call.
+    for prompt in prompts:
+        instructions = text_of(prompt[0])
+        assert "Basis:" in instructions
+        assert "offer the SQL" in instructions
+        assert "2026-06-30" in instructions
 
 
-async def test_the_agent_calls_its_tool_and_answers() -> None:
+async def test_an_error_payload_triggers_one_repair() -> None:
+    guess = BREACHES.replace("c.current_value", "c.measured_value")
+    error = {
+        "error_kind": "execution_error",
+        "message": 'Binder Error: Table "c" does not have a column named "measured_value"\n\n'
+        'Candidate bindings: : "current_value"',
+    }
+    server = StubServer(error, RESULT)
     fakes = Fakes(
-        model=FakeChatModelProvider([calls_tool("greet", name="Ada"), "I said hello to Ada."])
+        model=FakeChatModelProvider(
+            [calls_tool(EXECUTE, sql=guess), calls_tool(EXECUTE, sql=BREACHES), ANSWER]
+        )
     )
     async with fakes.container() as services:
-        reply = await ask(services, context(), "Say hello to Ada.")
+        graph = build_graph(services, [server.tool()])
+        reply = await answer(graph, services, context(), "Which clients have a covenant in breach?")
 
-    assert reply == "I said hello to Ada."
+    assert reply == ANSWER
+    # One failure, one repaired statement; the repair is a new call, not a re-send.
+    assert server.statements == [guess, BREACHES]
     prompts = fakes.model.models[0].calls
-    assert prompts[0][0].type == "system"
-    # The model is shown the tool result marked as data, not as an instruction.
-    assert prompts[1][-1].content == frame_untrusted("greet", "Hello, Ada!")
-    # Every model call and tool call is on the audit log, under the agent's name.
-    assert [record.event for record in fakes.audit.records] == [
-        "model.call",
-        "tool.call",
-        "model.call",
-    ]
-    assert {record.application for record in fakes.audit.records} == {APPLICATION}
+    assert len(prompts) == 3
+    # The repair is made with the failed statement and the server's own words in front of the
+    # model: the call it made, and the error the server returned for it.
+    repair_prompt = prompts[2]
+    failed_call, failure = repair_prompt[2], repair_prompt[3]
+    assert isinstance(failed_call, AIMessage)
+    assert failed_call.tool_calls[0]["args"]["sql"] == guess
+    assert json.loads(text_of(failure)) == error
+
+
+async def test_the_system_prompt_carries_schema_and_examples() -> None:
+    fakes = Fakes(model=FakeChatModelProvider(["one", "two"]))
+    async with fakes.container() as services:
+        graph = build_graph(services)
+        await answer(graph, services, context(), "first question")
+        await answer(graph, services, context(subject="u-2", thread="th-2"), "second question")
+
+    first = fakes.model.models[0].calls[0][0]
+    second = fakes.model.models[0].calls[1][0]
+    # The instructions are one static block, marked as the reusable prefix a provider caches.
+    assert first.type == "system"
+    assert first.additional_kwargs["agentlib_static_prefix"] is True
+    assert isinstance(first.content, list)
+    assert len(first.content) == 1
+    block = first.content[0]
+    assert isinstance(block, dict)
+    prompt = block["text"]
+    assert prompt == system_prompt()
+    assert schema_document() in prompt
+    assert load_prompt("examples", EXAMPLES_VERSION) in prompt
+    # Nothing in it varies by caller, thread or question, so every request shares the cache.
+    assert second.content == first.content
 
 
 async def test_the_agent_remembers_a_conversation_per_caller() -> None:

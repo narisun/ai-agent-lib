@@ -69,13 +69,6 @@ samples:
     expect: allow
     reason: rmqna-uses-its-models
 
-  - name: rmqna calls its own tool
-    action: tool.call
-    application: rmqna
-    resource: greet
-    expect: allow
-    reason: rmqna-calls-its-own-tools
-
   - name: rmqna may not call a tool no rule names
     action: tool.call
     application: rmqna
@@ -90,6 +83,30 @@ samples:
     classification: confidential
     expect: allow
     reason: rmqna-calls-rmqna-data
+
+  - name: rmqna looks up values at rmqna-data
+    action: tool.call
+    application: rmqna
+    resource: "rmqna-data/rmqna-data.search_column_values"
+    classification: confidential
+    expect: allow
+    reason: rmqna-calls-rmqna-data
+
+  - name: rmqna reads the schema at rmqna-data
+    action: tool.call
+    application: rmqna
+    resource: "rmqna-data/rmqna-data.get_schema"
+    classification: internal
+    expect: allow
+    reason: rmqna-calls-rmqna-data
+
+  - name: rmqna may not call a tool of another server
+    action: tool.call
+    application: rmqna
+    resource: "other-server/rmqna-data.execute_sql"
+    classification: confidential
+    expect: deny
+    reason: no_matching_rule
 
   - name: rmqna may not see restricted data through rmqna-data
     action: tool.call

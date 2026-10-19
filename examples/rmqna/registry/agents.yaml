@@ -5,7 +5,7 @@ agents:
 - id: rmqna
   owner: commercial-banking
   version: 0.1.0
-  description: Greets people by name.
+  description: Answers relationship-manager questions by writing and running read-only SQL over the client data.
   mcp_servers:
   - rmqna-data
   model_aliases:

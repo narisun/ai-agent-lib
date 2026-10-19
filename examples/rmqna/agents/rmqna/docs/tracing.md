@@ -69,8 +69,8 @@ Agent Lab process. Operational telemetry keeps its existing destination.
 
 ## 4. Inspect a conversation
 
-Select **rmqna** in Agent Lab. Ask `My name is Ada. Please greet me.` and
-then `What is my name?` in the same chat. Use a real model to exercise tool choices;
+Select **rmqna** in Agent Lab. Ask `Which Canadian clients are there?` and
+then `Which of them has the largest facility?` in the same chat, with `rmqna-data` running. Use a real model to exercise tool choices;
 the default fake model echoes input, while the tests script its tool calls.
 
 Select **Open trace in Agent Lab** beneath either answer; it opens the trace in

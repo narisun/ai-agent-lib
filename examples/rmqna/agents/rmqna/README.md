@@ -1,6 +1,6 @@
 # rmqna
 
-Greets people by name.
+Answers relationship-manager questions by writing and running read-only SQL over the client data.
 
 This LangGraph agent has a model node and a tool node. The library supplies
 model and tool wrappers that apply permissions, limits, and audit recording,
@@ -35,7 +35,7 @@ Choose a test for the behavior you want to change:
 
 | To change | Start in this service folder |
 | --- | --- |
-| What a tool does | `tests/test_rmqna.py`, the function tests |
+| What the prompt says, and how it is put together | `tests/test_prompts.py` |
 | How the agent behaves | `tests/test_rmqna.py`, the scripted model tests |
 | What the rules allow | `tests/test_rmqna_as_configured.py` |
 | HTTP requests and streaming | `tests/test_rmqna_service.py` |
@@ -104,7 +104,7 @@ from urllib.request import Request, urlopen
 stream = False
 route = "/invoke/stream" if stream else "/invoke"
 payload = {
-    "input": {"question": "Say hello to Ada."},
+    "input": {"question": "Which clients have a covenant in breach?"},
     "thread_id": "demo",
 }
 request = Request(
@@ -127,7 +127,7 @@ In the request terminal, select Python again and run:
 ```
 
 **Expected result:** the response contains `output.answer`. With the fake model
-its value is `fake: Say hello to Ada.`; a real model chooses its own wording.
+its value is `fake: Which clients have a covenant in breach?`; a real model chooses its own wording.
 Press Ctrl+C in each server terminal when you are finished.
 
 ### Ask a question from the command line
@@ -136,7 +136,7 @@ After preparing the model and starting any required MCP servers, you can
 also ask one question directly. This command exits after printing the answer:
 
 ```bat
-"%PYTHON%" -m rmqna "Say hello to Ada."
+"%PYTHON%" -m rmqna "Which clients have a covenant in breach?"
 ```
 
 The local development identity supplies the caller when no token is sent.
@@ -149,21 +149,26 @@ These paths are relative to this service folder:
 
 | File | What it contains |
 | --- | --- |
-| `src/rmqna/tools.py` | Plain Python tool functions |
+| `src/rmqna/prompts/` | The versioned prompt: instructions, schema document, examples |
 | `src/rmqna/graph.py` | Graph construction and governed components |
 | `src/rmqna/__main__.py` | The command-line entry point |
 | `src/rmqna/service.py` | The HTTP entry point and streaming |
 | `.env.example` | Committed example settings used by tests |
 
-## Add a tool
+## Change what the agent does
 
-1. Write a failing function test in `tests/test_rmqna.py`.
-2. Implement the function in `src/rmqna/tools.py` and add it to the list
-   in `src/rmqna/graph.py`.
-3. Add its name to `rmqna-calls-its-own-tools` in the workspace's
-   `policies/agentlib/rules/data.yaml` and add a policy sample. Unlisted tools
-   are denied; test this with `tests/test_rmqna_as_configured.py`.
-4. Run the workspace checks:
+The agent has no tools of its own: everything it can do is a tool of `rmqna-data`, and how it
+uses them (clarify, look a name up, write SQL, repair from an error, re-examine an empty
+result, answer with its basis) is written in the prompt, not in code.
+
+1. Never edit a prompt file in place. Copy `src/rmqna/prompts/system_v1.md` (or `examples_v1.md`)
+   to `_v2`, change the copy, and move the pin in `src/rmqna/prompts/__init__.py`. A running
+   agent never changes under a deployed version.
+2. The schema document is rendered, not written: change `tools/schema_notes.toml` or the data
+   in the workspace root and run `python -m tools.build_schema`.
+3. Every statement in the worked examples is run against the real engine by the workspace's
+   `tests/test_examples.py`, and what the prompt says about the server's limits and refusals is
+   checked against the server by `tests/test_prompt_contract.py`. Run the workspace checks:
 
    ```bat
    "%PYTHON%" -m ai_agent_lib_cli check
@@ -175,12 +180,13 @@ Start with this agent's scripted example, from the workspace root:
 
 ```bat
 "%PYTHON%" -m rmqna.examples.trace_react
-"%PYTHON%" examples\read_trace.py agents/rmqna/.agentlib/react-demo.jsonl --last 6
+"%PYTHON%" examples\read_trace.py agents/rmqna/.agentlib/react-demo/model-trace.jsonl --last 6
 ```
 
-It uses this graph and the local `greet` tool, with scripted model replies and
-an in-memory checkpoint. Expect 2, 4, and 6 messages on successive model calls.
-It supplies its own test providers and runs with the services stopped.
+It runs this graph against the real `rmqna-data` server in the same process, with scripted
+model replies: the model's SQL runs on the real engine, so the trace shows the tool call
+and the framed rows. Expect 2, 4, 6 and 8 messages on successive model calls. It needs no
+running service and writes `agents/rmqna/.agentlib/react-demo/model-trace.jsonl`.
 
 To try Anthropic, follow [this agent's setup instructions](docs/anthropic-example.md),
 then run:
@@ -192,8 +198,9 @@ then run:
 This sends two questions on one thread, prints the checkpoints and model trace,
 and saves the files under `agents/rmqna/.agentlib/anthropic-demo/`.
 It uses your configured model and API tokens. Add `--thread "your-thread-id"`
-to continue a saved conversation. The examples offer the local greeting tool;
-the normal CLI and HTTP entry points also discover any linked MCP tools.
+to continue a saved conversation. This example builds the graph without MCP tools, so
+the model answers from the schema document in its prompt; the normal CLI and HTTP entry
+points also discover the linked MCP tools.
 
 The [annotated verified run](../../docs/verified-anthropic-run.md) explains how
 the tool result and saved first turn became model input in a real Anthropic run.
@@ -209,8 +216,8 @@ AC2_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl
 Run a question with a named conversation after starting any required MCP servers:
 
 ```bat
-"%PYTHON%" -m rmqna "My name is Ada. Please greet me." --thread debug-ada
-"%PYTHON%" -m rmqna "What is my name?" --thread debug-ada
+"%PYTHON%" -m rmqna "Which Canadian clients are there?" --thread debug-canada
+"%PYTHON%" -m rmqna "Which of them has the largest facility?" --thread debug-canada
 ```
 
 Open `agents/rmqna/.agentlib/model-trace.jsonl`. Each line is a JSON event:
@@ -235,7 +242,7 @@ passes the messages to its model node. That node prepends the system prompt.
 After a tool call, the next model request includes the AI tool call and the tool
 result. The model can then answer or request another tool.
 
-Reuse `--thread debug-ada`, or the same HTTP `thread_id`, with the same caller
+Reuse `--thread debug-canada`, or the same HTTP `thread_id`, with the same caller
 and application to continue. Use a new thread ID for a separate conversation.
 The default fake model echoes questions; tests use scripted replies to exercise
 the tool loop. Checkpointing retains history; your graph decides what to send

@@ -21,8 +21,8 @@ from rmqna.settings import ENV_FILE
 
 SERVICE = ENV_FILE.parent
 QUESTIONS = (
-    "My name is Ada. Could you use the greet tool to greet me?",
-    "What is my name, and what did the greeting tool say? Use our conversation so far.",
+    "Which tables describe a client's credit facilities?",
+    "Which of those holds covenant tests? Use our conversation so far.",
 )
 
 
@@ -40,8 +40,9 @@ async def run_two_turns(
     history: list[dict[str, Any]] = []
     async with ServiceContainer(config, providers) as services:
         await services.validate()
-        # This walkthrough offers the local greet tool. MCP discovery belongs
-        # to the normal agent entry points, documented in the agent's README.
+        # This walkthrough builds the graph without MCP tools, so the model answers from the
+        # schema document in its prompt alone. MCP discovery belongs to the normal agent entry
+        # points, documented in the agent's README; trace_react runs the tool loop.
         graph = build_graph(services)
         for turn, question in enumerate(QUESTIONS, start=1):
             # Authenticate each request separately: same conversation, fresh request ID.
