@@ -16,6 +16,7 @@ JOIN facilities f ON f.facility_id = c.facility_id
 JOIN accounts a ON a.uen = f.uen
 WHERE c.in_compliance = false
 ORDER BY a.name, f.facility_id, c.name
+LIMIT 20
 ```
 
 Answer:
@@ -44,8 +45,8 @@ WITH latest AS (
   QUALIFY as_of = max(as_of) OVER (PARTITION BY facility_id)
 )
 SELECT a.name AS client,
-       SUM(l.drawn) AS drawn,
-       SUM(f.commitment) AS committed,
+       ROUND(SUM(l.drawn), 0) AS drawn,
+       ROUND(SUM(f.commitment), 0) AS committed,
        ROUND(100 * SUM(l.drawn) / SUM(f.commitment), 1) AS utilization_pct
 FROM latest l
 JOIN facilities f ON f.facility_id = l.facility_id
@@ -53,6 +54,7 @@ JOIN accounts a ON a.uen = f.uen
 GROUP BY a.name
 HAVING SUM(l.drawn) / SUM(f.commitment) > 0.8
 ORDER BY utilization_pct DESC
+LIMIT 20
 ```
 
 Answer:
@@ -121,6 +123,7 @@ WHERE stage IN ('Prospecting', 'Qualification', 'Proposal', 'Negotiation')
   AND close_date BETWEEN DATE '2026-06-30' AND DATE '2026-06-30' + INTERVAL 90 DAY
 GROUP BY product
 ORDER BY weighted_pipeline_usd DESC
+LIMIT 20
 ```
 
 Answer:
@@ -156,12 +159,13 @@ exposure AS (
   FROM facilities
   GROUP BY uen
 )
-SELECT a.name AS client, p.open_pipeline, e.exposure
+SELECT a.name AS client, ROUND(p.open_pipeline, 0) AS open_pipeline, ROUND(e.exposure, 0) AS exposure
 FROM pipeline p
 JOIN accounts a ON a.uen = p.uen
 LEFT JOIN exposure e ON e.uen = p.uen
 WHERE p.open_pipeline > 5000000
 ORDER BY p.open_pipeline DESC
+LIMIT 20
 ```
 
 Answer:
@@ -190,12 +194,13 @@ Turn the typed name into the stored value before filtering on it; never guess a 
 One match, so filter on that exact value:
 
 ```sql
-SELECT o.name AS deal, o.product, o.stage, o.amount, o.probability, o.close_date
+SELECT o.name AS deal, o.product, o.stage, ROUND(o.amount, 0) AS amount, o.probability, o.close_date
 FROM opportunities o
 JOIN accounts a ON a.uen = o.uen
 WHERE a.name = 'Wawona Packing Co., LLC'
   AND o.stage IN ('Prospecting', 'Qualification', 'Proposal', 'Negotiation')
 ORDER BY o.close_date
+LIMIT 20
 ```
 
 Answer:
@@ -227,6 +232,7 @@ JOIN rating cur ON cur.label = m.risk_rating
 JOIN rating prev ON prev.label = m.prior_risk_rating
 WHERE cur.number > prev.number
 ORDER BY cur.number - prev.number DESC, a.name
+LIMIT 20
 ```
 
 Answer:
@@ -252,6 +258,7 @@ WHERE rail = 'wire' AND direction = 'outbound'
   AND value_date <= DATE '2026-06-30'
 GROUP BY currency
 ORDER BY total_value DESC
+LIMIT 20
 ```
 
 Answer:
@@ -262,8 +269,8 @@ Answer:
 > | USD | 1,252 | 622.6M |
 > | CAD | 1,363 | 483.7M |
 > | CNY | 240 | 437.6M |
-> | EUR | 214 | 90.9M |
 > | JPY | 12 | 381.9M |
+> | EUR | 214 | 90.9M |
 >
 > Basis: transactions with rail = 'wire' and direction = 'outbound' (from the client's side, so
 > payables), value dates 2025-07-01 to 2026-06-30. Each total is in its own currency; I have not
@@ -282,6 +289,7 @@ JOIN credit_metrics c ON c.uen = a.uen
 JOIN benchmarks b ON b.naics_industry = a.naics_code // 10 AND b.indicator = 'Debt Service Coverage'
 WHERE c.debt_service_coverage < b.cohort_avg
 ORDER BY c.debt_service_coverage - b.cohort_avg
+LIMIT 20
 ```
 
 Answer:
@@ -299,20 +307,22 @@ Question: Which are our five largest facilities by commitment, and who borrows t
 First attempt. The column name was guessed:
 
 ```sql
-SELECT a.name AS client, f.facility_id, f.committed_amount
+SELECT a.name AS client, f.facility_id, ROUND(f.committed_amount, 0) AS commitment,
+       ROUND(f.our_hold, 0) AS our_hold
 FROM facilities f
 JOIN accounts a ON a.uen = f.uen
 ORDER BY f.committed_amount DESC
 LIMIT 5
 ```
 
-`execute_sql` returns `{"error_kind": "execution_error", "message": "Binder Error: Table \"f\" does not have a column named \"committed_amount\"\n\nCandidate bindings: : \"commitment\"\n\nLINE 1: SELECT a.name AS client, f.facility_id, f.committed_amount FROM facilities AS f JOIN accounts AS...\n                                                ^"}`.
+`execute_sql` returns `{"error_kind": "execution_error", "message": "Binder Error: Table \"f\" does not have a column named \"committed_amount\"\n\nCandidate bindings: : \"commitment\"\n\nLINE 1: SELECT a.name AS client, f.facility_id, ROUND(f.committed_amount, 0) AS commitment, ROUND(f.our_hold,...\n                                                      ^"}`.
 
 That is a normal result, not a failure of the tool. The message names the bad column and the
 candidate. This is repair 1 of at most 2: change only what the message points at.
 
 ```sql
-SELECT a.name AS client, f.facility_id, f.commitment, f.our_hold
+SELECT a.name AS client, f.facility_id, ROUND(f.commitment, 0) AS commitment,
+       ROUND(f.our_hold, 0) AS our_hold
 FROM facilities f
 JOIN accounts a ON a.uen = f.uen
 ORDER BY f.commitment DESC

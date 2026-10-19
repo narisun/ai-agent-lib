@@ -85,6 +85,55 @@ def test_the_limits_the_prompt_states_are_the_servers() -> None:
     assert f"At most {engine_module.VALUES_CAP} come back" in INSTRUCTIONS
 
 
+async def test_the_two_caps_behave_as_the_prompt_says(engine: RmqnaEngine) -> None:
+    # The row cap cuts the result and says so.
+    cut = await engine.execute("SELECT * FROM transactions")
+    assert (cut.row_count, cut.truncated) == (engine_module.DEFAULT_ROW_CAP, True)
+
+    # The byte ceiling does not cut: it refuses, as an execution_error, with the engine's words.
+    with pytest.raises(SqlRefused) as refused:
+        await engine.execute("SELECT list(t) FROM transactions t")
+    assert refused.value.error_kind == "execution_error"
+    ceiling = f"{engine_module.DEFAULT_MAX_RESULT_BYTES // 2**20} MB"
+    refusal = f"larger than {ceiling} once serialized"
+    assert refusal in refused.value.message
+
+    # The prompt says the same: where the row cap sets truncated, and that the size refusal is an
+    # execution_error that is neither cut nor flagged, quoted so the model can recognise it.
+    rows = next(line for line in INSTRUCTIONS.splitlines() if "cut at 200 rows" in line)
+    assert f"cut at {engine_module.DEFAULT_ROW_CAP} rows (truncated is true when it is)" in rows
+    size = next(line for line in INSTRUCTIONS.splitlines() if line.startswith("- Size:"))
+    assert refusal in size
+    assert "execution_error, never cut and never flagged truncated" in size
+    repair = INSTRUCTIONS.split("### Repairing a refused or failed statement")[1]
+    assert f"The result is {refusal}" in repair
+    # No sentence about the 2 MB ceiling says that truncated is set by it.
+    for sentence in re.split(r"(?<=[.:;])\s", INSTRUCTIONS):
+        if ceiling in sentence:
+            assert "truncated is true" not in sentence, sentence
+    # And the remedies the engine gives are the ones the prompt gives.
+    for remedy in ["fewer columns", "filter", "aggregate", "LIMIT", "list, array_agg, string_agg"]:
+        assert remedy in refused.value.message, remedy
+        assert remedy in size, remedy
+
+
+async def test_unknown_names_are_the_error_kinds_the_prompt_says(engine: RmqnaEngine) -> None:
+    async def kind_of(call: typing.Awaitable[object]) -> str:
+        with pytest.raises(SqlRefused) as refused:
+            await call
+        return refused.value.error_kind
+
+    # In a statement an unknown table is unknown_table but an unknown column is DuckDB's own error;
+    # search_column_values says unknown_table for either.
+    assert await kind_of(engine.execute("SELECT uen FROM customers")) == "unknown_table"
+    assert await kind_of(engine.execute("SELECT no_such FROM accounts")) == "execution_error"
+    assert await kind_of(engine.values("customers", "name", "x")) == "unknown_table"
+    assert await kind_of(engine.values("accounts", "no_such", "x")) == "unknown_table"
+    bullet = next(line for line in INSTRUCTIONS.splitlines() if line.startswith("- unknown_table:"))
+    assert "from search_column_values, a table or column" in bullet
+    assert "An unknown column inside a statement is an execution_error" in bullet
+
+
 # What the cheat-sheet says is not available. Each is refused by the real validator, with the
 # error kind the repair list teaches for it.
 REFUSED = [
@@ -98,6 +147,10 @@ REFUSED = [
     ("generate_series", "SELECT * FROM generate_series(1, 10)", "forbidden_function"),
     ("unnest", "SELECT unnest([1, 2, 3])", "forbidden_function"),
     ("repeat", "SELECT repeat('a', 3)", "forbidden_function"),
+    ("generate_subscripts", "SELECT generate_subscripts([1, 2, 3], 1)", "forbidden_function"),
+    ("list_resize", "SELECT list_resize([1], 3)", "forbidden_function"),
+    ("array_resize", "SELECT array_resize([1], 3)", "forbidden_function"),
+    ("equi_width_bins", "SELECT equi_width_bins(0.0, 1.0, 3, false)", "forbidden_function"),
     ("rpad", "SELECT rpad(name, 40, ' ') FROM accounts", "forbidden_function"),
     ("lpad", "SELECT lpad(name, 40, ' ') FROM accounts", "forbidden_function"),
     ("printf", "SELECT printf('%d', 1)", "forbidden_function"),
@@ -131,21 +184,11 @@ def test_the_prompt_lists_what_it_says_is_unavailable() -> None:
     unavailable = next(
         line for line in INSTRUCTIONS.splitlines() if line.startswith("- Not available")
     )
-    generators = [
-        "range",
-        "generate_series",
-        "unnest",
-        "repeat",
-        "rpad",
-        "lpad",
-        "printf",
-        "format",
-    ]
-    # Every generator the prompt lists is one the server refuses, and the other way round for the
-    # ones a model might reach for.
-    assert set(generators) <= validate_module._GENERATORS
-    for name in generators:
-        assert re.search(rf"\b{name}\b", unavailable), name
+    # The generators the prompt lists are exactly the ones the server denies: one the prompt omits
+    # is a repair the model spends twice, and one it adds is a refusal that never happens. A
+    # function added to the server's list fails here until the prompt names it.
+    listed = unavailable.split("PIVOT and UNPIVOT; ")[1].split(";")[0]
+    assert set(re.findall(r"[a-z_]+", listed)) - {"and"} == validate_module._GENERATORS
     for phrase in ["PIVOT and UNPIVOT", "UNION, EXCEPT and INTERSECT", "recursive CTEs"]:
         assert phrase in unavailable, phrase
     assert "schema-qualified names" in unavailable

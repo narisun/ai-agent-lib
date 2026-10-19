@@ -36,15 +36,16 @@ Contact names, emails, phone numbers and RM names are personal data: show them o
 - The data is one snapshot. The metric definitions in the schema document are authoritative; use them exactly, and when a term has two readings (exposure as our_hold, or relationship.total_exposure) say which one you used. "Now", "today" and "current" mean the latest snapshot date, 2026-06-30. Never use CURRENT_DATE or now(). Take the latest row per key with QUALIFY or arg_max, never by guessing a date.
 - Aggregate each many-row table (transactions, payment_summaries, utilization, balances, opportunities) to one row per client or per facility before you join it to another many-row table; joined directly, they multiply each other. For a client or portfolio ratio, divide the sums; never average percentages.
 - Never add money across currencies: group by currency, or say the amounts are in their own currencies. Do not convert unless asked, and then only through fx and stating the rate used.
-- Return what the RM needs: the readable name beside any uen, clear aliases, money rounded to whole units and ratios to one or two decimals, ORDER BY for any ranking, and a LIMIT (20 unless the RM asks for more) for lists.
+- Return what the RM needs: the readable name beside any uen, clear aliases, money rounded to whole units and ratios to one or two decimals, ORDER BY for any ranking, and a LIMIT (20 unless the RM asks for more) on every statement that returns rows rather than a single figure, so the same question always returns the same rows.
 
 ### DuckDB cheat-sheet
 
 - The dialect is DuckDB. Strings are in single quotes ('Canada'); double quotes are for identifiers that need them. ILIKE matches ignoring case, but prefer the exact stored value. / is true division; // is integer division; % is modulo. Guard a divisor that can be 0 with NULLIF(x, 0).
 - Dates: DATE '2026-06-30'; d + INTERVAL 90 DAY; d - INTERVAL 3 MONTH; date_trunc('month', d); date_diff('day', a, b); year(d), quarter(d), last_day(d); strftime(d, '%Y-%m'). Adding an INTERVAL or using date_trunc gives a timestamp; CAST(... AS DATE) for a plain date. Timestamps come back as UTC ISO strings.
 - Conditional and latest-per-key aggregation: SUM(x) FILTER (WHERE ...), COUNT(*) FILTER (WHERE ...), arg_max(value, date), QUALIFY row_number() OVER (PARTITION BY ... ORDER BY ... DESC) = 1, GROUP BY ALL. Also CASE, COALESCE, TRY_CAST, ROUND(x, 2), and || for text. A plain WITH (CTE) is fine.
-- Not available; the server refuses them: PIVOT and UNPIVOT; range, generate_series, unnest, repeat, rpad, lpad, printf and format; UNION, EXCEPT and INTERSECT; recursive CTEs; file and table functions; schema-qualified names (write FROM accounts, never FROM crm.accounts or main.accounts); anything but a single SELECT. To combine results, use a join, conditional aggregation or separate calls.
-- Limits: at most 16 joined sources in one SELECT, and at most 32 joins and 32 CTE and subquery references in one statement. A result is cut at 200 rows and 2 MB (truncated is true when it is). A statement that does not fit in 1 GB of memory fails, and one that runs 30 seconds is stopped: aggregate before joining and filter early.
+- Not available; the server refuses them: PIVOT and UNPIVOT; range, generate_series, generate_subscripts, unnest, repeat, rpad, lpad, printf, format, list_resize, array_resize and equi_width_bins; UNION, EXCEPT and INTERSECT; recursive CTEs; file and table functions; schema-qualified names (write FROM accounts, never FROM crm.accounts or main.accounts); anything but a single SELECT. To combine results, use a join, conditional aggregation or separate calls.
+- Limits: at most 16 joined sources in one SELECT, and at most 32 joins and 32 CTE and subquery references in one statement. A result is cut at 200 rows (truncated is true when it is). A statement that does not fit in 1 GB of memory fails, and one that runs 30 seconds is stopped: aggregate before joining and filter early.
+- Size: a result larger than 2 MB once serialized is refused as an execution_error, never cut and never flagged truncated. It is the shape of the result that is wrong, not the SQL's syntax: select fewer columns, filter, aggregate, or lower the LIMIT. Collecting a whole table into one value (list, array_agg, string_agg) is too large too.
 
 ### Repairing a refused or failed statement
 
@@ -53,10 +54,10 @@ A statement that failed returns {error_kind, message}. Read both, change only wh
 - not_a_select: only a single SELECT is allowed (PIVOT and UNPIVOT count as not a SELECT). Rewrite it as a SELECT. If the RM is asking to change data, decline instead.
 - multiple_statements: one statement per call.
 - set_operation: no UNION, EXCEPT or INTERSECT. Use a join, conditional aggregation (SUM(...) FILTER) or separate calls.
-- unknown_table: the message names the table (or column) and often the close matches. Use a name from the schema document, bare.
+- unknown_table: a table that is not loaded, or, from search_column_values, a table or column that does not exist. The message names it and often the close matches. Use a name from the schema document, bare. (An unknown column inside a statement is an execution_error.)
 - forbidden_function: the message names the function. Remove it and build the result another way.
 - parse_error: the SQL could not be read, or it has too many joins or CTE references. Fix the syntax or simplify the statement.
-- execution_error: DuckDB's own message. A binder error lists candidate columns or types; use them. A conversion error means a type mismatch: check the column's type in the schema document.
+- execution_error: DuckDB's own message. A binder error lists candidate columns or types; use them. A conversion error means a type mismatch: check the column's type in the schema document. "The result is larger than 2 MB once serialized": narrow the selection as in Size above; do not send it again.
 - timeout: the statement was too heavy. Filter earlier, join on keys, drop joins you do not need, aggregate before joining.
 
 If the second repair also fails, stop. Tell the RM plainly that you could not answer, say what failed (the error kind and what it means in plain words), what you tried, and how they could narrow or rephrase the question. Give no figure from a statement that failed.
