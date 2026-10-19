@@ -30,6 +30,7 @@ from ai_agent_lib_cli.workspace import (
 )
 from ai_agent_lib_core.adapters import OpaPolicyDecisionPoint
 from ai_agent_lib_core.config import Key, secret_key, variable_for
+from ai_agent_lib_core.config.bindings import legacy_spelling
 
 PINS = {"hello.greet": "ab" * 32, "hello.people_by_team": "cd" * 32}
 RULES = Path("policies/agentlib/rules/data.yaml")
@@ -131,6 +132,41 @@ def test_doctor_reports_broken_shared_files_and_unknown_services(
     assert "  FAIL  registries:" in capsys.readouterr().out
     assert run("doctor", "nobody", "--workspace", workspace) == 1
     assert "no service called 'nobody'" in capsys.readouterr().err
+
+
+def test_doctor_tells_a_deprecated_spelling_and_still_passes(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    env = workspace / "agents/hello-agent/.env"
+    current, old = variable_for(Key.MODEL_ID), legacy_spelling(variable_for(Key.MODEL_ID))
+    assert old.startswith("EAP_")  # the spelling the previous release documented
+    capsys.readouterr()
+
+    assert run("doctor", "hello-agent", "--workspace", workspace) == 0
+    assert "deprecated" not in capsys.readouterr().out  # canonical spellings are not told
+
+    env.write_text(
+        env.read_text(encoding="utf-8").replace(f"{current}=", f"{old}="), encoding="utf-8"
+    )
+    assert run("doctor", "hello-agent", "--workspace", workspace) == 0
+    out = capsys.readouterr().out
+    assert f"  ok    warning: {old} is deprecated; use {current} instead" in out
+    assert "FAIL" not in out
+    assert "Everything checked is usable." in out
+
+
+def test_doctor_fails_a_setting_that_carries_both_spellings_with_different_values(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    env = workspace / "agents/hello-agent/.env"
+    current = variable_for(Key.MODEL_ID)
+    old = legacy_spelling(current)
+    env.write_text(env.read_text(encoding="utf-8") + f"{old}=another-model\n", encoding="utf-8")
+    capsys.readouterr()
+
+    assert run("doctor", "hello-agent", "--workspace", workspace) == 1
+    out = capsys.readouterr().out
+    assert f"  FAIL  settings: {old} is deprecated and conflicts with {current}" in out
 
 
 def test_a_server_that_cannot_report_its_pins_fails_its_check(

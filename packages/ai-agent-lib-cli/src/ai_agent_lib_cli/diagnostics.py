@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from warnings import catch_warnings, simplefilter
 
 from ai_agent_lib_cli.errors import CliError
 from ai_agent_lib_cli.names import package_name
@@ -18,7 +19,7 @@ from ai_agent_lib_core.adapters import (
     RulesPolicyOptions,
     UuidGenerator,
 )
-from ai_agent_lib_core.config import DEFAULT_BINDINGS, load_service_config, service_resolver
+from ai_agent_lib_core.config import DEFAULT_BINDINGS, service_resolver
 from ai_agent_lib_core.config.phoenix import resolve_phoenix_settings
 from ai_agent_lib_core.contracts import AgentLibError, CheckResult
 from ai_agent_lib_core.di import diagnose
@@ -64,9 +65,14 @@ async def check_service(folder: Path) -> tuple[CheckResult, ...]:
             ),
         )
     try:
-        config = load_service_config(dotenv)
+        # The report below names each deprecated spelling itself, so the resolver's
+        # DeprecationWarning is not raised as well.
+        with catch_warnings():
+            simplefilter("ignore", DeprecationWarning)
+            resolution = service_resolver(dotenv).explain()
     except AgentLibError as problem:
         return (CheckResult.failed("settings", problem),)
+    config = resolution.config
     try:
         phoenix_resolution = resolve_phoenix_settings(dotenv)
     except AgentLibError as problem:
@@ -79,7 +85,16 @@ async def check_service(folder: Path) -> tuple[CheckResult, ...]:
             if phoenix_resolution.settings is None
             else "configuration valid (connectivity not checked)",
         )
-    return (CheckResult("settings", ok=True, detail="resolved"), phoenix, *await diagnose(config))
+    # A deprecated spelling still works, so it is told, not failed.
+    deprecated = tuple(
+        CheckResult("warning", ok=True, detail=warning) for warning in resolution.warnings
+    )
+    return (
+        CheckResult("settings", ok=True, detail="resolved"),
+        *deprecated,
+        phoenix,
+        *await diagnose(config),
+    )
 
 
 def _pins(

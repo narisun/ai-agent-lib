@@ -60,8 +60,9 @@ These changes landed afterward; each is documented where it is used and covered 
   their names.
 - The old `EAP_*` spellings keep working for one minor release and warn. A
   service logs one `WARNING` line per name that names its replacement (for
-  example `EAP_MODEL_ID is deprecated; use AC2_MODEL_ID instead`), and
-  `agentlib config explain` prints the same line. This covers every spelling the
+  example `EAP_MODEL_ID is deprecated; use AC2_MODEL_ID instead`); `agentlib
+  doctor` (as a passing `warning` check) and `agentlib config explain` print the
+  same line for the bound variables. This covers every spelling the
   library reads: the bound variables, the `SECRET_<NAME>` family, the Phoenix
   settings, Agent Lab's settings and the local launchers.
 - A value set in both spellings is safe only when the values are equal: equal
