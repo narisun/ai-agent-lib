@@ -74,7 +74,7 @@ in the `ai-agent-lib` repository and run:
 start-phoenix.bat setup
 ```
 
-The script installs `arize-phoenix==20.22.0` with pip into the package folder
+The script installs `arize-phoenix==20.21.1` with pip into the package folder
 `.agentlib\phoenix\.venv`, using your existing Python. Agent Lab and the agent
 keep their own `.venv` packages. All three run with the default Python
 executable, without using environment-local Python or pip binaries. You only
@@ -441,7 +441,7 @@ agent does not import the Phoenix server package.
 
 ### Remaining upstream warning
 
-Phoenix 20.22.0 can print SQLAlchemy's `Column-expression-level unary distinct()`
+The pinned Phoenix can print SQLAlchemy's `Column-expression-level unary distinct()`
 warning during startup or browsing. Its database queries use column-level
 `distinct()` where SQLAlchemy 2.1 expects
 [`select(...).distinct()`](https://docs.sqlalchemy.org/en/21/core/sqlelement.html#sqlalchemy.sql.expression.distinct).
@@ -461,7 +461,7 @@ agents keep their own model dependencies and can still send traces to Phoenix.
 
 | Symptom | Check |
 | --- | --- |
-| Package installation fails | Ask your package administrators for `arize-phoenix==20.22.0` and compatible wheels for your Python version and platform. |
+| Package installation fails | Ask your package administrators for `arize-phoenix==20.21.1` and compatible wheels for your Python version and platform. |
 | Phoenix environment is missing | Run `start-phoenix.bat setup` once, then retry `start-local.bat`. |
 | Port 6006 is in use | Stop a standalone Phoenix window before starting the combined stack. The launcher fails before starting services and leaves the existing process alone. |
 | Repeated connection errors on port 4318 | Set `AC2_TELEMETRY=off` for this local setup, or configure your separate operational collector. Restart the stack. |

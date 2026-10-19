@@ -15,9 +15,9 @@ if not __package__:
 
 from tools import package_runtime
 from tools.local_processes import Service, report, serve
+from tools.phoenix_server import PINNED_VERSION as VERSION
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "20.22.0"
 
 
 def setup(root: Path) -> None:
