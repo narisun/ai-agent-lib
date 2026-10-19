@@ -24,6 +24,7 @@ from mcp.server.mcpserver import MCPServer
 from mcp_types import CallToolResult
 
 from rmqna_data import APPLICATION, SERVER_ID, build_server
+from rmqna_data import validate as validate_module
 from rmqna_data.engine import ExecuteResult, ValuesResult
 from rmqna_data.server import add_tools
 from rmqna_data.settings import SCHEMA_PATH
@@ -81,6 +82,19 @@ async def test_the_sample_tools_are_gone(running: Running) -> None:
     names = {tool.name for tool in await server.list_tools()}
 
     assert names == {EXECUTE, VALUES, SCHEMA}
+
+
+async def test_the_tool_description_names_every_generator_the_validator_denies(
+    running: Running,
+) -> None:
+    _, server = running
+
+    tool = next(tool for tool in await server.list_tools() if tool.name == EXECUTE)
+
+    # The description is what the model reads before it writes SQL. One the server denies and the
+    # description omits is a refusal the model could have been spared.
+    for name in validate_module._GENERATORS:
+        assert name in (tool.description or ""), name
 
 
 async def test_an_analyst_and_a_manager_both_run_sql(running: Running) -> None:

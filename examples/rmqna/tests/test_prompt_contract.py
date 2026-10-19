@@ -155,6 +155,7 @@ REFUSED = [
     ("lpad", "SELECT lpad(name, 40, ' ') FROM accounts", "forbidden_function"),
     ("printf", "SELECT printf('%d', 1)", "forbidden_function"),
     ("format", "SELECT format('{}', 1)", "forbidden_function"),
+    ("concat_ws", "SELECT concat_ws(', ', name, uen) FROM accounts", "forbidden_function"),
     ("UNION", "SELECT uen FROM accounts UNION SELECT uen FROM facilities", "set_operation"),
     ("EXCEPT", "SELECT uen FROM accounts EXCEPT SELECT uen FROM facilities", "set_operation"),
     ("INTERSECT", "SELECT uen FROM accounts INTERSECT SELECT uen FROM facilities", "set_operation"),

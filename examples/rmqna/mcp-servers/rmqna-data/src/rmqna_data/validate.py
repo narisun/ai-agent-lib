@@ -153,9 +153,10 @@ _FORBIDDEN_FUNCTIONS: Final = frozenset(
 _FORBIDDEN_PREFIXES: Final = ("read_", "duckdb_", "pragma_", "parquet_")
 _FORBIDDEN_SUFFIXES: Final = ("_scan",)
 
-# Functions that make rows or memory out of a number. There is no use for one over this data, and
-# the engine's memory limit does not stop them (measured: repeat('a', 3e9) and unnest(range(0, 3e9))
-# both grow past 5 GB under a 1 GB limit). A table function that makes rows is also refused in FROM.
+# Functions that make rows or memory out of a number, or a wide string out of a separator. There is
+# no use for one over this data, and the engine's memory limit does not stop them (measured:
+# repeat('a', 3e9) and unnest(range(0, 3e9)) both grow past 5 GB under a 1 GB limit). A table
+# function that makes rows is also refused in FROM.
 # The list is the ones measured; replace() on a huge string and its kind are not on it.
 _GENERATORS: Final = frozenset(
     {
@@ -176,6 +177,9 @@ _GENERATORS: Final = frozenset(
         # A list of any length out of one number: equi_width_bins(0.0, amount, 1000000, false) per
         # row took 11 GB and ran 15 seconds past its timeout.
         "equi_width_bins",
+        # A string as wide as its separator, repeated between every argument: concat_ws with a
+        # 9000-character separator and 2000 arguments took 15.1 GB, inside the statement length cap.
+        "concat_ws",
     }
 )
 
@@ -418,8 +422,9 @@ def _refuse_functions(root: exp.Select) -> None:
             raise SqlRefused(
                 "forbidden_function",
                 f"The function {_generator_name(function, name)}() is not available: it makes "
-                "rows, or a string of any width, out of a number, and nothing over these tables "
-                "needs it. Aggregate or join the loaded tables instead.",
+                "rows, a list or a string of any size out of a number, or repeats or "
+                "concatenates text by a separator, and nothing over these tables needs it. "
+                "Aggregate or join the loaded tables instead.",
             )
         if _forbidden(name):
             raise SqlRefused(

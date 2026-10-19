@@ -346,6 +346,11 @@ def test_table_functions_are_refused(sql: str, function: str) -> None:
             "FROM transactions",
             "equi_width_bins",
         ),
+        # A long separator repeated between every argument: 15.1 GB in review, with a 9000-character
+        # separator and 2000 arguments, which fits inside the statement length cap.
+        ("SELECT length(concat_ws('" + "x" * 9000 + "'" + ", 'a'" * 2000 + "))", "concat_ws"),
+        ("SELECT concat_ws(', ', name, uen) FROM accounts", "concat_ws"),
+        ("SELECT generate_subscripts([1, 2, 3], 1)", "generate_subscripts"),
         ("SELECT printf('%2000000000d', 1)", "printf"),
         ("SELECT PRINTF('%5d', employees) FROM accounts", "printf"),
         ("SELECT format('{:>2000000000}', 1)", "format"),
@@ -362,6 +367,19 @@ def test_a_generator_of_rows_or_memory_is_refused_anywhere_in_the_statement(
     assert error.error_kind == "forbidden_function"
     assert any(name in error.message for name in function.split("|"))
     assert time.perf_counter() - started < 1  # refused at validation, never handed to DuckDB
+
+
+def test_the_generator_refusal_names_both_kinds_of_builder() -> None:
+    # The message is read by the model that must repair its SQL. It covers a builder out of a
+    # number (range, rpad) and one that concatenates or repeats text (concat_ws), not "a number"
+    # alone, which would not describe the second.
+    for sql in [
+        "SELECT rpad(name, 40, ' ') FROM accounts",
+        "SELECT concat_ws(',', name, uen) FROM accounts",
+    ]:
+        message = refused(sql).message.lower()
+        assert "number" in message and "concatenat" in message, sql
+        assert "aggregate or join" in message, sql
 
 
 def test_the_named_generators_are_not_a_blanket_bound_on_integer_arguments() -> None:
