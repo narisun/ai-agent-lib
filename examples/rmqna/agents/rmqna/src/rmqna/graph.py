@@ -1,0 +1,130 @@
+"""The agent graph: ordinary LangGraph, with five touchpoints into the library."""
+
+from __future__ import annotations
+
+from collections.abc import AsyncIterator, Sequence
+from typing import Annotated, Any, TypedDict
+
+from ai_agent_lib_core import RequestContext, ServiceContainer
+from langchain_core.messages import AnyMessage, HumanMessage, SystemMessage
+from langchain_core.tools import BaseTool
+from langgraph.graph import START, StateGraph
+from langgraph.graph.message import add_messages
+from langgraph.graph.state import CompiledStateGraph
+from langgraph.prebuilt import ToolNode, tools_condition
+
+from rmqna.tools import greet
+
+__all__ = [
+    "APPLICATION",
+    "State",
+    "answer",
+    "ask",
+    "build_graph",
+    "registered_mcp_tools",
+    "steps",
+]
+
+APPLICATION = "rmqna"
+"""The agent's name in the registry, in policy and in the audit log."""
+
+SYSTEM_PROMPT = (
+    "You are a friendly assistant. Use your tools when they help and never guess "
+    "what a tool would say. If a tool refuses, or finds nothing, say so."
+)
+
+
+class State(TypedDict):
+    """The graph state: the conversation so far."""
+
+    messages: Annotated[list[AnyMessage], add_messages]
+
+
+async def registered_mcp_tools(services: ServiceContainer) -> list[BaseTool]:
+    """Return the tools of every MCP server the registry lists for this agent."""
+    entry = services.registry.agents.get(APPLICATION)
+    tools: list[BaseTool] = []
+    for server in entry.mcp_servers if entry is not None else ():
+        tools += await services.mcp_tools(server)  # touchpoint 2
+    return tools
+
+
+def build_graph(
+    services: ServiceContainer, mcp_tools: Sequence[BaseTool] = ()
+) -> CompiledStateGraph[Any, Any, Any, Any]:
+    """Build the agent graph from governed parts.
+
+    Args:
+        services: A started service container.
+        mcp_tools: Governed tools of registered MCP servers, already loaded.
+    """
+    tools = services.tools([greet], read_only=["greet"])  # touchpoint 1
+    tools += mcp_tools
+    model = services.model("default").bind_tools(tools)  # touchpoint 3
+
+    async def agent(state: State) -> dict[str, list[AnyMessage]]:
+        reply = await model.ainvoke([SystemMessage(SYSTEM_PROMPT), *state["messages"]])
+        return {"messages": [reply]}
+
+    builder = StateGraph(State, context_schema=RequestContext)
+    builder.add_node("agent", agent)
+    builder.add_node("tools", ToolNode(tools))
+    builder.add_edge(START, "agent")
+    builder.add_conditional_edges("agent", tools_condition)
+    builder.add_edge("tools", "agent")
+    return builder.compile(**services.compile_kwargs())  # touchpoint 4
+
+
+async def answer(
+    graph: CompiledStateGraph[Any, Any, Any, Any],
+    services: ServiceContainer,
+    context: RequestContext,
+    question: str,
+) -> str:
+    """Run a built graph for one question on behalf of ``context``."""
+    result = await graph.ainvoke(
+        {"messages": [HumanMessage(question)]},
+        **services.invocation(context),  # touchpoint 5
+    )
+    return str(result["messages"][-1].text)
+
+
+async def steps(
+    graph: CompiledStateGraph[Any, Any, Any, Any],
+    services: ServiceContainer,
+    context: RequestContext,
+    question: str,
+) -> AsyncIterator[dict[str, Any]]:
+    """Run a built graph for one question and yield each step as it ends.
+
+    Each step names the graph node that ran and the messages it added, so a
+    caller sees tool calls and the answer as they happen.
+    """
+    async for update in graph.astream(
+        {"messages": [HumanMessage(question)]},
+        stream_mode="updates",
+        **services.invocation(context),
+    ):
+        for node, change in update.items():
+            added = change.get("messages", []) if isinstance(change, dict) else []
+            yield {
+                "node": node,
+                "messages": [
+                    {
+                        "type": message.type,
+                        "content": str(message.content),
+                        "tool_calls": [call["name"] for call in getattr(message, "tool_calls", [])],
+                    }
+                    for message in added
+                ],
+            }
+
+
+async def ask(services: ServiceContainer, context: RequestContext, question: str) -> str:
+    """Build the graph, with the tools of its MCP servers, and ask one question.
+
+    The command line uses this. A service builds the graph once and calls
+    :func:`answer` for every request.
+    """
+    graph = build_graph(services, await registered_mcp_tools(services))
+    return await answer(graph, services, context, question)

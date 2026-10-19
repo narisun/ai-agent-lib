@@ -1,0 +1,477 @@
+naics_industry,sector,indicator,external_macro,cohort_avg,unit,higher_is_better
+11121,"Agriculture, forestry, fishing and hunting",Revenue,60000000.00,64021633.64,usd,1
+11121,"Agriculture, forestry, fishing and hunting",EBITDA,4200000.00,3704959.14,usd,1
+11121,"Agriculture, forestry, fishing and hunting",Profit Margin,2.00,1.75,pct,1
+11121,"Agriculture, forestry, fishing and hunting",Debt/Net Worth (leverage),1.98,1.95,ratio,0
+11121,"Agriculture, forestry, fishing and hunting",Fixed Charge Coverage,1.15,1.27,ratio,1
+11121,"Agriculture, forestry, fishing and hunting",Debt Service Coverage,1.35,1.33,ratio,1
+11121,"Agriculture, forestry, fishing and hunting",Current Ratio,1.40,1.35,ratio,1
+11121,"Agriculture, forestry, fishing and hunting",OLBB,82.61,85.30,pct,1
+11121,"Agriculture, forestry, fishing and hunting",ACH Usage,90.90,89.81,pct,1
+11121,"Agriculture, forestry, fishing and hunting",EFT Usage,77.97,84.64,pct,1
+11121,"Agriculture, forestry, fishing and hunting",Wires Usage,57.93,56.26,pct,1
+11121,"Agriculture, forestry, fishing and hunting",Corporate Card,58.19,62.46,pct,1
+11121,"Agriculture, forestry, fishing and hunting",Cheques,83.67,87.15,pct,1
+11121,"Agriculture, forestry, fishing and hunting",Gross Margin,22.00,23.81,pct,1
+11133,"Agriculture, forestry, fishing and hunting",Revenue,60000000.00,57595581.07,usd,1
+11133,"Agriculture, forestry, fishing and hunting",EBITDA,4200000.00,3753275.91,usd,1
+11133,"Agriculture, forestry, fishing and hunting",Profit Margin,2.00,2.18,pct,1
+11133,"Agriculture, forestry, fishing and hunting",Debt/Net Worth (leverage),1.98,2.29,ratio,0
+11133,"Agriculture, forestry, fishing and hunting",Fixed Charge Coverage,1.15,0.98,ratio,1
+11133,"Agriculture, forestry, fishing and hunting",Debt Service Coverage,1.35,1.38,ratio,1
+11133,"Agriculture, forestry, fishing and hunting",Current Ratio,1.40,1.40,ratio,1
+11133,"Agriculture, forestry, fishing and hunting",OLBB,68.67,60.24,pct,1
+11133,"Agriculture, forestry, fishing and hunting",ACH Usage,68.39,66.86,pct,1
+11133,"Agriculture, forestry, fishing and hunting",EFT Usage,80.56,73.69,pct,1
+11133,"Agriculture, forestry, fishing and hunting",Wires Usage,69.55,61.39,pct,1
+11133,"Agriculture, forestry, fishing and hunting",Corporate Card,64.39,57.39,pct,1
+11133,"Agriculture, forestry, fishing and hunting",Cheques,90.98,84.61,pct,1
+11133,"Agriculture, forestry, fishing and hunting",Gross Margin,22.00,23.22,pct,1
+23622,Construction,Revenue,85000000.00,75150074.72,usd,1
+23622,Construction,EBITDA,2550000.00,2489967.14,usd,1
+23622,Construction,Profit Margin,1.00,1.12,pct,1
+23622,Construction,Debt/Net Worth (leverage),1.32,1.25,ratio,0
+23622,Construction,Fixed Charge Coverage,1.36,1.30,ratio,1
+23622,Construction,Debt Service Coverage,1.60,1.87,ratio,1
+23622,Construction,Current Ratio,1.50,1.63,ratio,1
+23622,Construction,OLBB,57.85,59.13,pct,1
+23622,Construction,ACH Usage,58.98,50.97,pct,1
+23622,Construction,EFT Usage,94.62,82.68,pct,1
+23622,Construction,Wires Usage,61.09,63.87,pct,1
+23622,Construction,Corporate Card,78.36,70.03,pct,1
+23622,Construction,Cheques,73.51,65.81,pct,1
+23622,Construction,Gross Margin,18.00,15.79,pct,1
+31120,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Revenue,110000000.00,106266933.29,usd,1
+31120,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EBITDA,14300000.00,16304279.38,usd,1
+31120,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Profit Margin,8.00,8.58,pct,1
+31120,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt/Net Worth (leverage),2.34,2.69,ratio,0
+31120,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Fixed Charge Coverage,1.32,1.13,ratio,1
+31120,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt Service Coverage,1.55,1.34,ratio,1
+31120,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Current Ratio,1.70,1.40,ratio,1
+31120,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",OLBB,58.49,61.41,pct,1
+31120,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",ACH Usage,67.50,60.95,pct,1
+31120,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EFT Usage,88.57,94.36,pct,1
+31120,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Wires Usage,82.03,78.77,pct,1
+31120,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Corporate Card,68.11,74.83,pct,1
+31120,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Cheques,62.29,63.26,pct,1
+31120,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Gross Margin,28.00,32.99,pct,1
+31141,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Revenue,110000000.00,90616963.60,usd,1
+31141,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EBITDA,14300000.00,15378825.93,usd,1
+31141,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Profit Margin,8.00,8.19,pct,1
+31141,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt/Net Worth (leverage),2.34,2.72,ratio,0
+31141,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Fixed Charge Coverage,1.32,1.56,ratio,1
+31141,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt Service Coverage,1.55,1.54,ratio,1
+31141,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Current Ratio,1.70,1.55,ratio,1
+31141,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",OLBB,92.88,93.76,pct,1
+31141,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",ACH Usage,94.37,98.89,pct,1
+31141,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EFT Usage,57.21,52.90,pct,1
+31141,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Wires Usage,62.81,59.91,pct,1
+31141,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Corporate Card,89.99,98.85,pct,1
+31141,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Cheques,70.87,65.41,pct,1
+31141,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Gross Margin,28.00,32.93,pct,1
+31142,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Revenue,110000000.00,95811100.72,usd,1
+31142,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EBITDA,14300000.00,15996038.07,usd,1
+31142,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Profit Margin,8.00,9.33,pct,1
+31142,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt/Net Worth (leverage),2.34,2.16,ratio,0
+31142,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Fixed Charge Coverage,1.32,1.53,ratio,1
+31142,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt Service Coverage,1.55,1.28,ratio,1
+31142,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Current Ratio,1.70,1.88,ratio,1
+31142,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",OLBB,91.84,94.05,pct,1
+31142,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",ACH Usage,60.38,54.08,pct,1
+31142,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EFT Usage,65.44,71.44,pct,1
+31142,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Wires Usage,56.78,60.61,pct,1
+31142,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Corporate Card,81.86,85.18,pct,1
+31142,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Cheques,81.73,74.14,pct,1
+31142,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Gross Margin,28.00,26.26,pct,1
+31151,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Revenue,110000000.00,109287956.05,usd,1
+31151,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EBITDA,14300000.00,12500839.41,usd,1
+31151,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Profit Margin,8.00,7.42,pct,1
+31151,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt/Net Worth (leverage),2.34,2.11,ratio,0
+31151,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Fixed Charge Coverage,1.32,1.10,ratio,1
+31151,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt Service Coverage,1.55,1.58,ratio,1
+31151,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Current Ratio,1.70,1.77,ratio,1
+31151,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",OLBB,59.53,57.70,pct,1
+31151,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",ACH Usage,80.26,77.77,pct,1
+31151,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EFT Usage,71.53,73.08,pct,1
+31151,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Wires Usage,86.95,92.97,pct,1
+31151,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Corporate Card,76.15,74.39,pct,1
+31151,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Cheques,58.74,64.00,pct,1
+31151,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Gross Margin,28.00,23.91,pct,1
+31161,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Revenue,110000000.00,100757577.57,usd,1
+31161,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EBITDA,14300000.00,16484331.17,usd,1
+31161,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Profit Margin,8.00,6.68,pct,1
+31161,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt/Net Worth (leverage),2.34,2.66,ratio,0
+31161,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Fixed Charge Coverage,1.32,1.44,ratio,1
+31161,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt Service Coverage,1.55,1.29,ratio,1
+31161,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Current Ratio,1.70,1.82,ratio,1
+31161,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",OLBB,70.30,75.81,pct,1
+31161,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",ACH Usage,60.18,53.64,pct,1
+31161,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EFT Usage,93.54,96.58,pct,1
+31161,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Wires Usage,75.48,76.27,pct,1
+31161,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Corporate Card,80.48,76.31,pct,1
+31161,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Cheques,81.52,73.59,pct,1
+31161,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Gross Margin,28.00,28.82,pct,1
+31180,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Revenue,110000000.00,92933891.29,usd,1
+31180,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EBITDA,14300000.00,11784434.21,usd,1
+31180,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Profit Margin,8.00,7.88,pct,1
+31180,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt/Net Worth (leverage),2.34,1.95,ratio,0
+31180,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Fixed Charge Coverage,1.32,1.18,ratio,1
+31180,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt Service Coverage,1.55,1.59,ratio,1
+31180,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Current Ratio,1.70,1.54,ratio,1
+31180,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",OLBB,92.47,91.63,pct,1
+31180,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",ACH Usage,89.23,90.41,pct,1
+31180,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EFT Usage,73.20,73.81,pct,1
+31180,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Wires Usage,60.32,51.37,pct,1
+31180,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Corporate Card,94.06,83.54,pct,1
+31180,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Cheques,71.03,62.32,pct,1
+31180,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Gross Margin,28.00,29.13,pct,1
+31191,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Revenue,110000000.00,127320503.24,usd,1
+31191,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EBITDA,14300000.00,15338179.39,usd,1
+31191,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Profit Margin,8.00,8.65,pct,1
+31191,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt/Net Worth (leverage),2.34,2.40,ratio,0
+31191,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Fixed Charge Coverage,1.32,1.36,ratio,1
+31191,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt Service Coverage,1.55,1.81,ratio,1
+31191,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Current Ratio,1.70,1.52,ratio,1
+31191,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",OLBB,56.41,56.79,pct,1
+31191,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",ACH Usage,60.92,65.80,pct,1
+31191,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EFT Usage,89.69,77.86,pct,1
+31191,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Wires Usage,66.75,64.15,pct,1
+31191,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Corporate Card,57.61,56.48,pct,1
+31191,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Cheques,85.20,81.16,pct,1
+31191,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Gross Margin,28.00,25.77,pct,1
+31199,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Revenue,110000000.00,119501776.77,usd,1
+31199,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EBITDA,14300000.00,13992876.38,usd,1
+31199,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Profit Margin,8.00,8.28,pct,1
+31199,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt/Net Worth (leverage),2.34,2.35,ratio,0
+31199,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Fixed Charge Coverage,1.32,1.43,ratio,1
+31199,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt Service Coverage,1.55,1.55,ratio,1
+31199,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Current Ratio,1.70,1.50,ratio,1
+31199,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",OLBB,72.69,64.68,pct,1
+31199,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",ACH Usage,82.14,82.64,pct,1
+31199,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EFT Usage,91.77,98.64,pct,1
+31199,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Wires Usage,85.49,74.17,pct,1
+31199,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Corporate Card,58.30,51.34,pct,1
+31199,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Cheques,70.28,68.29,pct,1
+31199,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Gross Margin,28.00,28.22,pct,1
+31212,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Revenue,110000000.00,104161337.27,usd,1
+31212,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EBITDA,14300000.00,13120421.87,usd,1
+31212,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Profit Margin,8.00,8.08,pct,1
+31212,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt/Net Worth (leverage),2.34,2.37,ratio,0
+31212,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Fixed Charge Coverage,1.32,1.53,ratio,1
+31212,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt Service Coverage,1.55,1.77,ratio,1
+31212,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Current Ratio,1.70,1.95,ratio,1
+31212,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",OLBB,75.25,74.49,pct,1
+31212,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",ACH Usage,56.22,57.59,pct,1
+31212,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EFT Usage,81.10,74.30,pct,1
+31212,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Wires Usage,90.16,90.67,pct,1
+31212,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Corporate Card,82.37,84.98,pct,1
+31212,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Cheques,68.34,58.40,pct,1
+31212,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Gross Margin,28.00,25.29,pct,1
+31213,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Revenue,110000000.00,122050560.90,usd,1
+31213,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EBITDA,14300000.00,15221008.94,usd,1
+31213,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Profit Margin,8.00,7.71,pct,1
+31213,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt/Net Worth (leverage),2.34,2.43,ratio,0
+31213,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Fixed Charge Coverage,1.32,1.17,ratio,1
+31213,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt Service Coverage,1.55,1.39,ratio,1
+31213,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Current Ratio,1.70,1.84,ratio,1
+31213,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",OLBB,56.76,55.13,pct,1
+31213,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",ACH Usage,81.21,87.82,pct,1
+31213,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EFT Usage,72.46,62.96,pct,1
+31213,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Wires Usage,55.60,59.41,pct,1
+31213,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Corporate Card,61.08,57.87,pct,1
+31213,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Cheques,55.34,47.75,pct,1
+31213,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Gross Margin,28.00,29.34,pct,1
+31321,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Revenue,110000000.00,117128098.23,usd,1
+31321,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EBITDA,14300000.00,12647759.71,usd,1
+31321,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Profit Margin,8.00,8.15,pct,1
+31321,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt/Net Worth (leverage),2.34,2.11,ratio,0
+31321,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Fixed Charge Coverage,1.32,1.42,ratio,1
+31321,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt Service Coverage,1.55,1.70,ratio,1
+31321,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Current Ratio,1.70,1.66,ratio,1
+31321,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",OLBB,57.72,56.11,pct,1
+31321,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",ACH Usage,73.52,72.76,pct,1
+31321,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EFT Usage,91.36,84.73,pct,1
+31321,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Wires Usage,67.58,62.26,pct,1
+31321,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Corporate Card,55.72,57.39,pct,1
+31321,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Cheques,71.35,75.36,pct,1
+31321,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Gross Margin,28.00,30.58,pct,1
+31412,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Revenue,110000000.00,114816474.93,usd,1
+31412,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EBITDA,14300000.00,13505983.33,usd,1
+31412,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Profit Margin,8.00,7.11,pct,1
+31412,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt/Net Worth (leverage),2.34,2.19,ratio,0
+31412,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Fixed Charge Coverage,1.32,1.18,ratio,1
+31412,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt Service Coverage,1.55,1.59,ratio,1
+31412,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Current Ratio,1.70,1.48,ratio,1
+31412,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",OLBB,84.00,90.77,pct,1
+31412,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",ACH Usage,79.39,68.06,pct,1
+31412,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EFT Usage,78.09,67.76,pct,1
+31412,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Wires Usage,76.90,76.00,pct,1
+31412,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Corporate Card,74.63,72.00,pct,1
+31412,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Cheques,62.96,56.04,pct,1
+31412,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Gross Margin,28.00,24.59,pct,1
+31491,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Revenue,110000000.00,124365253.21,usd,1
+31491,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EBITDA,14300000.00,13181486.32,usd,1
+31491,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Profit Margin,8.00,7.44,pct,1
+31491,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt/Net Worth (leverage),2.34,2.39,ratio,0
+31491,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Fixed Charge Coverage,1.32,1.34,ratio,1
+31491,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt Service Coverage,1.55,1.33,ratio,1
+31491,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Current Ratio,1.70,1.66,ratio,1
+31491,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",OLBB,92.27,96.39,pct,1
+31491,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",ACH Usage,87.39,92.19,pct,1
+31491,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EFT Usage,73.95,79.06,pct,1
+31491,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Wires Usage,76.28,65.32,pct,1
+31491,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Corporate Card,75.89,69.55,pct,1
+31491,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Cheques,69.10,69.09,pct,1
+31491,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Gross Margin,28.00,24.93,pct,1
+31521,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Revenue,110000000.00,104978045.13,usd,1
+31521,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EBITDA,14300000.00,14349501.71,usd,1
+31521,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Profit Margin,8.00,7.78,pct,1
+31521,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt/Net Worth (leverage),2.34,2.68,ratio,0
+31521,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Fixed Charge Coverage,1.32,1.44,ratio,1
+31521,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt Service Coverage,1.55,1.44,ratio,1
+31521,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Current Ratio,1.70,1.87,ratio,1
+31521,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",OLBB,69.21,75.23,pct,1
+31521,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",ACH Usage,90.34,85.24,pct,1
+31521,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EFT Usage,60.64,54.90,pct,1
+31521,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Wires Usage,77.57,68.21,pct,1
+31521,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Corporate Card,66.03,66.73,pct,1
+31521,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Cheques,94.65,85.19,pct,1
+31521,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Gross Margin,28.00,30.94,pct,1
+31522,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Revenue,697699970.73,682500000.00,usd,1
+31522,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EBITDA,90700996.20,84471989.72,usd,1
+31522,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Profit Margin,8.00,7.25,pct,1
+31522,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt/Net Worth (leverage),2.34,2.02,ratio,0
+31522,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Fixed Charge Coverage,1.32,1.41,ratio,1
+31522,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Debt Service Coverage,1.55,1.62,ratio,1
+31522,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Current Ratio,1.70,1.58,ratio,1
+31522,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",OLBB,68.75,64.84,pct,1
+31522,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",ACH Usage,79.86,80.23,pct,1
+31522,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",EFT Usage,76.17,78.87,pct,1
+31522,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Wires Usage,78.52,83.12,pct,1
+31522,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Corporate Card,57.20,61.39,pct,1
+31522,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Cheques,93.09,80.96,pct,1
+31522,"Manufacturing (food, beverage, tobacco, textile, apparel, leather)",Gross Margin,28.00,28.82,pct,1
+32221,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Revenue,150000000.00,174980570.05,usd,1
+32221,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",EBITDA,13500000.00,13136073.33,usd,1
+32221,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Profit Margin,4.00,3.95,pct,1
+32221,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Debt/Net Worth (leverage),2.13,2.20,ratio,0
+32221,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Fixed Charge Coverage,1.19,1.05,ratio,1
+32221,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Debt Service Coverage,1.40,1.36,ratio,1
+32221,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Current Ratio,1.75,1.64,ratio,1
+32221,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",OLBB,74.22,70.98,pct,1
+32221,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",ACH Usage,89.87,91.51,pct,1
+32221,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",EFT Usage,76.13,70.44,pct,1
+32221,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Wires Usage,64.93,65.39,pct,1
+32221,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Corporate Card,90.29,77.57,pct,1
+32221,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Cheques,72.69,78.69,pct,1
+32221,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Gross Margin,24.00,23.47,pct,1
+32561,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Revenue,150000000.00,131030213.65,usd,1
+32561,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",EBITDA,13500000.00,11662670.29,usd,1
+32561,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Profit Margin,4.00,4.51,pct,1
+32561,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Debt/Net Worth (leverage),2.13,2.46,ratio,0
+32561,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Fixed Charge Coverage,1.19,1.27,ratio,1
+32561,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Debt Service Coverage,1.40,1.35,ratio,1
+32561,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Current Ratio,1.75,1.83,ratio,1
+32561,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",OLBB,88.66,96.24,pct,1
+32561,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",ACH Usage,81.54,88.75,pct,1
+32561,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",EFT Usage,89.03,78.96,pct,1
+32561,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Wires Usage,92.18,83.74,pct,1
+32561,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Corporate Card,68.11,61.43,pct,1
+32561,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Cheques,93.44,97.33,pct,1
+32561,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Gross Margin,24.00,22.62,pct,1
+33221,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Revenue,130000000.00,116053301.54,usd,1
+33221,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",EBITDA,18200000.00,15402659.51,usd,1
+33221,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Profit Margin,9.00,9.97,pct,1
+33221,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Debt/Net Worth (leverage),1.82,1.65,ratio,0
+33221,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Fixed Charge Coverage,1.27,1.40,ratio,1
+33221,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Debt Service Coverage,1.50,1.59,ratio,1
+33221,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Current Ratio,1.85,1.78,ratio,1
+33221,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",OLBB,64.04,63.45,pct,1
+33221,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",ACH Usage,55.41,52.37,pct,1
+33221,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",EFT Usage,70.84,62.48,pct,1
+33221,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Wires Usage,64.30,55.75,pct,1
+33221,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Corporate Card,93.68,100.67,pct,1
+33221,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Cheques,87.38,93.33,pct,1
+33221,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Gross Margin,29.00,31.93,pct,1
+33991,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Revenue,130000000.00,119378982.25,usd,1
+33991,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",EBITDA,18200000.00,20628011.01,usd,1
+33991,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Profit Margin,9.00,8.26,pct,1
+33991,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Debt/Net Worth (leverage),1.82,1.93,ratio,0
+33991,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Fixed Charge Coverage,1.27,1.11,ratio,1
+33991,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Debt Service Coverage,1.50,1.66,ratio,1
+33991,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Current Ratio,1.85,2.18,ratio,1
+33991,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",OLBB,92.53,101.72,pct,1
+33991,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",ACH Usage,66.90,63.48,pct,1
+33991,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",EFT Usage,75.02,73.06,pct,1
+33991,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Wires Usage,84.29,83.26,pct,1
+33991,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Corporate Card,72.55,72.20,pct,1
+33991,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Cheques,94.75,102.91,pct,1
+33991,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Gross Margin,29.00,32.33,pct,1
+33992,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Revenue,130000000.00,133065158.05,usd,1
+33992,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",EBITDA,18200000.00,17794779.79,usd,1
+33992,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Profit Margin,9.00,7.90,pct,1
+33992,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Debt/Net Worth (leverage),1.82,1.93,ratio,0
+33992,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Fixed Charge Coverage,1.27,1.20,ratio,1
+33992,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Debt Service Coverage,1.50,1.40,ratio,1
+33992,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Current Ratio,1.85,1.99,ratio,1
+33992,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",OLBB,93.62,96.98,pct,1
+33992,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",ACH Usage,76.34,72.35,pct,1
+33992,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",EFT Usage,68.94,71.96,pct,1
+33992,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Wires Usage,70.87,71.76,pct,1
+33992,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Corporate Card,60.60,65.17,pct,1
+33992,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Cheques,57.43,55.60,pct,1
+33992,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Gross Margin,29.00,31.31,pct,1
+33993,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Revenue,130000000.00,131813222.09,usd,1
+33993,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",EBITDA,18200000.00,20162051.22,usd,1
+33993,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Profit Margin,9.00,8.51,pct,1
+33993,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Debt/Net Worth (leverage),1.82,1.80,ratio,0
+33993,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Fixed Charge Coverage,1.27,1.33,ratio,1
+33993,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Debt Service Coverage,1.50,1.74,ratio,1
+33993,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Current Ratio,1.85,1.84,ratio,1
+33993,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",OLBB,65.85,59.25,pct,1
+33993,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",ACH Usage,57.80,53.85,pct,1
+33993,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",EFT Usage,64.35,70.78,pct,1
+33993,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Wires Usage,80.63,70.13,pct,1
+33993,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Corporate Card,69.43,66.12,pct,1
+33993,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Cheques,93.26,96.27,pct,1
+33993,"Manufacturing (metals, machinery, electronics, transportation equipment, furniture, misc)",Gross Margin,29.00,27.74,pct,1
+42449,Wholesale trade,Revenue,180000000.00,148659753.06,usd,1
+42449,Wholesale trade,EBITDA,9000000.00,9355488.42,usd,1
+42449,Wholesale trade,Profit Margin,1.00,1.10,pct,1
+42449,Wholesale trade,Debt/Net Worth (leverage),1.66,1.48,ratio,0
+42449,Wholesale trade,Fixed Charge Coverage,1.23,1.26,ratio,1
+42449,Wholesale trade,Debt Service Coverage,1.45,1.62,ratio,1
+42449,Wholesale trade,Current Ratio,1.55,1.54,ratio,1
+42449,Wholesale trade,OLBB,87.04,74.17,pct,1
+42449,Wholesale trade,ACH Usage,91.96,82.64,pct,1
+42449,Wholesale trade,EFT Usage,55.24,58.67,pct,1
+42449,Wholesale trade,Wires Usage,65.97,65.97,pct,1
+42449,Wholesale trade,Corporate Card,77.53,81.71,pct,1
+42449,Wholesale trade,Cheques,87.29,86.45,pct,1
+42449,Wholesale trade,Gross Margin,20.00,23.36,pct,1
+45112,Retail trade,Revenue,95000000.00,79217884.29,usd,1
+45112,Retail trade,EBITDA,13300000.00,15416285.82,usd,1
+45112,Retail trade,Profit Margin,9.00,8.57,pct,1
+45112,Retail trade,Debt/Net Worth (leverage),1.07,1.24,ratio,0
+45112,Retail trade,Fixed Charge Coverage,1.19,1.06,ratio,1
+45112,Retail trade,Debt Service Coverage,1.40,1.60,ratio,1
+45112,Retail trade,Current Ratio,1.45,1.47,ratio,1
+45112,Retail trade,OLBB,64.02,70.18,pct,1
+45112,Retail trade,ACH Usage,64.78,60.55,pct,1
+45112,Retail trade,EFT Usage,91.53,85.83,pct,1
+45112,Retail trade,Wires Usage,71.24,73.33,pct,1
+45112,Retail trade,Corporate Card,58.07,49.91,pct,1
+45112,Retail trade,Cheques,60.83,66.70,pct,1
+45112,Retail trade,Gross Margin,29.00,32.94,pct,1
+45411,Retail trade,Revenue,95000000.00,79870683.61,usd,1
+45411,Retail trade,EBITDA,13300000.00,13758136.31,usd,1
+45411,Retail trade,Profit Margin,9.00,10.44,pct,1
+45411,Retail trade,Debt/Net Worth (leverage),1.07,1.22,ratio,0
+45411,Retail trade,Fixed Charge Coverage,1.19,1.20,ratio,1
+45411,Retail trade,Debt Service Coverage,1.40,1.17,ratio,1
+45411,Retail trade,Current Ratio,1.45,1.52,ratio,1
+45411,Retail trade,OLBB,82.44,79.21,pct,1
+45411,Retail trade,ACH Usage,67.22,64.72,pct,1
+45411,Retail trade,EFT Usage,90.66,80.26,pct,1
+45411,Retail trade,Wires Usage,92.93,91.20,pct,1
+45411,Retail trade,Corporate Card,94.09,95.83,pct,1
+45411,Retail trade,Cheques,56.76,57.51,pct,1
+45411,Retail trade,Gross Margin,29.00,29.22,pct,1
+52412,Finance and insurance,Revenue,140000000.00,141513048.18,usd,1
+52412,Finance and insurance,EBITDA,56000000.00,60332036.20,usd,1
+52412,Finance and insurance,Profit Margin,35.00,35.26,pct,1
+52412,Finance and insurance,Debt/Net Worth (leverage),1.93,1.81,ratio,0
+52412,Finance and insurance,Fixed Charge Coverage,1.49,1.61,ratio,1
+52412,Finance and insurance,Debt Service Coverage,1.75,1.57,ratio,1
+52412,Finance and insurance,Current Ratio,2.05,1.90,ratio,1
+52412,Finance and insurance,OLBB,75.62,66.27,pct,1
+52412,Finance and insurance,ACH Usage,84.42,83.36,pct,1
+52412,Finance and insurance,EFT Usage,62.91,63.73,pct,1
+52412,Finance and insurance,Wires Usage,65.84,63.30,pct,1
+52412,Finance and insurance,Corporate Card,63.94,58.30,pct,1
+52412,Finance and insurance,Cheques,93.76,99.60,pct,1
+52412,Finance and insurance,Gross Margin,55.00,49.22,pct,1
+54133,"Professional, scientific, and technical services",Revenue,55000000.00,53422748.10,usd,1
+54133,"Professional, scientific, and technical services",EBITDA,12650000.00,10475140.70,usd,1
+54133,"Professional, scientific, and technical services",Profit Margin,18.00,18.58,pct,1
+54133,"Professional, scientific, and technical services",Debt/Net Worth (leverage),1.65,1.77,ratio,0
+54133,"Professional, scientific, and technical services",Fixed Charge Coverage,1.78,2.00,ratio,1
+54133,"Professional, scientific, and technical services",Debt Service Coverage,2.10,1.97,ratio,1
+54133,"Professional, scientific, and technical services",Current Ratio,2.20,2.24,ratio,1
+54133,"Professional, scientific, and technical services",OLBB,62.09,62.70,pct,1
+54133,"Professional, scientific, and technical services",ACH Usage,62.80,56.97,pct,1
+54133,"Professional, scientific, and technical services",EFT Usage,86.05,82.78,pct,1
+54133,"Professional, scientific, and technical services",Wires Usage,71.36,60.79,pct,1
+54133,"Professional, scientific, and technical services",Corporate Card,79.40,84.62,pct,1
+54133,"Professional, scientific, and technical services",Cheques,59.47,54.91,pct,1
+54133,"Professional, scientific, and technical services",Gross Margin,38.00,39.29,pct,1
+54161,"Professional, scientific, and technical services",Revenue,55000000.00,60494016.76,usd,1
+54161,"Professional, scientific, and technical services",EBITDA,12650000.00,13026793.34,usd,1
+54161,"Professional, scientific, and technical services",Profit Margin,18.00,16.73,pct,1
+54161,"Professional, scientific, and technical services",Debt/Net Worth (leverage),1.65,1.86,ratio,0
+54161,"Professional, scientific, and technical services",Fixed Charge Coverage,1.78,1.87,ratio,1
+54161,"Professional, scientific, and technical services",Debt Service Coverage,2.10,2.08,ratio,1
+54161,"Professional, scientific, and technical services",Current Ratio,2.20,2.46,ratio,1
+54161,"Professional, scientific, and technical services",OLBB,93.12,90.61,pct,1
+54161,"Professional, scientific, and technical services",ACH Usage,58.69,57.56,pct,1
+54161,"Professional, scientific, and technical services",EFT Usage,93.54,83.03,pct,1
+54161,"Professional, scientific, and technical services",Wires Usage,55.57,47.35,pct,1
+54161,"Professional, scientific, and technical services",Corporate Card,79.00,83.85,pct,1
+54161,"Professional, scientific, and technical services",Cheques,56.17,58.31,pct,1
+54161,"Professional, scientific, and technical services",Gross Margin,38.00,41.85,pct,1
+62199,Health care and social assistance,Revenue,120000000.00,122488668.30,usd,1
+62199,Health care and social assistance,EBITDA,24000000.00,22704876.74,usd,1
+62199,Health care and social assistance,Profit Margin,15.00,12.61,pct,1
+62199,Health care and social assistance,Debt/Net Worth (leverage),2.09,1.77,ratio,0
+62199,Health care and social assistance,Fixed Charge Coverage,1.23,1.27,ratio,1
+62199,Health care and social assistance,Debt Service Coverage,1.45,1.51,ratio,1
+62199,Health care and social assistance,Current Ratio,1.60,1.68,ratio,1
+62199,Health care and social assistance,OLBB,92.90,96.68,pct,1
+62199,Health care and social assistance,ACH Usage,59.10,58.03,pct,1
+62199,Health care and social assistance,EFT Usage,85.18,91.84,pct,1
+62199,Health care and social assistance,Wires Usage,55.13,54.97,pct,1
+62199,Health care and social assistance,Corporate Card,92.34,94.39,pct,1
+62199,Health care and social assistance,Cheques,74.04,74.23,pct,1
+62199,Health care and social assistance,Gross Margin,35.00,28.74,pct,1
+72251,Accommodation and food services,Revenue,185926448.34,164720604.64,usd,1
+72251,Accommodation and food services,EBITDA,34086515.53,40151522.73,usd,1
+72251,Accommodation and food services,Profit Margin,5.50,6.20,pct,1
+72251,Accommodation and food services,Debt/Net Worth (leverage),1.07,0.97,ratio,0
+72251,Accommodation and food services,Fixed Charge Coverage,1.19,1.19,ratio,1
+72251,Accommodation and food services,Debt Service Coverage,1.35,1.23,ratio,1
+72251,Accommodation and food services,Current Ratio,1.45,1.20,ratio,1
+72251,Accommodation and food services,OLBB,87.03,83.33,pct,1
+72251,Accommodation and food services,ACH Usage,81.59,79.09,pct,1
+72251,Accommodation and food services,EFT Usage,73.41,68.64,pct,1
+72251,Accommodation and food services,Wires Usage,71.19,67.53,pct,1
+72251,Accommodation and food services,Corporate Card,94.40,102.92,pct,1
+72251,Accommodation and food services,Cheques,84.94,81.86,pct,1
+72251,Accommodation and food services,Gross Margin,62.00,67.86,pct,1
+32619,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Revenue,125000000.00,135556785.43,usd,1
+32619,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",EBITDA,13750000.00,13055109.16,usd,1
+32619,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Profit Margin,6.20,6.47,pct,1
+32619,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Debt/Net Worth (leverage),2.05,1.89,ratio,0
+32619,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Fixed Charge Coverage,1.32,1.35,ratio,1
+32619,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Debt Service Coverage,1.48,1.55,ratio,1
+32619,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Current Ratio,1.62,1.58,ratio,1
+32619,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",OLBB,63.53,66.73,pct,1
+32619,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",ACH Usage,68.96,69.22,pct,1
+32619,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",EFT Usage,91.52,100.85,pct,1
+32619,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Wires Usage,78.65,82.64,pct,1
+32619,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Corporate Card,88.89,89.93,pct,1
+32619,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Cheques,74.53,79.71,pct,1
+32619,"Manufacturing (wood, paper, printing, petroleum, chemicals, plastics, nonmetallic mineral)",Gross Margin,24.50,23.45,pct,1
+44911,Retail trade,Revenue,150000000.00,139287051.65,usd,1
+44911,Retail trade,EBITDA,16500000.00,17825623.55,usd,1
+44911,Retail trade,Profit Margin,5.40,5.27,pct,1
+44911,Retail trade,Debt/Net Worth (leverage),2.30,2.51,ratio,0
+44911,Retail trade,Fixed Charge Coverage,1.24,1.28,ratio,1
+44911,Retail trade,Debt Service Coverage,1.42,1.33,ratio,1
+44911,Retail trade,Current Ratio,1.35,1.21,ratio,1
+44911,Retail trade,OLBB,87.89,95.52,pct,1
+44911,Retail trade,ACH Usage,62.25,65.57,pct,1
+44911,Retail trade,EFT Usage,78.51,87.34,pct,1
+44911,Retail trade,Wires Usage,57.12,57.96,pct,1
+44911,Retail trade,Corporate Card,77.52,79.81,pct,1
+44911,Retail trade,Cheques,90.87,88.96,pct,1
+44911,Retail trade,Gross Margin,34.00,34.39,pct,1

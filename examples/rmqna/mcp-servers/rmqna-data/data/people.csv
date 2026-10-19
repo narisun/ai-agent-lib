@@ -1,0 +1,6 @@
+person_id,name,team,email,joined
+101,Ada Abel,platform,ada.abel@example.test,2021-04-12
+102,Ben Brook,platform,ben.brook@example.test,2023-09-01
+103,Cleo Carr,payments,cleo.carr@example.test,2019-01-28
+104,Dev Dalal,payments,dev.dalal@example.test,2024-06-03
+105,Eli Ember,risk,eli.ember@example.test,2022-11-15

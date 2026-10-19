@@ -1,0 +1,14 @@
+readiness_id,uen,domain,as_of_date,completeness_pct,reconciliation_status,quality_status,issue,owner,last_updated
+RDY-0001,ALLO-0001,crm,2026-08-02,96,reconciled,ready,,CRM Data Steward,2026-08-03
+RDY-0002,ALLO-0001,payments,2026-07-31,100,reconciled,ready,,Payments Data Steward,2026-08-03
+RDY-0003,BARG-0002,financials,2025-12-31,65,not_reconciled,stale,Audited statements and covenant package are overdue,Credit Data Steward,2026-08-03
+RDY-0004,BENC-0003,lending,2026-07-31,92,exception,review,Covenant waiver status is pending final approval,Credit Data Steward,2026-08-03
+RDY-0005,BOBS-0006,payments,2026-07-31,88,partial,review,Two foreign-currency corridors lack complete counterparty classification,Payments Data Steward,2026-08-03
+RDY-0006,BOST-0007,merchant,2026-06-30,94,reconciled,ready,,Merchant Data Steward,2026-08-02
+RDY-0007,CANA-0010,deposits,2026-07-31,100,reconciled,ready,CAD balances require CAD benchmark rates for yield analysis,Deposits Data Steward,2026-08-03
+RDY-0008,FARI-0016,market,2026-08-01,100,reconciled,ready,,Market Data Steward,2026-08-03
+RDY-0009,JONE-0022,lending,2026-07-20,72,not_reconciled,stale,Borrowing-base certificate and collateral report are missing,Credit Data Steward,2026-08-03
+RDY-0010,MCCO-0030,financials,2026-06-30,83,partial,review,Project backlog and margin schedule are not current,Credit Data Steward,2026-08-02
+RDY-0011,REMB-0036,financials,2026-03-31,70,not_reconciled,stale,Quarterly statements and aging schedules are overdue,Credit Data Steward,2026-08-03
+RDY-0012,VERM-0045,crm,2026-07-10,85,partial,review,Sponsor support and remediation milestones are not documented,CRM Data Steward,2026-08-03
+RDY-0013,WAWO-0046,lending,2026-06-30,90,partial,review,Annual review is in progress and the risk rating may change,Credit Data Steward,2026-08-03

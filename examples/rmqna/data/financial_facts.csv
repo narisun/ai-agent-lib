@@ -1,0 +1,1324 @@
+uen,concept,label,statement,value,unit,fiscal_year,period_end,is_annual
+ADUD-0013,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,13102881.64,USD,FY2025,2025-12-31,true
+ADUD-0013,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,14874430.94,USD,FY2023,2023-12-31,true
+ADUD-0013,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,19387553.88,USD,FY2026,2026-12-31,true
+ADUD-0013,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,24999615.69,USD,FY2024,2024-12-31,true
+ADUD-0013,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,46208848.29,USD,FY2025,2025-12-31,true
+ADUD-0013,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,47544944.45,USD,FY2024,2024-12-31,true
+ADUD-0013,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,64742863.05,USD,FY2026,2026-12-31,true
+ADUD-0013,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,73990036.68,USD,FY2023,2023-12-31,true
+ADUD-0013,GrossProfit,Gross profit,income_statement,55893220.54,USD,FY2023,2023-12-31,true
+ADUD-0013,GrossProfit,Gross profit,income_statement,57264685.02,USD,FY2025,2025-12-31,true
+ADUD-0013,GrossProfit,Gross profit,income_statement,57852308.91,USD,FY2024,2024-12-31,true
+ADUD-0013,GrossProfit,Gross profit,income_statement,63167409.93,USD,FY2026,2026-12-31,true
+ADUD-0013,InventoryNet,Inventory,balance_sheet,29876836.80,USD,FY2024,2024-12-31,true
+ADUD-0013,InventoryNet,Inventory,balance_sheet,34350703.89,USD,FY2025,2025-12-31,true
+ADUD-0013,InventoryNet,Inventory,balance_sheet,35916162.30,USD,FY2026,2026-12-31,true
+ADUD-0013,InventoryNet,Inventory,balance_sheet,44743882.15,USD,FY2023,2023-12-31,true
+ADUD-0013,NetIncomeLoss,Net income,income_statement,-15910664.65,USD,FY2024,2024-12-31,true
+ADUD-0013,NetIncomeLoss,Net income,income_statement,-16679879.01,USD,FY2025,2025-12-31,true
+ADUD-0013,NetIncomeLoss,Net income,income_statement,-23475241.74,USD,FY2026,2026-12-31,true
+ADUD-0013,NetIncomeLoss,Net income,income_statement,2381135.10,USD,FY2023,2023-12-31,true
+ADUD-0013,OperatingIncomeLoss,Operating income,income_statement,-10920502.22,USD,FY2025,2025-12-31,true
+ADUD-0013,OperatingIncomeLoss,Operating income,income_statement,-16383076.84,USD,FY2026,2026-12-31,true
+ADUD-0013,OperatingIncomeLoss,Operating income,income_statement,-6050108.31,USD,FY2024,2024-12-31,true
+ADUD-0013,OperatingIncomeLoss,Operating income,income_statement,11397556.92,USD,FY2023,2023-12-31,true
+ADUD-0013,Revenues,Total revenue,income_statement,245670227.67,USD,FY2023,2023-12-31,true
+ADUD-0013,Revenues,Total revenue,income_statement,276827361.69,USD,FY2024,2024-12-31,true
+ADUD-0013,Revenues,Total revenue,income_statement,311936000.17,USD,FY2025,2025-12-31,true
+ADUD-0013,Revenues,Total revenue,income_statement,350000000.00,USD,FY2026,2026-12-31,true
+ALLO-0001,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,10505404.65,USD,FY2025,2025-12-31,true
+ALLO-0001,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,16160868.25,USD,FY2023,2023-12-31,true
+ALLO-0001,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,18928315.76,USD,FY2026,2026-12-31,true
+ALLO-0001,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,8087825.47,USD,FY2024,2024-12-31,true
+ALLO-0001,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,28848694.29,USD,FY2025,2025-12-31,true
+ALLO-0001,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,33874534.18,USD,FY2026,2026-12-31,true
+ALLO-0001,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,43231164.73,USD,FY2023,2023-12-31,true
+ALLO-0001,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,52451563.29,USD,FY2024,2024-12-31,true
+ALLO-0001,GrossProfit,Gross profit,income_statement,60357179.40,USD,FY2023,2023-12-31,true
+ALLO-0001,GrossProfit,Gross profit,income_statement,67544399.43,USD,FY2024,2024-12-31,true
+ALLO-0001,GrossProfit,Gross profit,income_statement,69092656.69,USD,FY2026,2026-12-31,true
+ALLO-0001,GrossProfit,Gross profit,income_statement,69410414.08,USD,FY2025,2025-12-31,true
+ALLO-0001,InventoryNet,Inventory,balance_sheet,22055655.50,USD,FY2026,2026-12-31,true
+ALLO-0001,InventoryNet,Inventory,balance_sheet,22727527.37,USD,FY2024,2024-12-31,true
+ALLO-0001,InventoryNet,Inventory,balance_sheet,25355429.95,USD,FY2025,2025-12-31,true
+ALLO-0001,InventoryNet,Inventory,balance_sheet,25667832.03,USD,FY2023,2023-12-31,true
+ALLO-0001,NetIncomeLoss,Net income,income_statement,25066300.04,USD,FY2023,2023-12-31,true
+ALLO-0001,NetIncomeLoss,Net income,income_statement,25643458.23,USD,FY2025,2025-12-31,true
+ALLO-0001,NetIncomeLoss,Net income,income_statement,27111449.04,USD,FY2026,2026-12-31,true
+ALLO-0001,NetIncomeLoss,Net income,income_statement,28782853.24,USD,FY2024,2024-12-31,true
+ALLO-0001,OperatingIncomeLoss,Operating income,income_statement,33178647.94,USD,FY2023,2023-12-31,true
+ALLO-0001,OperatingIncomeLoss,Operating income,income_statement,37867434.20,USD,FY2024,2024-12-31,true
+ALLO-0001,OperatingIncomeLoss,Operating income,income_statement,37944502.69,USD,FY2025,2025-12-31,true
+ALLO-0001,OperatingIncomeLoss,Operating income,income_statement,38242851.18,USD,FY2026,2026-12-31,true
+ALLO-0001,Revenues,Total revenue,income_statement,183970398.06,USD,FY2023,2023-12-31,true
+ALLO-0001,Revenues,Total revenue,income_statement,192793158.74,USD,FY2024,2024-12-31,true
+ALLO-0001,Revenues,Total revenue,income_statement,197414436.13,USD,FY2025,2025-12-31,true
+ALLO-0001,Revenues,Total revenue,income_statement,206632395.93,USD,FY2026,2026-12-31,true
+BARG-0002,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,11797290.07,USD,FY2024,2024-12-31,true
+BARG-0002,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,17753587.01,USD,FY2026,2026-12-31,true
+BARG-0002,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,8379000.28,USD,FY2025,2025-12-31,true
+BARG-0002,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,9211851.83,USD,FY2023,2023-12-31,true
+BARG-0002,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,106926332.81,USD,FY2025,2025-12-31,true
+BARG-0002,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,147663125.59,USD,FY2023,2023-12-31,true
+BARG-0002,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,70866603.94,USD,FY2026,2026-12-31,true
+BARG-0002,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,84525760.20,USD,FY2024,2024-12-31,true
+BARG-0002,GrossProfit,Gross profit,income_statement,59706474.63,USD,FY2025,2025-12-31,true
+BARG-0002,GrossProfit,Gross profit,income_statement,60719249.33,USD,FY2024,2024-12-31,true
+BARG-0002,GrossProfit,Gross profit,income_statement,65658081.78,USD,FY2026,2026-12-31,true
+BARG-0002,GrossProfit,Gross profit,income_statement,65840830.87,USD,FY2023,2023-12-31,true
+BARG-0002,InventoryNet,Inventory,balance_sheet,16805130.08,USD,FY2023,2023-12-31,true
+BARG-0002,InventoryNet,Inventory,balance_sheet,23780947.15,USD,FY2026,2026-12-31,true
+BARG-0002,InventoryNet,Inventory,balance_sheet,24110842.19,USD,FY2025,2025-12-31,true
+BARG-0002,InventoryNet,Inventory,balance_sheet,24335808.92,USD,FY2024,2024-12-31,true
+BARG-0002,NetIncomeLoss,Net income,income_statement,18793994.58,USD,FY2024,2024-12-31,true
+BARG-0002,NetIncomeLoss,Net income,income_statement,21704562.61,USD,FY2025,2025-12-31,true
+BARG-0002,NetIncomeLoss,Net income,income_statement,23969252.92,USD,FY2026,2026-12-31,true
+BARG-0002,NetIncomeLoss,Net income,income_statement,34496415.99,USD,FY2023,2023-12-31,true
+BARG-0002,OperatingIncomeLoss,Operating income,income_statement,23909781.33,USD,FY2025,2025-12-31,true
+BARG-0002,OperatingIncomeLoss,Operating income,income_statement,25215522.99,USD,FY2024,2024-12-31,true
+BARG-0002,OperatingIncomeLoss,Operating income,income_statement,27567999.51,USD,FY2026,2026-12-31,true
+BARG-0002,OperatingIncomeLoss,Operating income,income_statement,39018572.21,USD,FY2023,2023-12-31,true
+BARG-0002,Revenues,Total revenue,income_statement,159642657.20,USD,FY2023,2023-12-31,true
+BARG-0002,Revenues,Total revenue,income_statement,169489066.98,USD,FY2024,2024-12-31,true
+BARG-0002,Revenues,Total revenue,income_statement,179942781.76,USD,FY2025,2025-12-31,true
+BARG-0002,Revenues,Total revenue,income_statement,195000000.00,USD,FY2026,2026-12-31,true
+BENC-0003,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,2827147.58,USD,FY2024,2024-12-31,true
+BENC-0003,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,3310022.93,USD,FY2026,2026-12-31,true
+BENC-0003,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,4283941.66,USD,FY2025,2025-12-31,true
+BENC-0003,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,5496323.54,USD,FY2023,2023-12-31,true
+BENC-0003,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,23951031.80,USD,FY2025,2025-12-31,true
+BENC-0003,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,29365542.66,USD,FY2023,2023-12-31,true
+BENC-0003,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,42601277.47,USD,FY2024,2024-12-31,true
+BENC-0003,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,8211005.67,USD,FY2026,2026-12-31,true
+BENC-0003,GrossProfit,Gross profit,income_statement,11510704.95,USD,FY2026,2026-12-31,true
+BENC-0003,GrossProfit,Gross profit,income_statement,13095361.06,USD,FY2025,2025-12-31,true
+BENC-0003,GrossProfit,Gross profit,income_statement,20491487.74,USD,FY2024,2024-12-31,true
+BENC-0003,GrossProfit,Gross profit,income_statement,20535576.27,USD,FY2023,2023-12-31,true
+BENC-0003,InventoryNet,Inventory,balance_sheet,10590599.22,USD,FY2023,2023-12-31,true
+BENC-0003,InventoryNet,Inventory,balance_sheet,4352792.29,USD,FY2025,2025-12-31,true
+BENC-0003,InventoryNet,Inventory,balance_sheet,7109775.85,USD,FY2024,2024-12-31,true
+BENC-0003,InventoryNet,Inventory,balance_sheet,7425410.71,USD,FY2026,2026-12-31,true
+BENC-0003,NetIncomeLoss,Net income,income_statement,1072723.17,USD,FY2026,2026-12-31,true
+BENC-0003,NetIncomeLoss,Net income,income_statement,1718406.58,USD,FY2025,2025-12-31,true
+BENC-0003,NetIncomeLoss,Net income,income_statement,2063739.52,USD,FY2023,2023-12-31,true
+BENC-0003,NetIncomeLoss,Net income,income_statement,7975935.46,USD,FY2024,2024-12-31,true
+BENC-0003,OperatingIncomeLoss,Operating income,income_statement,2763843.53,USD,FY2026,2026-12-31,true
+BENC-0003,OperatingIncomeLoss,Operating income,income_statement,3156505.10,USD,FY2025,2025-12-31,true
+BENC-0003,OperatingIncomeLoss,Operating income,income_statement,4285504.86,USD,FY2023,2023-12-31,true
+BENC-0003,OperatingIncomeLoss,Operating income,income_statement,9087210.29,USD,FY2024,2024-12-31,true
+BENC-0003,Revenues,Total revenue,income_statement,47312938.98,USD,FY2026,2026-12-31,true
+BENC-0003,Revenues,Total revenue,income_statement,52594191.46,USD,FY2025,2025-12-31,true
+BENC-0003,Revenues,Total revenue,income_statement,59335614.96,USD,FY2024,2024-12-31,true
+BENC-0003,Revenues,Total revenue,income_statement,66941141.32,USD,FY2023,2023-12-31,true
+BETT-0004,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,2749832.20,USD,FY2023,2023-12-31,true
+BETT-0004,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,3811875.70,USD,FY2024,2024-12-31,true
+BETT-0004,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,5149152.51,USD,FY2025,2025-12-31,true
+BETT-0004,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,8274757.54,USD,FY2026,2026-12-31,true
+BETT-0004,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,21283596.15,USD,FY2023,2023-12-31,true
+BETT-0004,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,24277759.54,USD,FY2025,2025-12-31,true
+BETT-0004,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,37282198.93,USD,FY2024,2024-12-31,true
+BETT-0004,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,49657003.94,USD,FY2026,2026-12-31,true
+BETT-0004,GrossProfit,Gross profit,income_statement,14843258.49,USD,FY2023,2023-12-31,true
+BETT-0004,GrossProfit,Gross profit,income_statement,17774860.66,USD,FY2024,2024-12-31,true
+BETT-0004,GrossProfit,Gross profit,income_statement,20177229.15,USD,FY2025,2025-12-31,true
+BETT-0004,GrossProfit,Gross profit,income_statement,24432804.60,USD,FY2026,2026-12-31,true
+BETT-0004,InventoryNet,Inventory,balance_sheet,12462017.01,USD,FY2024,2024-12-31,true
+BETT-0004,InventoryNet,Inventory,balance_sheet,14060491.05,USD,FY2026,2026-12-31,true
+BETT-0004,InventoryNet,Inventory,balance_sheet,5990234.22,USD,FY2025,2025-12-31,true
+BETT-0004,InventoryNet,Inventory,balance_sheet,8046506.37,USD,FY2023,2023-12-31,true
+BETT-0004,NetIncomeLoss,Net income,income_statement,1367773.27,USD,FY2023,2023-12-31,true
+BETT-0004,NetIncomeLoss,Net income,income_statement,1378192.53,USD,FY2025,2025-12-31,true
+BETT-0004,NetIncomeLoss,Net income,income_statement,5244519.57,USD,FY2024,2024-12-31,true
+BETT-0004,NetIncomeLoss,Net income,income_statement,734959.15,USD,FY2026,2026-12-31,true
+BETT-0004,OperatingIncomeLoss,Operating income,income_statement,2687705.72,USD,FY2025,2025-12-31,true
+BETT-0004,OperatingIncomeLoss,Operating income,income_statement,2965015.88,USD,FY2023,2023-12-31,true
+BETT-0004,OperatingIncomeLoss,Operating income,income_statement,4316134.50,USD,FY2026,2026-12-31,true
+BETT-0004,OperatingIncomeLoss,Operating income,income_statement,6632434.47,USD,FY2024,2024-12-31,true
+BETT-0004,Revenues,Total revenue,income_statement,61790083.56,USD,FY2023,2023-12-31,true
+BETT-0004,Revenues,Total revenue,income_statement,69626612.77,USD,FY2024,2024-12-31,true
+BETT-0004,Revenues,Total revenue,income_statement,78457010.04,USD,FY2025,2025-12-31,true
+BETT-0004,Revenues,Total revenue,income_statement,90000000.00,USD,FY2026,2026-12-31,true
+BLOU-0005,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,17911317.69,USD,FY2025,2025-12-31,true
+BLOU-0005,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,29444297.80,USD,FY2023,2023-12-31,true
+BLOU-0005,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,34138922.11,USD,FY2026,2026-12-31,true
+BLOU-0005,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,38870252.02,USD,FY2024,2024-12-31,true
+BLOU-0005,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,101095558.65,USD,FY2025,2025-12-31,true
+BLOU-0005,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,51910868.64,USD,FY2026,2026-12-31,true
+BLOU-0005,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,83281521.98,USD,FY2023,2023-12-31,true
+BLOU-0005,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,90976061.97,USD,FY2024,2024-12-31,true
+BLOU-0005,GrossProfit,Gross profit,income_statement,72151182.18,USD,FY2023,2023-12-31,true
+BLOU-0005,GrossProfit,Gross profit,income_statement,74262340.03,USD,FY2024,2024-12-31,true
+BLOU-0005,GrossProfit,Gross profit,income_statement,74792040.27,USD,FY2026,2026-12-31,true
+BLOU-0005,GrossProfit,Gross profit,income_statement,78294819.31,USD,FY2025,2025-12-31,true
+BLOU-0005,InventoryNet,Inventory,balance_sheet,35038990.58,USD,FY2024,2024-12-31,true
+BLOU-0005,InventoryNet,Inventory,balance_sheet,36940917.05,USD,FY2025,2025-12-31,true
+BLOU-0005,InventoryNet,Inventory,balance_sheet,47422330.88,USD,FY2023,2023-12-31,true
+BLOU-0005,InventoryNet,Inventory,balance_sheet,50786188.33,USD,FY2026,2026-12-31,true
+BLOU-0005,NetIncomeLoss,Net income,income_statement,5065364.82,USD,FY2025,2025-12-31,true
+BLOU-0005,NetIncomeLoss,Net income,income_statement,5329373.88,USD,FY2023,2023-12-31,true
+BLOU-0005,NetIncomeLoss,Net income,income_statement,5564301.89,USD,FY2024,2024-12-31,true
+BLOU-0005,NetIncomeLoss,Net income,income_statement,5690463.77,USD,FY2026,2026-12-31,true
+BLOU-0005,OperatingIncomeLoss,Operating income,income_statement,7123109.27,USD,FY2025,2025-12-31,true
+BLOU-0005,OperatingIncomeLoss,Operating income,income_statement,7630800.42,USD,FY2026,2026-12-31,true
+BLOU-0005,OperatingIncomeLoss,Operating income,income_statement,8161502.08,USD,FY2023,2023-12-31,true
+BLOU-0005,OperatingIncomeLoss,Operating income,income_statement,8184828.54,USD,FY2024,2024-12-31,true
+BLOU-0005,Revenues,Total revenue,income_statement,386643429.71,USD,FY2023,2023-12-31,true
+BLOU-0005,Revenues,Total revenue,income_statement,407223383.96,USD,FY2024,2024-12-31,true
+BLOU-0005,Revenues,Total revenue,income_statement,425480796.61,USD,FY2025,2025-12-31,true
+BLOU-0005,Revenues,Total revenue,income_statement,448863308.73,USD,FY2026,2026-12-31,true
+BOBS-0006,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,10007926.01,USD,FY2024,2024-12-31,true
+BOBS-0006,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,10919836.01,USD,FY2026,2026-12-31,true
+BOBS-0006,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,12014000.47,USD,FY2023,2023-12-31,true
+BOBS-0006,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,16722719.73,USD,FY2025,2025-12-31,true
+BOBS-0006,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,35161891.50,USD,FY2025,2025-12-31,true
+BOBS-0006,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,37306492.89,USD,FY2024,2024-12-31,true
+BOBS-0006,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,42273527.77,USD,FY2023,2023-12-31,true
+BOBS-0006,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,76242238.58,USD,FY2026,2026-12-31,true
+BOBS-0006,GrossProfit,Gross profit,income_statement,38701148.89,USD,FY2023,2023-12-31,true
+BOBS-0006,GrossProfit,Gross profit,income_statement,39626478.79,USD,FY2024,2024-12-31,true
+BOBS-0006,GrossProfit,Gross profit,income_statement,43775342.07,USD,FY2025,2025-12-31,true
+BOBS-0006,GrossProfit,Gross profit,income_statement,45494834.35,USD,FY2026,2026-12-31,true
+BOBS-0006,InventoryNet,Inventory,balance_sheet,16594839.61,USD,FY2026,2026-12-31,true
+BOBS-0006,InventoryNet,Inventory,balance_sheet,18372361.28,USD,FY2025,2025-12-31,true
+BOBS-0006,InventoryNet,Inventory,balance_sheet,21122067.31,USD,FY2023,2023-12-31,true
+BOBS-0006,InventoryNet,Inventory,balance_sheet,28103402.04,USD,FY2024,2024-12-31,true
+BOBS-0006,NetIncomeLoss,Net income,income_statement,-2766766.22,USD,FY2024,2024-12-31,true
+BOBS-0006,NetIncomeLoss,Net income,income_statement,-3285990.03,USD,FY2025,2025-12-31,true
+BOBS-0006,NetIncomeLoss,Net income,income_statement,-5306723.65,USD,FY2026,2026-12-31,true
+BOBS-0006,NetIncomeLoss,Net income,income_statement,3489930.93,USD,FY2023,2023-12-31,true
+BOBS-0006,OperatingIncomeLoss,Operating income,income_statement,2122903.76,USD,FY2024,2024-12-31,true
+BOBS-0006,OperatingIncomeLoss,Operating income,income_statement,284473.51,USD,FY2026,2026-12-31,true
+BOBS-0006,OperatingIncomeLoss,Operating income,income_statement,670570.03,USD,FY2025,2025-12-31,true
+BOBS-0006,OperatingIncomeLoss,Operating income,income_statement,7862374.63,USD,FY2023,2023-12-31,true
+BOBS-0006,Revenues,Total revenue,income_statement,141305452.17,USD,FY2023,2023-12-31,true
+BOBS-0006,Revenues,Total revenue,income_statement,159226520.40,USD,FY2024,2024-12-31,true
+BOBS-0006,Revenues,Total revenue,income_statement,179420428.65,USD,FY2025,2025-12-31,true
+BOBS-0006,Revenues,Total revenue,income_statement,197905223.72,USD,FY2026,2026-12-31,true
+BOST-0007,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,2634031.09,USD,FY2024,2024-12-31,true
+BOST-0007,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,4094511.80,USD,FY2023,2023-12-31,true
+BOST-0007,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,4139346.75,USD,FY2026,2026-12-31,true
+BOST-0007,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,4730328.24,USD,FY2025,2025-12-31,true
+BOST-0007,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,43874036.11,USD,FY2024,2024-12-31,true
+BOST-0007,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,51403181.54,USD,FY2025,2025-12-31,true
+BOST-0007,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,66657321.32,USD,FY2023,2023-12-31,true
+BOST-0007,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,77233890.24,USD,FY2026,2026-12-31,true
+BOST-0007,GrossProfit,Gross profit,income_statement,30322542.40,USD,FY2024,2024-12-31,true
+BOST-0007,GrossProfit,Gross profit,income_statement,33449408.97,USD,FY2023,2023-12-31,true
+BOST-0007,GrossProfit,Gross profit,income_statement,35129609.02,USD,FY2025,2025-12-31,true
+BOST-0007,GrossProfit,Gross profit,income_statement,36913011.35,USD,FY2026,2026-12-31,true
+BOST-0007,InventoryNet,Inventory,balance_sheet,2382031.13,USD,FY2026,2026-12-31,true
+BOST-0007,InventoryNet,Inventory,balance_sheet,2426056.58,USD,FY2024,2024-12-31,true
+BOST-0007,InventoryNet,Inventory,balance_sheet,2489049.43,USD,FY2023,2023-12-31,true
+BOST-0007,InventoryNet,Inventory,balance_sheet,4207187.81,USD,FY2025,2025-12-31,true
+BOST-0007,NetIncomeLoss,Net income,income_statement,17954627.03,USD,FY2024,2024-12-31,true
+BOST-0007,NetIncomeLoss,Net income,income_statement,20787064.71,USD,FY2023,2023-12-31,true
+BOST-0007,NetIncomeLoss,Net income,income_statement,22383092.25,USD,FY2025,2025-12-31,true
+BOST-0007,NetIncomeLoss,Net income,income_statement,24672612.60,USD,FY2026,2026-12-31,true
+BOST-0007,OperatingIncomeLoss,Operating income,income_statement,18717928.26,USD,FY2024,2024-12-31,true
+BOST-0007,OperatingIncomeLoss,Operating income,income_statement,21414012.05,USD,FY2023,2023-12-31,true
+BOST-0007,OperatingIncomeLoss,Operating income,income_statement,24456049.21,USD,FY2025,2025-12-31,true
+BOST-0007,OperatingIncomeLoss,Operating income,income_statement,26918373.45,USD,FY2026,2026-12-31,true
+BOST-0007,Revenues,Total revenue,income_statement,49532184.94,USD,FY2023,2023-12-31,true
+BOST-0007,Revenues,Total revenue,income_statement,52587221.73,USD,FY2024,2024-12-31,true
+BOST-0007,Revenues,Total revenue,income_statement,55830686.50,USD,FY2025,2025-12-31,true
+BOST-0007,Revenues,Total revenue,income_statement,60000000.00,USD,FY2026,2026-12-31,true
+BUCK-0008,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,3710130.24,USD,FY2024,2024-12-31,true
+BUCK-0008,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,5405688.21,USD,FY2023,2023-12-31,true
+BUCK-0008,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,6698190.59,USD,FY2026,2026-12-31,true
+BUCK-0008,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,7524853.66,USD,FY2025,2025-12-31,true
+BUCK-0008,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,23651293.20,USD,FY2023,2023-12-31,true
+BUCK-0008,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,32210980.52,USD,FY2024,2024-12-31,true
+BUCK-0008,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,40622651.85,USD,FY2026,2026-12-31,true
+BUCK-0008,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,61427537.97,USD,FY2025,2025-12-31,true
+BUCK-0008,GrossProfit,Gross profit,income_statement,14771803.95,USD,FY2023,2023-12-31,true
+BUCK-0008,GrossProfit,Gross profit,income_statement,21750943.39,USD,FY2024,2024-12-31,true
+BUCK-0008,GrossProfit,Gross profit,income_statement,26362235.20,USD,FY2025,2025-12-31,true
+BUCK-0008,GrossProfit,Gross profit,income_statement,28207386.40,USD,FY2026,2026-12-31,true
+BUCK-0008,InventoryNet,Inventory,balance_sheet,10330060.24,USD,FY2023,2023-12-31,true
+BUCK-0008,InventoryNet,Inventory,balance_sheet,11231828.93,USD,FY2026,2026-12-31,true
+BUCK-0008,InventoryNet,Inventory,balance_sheet,9105869.72,USD,FY2025,2025-12-31,true
+BUCK-0008,InventoryNet,Inventory,balance_sheet,9989787.98,USD,FY2024,2024-12-31,true
+BUCK-0008,NetIncomeLoss,Net income,income_statement,3735410.15,USD,FY2023,2023-12-31,true
+BUCK-0008,NetIncomeLoss,Net income,income_statement,5665980.56,USD,FY2024,2024-12-31,true
+BUCK-0008,NetIncomeLoss,Net income,income_statement,9018169.26,USD,FY2025,2025-12-31,true
+BUCK-0008,NetIncomeLoss,Net income,income_statement,9475775.51,USD,FY2026,2026-12-31,true
+BUCK-0008,OperatingIncomeLoss,Operating income,income_statement,11641548.88,USD,FY2025,2025-12-31,true
+BUCK-0008,OperatingIncomeLoss,Operating income,income_statement,13543740.58,USD,FY2026,2026-12-31,true
+BUCK-0008,OperatingIncomeLoss,Operating income,income_statement,5404663.35,USD,FY2023,2023-12-31,true
+BUCK-0008,OperatingIncomeLoss,Operating income,income_statement,6650429.88,USD,FY2024,2024-12-31,true
+BUCK-0008,Revenues,Total revenue,income_statement,60662983.62,USD,FY2023,2023-12-31,true
+BUCK-0008,Revenues,Total revenue,income_statement,68356568.35,USD,FY2024,2024-12-31,true
+BUCK-0008,Revenues,Total revenue,income_statement,77025892.19,USD,FY2025,2025-12-31,true
+BUCK-0008,Revenues,Total revenue,income_statement,85000000.00,USD,FY2026,2026-12-31,true
+BUSH-0009,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,105605384.91,USD,FY2023,2023-12-31,true
+BUSH-0009,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,49533741.01,USD,FY2026,2026-12-31,true
+BUSH-0009,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,77102540.15,USD,FY2025,2025-12-31,true
+BUSH-0009,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,85690067.56,USD,FY2024,2024-12-31,true
+BUSH-0009,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,308091027.64,USD,FY2026,2026-12-31,true
+BUSH-0009,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,416088004.32,USD,FY2023,2023-12-31,true
+BUSH-0009,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,483300400.90,USD,FY2025,2025-12-31,true
+BUSH-0009,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,522200263.96,USD,FY2024,2024-12-31,true
+BUSH-0009,GrossProfit,Gross profit,income_statement,244049030.52,USD,FY2026,2026-12-31,true
+BUSH-0009,GrossProfit,Gross profit,income_statement,271448681.08,USD,FY2025,2025-12-31,true
+BUSH-0009,GrossProfit,Gross profit,income_statement,305920926.75,USD,FY2023,2023-12-31,true
+BUSH-0009,GrossProfit,Gross profit,income_statement,317165490.54,USD,FY2024,2024-12-31,true
+BUSH-0009,InventoryNet,Inventory,balance_sheet,130664166.86,USD,FY2024,2024-12-31,true
+BUSH-0009,InventoryNet,Inventory,balance_sheet,131413907.59,USD,FY2026,2026-12-31,true
+BUSH-0009,InventoryNet,Inventory,balance_sheet,185883269.49,USD,FY2023,2023-12-31,true
+BUSH-0009,InventoryNet,Inventory,balance_sheet,69569843.33,USD,FY2025,2025-12-31,true
+BUSH-0009,NetIncomeLoss,Net income,income_statement,32100556.81,USD,FY2023,2023-12-31,true
+BUSH-0009,NetIncomeLoss,Net income,income_statement,60581837.95,USD,FY2026,2026-12-31,true
+BUSH-0009,NetIncomeLoss,Net income,income_statement,62443548.55,USD,FY2025,2025-12-31,true
+BUSH-0009,NetIncomeLoss,Net income,income_statement,95487975.02,USD,FY2024,2024-12-31,true
+BUSH-0009,OperatingIncomeLoss,Operating income,income_statement,127654986.72,USD,FY2024,2024-12-31,true
+BUSH-0009,OperatingIncomeLoss,Operating income,income_statement,65778131.24,USD,FY2023,2023-12-31,true
+BUSH-0009,OperatingIncomeLoss,Operating income,income_statement,65800095.62,USD,FY2026,2026-12-31,true
+BUSH-0009,OperatingIncomeLoss,Operating income,income_statement,81857758.00,USD,FY2025,2025-12-31,true
+BUSH-0009,Revenues,Total revenue,income_statement,1027234434.15,USD,FY2024,2024-12-31,true
+BUSH-0009,Revenues,Total revenue,income_statement,1231501097.00,USD,FY2023,2023-12-31,true
+BUSH-0009,Revenues,Total revenue,income_statement,750000000.00,USD,FY2026,2026-12-31,true
+BUSH-0009,Revenues,Total revenue,income_statement,856849080.37,USD,FY2025,2025-12-31,true
+CANA-0010,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,41174817.49,USD,FY2025,2025-12-31,true
+CANA-0010,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,45798745.55,USD,FY2024,2024-12-31,true
+CANA-0010,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,52548470.05,USD,FY2023,2023-12-31,true
+CANA-0010,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,75505116.39,USD,FY2026,2026-12-31,true
+CANA-0010,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,293867068.27,USD,FY2025,2025-12-31,true
+CANA-0010,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,385589496.05,USD,FY2026,2026-12-31,true
+CANA-0010,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,388640987.01,USD,FY2023,2023-12-31,true
+CANA-0010,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,448058667.04,USD,FY2024,2024-12-31,true
+CANA-0010,GrossProfit,Gross profit,income_statement,262438283.43,USD,FY2025,2025-12-31,true
+CANA-0010,GrossProfit,Gross profit,income_statement,277587475.19,USD,FY2024,2024-12-31,true
+CANA-0010,GrossProfit,Gross profit,income_statement,284415328.75,USD,FY2023,2023-12-31,true
+CANA-0010,GrossProfit,Gross profit,income_statement,290859580.43,USD,FY2026,2026-12-31,true
+CANA-0010,InventoryNet,Inventory,balance_sheet,119836843.49,USD,FY2026,2026-12-31,true
+CANA-0010,InventoryNet,Inventory,balance_sheet,80413058.05,USD,FY2024,2024-12-31,true
+CANA-0010,InventoryNet,Inventory,balance_sheet,95215177.23,USD,FY2025,2025-12-31,true
+CANA-0010,InventoryNet,Inventory,balance_sheet,96195575.64,USD,FY2023,2023-12-31,true
+CANA-0010,NetIncomeLoss,Net income,income_statement,15785433.87,USD,FY2026,2026-12-31,true
+CANA-0010,NetIncomeLoss,Net income,income_statement,27585314.98,USD,FY2025,2025-12-31,true
+CANA-0010,NetIncomeLoss,Net income,income_statement,38145796.36,USD,FY2024,2024-12-31,true
+CANA-0010,NetIncomeLoss,Net income,income_statement,54880577.28,USD,FY2023,2023-12-31,true
+CANA-0010,OperatingIncomeLoss,Operating income,income_statement,52515337.59,USD,FY2025,2025-12-31,true
+CANA-0010,OperatingIncomeLoss,Operating income,income_statement,65221257.83,USD,FY2026,2026-12-31,true
+CANA-0010,OperatingIncomeLoss,Operating income,income_statement,68232681.10,USD,FY2023,2023-12-31,true
+CANA-0010,OperatingIncomeLoss,Operating income,income_statement,68954564.17,USD,FY2024,2024-12-31,true
+CANA-0010,Revenues,Total revenue,income_statement,846000000.00,USD,FY2023,2023-12-31,true
+CANA-0010,Revenues,Total revenue,income_statement,902000000.00,USD,FY2024,2024-12-31,true
+CANA-0010,Revenues,Total revenue,income_statement,919811320.76,USD,FY2025,2025-12-31,true
+CANA-0010,Revenues,Total revenue,income_statement,975000000.00,USD,FY2026,2026-12-31,true
+CHAN-0011,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,4547647.11,USD,FY2025,2025-12-31,true
+CHAN-0011,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,6206584.58,USD,FY2024,2024-12-31,true
+CHAN-0011,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,6817771.94,USD,FY2026,2026-12-31,true
+CHAN-0011,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,7230125.77,USD,FY2023,2023-12-31,true
+CHAN-0011,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,12217608.23,USD,FY2026,2026-12-31,true
+CHAN-0011,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,21439826.78,USD,FY2025,2025-12-31,true
+CHAN-0011,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,22967481.57,USD,FY2023,2023-12-31,true
+CHAN-0011,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,23811083.79,USD,FY2024,2024-12-31,true
+CHAN-0011,GrossProfit,Gross profit,income_statement,27189782.61,USD,FY2024,2024-12-31,true
+CHAN-0011,GrossProfit,Gross profit,income_statement,27250280.37,USD,FY2023,2023-12-31,true
+CHAN-0011,GrossProfit,Gross profit,income_statement,28349104.68,USD,FY2025,2025-12-31,true
+CHAN-0011,GrossProfit,Gross profit,income_statement,29998761.27,USD,FY2026,2026-12-31,true
+CHAN-0011,InventoryNet,Inventory,balance_sheet,10412521.50,USD,FY2023,2023-12-31,true
+CHAN-0011,InventoryNet,Inventory,balance_sheet,13517066.56,USD,FY2026,2026-12-31,true
+CHAN-0011,InventoryNet,Inventory,balance_sheet,7763803.15,USD,FY2024,2024-12-31,true
+CHAN-0011,InventoryNet,Inventory,balance_sheet,8604860.67,USD,FY2025,2025-12-31,true
+CHAN-0011,NetIncomeLoss,Net income,income_statement,1733776.81,USD,FY2024,2024-12-31,true
+CHAN-0011,NetIncomeLoss,Net income,income_statement,1829445.93,USD,FY2026,2026-12-31,true
+CHAN-0011,NetIncomeLoss,Net income,income_statement,1980955.57,USD,FY2023,2023-12-31,true
+CHAN-0011,NetIncomeLoss,Net income,income_statement,2019829.81,USD,FY2025,2025-12-31,true
+CHAN-0011,OperatingIncomeLoss,Operating income,income_statement,2342257.94,USD,FY2024,2024-12-31,true
+CHAN-0011,OperatingIncomeLoss,Operating income,income_statement,2651781.47,USD,FY2026,2026-12-31,true
+CHAN-0011,OperatingIncomeLoss,Operating income,income_statement,2800632.99,USD,FY2023,2023-12-31,true
+CHAN-0011,OperatingIncomeLoss,Operating income,income_statement,2877717.45,USD,FY2025,2025-12-31,true
+CHAN-0011,Revenues,Total revenue,income_statement,80473287.54,USD,FY2023,2023-12-31,true
+CHAN-0011,Revenues,Total revenue,income_statement,82560939.72,USD,FY2024,2024-12-31,true
+CHAN-0011,Revenues,Total revenue,income_statement,83505917.14,USD,FY2025,2025-12-31,true
+CHAN-0011,Revenues,Total revenue,income_statement,87349707.12,USD,FY2026,2026-12-31,true
+DGYU-0012,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,11621519.62,USD,FY2024,2024-12-31,true
+DGYU-0012,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,11887941.51,USD,FY2023,2023-12-31,true
+DGYU-0012,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,13721763.64,USD,FY2025,2025-12-31,true
+DGYU-0012,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,28920238.55,USD,FY2026,2026-12-31,true
+DGYU-0012,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,125055747.92,USD,FY2025,2025-12-31,true
+DGYU-0012,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,150187069.36,USD,FY2024,2024-12-31,true
+DGYU-0012,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,157176515.61,USD,FY2026,2026-12-31,true
+DGYU-0012,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,45910419.36,USD,FY2023,2023-12-31,true
+DGYU-0012,GrossProfit,Gross profit,income_statement,111221001.67,USD,FY2026,2026-12-31,true
+DGYU-0012,GrossProfit,Gross profit,income_statement,43780509.51,USD,FY2023,2023-12-31,true
+DGYU-0012,GrossProfit,Gross profit,income_statement,72961498.37,USD,FY2024,2024-12-31,true
+DGYU-0012,GrossProfit,Gross profit,income_statement,89181847.45,USD,FY2025,2025-12-31,true
+DGYU-0012,InventoryNet,Inventory,balance_sheet,26429237.42,USD,FY2024,2024-12-31,true
+DGYU-0012,InventoryNet,Inventory,balance_sheet,33406261.86,USD,FY2023,2023-12-31,true
+DGYU-0012,InventoryNet,Inventory,balance_sheet,39546004.51,USD,FY2025,2025-12-31,true
+DGYU-0012,InventoryNet,Inventory,balance_sheet,44822824.72,USD,FY2026,2026-12-31,true
+DGYU-0012,NetIncomeLoss,Net income,income_statement,16956825.39,USD,FY2024,2024-12-31,true
+DGYU-0012,NetIncomeLoss,Net income,income_statement,3886292.09,USD,FY2023,2023-12-31,true
+DGYU-0012,NetIncomeLoss,Net income,income_statement,9302734.87,USD,FY2026,2026-12-31,true
+DGYU-0012,NetIncomeLoss,Net income,income_statement,9679052.44,USD,FY2025,2025-12-31,true
+DGYU-0012,OperatingIncomeLoss,Operating income,income_statement,20375552.19,USD,FY2025,2025-12-31,true
+DGYU-0012,OperatingIncomeLoss,Operating income,income_statement,22057683.79,USD,FY2024,2024-12-31,true
+DGYU-0012,OperatingIncomeLoss,Operating income,income_statement,26356693.13,USD,FY2026,2026-12-31,true
+DGYU-0012,OperatingIncomeLoss,Operating income,income_statement,8922728.57,USD,FY2023,2023-12-31,true
+DGYU-0012,Revenues,Total revenue,income_statement,193209933.32,USD,FY2023,2023-12-31,true
+DGYU-0012,Revenues,Total revenue,income_statement,231005307.18,USD,FY2024,2024-12-31,true
+DGYU-0012,Revenues,Total revenue,income_statement,276194142.97,USD,FY2025,2025-12-31,true
+DGYU-0012,Revenues,Total revenue,income_statement,332901819.37,USD,FY2026,2026-12-31,true
+DULU-0014,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,1320486.47,USD,FY2026,2026-12-31,true
+DULU-0014,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,1837871.30,USD,FY2025,2025-12-31,true
+DULU-0014,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,2601398.32,USD,FY2024,2024-12-31,true
+DULU-0014,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,3313414.50,USD,FY2023,2023-12-31,true
+DULU-0014,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,10784144.75,USD,FY2025,2025-12-31,true
+DULU-0014,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,11166163.22,USD,FY2026,2026-12-31,true
+DULU-0014,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,11486521.35,USD,FY2023,2023-12-31,true
+DULU-0014,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,20894637.36,USD,FY2024,2024-12-31,true
+DULU-0014,GrossProfit,Gross profit,income_statement,10295275.19,USD,FY2024,2024-12-31,true
+DULU-0014,GrossProfit,Gross profit,income_statement,6580194.80,USD,FY2026,2026-12-31,true
+DULU-0014,GrossProfit,Gross profit,income_statement,7787785.85,USD,FY2025,2025-12-31,true
+DULU-0014,GrossProfit,Gross profit,income_statement,9703142.93,USD,FY2023,2023-12-31,true
+DULU-0014,InventoryNet,Inventory,balance_sheet,2226227.33,USD,FY2025,2025-12-31,true
+DULU-0014,InventoryNet,Inventory,balance_sheet,3699837.98,USD,FY2026,2026-12-31,true
+DULU-0014,InventoryNet,Inventory,balance_sheet,4082997.32,USD,FY2023,2023-12-31,true
+DULU-0014,InventoryNet,Inventory,balance_sheet,4697572.05,USD,FY2024,2024-12-31,true
+DULU-0014,NetIncomeLoss,Net income,income_statement,-426192.63,USD,FY2023,2023-12-31,true
+DULU-0014,NetIncomeLoss,Net income,income_statement,3738938.00,USD,FY2024,2024-12-31,true
+DULU-0014,NetIncomeLoss,Net income,income_statement,727954.96,USD,FY2026,2026-12-31,true
+DULU-0014,NetIncomeLoss,Net income,income_statement,751732.95,USD,FY2025,2025-12-31,true
+DULU-0014,OperatingIncomeLoss,Operating income,income_statement,1356290.00,USD,FY2026,2026-12-31,true
+DULU-0014,OperatingIncomeLoss,Operating income,income_statement,1716475.39,USD,FY2025,2025-12-31,true
+DULU-0014,OperatingIncomeLoss,Operating income,income_statement,4142690.89,USD,FY2024,2024-12-31,true
+DULU-0014,OperatingIncomeLoss,Operating income,income_statement,950276.91,USD,FY2023,2023-12-31,true
+DULU-0014,Revenues,Total revenue,income_statement,26000000.00,USD,FY2026,2026-12-31,true
+DULU-0014,Revenues,Total revenue,income_statement,29714799.47,USD,FY2025,2025-12-31,true
+DULU-0014,Revenues,Total revenue,income_statement,33523585.99,USD,FY2024,2024-12-31,true
+DULU-0014,Revenues,Total revenue,income_statement,37820575.53,USD,FY2023,2023-12-31,true
+ESTW-0015,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,3535276.30,USD,FY2023,2023-12-31,true
+ESTW-0015,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,5401918.10,USD,FY2024,2024-12-31,true
+ESTW-0015,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,6028690.07,USD,FY2025,2025-12-31,true
+ESTW-0015,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,6133467.91,USD,FY2026,2026-12-31,true
+ESTW-0015,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,10153311.49,USD,FY2024,2024-12-31,true
+ESTW-0015,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,10333958.96,USD,FY2026,2026-12-31,true
+ESTW-0015,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,12685047.00,USD,FY2023,2023-12-31,true
+ESTW-0015,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,13456482.17,USD,FY2025,2025-12-31,true
+ESTW-0015,GrossProfit,Gross profit,income_statement,18495840.86,USD,FY2024,2024-12-31,true
+ESTW-0015,GrossProfit,Gross profit,income_statement,18630259.84,USD,FY2023,2023-12-31,true
+ESTW-0015,GrossProfit,Gross profit,income_statement,20101256.86,USD,FY2026,2026-12-31,true
+ESTW-0015,GrossProfit,Gross profit,income_statement,21011980.12,USD,FY2025,2025-12-31,true
+ESTW-0015,InventoryNet,Inventory,balance_sheet,5433260.03,USD,FY2026,2026-12-31,true
+ESTW-0015,InventoryNet,Inventory,balance_sheet,5574309.79,USD,FY2023,2023-12-31,true
+ESTW-0015,InventoryNet,Inventory,balance_sheet,7720177.69,USD,FY2025,2025-12-31,true
+ESTW-0015,InventoryNet,Inventory,balance_sheet,9076830.50,USD,FY2024,2024-12-31,true
+ESTW-0015,NetIncomeLoss,Net income,income_statement,705194.69,USD,FY2023,2023-12-31,true
+ESTW-0015,NetIncomeLoss,Net income,income_statement,717899.11,USD,FY2025,2025-12-31,true
+ESTW-0015,NetIncomeLoss,Net income,income_statement,750458.69,USD,FY2024,2024-12-31,true
+ESTW-0015,NetIncomeLoss,Net income,income_statement,797606.66,USD,FY2026,2026-12-31,true
+ESTW-0015,OperatingIncomeLoss,Operating income,income_statement,1010783.12,USD,FY2023,2023-12-31,true
+ESTW-0015,OperatingIncomeLoss,Operating income,income_statement,1175830.41,USD,FY2026,2026-12-31,true
+ESTW-0015,OperatingIncomeLoss,Operating income,income_statement,949896.98,USD,FY2025,2025-12-31,true
+ESTW-0015,OperatingIncomeLoss,Operating income,income_statement,989924.90,USD,FY2024,2024-12-31,true
+ESTW-0015,Revenues,Total revenue,income_statement,60394903.04,USD,FY2023,2023-12-31,true
+ESTW-0015,Revenues,Total revenue,income_statement,61501977.14,USD,FY2024,2024-12-31,true
+ESTW-0015,Revenues,Total revenue,income_statement,65074626.86,USD,FY2025,2025-12-31,true
+ESTW-0015,Revenues,Total revenue,income_statement,67024128.69,USD,FY2026,2026-12-31,true
+FARI-0016,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,1324706.13,USD,FY2026,2026-12-31,true
+FARI-0016,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,1351035.39,USD,FY2025,2025-12-31,true
+FARI-0016,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,2109234.39,USD,FY2023,2023-12-31,true
+FARI-0016,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,2120961.66,USD,FY2024,2024-12-31,true
+FARI-0016,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,11572556.66,USD,FY2025,2025-12-31,true
+FARI-0016,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,13435788.25,USD,FY2024,2024-12-31,true
+FARI-0016,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,4449021.58,USD,FY2023,2023-12-31,true
+FARI-0016,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,7882075.63,USD,FY2026,2026-12-31,true
+FARI-0016,GrossProfit,Gross profit,income_statement,5247438.67,USD,FY2023,2023-12-31,true
+FARI-0016,GrossProfit,Gross profit,income_statement,6860105.76,USD,FY2025,2025-12-31,true
+FARI-0016,GrossProfit,Gross profit,income_statement,6985821.06,USD,FY2026,2026-12-31,true
+FARI-0016,GrossProfit,Gross profit,income_statement,7332769.17,USD,FY2024,2024-12-31,true
+FARI-0016,InventoryNet,Inventory,balance_sheet,2087620.03,USD,FY2026,2026-12-31,true
+FARI-0016,InventoryNet,Inventory,balance_sheet,2294793.81,USD,FY2025,2025-12-31,true
+FARI-0016,InventoryNet,Inventory,balance_sheet,2527928.39,USD,FY2024,2024-12-31,true
+FARI-0016,InventoryNet,Inventory,balance_sheet,3417937.12,USD,FY2023,2023-12-31,true
+FARI-0016,NetIncomeLoss,Net income,income_statement,-827125.48,USD,FY2023,2023-12-31,true
+FARI-0016,NetIncomeLoss,Net income,income_statement,1274590.79,USD,FY2024,2024-12-31,true
+FARI-0016,NetIncomeLoss,Net income,income_statement,659850.25,USD,FY2026,2026-12-31,true
+FARI-0016,NetIncomeLoss,Net income,income_statement,992597.82,USD,FY2025,2025-12-31,true
+FARI-0016,OperatingIncomeLoss,Operating income,income_statement,-332452.34,USD,FY2023,2023-12-31,true
+FARI-0016,OperatingIncomeLoss,Operating income,income_statement,1993937.73,USD,FY2025,2025-12-31,true
+FARI-0016,OperatingIncomeLoss,Operating income,income_statement,2069269.05,USD,FY2024,2024-12-31,true
+FARI-0016,OperatingIncomeLoss,Operating income,income_statement,2169063.08,USD,FY2026,2026-12-31,true
+FARI-0016,Revenues,Total revenue,income_statement,23194877.11,USD,FY2023,2023-12-31,true
+FARI-0016,Revenues,Total revenue,income_statement,24625486.37,USD,FY2024,2024-12-31,true
+FARI-0016,Revenues,Total revenue,income_statement,26144332.49,USD,FY2025,2025-12-31,true
+FARI-0016,Revenues,Total revenue,income_statement,28000000.00,USD,FY2026,2026-12-31,true
+FILS-0017,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,11997585.06,USD,FY2025,2025-12-31,true
+FILS-0017,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,12068137.65,USD,FY2026,2026-12-31,true
+FILS-0017,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,5145538.44,USD,FY2024,2024-12-31,true
+FILS-0017,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,6051579.03,USD,FY2023,2023-12-31,true
+FILS-0017,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,12587686.97,USD,FY2023,2023-12-31,true
+FILS-0017,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,22946525.20,USD,FY2024,2024-12-31,true
+FILS-0017,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,35870895.74,USD,FY2026,2026-12-31,true
+FILS-0017,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,38298049.66,USD,FY2025,2025-12-31,true
+FILS-0017,GrossProfit,Gross profit,income_statement,54158810.05,USD,FY2023,2023-12-31,true
+FILS-0017,GrossProfit,Gross profit,income_statement,57028287.05,USD,FY2024,2024-12-31,true
+FILS-0017,GrossProfit,Gross profit,income_statement,60199321.76,USD,FY2025,2025-12-31,true
+FILS-0017,GrossProfit,Gross profit,income_statement,61478223.88,USD,FY2026,2026-12-31,true
+FILS-0017,InventoryNet,Inventory,balance_sheet,14770746.83,USD,FY2026,2026-12-31,true
+FILS-0017,InventoryNet,Inventory,balance_sheet,14969842.13,USD,FY2023,2023-12-31,true
+FILS-0017,InventoryNet,Inventory,balance_sheet,18629804.78,USD,FY2024,2024-12-31,true
+FILS-0017,InventoryNet,Inventory,balance_sheet,19319452.53,USD,FY2025,2025-12-31,true
+FILS-0017,NetIncomeLoss,Net income,income_statement,3205400.86,USD,FY2024,2024-12-31,true
+FILS-0017,NetIncomeLoss,Net income,income_statement,3237640.16,USD,FY2023,2023-12-31,true
+FILS-0017,NetIncomeLoss,Net income,income_statement,3287405.06,USD,FY2025,2025-12-31,true
+FILS-0017,NetIncomeLoss,Net income,income_statement,3490511.12,USD,FY2026,2026-12-31,true
+FILS-0017,OperatingIncomeLoss,Operating income,income_statement,4214010.68,USD,FY2023,2023-12-31,true
+FILS-0017,OperatingIncomeLoss,Operating income,income_statement,4350644.09,USD,FY2024,2024-12-31,true
+FILS-0017,OperatingIncomeLoss,Operating income,income_statement,4501082.24,USD,FY2025,2025-12-31,true
+FILS-0017,OperatingIncomeLoss,Operating income,income_statement,4887861.87,USD,FY2026,2026-12-31,true
+FILS-0017,Revenues,Total revenue,income_statement,118188617.00,USD,FY2023,2023-12-31,true
+FILS-0017,Revenues,Total revenue,income_statement,126427331.81,USD,FY2024,2024-12-31,true
+FILS-0017,Revenues,Total revenue,income_statement,132022354.75,USD,FY2025,2025-12-31,true
+FILS-0017,Revenues,Total revenue,income_statement,137227994.51,USD,FY2026,2026-12-31,true
+FRES-0018,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,1721969.10,USD,FY2026,2026-12-31,true
+FRES-0018,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,1983194.59,USD,FY2024,2024-12-31,true
+FRES-0018,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,2951500.17,USD,FY2025,2025-12-31,true
+FRES-0018,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,3695180.46,USD,FY2023,2023-12-31,true
+FRES-0018,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,32930859.09,USD,FY2024,2024-12-31,true
+FRES-0018,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,41589767.24,USD,FY2026,2026-12-31,true
+FRES-0018,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,44820339.92,USD,FY2023,2023-12-31,true
+FRES-0018,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,54131971.18,USD,FY2025,2025-12-31,true
+FRES-0018,GrossProfit,Gross profit,income_statement,21547540.43,USD,FY2024,2024-12-31,true
+FRES-0018,GrossProfit,Gross profit,income_statement,21991858.82,USD,FY2025,2025-12-31,true
+FRES-0018,GrossProfit,Gross profit,income_statement,26433133.65,USD,FY2023,2023-12-31,true
+FRES-0018,GrossProfit,Gross profit,income_statement,4883370.12,USD,FY2026,2026-12-31,true
+FRES-0018,InventoryNet,Inventory,balance_sheet,1137081.49,USD,FY2025,2025-12-31,true
+FRES-0018,InventoryNet,Inventory,balance_sheet,1719013.70,USD,FY2026,2026-12-31,true
+FRES-0018,InventoryNet,Inventory,balance_sheet,1842019.92,USD,FY2024,2024-12-31,true
+FRES-0018,InventoryNet,Inventory,balance_sheet,2362441.31,USD,FY2023,2023-12-31,true
+FRES-0018,NetIncomeLoss,Net income,income_statement,11073701.61,USD,FY2024,2024-12-31,true
+FRES-0018,NetIncomeLoss,Net income,income_statement,1281884.66,USD,FY2026,2026-12-31,true
+FRES-0018,NetIncomeLoss,Net income,income_statement,15689139.12,USD,FY2025,2025-12-31,true
+FRES-0018,NetIncomeLoss,Net income,income_statement,19542000.99,USD,FY2023,2023-12-31,true
+FRES-0018,OperatingIncomeLoss,Operating income,income_statement,12197964.13,USD,FY2024,2024-12-31,true
+FRES-0018,OperatingIncomeLoss,Operating income,income_statement,16143221.69,USD,FY2025,2025-12-31,true
+FRES-0018,OperatingIncomeLoss,Operating income,income_statement,1678658.48,USD,FY2026,2026-12-31,true
+FRES-0018,OperatingIncomeLoss,Operating income,income_statement,19960831.54,USD,FY2023,2023-12-31,true
+FRES-0018,Revenues,Total revenue,income_statement,30521063.24,USD,FY2026,2026-12-31,true
+FRES-0018,Revenues,Total revenue,income_statement,32818347.57,USD,FY2025,2025-12-31,true
+FRES-0018,Revenues,Total revenue,income_statement,34852965.89,USD,FY2024,2024-12-31,true
+FRES-0018,Revenues,Total revenue,income_statement,37013723.15,USD,FY2023,2023-12-31,true
+GREA-0019,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,10577051.10,USD,FY2023,2023-12-31,true
+GREA-0019,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,11328764.53,USD,FY2025,2025-12-31,true
+GREA-0019,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,13810264.73,USD,FY2024,2024-12-31,true
+GREA-0019,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,7588127.71,USD,FY2026,2026-12-31,true
+GREA-0019,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,23565434.41,USD,FY2026,2026-12-31,true
+GREA-0019,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,31148550.68,USD,FY2024,2024-12-31,true
+GREA-0019,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,32598170.73,USD,FY2025,2025-12-31,true
+GREA-0019,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,48707268.08,USD,FY2023,2023-12-31,true
+GREA-0019,GrossProfit,Gross profit,income_statement,31073506.88,USD,FY2026,2026-12-31,true
+GREA-0019,GrossProfit,Gross profit,income_statement,37131624.93,USD,FY2025,2025-12-31,true
+GREA-0019,GrossProfit,Gross profit,income_statement,37803919.56,USD,FY2024,2024-12-31,true
+GREA-0019,GrossProfit,Gross profit,income_statement,41473528.78,USD,FY2023,2023-12-31,true
+GREA-0019,InventoryNet,Inventory,balance_sheet,13212460.08,USD,FY2026,2026-12-31,true
+GREA-0019,InventoryNet,Inventory,balance_sheet,22748646.56,USD,FY2025,2025-12-31,true
+GREA-0019,InventoryNet,Inventory,balance_sheet,25076276.53,USD,FY2023,2023-12-31,true
+GREA-0019,InventoryNet,Inventory,balance_sheet,27393351.25,USD,FY2024,2024-12-31,true
+GREA-0019,NetIncomeLoss,Net income,income_statement,-3723568.84,USD,FY2024,2024-12-31,true
+GREA-0019,NetIncomeLoss,Net income,income_statement,-7753544.19,USD,FY2023,2023-12-31,true
+GREA-0019,NetIncomeLoss,Net income,income_statement,1475351.21,USD,FY2025,2025-12-31,true
+GREA-0019,NetIncomeLoss,Net income,income_statement,1682891.84,USD,FY2026,2026-12-31,true
+GREA-0019,OperatingIncomeLoss,Operating income,income_statement,-1302251.61,USD,FY2024,2024-12-31,true
+GREA-0019,OperatingIncomeLoss,Operating income,income_statement,-4094160.30,USD,FY2023,2023-12-31,true
+GREA-0019,OperatingIncomeLoss,Operating income,income_statement,3567161.75,USD,FY2026,2026-12-31,true
+GREA-0019,OperatingIncomeLoss,Operating income,income_statement,6061862.48,USD,FY2025,2025-12-31,true
+GREA-0019,Revenues,Total revenue,income_statement,117857441.87,USD,FY2026,2026-12-31,true
+GREA-0019,Revenues,Total revenue,income_statement,139459758.46,USD,FY2025,2025-12-31,true
+GREA-0019,Revenues,Total revenue,income_statement,167191480.19,USD,FY2024,2024-12-31,true
+GREA-0019,Revenues,Total revenue,income_statement,200437684.37,USD,FY2023,2023-12-31,true
+GUID-0020,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,17669605.69,USD,FY2024,2024-12-31,true
+GUID-0020,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,17958370.36,USD,FY2025,2025-12-31,true
+GUID-0020,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,32443047.85,USD,FY2023,2023-12-31,true
+GUID-0020,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,33078536.16,USD,FY2026,2026-12-31,true
+GUID-0020,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,123250813.25,USD,FY2026,2026-12-31,true
+GUID-0020,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,43908388.94,USD,FY2025,2025-12-31,true
+GUID-0020,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,43924691.92,USD,FY2024,2024-12-31,true
+GUID-0020,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,97527019.60,USD,FY2023,2023-12-31,true
+GUID-0020,GrossProfit,Gross profit,income_statement,83887994.97,USD,FY2023,2023-12-31,true
+GUID-0020,GrossProfit,Gross profit,income_statement,92831660.98,USD,FY2024,2024-12-31,true
+GUID-0020,GrossProfit,Gross profit,income_statement,98661889.32,USD,FY2026,2026-12-31,true
+GUID-0020,GrossProfit,Gross profit,income_statement,99970111.89,USD,FY2025,2025-12-31,true
+GUID-0020,InventoryNet,Inventory,balance_sheet,2209969.94,USD,FY2026,2026-12-31,true
+GUID-0020,InventoryNet,Inventory,balance_sheet,2553225.05,USD,FY2023,2023-12-31,true
+GUID-0020,InventoryNet,Inventory,balance_sheet,2988157.40,USD,FY2025,2025-12-31,true
+GUID-0020,InventoryNet,Inventory,balance_sheet,511016.82,USD,FY2024,2024-12-31,true
+GUID-0020,NetIncomeLoss,Net income,income_statement,28500424.88,USD,FY2023,2023-12-31,true
+GUID-0020,NetIncomeLoss,Net income,income_statement,29836960.99,USD,FY2025,2025-12-31,true
+GUID-0020,NetIncomeLoss,Net income,income_statement,34567943.37,USD,FY2026,2026-12-31,true
+GUID-0020,NetIncomeLoss,Net income,income_statement,35625959.71,USD,FY2024,2024-12-31,true
+GUID-0020,OperatingIncomeLoss,Operating income,income_statement,38150856.14,USD,FY2023,2023-12-31,true
+GUID-0020,OperatingIncomeLoss,Operating income,income_statement,39552709.70,USD,FY2025,2025-12-31,true
+GUID-0020,OperatingIncomeLoss,Operating income,income_statement,47459110.35,USD,FY2026,2026-12-31,true
+GUID-0020,OperatingIncomeLoss,Operating income,income_statement,54208537.89,USD,FY2024,2024-12-31,true
+GUID-0020,Revenues,Total revenue,income_statement,403187438.47,USD,FY2023,2023-12-31,true
+GUID-0020,Revenues,Total revenue,income_statement,418539126.82,USD,FY2024,2024-12-31,true
+GUID-0020,Revenues,Total revenue,income_statement,426470592.57,USD,FY2025,2025-12-31,true
+GUID-0020,Revenues,Total revenue,income_statement,452209399.42,USD,FY2026,2026-12-31,true
+IGLO-0021,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,16594214.42,USD,FY2026,2026-12-31,true
+IGLO-0021,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,16723616.62,USD,FY2025,2025-12-31,true
+IGLO-0021,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,7194857.76,USD,FY2024,2024-12-31,true
+IGLO-0021,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,8448597.48,USD,FY2023,2023-12-31,true
+IGLO-0021,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,34814103.54,USD,FY2025,2025-12-31,true
+IGLO-0021,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,67794638.78,USD,FY2026,2026-12-31,true
+IGLO-0021,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,78682394.69,USD,FY2023,2023-12-31,true
+IGLO-0021,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,96137443.99,USD,FY2024,2024-12-31,true
+IGLO-0021,GrossProfit,Gross profit,income_statement,32987831.20,USD,FY2025,2025-12-31,true
+IGLO-0021,GrossProfit,Gross profit,income_statement,37579625.16,USD,FY2026,2026-12-31,true
+IGLO-0021,GrossProfit,Gross profit,income_statement,40622704.19,USD,FY2023,2023-12-31,true
+IGLO-0021,GrossProfit,Gross profit,income_statement,48923905.12,USD,FY2024,2024-12-31,true
+IGLO-0021,InventoryNet,Inventory,balance_sheet,18762438.44,USD,FY2023,2023-12-31,true
+IGLO-0021,InventoryNet,Inventory,balance_sheet,23396282.36,USD,FY2024,2024-12-31,true
+IGLO-0021,InventoryNet,Inventory,balance_sheet,26133765.25,USD,FY2026,2026-12-31,true
+IGLO-0021,InventoryNet,Inventory,balance_sheet,27658072.86,USD,FY2025,2025-12-31,true
+IGLO-0021,NetIncomeLoss,Net income,income_statement,-14995800.30,USD,FY2025,2025-12-31,true
+IGLO-0021,NetIncomeLoss,Net income,income_statement,-15895180.47,USD,FY2026,2026-12-31,true
+IGLO-0021,NetIncomeLoss,Net income,income_statement,10473685.69,USD,FY2023,2023-12-31,true
+IGLO-0021,NetIncomeLoss,Net income,income_statement,18210859.44,USD,FY2024,2024-12-31,true
+IGLO-0021,OperatingIncomeLoss,Operating income,income_statement,-11372184.89,USD,FY2025,2025-12-31,true
+IGLO-0021,OperatingIncomeLoss,Operating income,income_statement,-12201805.48,USD,FY2026,2026-12-31,true
+IGLO-0021,OperatingIncomeLoss,Operating income,income_statement,16055978.63,USD,FY2023,2023-12-31,true
+IGLO-0021,OperatingIncomeLoss,Operating income,income_statement,20989984.73,USD,FY2024,2024-12-31,true
+IGLO-0021,Revenues,Total revenue,income_statement,143994602.17,USD,FY2023,2023-12-31,true
+IGLO-0021,Revenues,Total revenue,income_statement,162256721.93,USD,FY2024,2024-12-31,true
+IGLO-0021,Revenues,Total revenue,income_statement,182834935.58,USD,FY2025,2025-12-31,true
+IGLO-0021,Revenues,Total revenue,income_statement,206114399.26,USD,FY2026,2026-12-31,true
+JONE-0022,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,12482533.50,USD,FY2023,2023-12-31,true
+JONE-0022,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,12707718.61,USD,FY2026,2026-12-31,true
+JONE-0022,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,8054015.00,USD,FY2024,2024-12-31,true
+JONE-0022,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,9122975.42,USD,FY2025,2025-12-31,true
+JONE-0022,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,165131082.43,USD,FY2024,2024-12-31,true
+JONE-0022,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,168908892.47,USD,FY2023,2023-12-31,true
+JONE-0022,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,64555466.12,USD,FY2025,2025-12-31,true
+JONE-0022,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,98219792.65,USD,FY2026,2026-12-31,true
+JONE-0022,GrossProfit,Gross profit,income_statement,41554872.76,USD,FY2026,2026-12-31,true
+JONE-0022,GrossProfit,Gross profit,income_statement,43283347.46,USD,FY2025,2025-12-31,true
+JONE-0022,GrossProfit,Gross profit,income_statement,63172556.33,USD,FY2024,2024-12-31,true
+JONE-0022,GrossProfit,Gross profit,income_statement,75987725.28,USD,FY2023,2023-12-31,true
+JONE-0022,InventoryNet,Inventory,balance_sheet,18469912.07,USD,FY2025,2025-12-31,true
+JONE-0022,InventoryNet,Inventory,balance_sheet,19760475.84,USD,FY2023,2023-12-31,true
+JONE-0022,InventoryNet,Inventory,balance_sheet,19980602.05,USD,FY2024,2024-12-31,true
+JONE-0022,InventoryNet,Inventory,balance_sheet,25665287.36,USD,FY2026,2026-12-31,true
+JONE-0022,NetIncomeLoss,Net income,income_statement,1603728.98,USD,FY2026,2026-12-31,true
+JONE-0022,NetIncomeLoss,Net income,income_statement,26247145.39,USD,FY2024,2024-12-31,true
+JONE-0022,NetIncomeLoss,Net income,income_statement,29639713.75,USD,FY2023,2023-12-31,true
+JONE-0022,NetIncomeLoss,Net income,income_statement,401612.44,USD,FY2025,2025-12-31,true
+JONE-0022,OperatingIncomeLoss,Operating income,income_statement,29258443.91,USD,FY2024,2024-12-31,true
+JONE-0022,OperatingIncomeLoss,Operating income,income_statement,36034864.49,USD,FY2023,2023-12-31,true
+JONE-0022,OperatingIncomeLoss,Operating income,income_statement,3615038.54,USD,FY2026,2026-12-31,true
+JONE-0022,OperatingIncomeLoss,Operating income,income_statement,5865327.96,USD,FY2025,2025-12-31,true
+JONE-0022,Revenues,Total revenue,income_statement,156233612.15,USD,FY2026,2026-12-31,true
+JONE-0022,Revenues,Total revenue,income_statement,169819143.64,USD,FY2025,2025-12-31,true
+JONE-0022,Revenues,Total revenue,income_statement,196292321.54,USD,FY2024,2024-12-31,true
+JONE-0022,Revenues,Total revenue,income_statement,226892414.32,USD,FY2023,2023-12-31,true
+KING-0023,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,14164341.61,USD,FY2023,2023-12-31,true
+KING-0023,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,14766794.60,USD,FY2025,2025-12-31,true
+KING-0023,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,20106900.98,USD,FY2024,2024-12-31,true
+KING-0023,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,25087296.35,USD,FY2026,2026-12-31,true
+KING-0023,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,113182899.91,USD,FY2024,2024-12-31,true
+KING-0023,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,218899979.56,USD,FY2026,2026-12-31,true
+KING-0023,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,54085789.74,USD,FY2025,2025-12-31,true
+KING-0023,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,85184391.09,USD,FY2023,2023-12-31,true
+KING-0023,GrossProfit,Gross profit,income_statement,52986445.18,USD,FY2023,2023-12-31,true
+KING-0023,GrossProfit,Gross profit,income_statement,59992141.92,USD,FY2024,2024-12-31,true
+KING-0023,GrossProfit,Gross profit,income_statement,63280897.75,USD,FY2025,2025-12-31,true
+KING-0023,GrossProfit,Gross profit,income_statement,75595129.28,USD,FY2026,2026-12-31,true
+KING-0023,InventoryNet,Inventory,balance_sheet,18263004.95,USD,FY2023,2023-12-31,true
+KING-0023,InventoryNet,Inventory,balance_sheet,22061698.31,USD,FY2024,2024-12-31,true
+KING-0023,InventoryNet,Inventory,balance_sheet,33405175.22,USD,FY2026,2026-12-31,true
+KING-0023,InventoryNet,Inventory,balance_sheet,38846283.29,USD,FY2025,2025-12-31,true
+KING-0023,NetIncomeLoss,Net income,income_statement,15876070.42,USD,FY2024,2024-12-31,true
+KING-0023,NetIncomeLoss,Net income,income_statement,2202153.85,USD,FY2025,2025-12-31,true
+KING-0023,NetIncomeLoss,Net income,income_statement,3892595.71,USD,FY2023,2023-12-31,true
+KING-0023,NetIncomeLoss,Net income,income_statement,5548866.38,USD,FY2026,2026-12-31,true
+KING-0023,OperatingIncomeLoss,Operating income,income_statement,22210427.51,USD,FY2024,2024-12-31,true
+KING-0023,OperatingIncomeLoss,Operating income,income_statement,5931104.17,USD,FY2026,2026-12-31,true
+KING-0023,OperatingIncomeLoss,Operating income,income_statement,8451861.99,USD,FY2025,2025-12-31,true
+KING-0023,OperatingIncomeLoss,Operating income,income_statement,9498633.32,USD,FY2023,2023-12-31,true
+KING-0023,Revenues,Total revenue,income_statement,171990866.32,USD,FY2023,2023-12-31,true
+KING-0023,Revenues,Total revenue,income_statement,205635405.10,USD,FY2024,2024-12-31,true
+KING-0023,Revenues,Total revenue,income_statement,245861427.03,USD,FY2025,2025-12-31,true
+KING-0023,Revenues,Total revenue,income_statement,289653814.85,USD,FY2026,2026-12-31,true
+KLEI-0024,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,25889851.36,USD,FY2026,2026-12-31,true
+KLEI-0024,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,28238862.79,USD,FY2023,2023-12-31,true
+KLEI-0024,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,28584701.15,USD,FY2024,2024-12-31,true
+KLEI-0024,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,44870946.84,USD,FY2025,2025-12-31,true
+KLEI-0024,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,122130467.50,USD,FY2024,2024-12-31,true
+KLEI-0024,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,127341277.85,USD,FY2023,2023-12-31,true
+KLEI-0024,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,165454489.39,USD,FY2026,2026-12-31,true
+KLEI-0024,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,59684511.27,USD,FY2025,2025-12-31,true
+KLEI-0024,GrossProfit,Gross profit,income_statement,181889510.88,USD,FY2023,2023-12-31,true
+KLEI-0024,GrossProfit,Gross profit,income_statement,186236815.25,USD,FY2024,2024-12-31,true
+KLEI-0024,GrossProfit,Gross profit,income_statement,200981622.39,USD,FY2025,2025-12-31,true
+KLEI-0024,GrossProfit,Gross profit,income_statement,212802357.13,USD,FY2026,2026-12-31,true
+KLEI-0024,InventoryNet,Inventory,balance_sheet,49533046.46,USD,FY2025,2025-12-31,true
+KLEI-0024,InventoryNet,Inventory,balance_sheet,70851019.03,USD,FY2024,2024-12-31,true
+KLEI-0024,InventoryNet,Inventory,balance_sheet,75380827.10,USD,FY2023,2023-12-31,true
+KLEI-0024,InventoryNet,Inventory,balance_sheet,81425535.56,USD,FY2026,2026-12-31,true
+KLEI-0024,NetIncomeLoss,Net income,income_statement,40840730.99,USD,FY2023,2023-12-31,true
+KLEI-0024,NetIncomeLoss,Net income,income_statement,41948653.33,USD,FY2024,2024-12-31,true
+KLEI-0024,NetIncomeLoss,Net income,income_statement,42913338.21,USD,FY2025,2025-12-31,true
+KLEI-0024,NetIncomeLoss,Net income,income_statement,49866046.99,USD,FY2026,2026-12-31,true
+KLEI-0024,OperatingIncomeLoss,Operating income,income_statement,55875148.10,USD,FY2023,2023-12-31,true
+KLEI-0024,OperatingIncomeLoss,Operating income,income_statement,62790845.98,USD,FY2024,2024-12-31,true
+KLEI-0024,OperatingIncomeLoss,Operating income,income_statement,64642437.61,USD,FY2025,2025-12-31,true
+KLEI-0024,OperatingIncomeLoss,Operating income,income_statement,75791564.78,USD,FY2026,2026-12-31,true
+KLEI-0024,Revenues,Total revenue,income_statement,483543259.09,USD,FY2023,2023-12-31,true
+KLEI-0024,Revenues,Total revenue,income_statement,506718968.43,USD,FY2024,2024-12-31,true
+KLEI-0024,Revenues,Total revenue,income_statement,539377017.93,USD,FY2025,2025-12-31,true
+KLEI-0024,Revenues,Total revenue,income_statement,552620690.93,USD,FY2026,2026-12-31,true
+LIFE-0025,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,12847151.89,USD,FY2025,2025-12-31,true
+LIFE-0025,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,17359954.23,USD,FY2023,2023-12-31,true
+LIFE-0025,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,6631476.60,USD,FY2026,2026-12-31,true
+LIFE-0025,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,7170274.98,USD,FY2024,2024-12-31,true
+LIFE-0025,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,113252891.00,USD,FY2023,2023-12-31,true
+LIFE-0025,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,116953449.14,USD,FY2026,2026-12-31,true
+LIFE-0025,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,51428149.53,USD,FY2025,2025-12-31,true
+LIFE-0025,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,64633823.13,USD,FY2024,2024-12-31,true
+LIFE-0025,GrossProfit,Gross profit,income_statement,40755891.24,USD,FY2024,2024-12-31,true
+LIFE-0025,GrossProfit,Gross profit,income_statement,41349427.45,USD,FY2026,2026-12-31,true
+LIFE-0025,GrossProfit,Gross profit,income_statement,45688029.70,USD,FY2025,2025-12-31,true
+LIFE-0025,GrossProfit,Gross profit,income_statement,56146611.53,USD,FY2023,2023-12-31,true
+LIFE-0025,InventoryNet,Inventory,balance_sheet,10830518.66,USD,FY2026,2026-12-31,true
+LIFE-0025,InventoryNet,Inventory,balance_sheet,14394102.75,USD,FY2024,2024-12-31,true
+LIFE-0025,InventoryNet,Inventory,balance_sheet,19796202.04,USD,FY2025,2025-12-31,true
+LIFE-0025,InventoryNet,Inventory,balance_sheet,21277667.34,USD,FY2023,2023-12-31,true
+LIFE-0025,NetIncomeLoss,Net income,income_statement,10878826.32,USD,FY2023,2023-12-31,true
+LIFE-0025,NetIncomeLoss,Net income,income_statement,3951045.55,USD,FY2026,2026-12-31,true
+LIFE-0025,NetIncomeLoss,Net income,income_statement,4720379.96,USD,FY2024,2024-12-31,true
+LIFE-0025,NetIncomeLoss,Net income,income_statement,6601496.76,USD,FY2025,2025-12-31,true
+LIFE-0025,OperatingIncomeLoss,Operating income,income_statement,10405732.01,USD,FY2025,2025-12-31,true
+LIFE-0025,OperatingIncomeLoss,Operating income,income_statement,14153968.30,USD,FY2023,2023-12-31,true
+LIFE-0025,OperatingIncomeLoss,Operating income,income_statement,7456169.35,USD,FY2026,2026-12-31,true
+LIFE-0025,OperatingIncomeLoss,Operating income,income_statement,7614276.55,USD,FY2024,2024-12-31,true
+LIFE-0025,Revenues,Total revenue,income_statement,130690077.78,USD,FY2026,2026-12-31,true
+LIFE-0025,Revenues,Total revenue,income_statement,147908912.84,USD,FY2025,2025-12-31,true
+LIFE-0025,Revenues,Total revenue,income_statement,166867596.18,USD,FY2024,2024-12-31,true
+LIFE-0025,Revenues,Total revenue,income_statement,188256367.53,USD,FY2023,2023-12-31,true
+LIPM-0026,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,26109284.64,USD,FY2025,2025-12-31,true
+LIPM-0026,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,52668411.96,USD,FY2024,2024-12-31,true
+LIPM-0026,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,52892085.88,USD,FY2026,2026-12-31,true
+LIPM-0026,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,53662065.69,USD,FY2023,2023-12-31,true
+LIPM-0026,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,116267270.94,USD,FY2025,2025-12-31,true
+LIPM-0026,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,161855646.45,USD,FY2023,2023-12-31,true
+LIPM-0026,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,69842932.63,USD,FY2026,2026-12-31,true
+LIPM-0026,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,92649285.18,USD,FY2024,2024-12-31,true
+LIPM-0026,GrossProfit,Gross profit,income_statement,78074833.21,USD,FY2024,2024-12-31,true
+LIPM-0026,GrossProfit,Gross profit,income_statement,88954836.17,USD,FY2026,2026-12-31,true
+LIPM-0026,GrossProfit,Gross profit,income_statement,89021581.14,USD,FY2023,2023-12-31,true
+LIPM-0026,GrossProfit,Gross profit,income_statement,89940760.66,USD,FY2025,2025-12-31,true
+LIPM-0026,InventoryNet,Inventory,balance_sheet,61257623.44,USD,FY2023,2023-12-31,true
+LIPM-0026,InventoryNet,Inventory,balance_sheet,62739736.41,USD,FY2025,2025-12-31,true
+LIPM-0026,InventoryNet,Inventory,balance_sheet,63437673.31,USD,FY2024,2024-12-31,true
+LIPM-0026,InventoryNet,Inventory,balance_sheet,87966403.28,USD,FY2026,2026-12-31,true
+LIPM-0026,NetIncomeLoss,Net income,income_statement,28113509.08,USD,FY2026,2026-12-31,true
+LIPM-0026,NetIncomeLoss,Net income,income_statement,29650687.86,USD,FY2025,2025-12-31,true
+LIPM-0026,NetIncomeLoss,Net income,income_statement,30391161.07,USD,FY2023,2023-12-31,true
+LIPM-0026,NetIncomeLoss,Net income,income_statement,33173853.22,USD,FY2024,2024-12-31,true
+LIPM-0026,OperatingIncomeLoss,Operating income,income_statement,39327385.69,USD,FY2025,2025-12-31,true
+LIPM-0026,OperatingIncomeLoss,Operating income,income_statement,39669159.27,USD,FY2023,2023-12-31,true
+LIPM-0026,OperatingIncomeLoss,Operating income,income_statement,40117234.09,USD,FY2026,2026-12-31,true
+LIPM-0026,OperatingIncomeLoss,Operating income,income_statement,44047883.35,USD,FY2024,2024-12-31,true
+LIPM-0026,Revenues,Total revenue,income_statement,609928543.81,USD,FY2023,2023-12-31,true
+LIPM-0026,Revenues,Total revenue,income_statement,621852113.95,USD,FY2024,2024-12-31,true
+LIPM-0026,Revenues,Total revenue,income_statement,629919527.64,USD,FY2025,2025-12-31,true
+LIPM-0026,Revenues,Total revenue,income_statement,664180737.50,USD,FY2026,2026-12-31,true
+MALO-0027,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,11481439.41,USD,FY2024,2024-12-31,true
+MALO-0027,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,13004552.84,USD,FY2023,2023-12-31,true
+MALO-0027,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,13563418.97,USD,FY2024,2024-12-31,true
+MALO-0027,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,14107568.44,USD,FY2023,2023-12-31,true
+MALO-0027,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,15390859.34,USD,FY2025,2025-12-31,true
+MALO-0027,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,17892730.43,USD,FY2026,2026-12-31,true
+MALO-0027,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,127544957.20,USD,FY2024,2024-12-31,true
+MALO-0027,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,144673567.35,USD,FY2023,2023-12-31,true
+MALO-0027,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,190455050.79,USD,FY2026,2026-12-31,true
+MALO-0027,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,243246196.23,USD,FY2025,2025-12-31,true
+MALO-0027,GrossProfit,Gross profit,income_statement,101742402.15,USD,FY2025,2025-12-31,true
+MALO-0027,GrossProfit,Gross profit,income_statement,123606666.78,USD,FY2025,2025-12-31,true
+MALO-0027,GrossProfit,Gross profit,income_statement,153905377.19,USD,FY2026,2026-12-31,true
+MALO-0027,GrossProfit,Gross profit,income_statement,53858910.90,USD,FY2023,2023-12-31,true
+MALO-0027,InventoryNet,Inventory,balance_sheet,22149695.52,USD,FY2026,2026-12-31,true
+MALO-0027,InventoryNet,Inventory,balance_sheet,26926404.57,USD,FY2023,2023-12-31,true
+MALO-0027,InventoryNet,Inventory,balance_sheet,28101539.55,USD,FY2025,2025-12-31,true
+MALO-0027,NetIncomeLoss,Net income,income_statement,-840737.80,USD,FY2023,2023-12-31,true
+MALO-0027,NetIncomeLoss,Net income,income_statement,14921282.31,USD,FY2024,2024-12-31,true
+MALO-0027,NetIncomeLoss,Net income,income_statement,38237137.49,USD,FY2025,2025-12-31,true
+MALO-0027,NetIncomeLoss,Net income,income_statement,9835195.05,USD,FY2024,2024-12-31,true
+MALO-0027,OperatingIncomeLoss,Operating income,income_statement,14107781.64,USD,FY2024,2024-12-31,true
+MALO-0027,OperatingIncomeLoss,Operating income,income_statement,24120191.42,USD,FY2024,2024-12-31,true
+MALO-0027,OperatingIncomeLoss,Operating income,income_statement,45240865.82,USD,FY2025,2025-12-31,true
+MALO-0027,OperatingIncomeLoss,Operating income,income_statement,45309100.86,USD,FY2023,2023-12-31,true
+MALO-0027,OperatingIncomeLoss,Operating income,income_statement,4991570.55,USD,FY2023,2023-12-31,true
+MALO-0027,OperatingIncomeLoss,Operating income,income_statement,51703196.08,USD,FY2025,2025-12-31,true
+MALO-0027,OperatingIncomeLoss,Operating income,income_statement,63055353.83,USD,FY2026,2026-12-31,true
+MALO-0027,Revenues,Total revenue,income_statement,199506002.69,USD,FY2023,2023-12-31,true
+MALO-0027,Revenues,Total revenue,income_statement,226253794.47,USD,FY2023,2023-12-31,true
+MALO-0027,Revenues,Total revenue,income_statement,238533002.13,USD,FY2024,2024-12-31,true
+MALO-0027,Revenues,Total revenue,income_statement,270513148.03,USD,FY2024,2024-12-31,true
+MALO-0027,Revenues,Total revenue,income_statement,285194391.84,USD,FY2025,2025-12-31,true
+MALO-0027,Revenues,Total revenue,income_statement,323430435.40,USD,FY2025,2025-12-31,true
+MALO-0027,Revenues,Total revenue,income_statement,345147435.40,USD,FY2026,2026-12-31,true
+MAPL-0028,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,27185595.84,USD,FY2025,2025-12-31,true
+MAPL-0028,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,34181515.75,USD,FY2024,2024-12-31,true
+MAPL-0028,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,35860366.91,USD,FY2023,2023-12-31,true
+MAPL-0028,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,69496022.62,USD,FY2026,2026-12-31,true
+MAPL-0028,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,106802725.05,USD,FY2025,2025-12-31,true
+MAPL-0028,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,73308988.49,USD,FY2023,2023-12-31,true
+MAPL-0028,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,81799241.16,USD,FY2026,2026-12-31,true
+MAPL-0028,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,84517078.43,USD,FY2024,2024-12-31,true
+MAPL-0028,GrossProfit,Gross profit,income_statement,78509227.64,USD,FY2023,2023-12-31,true
+MAPL-0028,GrossProfit,Gross profit,income_statement,82950212.63,USD,FY2024,2024-12-31,true
+MAPL-0028,GrossProfit,Gross profit,income_statement,85977191.85,USD,FY2025,2025-12-31,true
+MAPL-0028,GrossProfit,Gross profit,income_statement,90864565.87,USD,FY2026,2026-12-31,true
+MAPL-0028,InventoryNet,Inventory,balance_sheet,57244298.18,USD,FY2024,2024-12-31,true
+MAPL-0028,InventoryNet,Inventory,balance_sheet,81190641.94,USD,FY2026,2026-12-31,true
+MAPL-0028,InventoryNet,Inventory,balance_sheet,84648601.03,USD,FY2023,2023-12-31,true
+MAPL-0028,InventoryNet,Inventory,balance_sheet,91773175.95,USD,FY2025,2025-12-31,true
+MAPL-0028,NetIncomeLoss,Net income,income_statement,20165695.02,USD,FY2024,2024-12-31,true
+MAPL-0028,NetIncomeLoss,Net income,income_statement,23269308.86,USD,FY2023,2023-12-31,true
+MAPL-0028,NetIncomeLoss,Net income,income_statement,24244609.30,USD,FY2026,2026-12-31,true
+MAPL-0028,NetIncomeLoss,Net income,income_statement,26945666.96,USD,FY2025,2025-12-31,true
+MAPL-0028,OperatingIncomeLoss,Operating income,income_statement,28382621.31,USD,FY2024,2024-12-31,true
+MAPL-0028,OperatingIncomeLoss,Operating income,income_statement,34157843.97,USD,FY2023,2023-12-31,true
+MAPL-0028,OperatingIncomeLoss,Operating income,income_statement,34940328.59,USD,FY2026,2026-12-31,true
+MAPL-0028,OperatingIncomeLoss,Operating income,income_statement,37686017.76,USD,FY2025,2025-12-31,true
+MAPL-0028,Revenues,Total revenue,income_statement,587101912.58,USD,FY2023,2023-12-31,true
+MAPL-0028,Revenues,Total revenue,income_statement,621124939.59,USD,FY2024,2024-12-31,true
+MAPL-0028,Revenues,Total revenue,income_statement,660710625.14,USD,FY2025,2025-12-31,true
+MAPL-0028,Revenues,Total revenue,income_statement,711551380.30,USD,FY2026,2026-12-31,true
+MAST-0029,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,3110985.16,USD,FY2023,2023-12-31,true
+MAST-0029,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,3267284.46,USD,FY2025,2025-12-31,true
+MAST-0029,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,4265307.01,USD,FY2026,2026-12-31,true
+MAST-0029,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,6501627.06,USD,FY2024,2024-12-31,true
+MAST-0029,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,12206330.13,USD,FY2023,2023-12-31,true
+MAST-0029,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,14640020.65,USD,FY2024,2024-12-31,true
+MAST-0029,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,21941450.92,USD,FY2026,2026-12-31,true
+MAST-0029,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,22654368.40,USD,FY2025,2025-12-31,true
+MAST-0029,GrossProfit,Gross profit,income_statement,26671890.17,USD,FY2023,2023-12-31,true
+MAST-0029,GrossProfit,Gross profit,income_statement,26927629.00,USD,FY2024,2024-12-31,true
+MAST-0029,GrossProfit,Gross profit,income_statement,29114210.68,USD,FY2025,2025-12-31,true
+MAST-0029,GrossProfit,Gross profit,income_statement,30204380.10,USD,FY2026,2026-12-31,true
+MAST-0029,InventoryNet,Inventory,balance_sheet,11568852.38,USD,FY2024,2024-12-31,true
+MAST-0029,InventoryNet,Inventory,balance_sheet,8480049.46,USD,FY2026,2026-12-31,true
+MAST-0029,InventoryNet,Inventory,balance_sheet,8554384.75,USD,FY2023,2023-12-31,true
+MAST-0029,InventoryNet,Inventory,balance_sheet,8566929.88,USD,FY2025,2025-12-31,true
+MAST-0029,NetIncomeLoss,Net income,income_statement,2981920.03,USD,FY2024,2024-12-31,true
+MAST-0029,NetIncomeLoss,Net income,income_statement,3311122.59,USD,FY2023,2023-12-31,true
+MAST-0029,NetIncomeLoss,Net income,income_statement,3353318.66,USD,FY2025,2025-12-31,true
+MAST-0029,NetIncomeLoss,Net income,income_statement,3867012.74,USD,FY2026,2026-12-31,true
+MAST-0029,OperatingIncomeLoss,Operating income,income_statement,4293211.93,USD,FY2024,2024-12-31,true
+MAST-0029,OperatingIncomeLoss,Operating income,income_statement,4379411.17,USD,FY2023,2023-12-31,true
+MAST-0029,OperatingIncomeLoss,Operating income,income_statement,4755844.70,USD,FY2025,2025-12-31,true
+MAST-0029,OperatingIncomeLoss,Operating income,income_statement,5404887.59,USD,FY2026,2026-12-31,true
+MAST-0029,Revenues,Total revenue,income_statement,73403119.28,USD,FY2023,2023-12-31,true
+MAST-0029,Revenues,Total revenue,income_statement,74956845.85,USD,FY2024,2024-12-31,true
+MAST-0029,Revenues,Total revenue,income_statement,79625496.80,USD,FY2025,2025-12-31,true
+MAST-0029,Revenues,Total revenue,income_statement,83848653.18,USD,FY2026,2026-12-31,true
+MCCO-0030,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,24812721.50,USD,FY2026,2026-12-31,true
+MCCO-0030,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,25321327.34,USD,FY2023,2023-12-31,true
+MCCO-0030,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,32408237.06,USD,FY2025,2025-12-31,true
+MCCO-0030,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,33003150.19,USD,FY2024,2024-12-31,true
+MCCO-0030,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,52451128.42,USD,FY2023,2023-12-31,true
+MCCO-0030,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,58566071.46,USD,FY2025,2025-12-31,true
+MCCO-0030,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,59255343.79,USD,FY2026,2026-12-31,true
+MCCO-0030,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,79765809.08,USD,FY2024,2024-12-31,true
+MCCO-0030,GrossProfit,Gross profit,income_statement,100069165.81,USD,FY2023,2023-12-31,true
+MCCO-0030,GrossProfit,Gross profit,income_statement,57701926.56,USD,FY2026,2026-12-31,true
+MCCO-0030,GrossProfit,Gross profit,income_statement,69157871.08,USD,FY2025,2025-12-31,true
+MCCO-0030,GrossProfit,Gross profit,income_statement,78456633.44,USD,FY2024,2024-12-31,true
+MCCO-0030,InventoryNet,Inventory,balance_sheet,53483925.99,USD,FY2026,2026-12-31,true
+MCCO-0030,InventoryNet,Inventory,balance_sheet,75305788.97,USD,FY2024,2024-12-31,true
+MCCO-0030,InventoryNet,Inventory,balance_sheet,96196185.59,USD,FY2023,2023-12-31,true
+MCCO-0030,InventoryNet,Inventory,balance_sheet,97825606.27,USD,FY2025,2025-12-31,true
+MCCO-0030,NetIncomeLoss,Net income,income_statement,-18616713.00,USD,FY2024,2024-12-31,true
+MCCO-0030,NetIncomeLoss,Net income,income_statement,-24302012.12,USD,FY2026,2026-12-31,true
+MCCO-0030,NetIncomeLoss,Net income,income_statement,-27988650.14,USD,FY2025,2025-12-31,true
+MCCO-0030,NetIncomeLoss,Net income,income_statement,-52725148.80,USD,FY2023,2023-12-31,true
+MCCO-0030,OperatingIncomeLoss,Operating income,income_statement,-11595495.98,USD,FY2026,2026-12-31,true
+MCCO-0030,OperatingIncomeLoss,Operating income,income_statement,-17789199.98,USD,FY2025,2025-12-31,true
+MCCO-0030,OperatingIncomeLoss,Operating income,income_statement,-44295121.99,USD,FY2023,2023-12-31,true
+MCCO-0030,OperatingIncomeLoss,Operating income,income_statement,-8289481.61,USD,FY2024,2024-12-31,true
+MCCO-0030,Revenues,Total revenue,income_statement,410000000.00,USD,FY2026,2026-12-31,true
+MCCO-0030,Revenues,Total revenue,income_statement,465909090.90,USD,FY2025,2025-12-31,true
+MCCO-0030,Revenues,Total revenue,income_statement,538539855.52,USD,FY2024,2024-12-31,true
+MCCO-0030,Revenues,Total revenue,income_statement,622493060.69,USD,FY2023,2023-12-31,true
+NEWM-0031,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,12845496.85,USD,FY2024,2024-12-31,true
+NEWM-0031,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,17800504.08,USD,FY2025,2025-12-31,true
+NEWM-0031,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,19839069.06,USD,FY2023,2023-12-31,true
+NEWM-0031,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,25724266.66,USD,FY2026,2026-12-31,true
+NEWM-0031,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,37096367.73,USD,FY2025,2025-12-31,true
+NEWM-0031,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,44632185.90,USD,FY2026,2026-12-31,true
+NEWM-0031,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,63999439.10,USD,FY2023,2023-12-31,true
+NEWM-0031,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,69644457.42,USD,FY2024,2024-12-31,true
+NEWM-0031,GrossProfit,Gross profit,income_statement,69203774.62,USD,FY2024,2024-12-31,true
+NEWM-0031,GrossProfit,Gross profit,income_statement,71505515.92,USD,FY2023,2023-12-31,true
+NEWM-0031,GrossProfit,Gross profit,income_statement,72368445.99,USD,FY2025,2025-12-31,true
+NEWM-0031,GrossProfit,Gross profit,income_statement,81105534.70,USD,FY2026,2026-12-31,true
+NEWM-0031,InventoryNet,Inventory,balance_sheet,19891608.91,USD,FY2024,2024-12-31,true
+NEWM-0031,InventoryNet,Inventory,balance_sheet,21531259.22,USD,FY2025,2025-12-31,true
+NEWM-0031,InventoryNet,Inventory,balance_sheet,21649955.21,USD,FY2023,2023-12-31,true
+NEWM-0031,InventoryNet,Inventory,balance_sheet,30477533.46,USD,FY2026,2026-12-31,true
+NEWM-0031,NetIncomeLoss,Net income,income_statement,2471257.47,USD,FY2024,2024-12-31,true
+NEWM-0031,NetIncomeLoss,Net income,income_statement,2473834.91,USD,FY2023,2023-12-31,true
+NEWM-0031,NetIncomeLoss,Net income,income_statement,2993356.92,USD,FY2026,2026-12-31,true
+NEWM-0031,NetIncomeLoss,Net income,income_statement,3197114.88,USD,FY2025,2025-12-31,true
+NEWM-0031,OperatingIncomeLoss,Operating income,income_statement,3321418.37,USD,FY2024,2024-12-31,true
+NEWM-0031,OperatingIncomeLoss,Operating income,income_statement,3673353.98,USD,FY2023,2023-12-31,true
+NEWM-0031,OperatingIncomeLoss,Operating income,income_statement,4159368.82,USD,FY2026,2026-12-31,true
+NEWM-0031,OperatingIncomeLoss,Operating income,income_statement,4410725.53,USD,FY2025,2025-12-31,true
+NEWM-0031,Revenues,Total revenue,income_statement,228045690.21,USD,FY2023,2023-12-31,true
+NEWM-0031,Revenues,Total revenue,income_statement,235347317.86,USD,FY2024,2024-12-31,true
+NEWM-0031,Revenues,Total revenue,income_statement,250289077.81,USD,FY2025,2025-12-31,true
+NEWM-0031,Revenues,Total revenue,income_statement,264549231.09,USD,FY2026,2026-12-31,true
+OLSS-0032,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,15958558.31,USD,FY2023,2023-12-31,true
+OLSS-0032,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,16784765.70,USD,FY2025,2025-12-31,true
+OLSS-0032,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,18837444.44,USD,FY2026,2026-12-31,true
+OLSS-0032,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,21963977.56,USD,FY2024,2024-12-31,true
+OLSS-0032,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,201525178.13,USD,FY2024,2024-12-31,true
+OLSS-0032,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,246668786.34,USD,FY2023,2023-12-31,true
+OLSS-0032,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,65901899.44,USD,FY2025,2025-12-31,true
+OLSS-0032,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,67359344.47,USD,FY2026,2026-12-31,true
+OLSS-0032,GrossProfit,Gross profit,income_statement,109581979.12,USD,FY2024,2024-12-31,true
+OLSS-0032,GrossProfit,Gross profit,income_statement,73664332.50,USD,FY2026,2026-12-31,true
+OLSS-0032,GrossProfit,Gross profit,income_statement,77056384.26,USD,FY2025,2025-12-31,true
+OLSS-0032,GrossProfit,Gross profit,income_statement,99905008.04,USD,FY2023,2023-12-31,true
+OLSS-0032,InventoryNet,Inventory,balance_sheet,21385115.70,USD,FY2024,2024-12-31,true
+OLSS-0032,InventoryNet,Inventory,balance_sheet,23057283.18,USD,FY2026,2026-12-31,true
+OLSS-0032,InventoryNet,Inventory,balance_sheet,31564246.83,USD,FY2025,2025-12-31,true
+OLSS-0032,InventoryNet,Inventory,balance_sheet,37776142.49,USD,FY2023,2023-12-31,true
+OLSS-0032,NetIncomeLoss,Net income,income_statement,11518317.94,USD,FY2025,2025-12-31,true
+OLSS-0032,NetIncomeLoss,Net income,income_statement,48416723.87,USD,FY2023,2023-12-31,true
+OLSS-0032,NetIncomeLoss,Net income,income_statement,53429768.24,USD,FY2024,2024-12-31,true
+OLSS-0032,NetIncomeLoss,Net income,income_statement,9938924.17,USD,FY2026,2026-12-31,true
+OLSS-0032,OperatingIncomeLoss,Operating income,income_statement,19639614.75,USD,FY2025,2025-12-31,true
+OLSS-0032,OperatingIncomeLoss,Operating income,income_statement,20668341.18,USD,FY2026,2026-12-31,true
+OLSS-0032,OperatingIncomeLoss,Operating income,income_statement,59137221.04,USD,FY2023,2023-12-31,true
+OLSS-0032,OperatingIncomeLoss,Operating income,income_statement,62234046.62,USD,FY2024,2024-12-31,true
+OLSS-0032,Revenues,Total revenue,income_statement,225124136.77,USD,FY2026,2026-12-31,true
+OLSS-0032,Revenues,Total revenue,income_statement,237742860.48,USD,FY2025,2025-12-31,true
+OLSS-0032,Revenues,Total revenue,income_statement,252482054.10,USD,FY2024,2024-12-31,true
+OLSS-0032,Revenues,Total revenue,income_statement,268135024.18,USD,FY2023,2023-12-31,true
+PEND-0033,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,14196251.55,USD,FY2024,2024-12-31,true
+PEND-0033,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,21339187.69,USD,FY2023,2023-12-31,true
+PEND-0033,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,23012426.82,USD,FY2026,2026-12-31,true
+PEND-0033,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,29443295.97,USD,FY2025,2025-12-31,true
+PEND-0033,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,119181091.01,USD,FY2024,2024-12-31,true
+PEND-0033,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,197865320.51,USD,FY2025,2025-12-31,true
+PEND-0033,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,222796432.35,USD,FY2026,2026-12-31,true
+PEND-0033,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,61480398.25,USD,FY2023,2023-12-31,true
+PEND-0033,GrossProfit,Gross profit,income_statement,64391998.66,USD,FY2023,2023-12-31,true
+PEND-0033,GrossProfit,Gross profit,income_statement,83171118.24,USD,FY2025,2025-12-31,true
+PEND-0033,GrossProfit,Gross profit,income_statement,84731085.29,USD,FY2026,2026-12-31,true
+PEND-0033,GrossProfit,Gross profit,income_statement,87061875.50,USD,FY2024,2024-12-31,true
+PEND-0033,InventoryNet,Inventory,balance_sheet,35978973.44,USD,FY2023,2023-12-31,true
+PEND-0033,InventoryNet,Inventory,balance_sheet,43544216.79,USD,FY2026,2026-12-31,true
+PEND-0033,InventoryNet,Inventory,balance_sheet,43984556.82,USD,FY2025,2025-12-31,true
+PEND-0033,InventoryNet,Inventory,balance_sheet,50060896.38,USD,FY2024,2024-12-31,true
+PEND-0033,NetIncomeLoss,Net income,income_statement,-1775657.39,USD,FY2023,2023-12-31,true
+PEND-0033,NetIncomeLoss,Net income,income_statement,26772402.78,USD,FY2025,2025-12-31,true
+PEND-0033,NetIncomeLoss,Net income,income_statement,32633459.09,USD,FY2026,2026-12-31,true
+PEND-0033,NetIncomeLoss,Net income,income_statement,8716965.39,USD,FY2024,2024-12-31,true
+PEND-0033,OperatingIncomeLoss,Operating income,income_statement,16442624.41,USD,FY2024,2024-12-31,true
+PEND-0033,OperatingIncomeLoss,Operating income,income_statement,32770850.42,USD,FY2025,2025-12-31,true
+PEND-0033,OperatingIncomeLoss,Operating income,income_statement,35291343.22,USD,FY2026,2026-12-31,true
+PEND-0033,OperatingIncomeLoss,Operating income,income_statement,6813879.49,USD,FY2023,2023-12-31,true
+PEND-0033,Revenues,Total revenue,income_statement,271389822.16,USD,FY2023,2023-12-31,true
+PEND-0033,Revenues,Total revenue,income_statement,288128552.55,USD,FY2024,2024-12-31,true
+PEND-0033,Revenues,Total revenue,income_statement,305899691.21,USD,FY2025,2025-12-31,true
+PEND-0033,Revenues,Total revenue,income_statement,319872519.75,USD,FY2026,2026-12-31,true
+PRAI-0034,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,2895207.02,USD,FY2023,2023-12-31,true
+PRAI-0034,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,3054033.04,USD,FY2024,2024-12-31,true
+PRAI-0034,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,3831991.14,USD,FY2025,2025-12-31,true
+PRAI-0034,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,4188846.96,USD,FY2026,2026-12-31,true
+PRAI-0034,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,12418981.19,USD,FY2026,2026-12-31,true
+PRAI-0034,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,4494795.41,USD,FY2024,2024-12-31,true
+PRAI-0034,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,5527318.26,USD,FY2023,2023-12-31,true
+PRAI-0034,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,7406772.53,USD,FY2025,2025-12-31,true
+PRAI-0034,GrossProfit,Gross profit,income_statement,5250482.83,USD,FY2023,2023-12-31,true
+PRAI-0034,GrossProfit,Gross profit,income_statement,5288862.19,USD,FY2024,2024-12-31,true
+PRAI-0034,GrossProfit,Gross profit,income_statement,5432499.07,USD,FY2025,2025-12-31,true
+PRAI-0034,GrossProfit,Gross profit,income_statement,5593242.13,USD,FY2026,2026-12-31,true
+PRAI-0034,InventoryNet,Inventory,balance_sheet,4863254.05,USD,FY2024,2024-12-31,true
+PRAI-0034,InventoryNet,Inventory,balance_sheet,5389427.08,USD,FY2023,2023-12-31,true
+PRAI-0034,InventoryNet,Inventory,balance_sheet,6177058.90,USD,FY2025,2025-12-31,true
+PRAI-0034,InventoryNet,Inventory,balance_sheet,6635444.04,USD,FY2026,2026-12-31,true
+PRAI-0034,NetIncomeLoss,Net income,income_statement,2365669.63,USD,FY2024,2024-12-31,true
+PRAI-0034,NetIncomeLoss,Net income,income_statement,2692378.22,USD,FY2025,2025-12-31,true
+PRAI-0034,NetIncomeLoss,Net income,income_statement,2711758.13,USD,FY2023,2023-12-31,true
+PRAI-0034,NetIncomeLoss,Net income,income_statement,3236022.55,USD,FY2026,2026-12-31,true
+PRAI-0034,OperatingIncomeLoss,Operating income,income_statement,3544467.97,USD,FY2024,2024-12-31,true
+PRAI-0034,OperatingIncomeLoss,Operating income,income_statement,3564778.18,USD,FY2023,2023-12-31,true
+PRAI-0034,OperatingIncomeLoss,Operating income,income_statement,3828094.93,USD,FY2025,2025-12-31,true
+PRAI-0034,OperatingIncomeLoss,Operating income,income_statement,4474593.71,USD,FY2026,2026-12-31,true
+PRAI-0034,Revenues,Total revenue,income_statement,37986078.26,USD,FY2023,2023-12-31,true
+PRAI-0034,Revenues,Total revenue,income_statement,38432191.63,USD,FY2024,2024-12-31,true
+PRAI-0034,Revenues,Total revenue,income_statement,41459485.63,USD,FY2025,2025-12-31,true
+PRAI-0034,Revenues,Total revenue,income_statement,42812291.88,USD,FY2026,2026-12-31,true
+PREM-0035,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,34385901.51,USD,FY2023,2023-12-31,true
+PREM-0035,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,35814306.56,USD,FY2024,2024-12-31,true
+PREM-0035,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,46429292.22,USD,FY2025,2025-12-31,true
+PREM-0035,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,75307298.44,USD,FY2026,2026-12-31,true
+PREM-0035,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,465883372.45,USD,FY2024,2024-12-31,true
+PREM-0035,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,478193848.39,USD,FY2026,2026-12-31,true
+PREM-0035,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,484755891.31,USD,FY2023,2023-12-31,true
+PREM-0035,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,535397148.58,USD,FY2025,2025-12-31,true
+PREM-0035,GrossProfit,Gross profit,income_statement,186403487.01,USD,FY2023,2023-12-31,true
+PREM-0035,GrossProfit,Gross profit,income_statement,199003858.01,USD,FY2024,2024-12-31,true
+PREM-0035,GrossProfit,Gross profit,income_statement,299942276.56,USD,FY2025,2025-12-31,true
+PREM-0035,GrossProfit,Gross profit,income_statement,373705801.29,USD,FY2026,2026-12-31,true
+PREM-0035,InventoryNet,Inventory,balance_sheet,114028981.49,USD,FY2026,2026-12-31,true
+PREM-0035,InventoryNet,Inventory,balance_sheet,40174619.29,USD,FY2023,2023-12-31,true
+PREM-0035,InventoryNet,Inventory,balance_sheet,74717197.60,USD,FY2024,2024-12-31,true
+PREM-0035,InventoryNet,Inventory,balance_sheet,94778087.24,USD,FY2025,2025-12-31,true
+PREM-0035,NetIncomeLoss,Net income,income_statement,111738942.63,USD,FY2025,2025-12-31,true
+PREM-0035,NetIncomeLoss,Net income,income_statement,137256238.64,USD,FY2026,2026-12-31,true
+PREM-0035,NetIncomeLoss,Net income,income_statement,68009377.93,USD,FY2023,2023-12-31,true
+PREM-0035,NetIncomeLoss,Net income,income_statement,80731209.94,USD,FY2024,2024-12-31,true
+PREM-0035,OperatingIncomeLoss,Operating income,income_statement,122181925.11,USD,FY2025,2025-12-31,true
+PREM-0035,OperatingIncomeLoss,Operating income,income_statement,136536931.06,USD,FY2026,2026-12-31,true
+PREM-0035,OperatingIncomeLoss,Operating income,income_statement,81193315.71,USD,FY2023,2023-12-31,true
+PREM-0035,OperatingIncomeLoss,Operating income,income_statement,87531592.90,USD,FY2024,2024-12-31,true
+PREM-0035,Revenues,Total revenue,income_statement,521780247.02,USD,FY2023,2023-12-31,true
+PREM-0035,Revenues,Total revenue,income_statement,623849944.86,USD,FY2024,2024-12-31,true
+PREM-0035,Revenues,Total revenue,income_statement,745886330.32,USD,FY2025,2025-12-31,true
+PREM-0035,Revenues,Total revenue,income_statement,900000000.00,USD,FY2026,2026-12-31,true
+REMB-0036,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,3411230.39,USD,FY2026,2026-12-31,true
+REMB-0036,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,5822958.69,USD,FY2026,2026-12-31,true
+REMB-0036,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,7606186.27,USD,FY2023,2023-12-31,true
+REMB-0036,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,7785703.20,USD,FY2025,2025-12-31,true
+REMB-0036,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,8498644.27,USD,FY2025,2025-12-31,true
+REMB-0036,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,8605100.11,USD,FY2023,2023-12-31,true
+REMB-0036,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,8726105.31,USD,FY2024,2024-12-31,true
+REMB-0036,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,9580530.03,USD,FY2024,2024-12-31,true
+REMB-0036,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,12804289.72,USD,FY2023,2023-12-31,true
+REMB-0036,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,19306941.49,USD,FY2024,2024-12-31,true
+REMB-0036,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,20468965.78,USD,FY2025,2025-12-31,true
+REMB-0036,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,26574456.29,USD,FY2025,2025-12-31,true
+REMB-0036,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,30419817.16,USD,FY2026,2026-12-31,true
+REMB-0036,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,34561760.09,USD,FY2026,2026-12-31,true
+REMB-0036,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,55057702.19,USD,FY2024,2024-12-31,true
+REMB-0036,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,83347644.91,USD,FY2023,2023-12-31,true
+REMB-0036,GrossProfit,Gross profit,income_statement,11079363.43,USD,FY2026,2026-12-31,true
+REMB-0036,GrossProfit,Gross profit,income_statement,17638129.09,USD,FY2024,2024-12-31,true
+REMB-0036,GrossProfit,Gross profit,income_statement,18235459.95,USD,FY2025,2025-12-31,true
+REMB-0036,GrossProfit,Gross profit,income_statement,19626481.07,USD,FY2026,2026-12-31,true
+REMB-0036,GrossProfit,Gross profit,income_statement,20843223.45,USD,FY2023,2023-12-31,true
+REMB-0036,GrossProfit,Gross profit,income_statement,23701860.57,USD,FY2025,2025-12-31,true
+REMB-0036,GrossProfit,Gross profit,income_statement,36729719.85,USD,FY2024,2024-12-31,true
+REMB-0036,GrossProfit,Gross profit,income_statement,39202512.87,USD,FY2023,2023-12-31,true
+REMB-0036,InventoryNet,Inventory,balance_sheet,11003632.23,USD,FY2024,2024-12-31,true
+REMB-0036,InventoryNet,Inventory,balance_sheet,12759561.59,USD,FY2025,2025-12-31,true
+REMB-0036,InventoryNet,Inventory,balance_sheet,13448071.75,USD,FY2026,2026-12-31,true
+REMB-0036,InventoryNet,Inventory,balance_sheet,14132575.81,USD,FY2024,2024-12-31,true
+REMB-0036,InventoryNet,Inventory,balance_sheet,21186425.13,USD,FY2023,2023-12-31,true
+REMB-0036,InventoryNet,Inventory,balance_sheet,21892334.89,USD,FY2025,2025-12-31,true
+REMB-0036,InventoryNet,Inventory,balance_sheet,7490222.60,USD,FY2026,2026-12-31,true
+REMB-0036,InventoryNet,Inventory,balance_sheet,9508767.13,USD,FY2023,2023-12-31,true
+REMB-0036,NetIncomeLoss,Net income,income_statement,-1502608.07,USD,FY2025,2025-12-31,true
+REMB-0036,NetIncomeLoss,Net income,income_statement,-5927508.75,USD,FY2025,2025-12-31,true
+REMB-0036,NetIncomeLoss,Net income,income_statement,-6296369.66,USD,FY2023,2023-12-31,true
+REMB-0036,NetIncomeLoss,Net income,income_statement,-7050473.47,USD,FY2026,2026-12-31,true
+REMB-0036,NetIncomeLoss,Net income,income_statement,-8951091.72,USD,FY2024,2024-12-31,true
+REMB-0036,NetIncomeLoss,Net income,income_statement,2753057.33,USD,FY2024,2024-12-31,true
+REMB-0036,NetIncomeLoss,Net income,income_statement,2820201.60,USD,FY2026,2026-12-31,true
+REMB-0036,NetIncomeLoss,Net income,income_statement,8434238.42,USD,FY2023,2023-12-31,true
+REMB-0036,OperatingIncomeLoss,Operating income,income_statement,-1549806.46,USD,FY2025,2025-12-31,true
+REMB-0036,OperatingIncomeLoss,Operating income,income_statement,-2964265.78,USD,FY2026,2026-12-31,true
+REMB-0036,OperatingIncomeLoss,Operating income,income_statement,-3616189.30,USD,FY2023,2023-12-31,true
+REMB-0036,OperatingIncomeLoss,Operating income,income_statement,-400201.65,USD,FY2025,2025-12-31,true
+REMB-0036,OperatingIncomeLoss,Operating income,income_statement,-5225371.19,USD,FY2024,2024-12-31,true
+REMB-0036,OperatingIncomeLoss,Operating income,income_statement,10131179.16,USD,FY2023,2023-12-31,true
+REMB-0036,OperatingIncomeLoss,Operating income,income_statement,3827416.46,USD,FY2026,2026-12-31,true
+REMB-0036,OperatingIncomeLoss,Operating income,income_statement,5505623.35,USD,FY2024,2024-12-31,true
+REMB-0036,Revenues,Total revenue,income_statement,100721485.72,USD,FY2026,2026-12-31,true
+REMB-0036,Revenues,Total revenue,income_statement,104252862.88,USD,FY2024,2024-12-31,true
+REMB-0036,Revenues,Total revenue,income_statement,107019204.58,USD,FY2025,2025-12-31,true
+REMB-0036,Revenues,Total revenue,income_statement,110682951.34,USD,FY2025,2025-12-31,true
+REMB-0036,Revenues,Total revenue,income_statement,120000000.00,USD,FY2026,2026-12-31,true
+REMB-0036,Revenues,Total revenue,income_statement,120736722.84,USD,FY2024,2024-12-31,true
+REMB-0036,Revenues,Total revenue,income_statement,136212526.51,USD,FY2023,2023-12-31,true
+REMB-0036,Revenues,Total revenue,income_statement,98196328.22,USD,FY2023,2023-12-31,true
+SEBA-0037,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,1365670.15,USD,FY2024,2024-12-31,true
+SEBA-0037,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,1531628.80,USD,FY2026,2026-12-31,true
+SEBA-0037,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,1751150.88,USD,FY2023,2023-12-31,true
+SEBA-0037,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,3051937.45,USD,FY2025,2025-12-31,true
+SEBA-0037,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,17039083.31,USD,FY2024,2024-12-31,true
+SEBA-0037,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,17258434.58,USD,FY2023,2023-12-31,true
+SEBA-0037,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,31507604.97,USD,FY2026,2026-12-31,true
+SEBA-0037,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,9924501.99,USD,FY2025,2025-12-31,true
+SEBA-0037,GrossProfit,Gross profit,income_statement,5552009.12,USD,FY2026,2026-12-31,true
+SEBA-0037,GrossProfit,Gross profit,income_statement,7625073.01,USD,FY2024,2024-12-31,true
+SEBA-0037,GrossProfit,Gross profit,income_statement,7786111.81,USD,FY2023,2023-12-31,true
+SEBA-0037,GrossProfit,Gross profit,income_statement,8978610.06,USD,FY2025,2025-12-31,true
+SEBA-0037,InventoryNet,Inventory,balance_sheet,2977159.00,USD,FY2023,2023-12-31,true
+SEBA-0037,InventoryNet,Inventory,balance_sheet,3596043.48,USD,FY2024,2024-12-31,true
+SEBA-0037,InventoryNet,Inventory,balance_sheet,3770515.41,USD,FY2025,2025-12-31,true
+SEBA-0037,InventoryNet,Inventory,balance_sheet,5377707.96,USD,FY2026,2026-12-31,true
+SEBA-0037,NetIncomeLoss,Net income,income_statement,-80684.21,USD,FY2025,2025-12-31,true
+SEBA-0037,NetIncomeLoss,Net income,income_statement,2454188.98,USD,FY2024,2024-12-31,true
+SEBA-0037,NetIncomeLoss,Net income,income_statement,2915971.34,USD,FY2023,2023-12-31,true
+SEBA-0037,NetIncomeLoss,Net income,income_statement,925334.85,USD,FY2026,2026-12-31,true
+SEBA-0037,OperatingIncomeLoss,Operating income,income_statement,1008648.78,USD,FY2025,2025-12-31,true
+SEBA-0037,OperatingIncomeLoss,Operating income,income_statement,1388002.28,USD,FY2026,2026-12-31,true
+SEBA-0037,OperatingIncomeLoss,Operating income,income_statement,2922108.57,USD,FY2024,2024-12-31,true
+SEBA-0037,OperatingIncomeLoss,Operating income,income_statement,3303858.17,USD,FY2023,2023-12-31,true
+SEBA-0037,Revenues,Total revenue,income_statement,22954339.35,USD,FY2023,2023-12-31,true
+SEBA-0037,Revenues,Total revenue,income_statement,27444625.24,USD,FY2024,2024-12-31,true
+SEBA-0037,Revenues,Total revenue,income_statement,30844495.09,USD,FY2026,2026-12-31,true
+SEBA-0037,Revenues,Total revenue,income_statement,32813292.65,USD,FY2025,2025-12-31,true
+SHAM-0038,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,39114005.40,USD,FY2026,2026-12-31,true
+SHAM-0038,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,41504913.61,USD,FY2025,2025-12-31,true
+SHAM-0038,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,71836089.38,USD,FY2024,2024-12-31,true
+SHAM-0038,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,88136892.01,USD,FY2023,2023-12-31,true
+SHAM-0038,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,177474283.01,USD,FY2025,2025-12-31,true
+SHAM-0038,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,185216991.38,USD,FY2026,2026-12-31,true
+SHAM-0038,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,415686270.10,USD,FY2024,2024-12-31,true
+SHAM-0038,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,640722164.04,USD,FY2023,2023-12-31,true
+SHAM-0038,GrossProfit,Gross profit,income_statement,142323104.56,USD,FY2026,2026-12-31,true
+SHAM-0038,GrossProfit,Gross profit,income_statement,161513835.33,USD,FY2025,2025-12-31,true
+SHAM-0038,GrossProfit,Gross profit,income_statement,278914730.78,USD,FY2024,2024-12-31,true
+SHAM-0038,GrossProfit,Gross profit,income_statement,297705611.49,USD,FY2023,2023-12-31,true
+SHAM-0038,InventoryNet,Inventory,balance_sheet,114578903.36,USD,FY2025,2025-12-31,true
+SHAM-0038,InventoryNet,Inventory,balance_sheet,133784750.96,USD,FY2024,2024-12-31,true
+SHAM-0038,InventoryNet,Inventory,balance_sheet,159291305.57,USD,FY2023,2023-12-31,true
+SHAM-0038,InventoryNet,Inventory,balance_sheet,54819426.76,USD,FY2026,2026-12-31,true
+SHAM-0038,NetIncomeLoss,Net income,income_statement,-37235013.49,USD,FY2026,2026-12-31,true
+SHAM-0038,NetIncomeLoss,Net income,income_statement,-40698466.41,USD,FY2025,2025-12-31,true
+SHAM-0038,NetIncomeLoss,Net income,income_statement,52734471.19,USD,FY2024,2024-12-31,true
+SHAM-0038,NetIncomeLoss,Net income,income_statement,92094453.65,USD,FY2023,2023-12-31,true
+SHAM-0038,OperatingIncomeLoss,Operating income,income_statement,-22012624.97,USD,FY2026,2026-12-31,true
+SHAM-0038,OperatingIncomeLoss,Operating income,income_statement,-26217514.19,USD,FY2025,2025-12-31,true
+SHAM-0038,OperatingIncomeLoss,Operating income,income_statement,105926049.92,USD,FY2023,2023-12-31,true
+SHAM-0038,OperatingIncomeLoss,Operating income,income_statement,85465668.23,USD,FY2024,2024-12-31,true
+SHAM-0038,Revenues,Total revenue,income_statement,620000000.00,USD,FY2026,2026-12-31,true
+SHAM-0038,Revenues,Total revenue,income_statement,722161341.31,USD,FY2025,2025-12-31,true
+SHAM-0038,Revenues,Total revenue,income_statement,834739377.30,USD,FY2024,2024-12-31,true
+SHAM-0038,Revenues,Total revenue,income_statement,964867250.82,USD,FY2023,2023-12-31,true
+SHIN-0039,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,4729344.79,USD,FY2026,2026-12-31,true
+SHIN-0039,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,6650457.22,USD,FY2025,2025-12-31,true
+SHIN-0039,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,7424535.69,USD,FY2023,2023-12-31,true
+SHIN-0039,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,8005376.17,USD,FY2024,2024-12-31,true
+SHIN-0039,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,34953960.53,USD,FY2023,2023-12-31,true
+SHIN-0039,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,48092394.44,USD,FY2025,2025-12-31,true
+SHIN-0039,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,70233529.42,USD,FY2024,2024-12-31,true
+SHIN-0039,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,95212096.14,USD,FY2026,2026-12-31,true
+SHIN-0039,GrossProfit,Gross profit,income_statement,12694840.69,USD,FY2026,2026-12-31,true
+SHIN-0039,GrossProfit,Gross profit,income_statement,25709035.35,USD,FY2023,2023-12-31,true
+SHIN-0039,GrossProfit,Gross profit,income_statement,27121339.68,USD,FY2025,2025-12-31,true
+SHIN-0039,GrossProfit,Gross profit,income_statement,32406643.67,USD,FY2024,2024-12-31,true
+SHIN-0039,InventoryNet,Inventory,balance_sheet,11620517.82,USD,FY2024,2024-12-31,true
+SHIN-0039,InventoryNet,Inventory,balance_sheet,12597951.69,USD,FY2026,2026-12-31,true
+SHIN-0039,InventoryNet,Inventory,balance_sheet,8472932.37,USD,FY2023,2023-12-31,true
+SHIN-0039,InventoryNet,Inventory,balance_sheet,8706846.86,USD,FY2025,2025-12-31,true
+SHIN-0039,NetIncomeLoss,Net income,income_statement,15414907.39,USD,FY2024,2024-12-31,true
+SHIN-0039,NetIncomeLoss,Net income,income_statement,1994903.54,USD,FY2026,2026-12-31,true
+SHIN-0039,NetIncomeLoss,Net income,income_statement,6301891.33,USD,FY2023,2023-12-31,true
+SHIN-0039,NetIncomeLoss,Net income,income_statement,7240036.02,USD,FY2025,2025-12-31,true
+SHIN-0039,OperatingIncomeLoss,Operating income,income_statement,11181289.84,USD,FY2025,2025-12-31,true
+SHIN-0039,OperatingIncomeLoss,Operating income,income_statement,17018863.38,USD,FY2024,2024-12-31,true
+SHIN-0039,OperatingIncomeLoss,Operating income,income_statement,2720323.00,USD,FY2026,2026-12-31,true
+SHIN-0039,OperatingIncomeLoss,Operating income,income_statement,8388217.29,USD,FY2023,2023-12-31,true
+SHIN-0039,Revenues,Total revenue,income_statement,101884756.73,USD,FY2025,2025-12-31,true
+SHIN-0039,Revenues,Total revenue,income_statement,80240983.30,USD,FY2023,2023-12-31,true
+SHIN-0039,Revenues,Total revenue,income_statement,90417548.42,USD,FY2024,2024-12-31,true
+SHIN-0039,Revenues,Total revenue,income_statement,90677433.49,USD,FY2026,2026-12-31,true
+SIMM-0040,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,10054620.31,USD,FY2026,2026-12-31,true
+SIMM-0040,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,4695908.27,USD,FY2024,2024-12-31,true
+SIMM-0040,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,5709717.89,USD,FY2025,2025-12-31,true
+SIMM-0040,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,9516952.58,USD,FY2023,2023-12-31,true
+SIMM-0040,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,20938714.74,USD,FY2025,2025-12-31,true
+SIMM-0040,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,21617395.45,USD,FY2023,2023-12-31,true
+SIMM-0040,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,32023461.08,USD,FY2026,2026-12-31,true
+SIMM-0040,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,33325588.15,USD,FY2024,2024-12-31,true
+SIMM-0040,GrossProfit,Gross profit,income_statement,43874936.25,USD,FY2023,2023-12-31,true
+SIMM-0040,GrossProfit,Gross profit,income_statement,46021012.97,USD,FY2024,2024-12-31,true
+SIMM-0040,GrossProfit,Gross profit,income_statement,47082501.45,USD,FY2025,2025-12-31,true
+SIMM-0040,GrossProfit,Gross profit,income_statement,48896460.12,USD,FY2026,2026-12-31,true
+SIMM-0040,InventoryNet,Inventory,balance_sheet,12409268.60,USD,FY2026,2026-12-31,true
+SIMM-0040,InventoryNet,Inventory,balance_sheet,13704155.38,USD,FY2025,2025-12-31,true
+SIMM-0040,InventoryNet,Inventory,balance_sheet,16361000.11,USD,FY2023,2023-12-31,true
+SIMM-0040,InventoryNet,Inventory,balance_sheet,16593981.18,USD,FY2024,2024-12-31,true
+SIMM-0040,NetIncomeLoss,Net income,income_statement,747431.69,USD,FY2023,2023-12-31,true
+SIMM-0040,NetIncomeLoss,Net income,income_statement,791714.81,USD,FY2024,2024-12-31,true
+SIMM-0040,NetIncomeLoss,Net income,income_statement,872146.80,USD,FY2026,2026-12-31,true
+SIMM-0040,NetIncomeLoss,Net income,income_statement,891978.65,USD,FY2025,2025-12-31,true
+SIMM-0040,OperatingIncomeLoss,Operating income,income_statement,1060251.60,USD,FY2023,2023-12-31,true
+SIMM-0040,OperatingIncomeLoss,Operating income,income_statement,1175487.25,USD,FY2024,2024-12-31,true
+SIMM-0040,OperatingIncomeLoss,Operating income,income_statement,1217723.69,USD,FY2026,2026-12-31,true
+SIMM-0040,OperatingIncomeLoss,Operating income,income_statement,1342053.17,USD,FY2025,2025-12-31,true
+SIMM-0040,Revenues,Total revenue,income_statement,104497172.41,USD,FY2023,2023-12-31,true
+SIMM-0040,Revenues,Total revenue,income_statement,112936224.69,USD,FY2024,2024-12-31,true
+SIMM-0040,Revenues,Total revenue,income_statement,115690713.21,USD,FY2025,2025-12-31,true
+SIMM-0040,Revenues,Total revenue,income_statement,118654560.46,USD,FY2026,2026-12-31,true
+SLEE-0041,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,51581177.15,USD,FY2025,2025-12-31,true
+SLEE-0041,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,64944315.90,USD,FY2024,2024-12-31,true
+SLEE-0041,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,66450438.75,USD,FY2026,2026-12-31,true
+SLEE-0041,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,73724433.67,USD,FY2023,2023-12-31,true
+SLEE-0041,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,111763600.68,USD,FY2023,2023-12-31,true
+SLEE-0041,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,132121972.67,USD,FY2024,2024-12-31,true
+SLEE-0041,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,180655816.04,USD,FY2025,2025-12-31,true
+SLEE-0041,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,340680846.50,USD,FY2026,2026-12-31,true
+SLEE-0041,GrossProfit,Gross profit,income_statement,181155494.54,USD,FY2026,2026-12-31,true
+SLEE-0041,GrossProfit,Gross profit,income_statement,197874183.56,USD,FY2023,2023-12-31,true
+SLEE-0041,GrossProfit,Gross profit,income_statement,207625312.13,USD,FY2025,2025-12-31,true
+SLEE-0041,GrossProfit,Gross profit,income_statement,228671098.22,USD,FY2024,2024-12-31,true
+SLEE-0041,InventoryNet,Inventory,balance_sheet,101200656.18,USD,FY2024,2024-12-31,true
+SLEE-0041,InventoryNet,Inventory,balance_sheet,105063321.88,USD,FY2025,2025-12-31,true
+SLEE-0041,InventoryNet,Inventory,balance_sheet,85651026.79,USD,FY2026,2026-12-31,true
+SLEE-0041,InventoryNet,Inventory,balance_sheet,98680239.54,USD,FY2023,2023-12-31,true
+SLEE-0041,NetIncomeLoss,Net income,income_statement,-1031115.42,USD,FY2024,2024-12-31,true
+SLEE-0041,NetIncomeLoss,Net income,income_statement,-83405283.45,USD,FY2023,2023-12-31,true
+SLEE-0041,NetIncomeLoss,Net income,income_statement,13665824.91,USD,FY2025,2025-12-31,true
+SLEE-0041,NetIncomeLoss,Net income,income_statement,3925289.89,USD,FY2026,2026-12-31,true
+SLEE-0041,OperatingIncomeLoss,Operating income,income_statement,-50549448.99,USD,FY2023,2023-12-31,true
+SLEE-0041,OperatingIncomeLoss,Operating income,income_statement,23098590.11,USD,FY2024,2024-12-31,true
+SLEE-0041,OperatingIncomeLoss,Operating income,income_statement,37409441.37,USD,FY2025,2025-12-31,true
+SLEE-0041,OperatingIncomeLoss,Operating income,income_statement,43266591.01,USD,FY2026,2026-12-31,true
+SLEE-0041,Revenues,Total revenue,income_statement,670000000.00,USD,FY2026,2026-12-31,true
+SLEE-0041,Revenues,Total revenue,income_statement,732412636.81,USD,FY2025,2025-12-31,true
+SLEE-0041,Revenues,Total revenue,income_statement,826291896.64,USD,FY2024,2024-12-31,true
+SLEE-0041,Revenues,Total revenue,income_statement,932204421.58,USD,FY2023,2023-12-31,true
+STHU-0042,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,10114664.35,USD,FY2024,2024-12-31,true
+STHU-0042,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,11156727.41,USD,FY2023,2023-12-31,true
+STHU-0042,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,11772474.66,USD,FY2026,2026-12-31,true
+STHU-0042,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,13969231.99,USD,FY2025,2025-12-31,true
+STHU-0042,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,124299298.26,USD,FY2023,2023-12-31,true
+STHU-0042,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,155735618.28,USD,FY2025,2025-12-31,true
+STHU-0042,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,228695471.29,USD,FY2026,2026-12-31,true
+STHU-0042,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,248421344.05,USD,FY2024,2024-12-31,true
+STHU-0042,GrossProfit,Gross profit,income_statement,109661625.43,USD,FY2024,2024-12-31,true
+STHU-0042,GrossProfit,Gross profit,income_statement,121885158.10,USD,FY2025,2025-12-31,true
+STHU-0042,GrossProfit,Gross profit,income_statement,144171333.05,USD,FY2026,2026-12-31,true
+STHU-0042,GrossProfit,Gross profit,income_statement,72852597.92,USD,FY2023,2023-12-31,true
+STHU-0042,InventoryNet,Inventory,balance_sheet,10972166.21,USD,FY2023,2023-12-31,true
+STHU-0042,InventoryNet,Inventory,balance_sheet,4732896.32,USD,FY2024,2024-12-31,true
+STHU-0042,InventoryNet,Inventory,balance_sheet,7340661.53,USD,FY2025,2025-12-31,true
+STHU-0042,InventoryNet,Inventory,balance_sheet,7827797.45,USD,FY2026,2026-12-31,true
+STHU-0042,NetIncomeLoss,Net income,income_statement,38545735.77,USD,FY2023,2023-12-31,true
+STHU-0042,NetIncomeLoss,Net income,income_statement,71877077.09,USD,FY2025,2025-12-31,true
+STHU-0042,NetIncomeLoss,Net income,income_statement,73986318.89,USD,FY2024,2024-12-31,true
+STHU-0042,NetIncomeLoss,Net income,income_statement,87174190.20,USD,FY2026,2026-12-31,true
+STHU-0042,OperatingIncomeLoss,Operating income,income_statement,43273080.42,USD,FY2023,2023-12-31,true
+STHU-0042,OperatingIncomeLoss,Operating income,income_statement,75843757.78,USD,FY2024,2024-12-31,true
+STHU-0042,OperatingIncomeLoss,Operating income,income_statement,77707458.38,USD,FY2025,2025-12-31,true
+STHU-0042,OperatingIncomeLoss,Operating income,income_statement,92735553.51,USD,FY2026,2026-12-31,true
+STHU-0042,Revenues,Total revenue,income_statement,128476028.03,USD,FY2023,2023-12-31,true
+STHU-0042,Revenues,Total revenue,income_statement,153608273.71,USD,FY2024,2024-12-31,true
+STHU-0042,Revenues,Total revenue,income_statement,183656843.33,USD,FY2025,2025-12-31,true
+STHU-0042,Revenues,Total revenue,income_statement,218554980.87,USD,FY2026,2026-12-31,true
+SUNM-0043,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,22636336.43,USD,FY2025,2025-12-31,true
+SUNM-0043,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,30968084.11,USD,FY2026,2026-12-31,true
+SUNM-0043,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,32162221.77,USD,FY2023,2023-12-31,true
+SUNM-0043,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,45401754.99,USD,FY2024,2024-12-31,true
+SUNM-0043,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,133344335.56,USD,FY2024,2024-12-31,true
+SUNM-0043,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,135559278.14,USD,FY2026,2026-12-31,true
+SUNM-0043,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,263690478.80,USD,FY2025,2025-12-31,true
+SUNM-0043,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,289554322.20,USD,FY2023,2023-12-31,true
+SUNM-0043,GrossProfit,Gross profit,income_statement,108742045.38,USD,FY2026,2026-12-31,true
+SUNM-0043,GrossProfit,Gross profit,income_statement,127704270.04,USD,FY2025,2025-12-31,true
+SUNM-0043,GrossProfit,Gross profit,income_statement,141784483.31,USD,FY2024,2024-12-31,true
+SUNM-0043,GrossProfit,Gross profit,income_statement,190861460.34,USD,FY2023,2023-12-31,true
+SUNM-0043,InventoryNet,Inventory,balance_sheet,47279179.74,USD,FY2026,2026-12-31,true
+SUNM-0043,InventoryNet,Inventory,balance_sheet,55919985.64,USD,FY2023,2023-12-31,true
+SUNM-0043,InventoryNet,Inventory,balance_sheet,80951333.38,USD,FY2025,2025-12-31,true
+SUNM-0043,InventoryNet,Inventory,balance_sheet,99105479.10,USD,FY2024,2024-12-31,true
+SUNM-0043,NetIncomeLoss,Net income,income_statement,-6948987.82,USD,FY2024,2024-12-31,true
+SUNM-0043,NetIncomeLoss,Net income,income_statement,21694775.30,USD,FY2023,2023-12-31,true
+SUNM-0043,NetIncomeLoss,Net income,income_statement,27286469.77,USD,FY2025,2025-12-31,true
+SUNM-0043,NetIncomeLoss,Net income,income_statement,27954153.98,USD,FY2026,2026-12-31,true
+SUNM-0043,OperatingIncomeLoss,Operating income,income_statement,2346025.28,USD,FY2024,2024-12-31,true
+SUNM-0043,OperatingIncomeLoss,Operating income,income_statement,29897662.98,USD,FY2026,2026-12-31,true
+SUNM-0043,OperatingIncomeLoss,Operating income,income_statement,33573016.67,USD,FY2025,2025-12-31,true
+SUNM-0043,OperatingIncomeLoss,Operating income,income_statement,34485808.14,USD,FY2023,2023-12-31,true
+SUNM-0043,Revenues,Total revenue,income_statement,430000000.00,USD,FY2026,2026-12-31,true
+SUNM-0043,Revenues,Total revenue,income_statement,494233609.84,USD,FY2025,2025-12-31,true
+SUNM-0043,Revenues,Total revenue,income_statement,571279895.68,USD,FY2024,2024-12-31,true
+SUNM-0043,Revenues,Total revenue,income_statement,660336959.50,USD,FY2023,2023-12-31,true
+THEV-0044,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,2519539.87,USD,FY2026,2026-12-31,true
+THEV-0044,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,3187917.49,USD,FY2024,2024-12-31,true
+THEV-0044,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,3431936.07,USD,FY2025,2025-12-31,true
+THEV-0044,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,6186265.07,USD,FY2023,2023-12-31,true
+THEV-0044,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,10997680.39,USD,FY2026,2026-12-31,true
+THEV-0044,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,22227749.09,USD,FY2024,2024-12-31,true
+THEV-0044,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,28892659.47,USD,FY2025,2025-12-31,true
+THEV-0044,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,8899641.51,USD,FY2023,2023-12-31,true
+THEV-0044,GrossProfit,Gross profit,income_statement,16342337.80,USD,FY2023,2023-12-31,true
+THEV-0044,GrossProfit,Gross profit,income_statement,20096332.76,USD,FY2026,2026-12-31,true
+THEV-0044,GrossProfit,Gross profit,income_statement,20440541.49,USD,FY2024,2024-12-31,true
+THEV-0044,GrossProfit,Gross profit,income_statement,21326406.24,USD,FY2025,2025-12-31,true
+THEV-0044,InventoryNet,Inventory,balance_sheet,12098079.23,USD,FY2023,2023-12-31,true
+THEV-0044,InventoryNet,Inventory,balance_sheet,5648402.47,USD,FY2026,2026-12-31,true
+THEV-0044,InventoryNet,Inventory,balance_sheet,6348574.94,USD,FY2024,2024-12-31,true
+THEV-0044,InventoryNet,Inventory,balance_sheet,8220291.25,USD,FY2025,2025-12-31,true
+THEV-0044,NetIncomeLoss,Net income,income_statement,2539429.51,USD,FY2023,2023-12-31,true
+THEV-0044,NetIncomeLoss,Net income,income_statement,7089738.43,USD,FY2026,2026-12-31,true
+THEV-0044,NetIncomeLoss,Net income,income_statement,7459467.86,USD,FY2025,2025-12-31,true
+THEV-0044,NetIncomeLoss,Net income,income_statement,9092716.27,USD,FY2024,2024-12-31,true
+THEV-0044,OperatingIncomeLoss,Operating income,income_statement,3985811.52,USD,FY2023,2023-12-31,true
+THEV-0044,OperatingIncomeLoss,Operating income,income_statement,8496122.76,USD,FY2026,2026-12-31,true
+THEV-0044,OperatingIncomeLoss,Operating income,income_statement,8942795.72,USD,FY2025,2025-12-31,true
+THEV-0044,OperatingIncomeLoss,Operating income,income_statement,9763803.11,USD,FY2024,2024-12-31,true
+THEV-0044,Revenues,Total revenue,income_statement,57923431.16,USD,FY2026,2026-12-31,true
+THEV-0044,Revenues,Total revenue,income_statement,61345087.97,USD,FY2025,2025-12-31,true
+THEV-0044,Revenues,Total revenue,income_statement,65148260.55,USD,FY2024,2024-12-31,true
+THEV-0044,Revenues,Total revenue,income_statement,69187216.02,USD,FY2023,2023-12-31,true
+VERM-0045,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,3039630.70,USD,FY2025,2025-12-31,true
+VERM-0045,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,3834806.31,USD,FY2026,2026-12-31,true
+VERM-0045,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,4172311.04,USD,FY2024,2024-12-31,true
+VERM-0045,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,6978886.46,USD,FY2023,2023-12-31,true
+VERM-0045,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,21422917.28,USD,FY2023,2023-12-31,true
+VERM-0045,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,27189883.03,USD,FY2026,2026-12-31,true
+VERM-0045,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,29310203.93,USD,FY2024,2024-12-31,true
+VERM-0045,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,32276070.40,USD,FY2025,2025-12-31,true
+VERM-0045,GrossProfit,Gross profit,income_statement,18571134.33,USD,FY2026,2026-12-31,true
+VERM-0045,GrossProfit,Gross profit,income_statement,20625666.06,USD,FY2023,2023-12-31,true
+VERM-0045,GrossProfit,Gross profit,income_statement,22047883.07,USD,FY2025,2025-12-31,true
+VERM-0045,GrossProfit,Gross profit,income_statement,24246603.26,USD,FY2024,2024-12-31,true
+VERM-0045,InventoryNet,Inventory,balance_sheet,10181051.41,USD,FY2025,2025-12-31,true
+VERM-0045,InventoryNet,Inventory,balance_sheet,10993254.93,USD,FY2024,2024-12-31,true
+VERM-0045,InventoryNet,Inventory,balance_sheet,7093848.95,USD,FY2023,2023-12-31,true
+VERM-0045,InventoryNet,Inventory,balance_sheet,7549915.69,USD,FY2026,2026-12-31,true
+VERM-0045,NetIncomeLoss,Net income,income_statement,4753504.54,USD,FY2023,2023-12-31,true
+VERM-0045,NetIncomeLoss,Net income,income_statement,5041992.53,USD,FY2024,2024-12-31,true
+VERM-0045,NetIncomeLoss,Net income,income_statement,5124984.63,USD,FY2026,2026-12-31,true
+VERM-0045,NetIncomeLoss,Net income,income_statement,5267952.42,USD,FY2025,2025-12-31,true
+VERM-0045,OperatingIncomeLoss,Operating income,income_statement,5898107.81,USD,FY2023,2023-12-31,true
+VERM-0045,OperatingIncomeLoss,Operating income,income_statement,6060114.16,USD,FY2024,2024-12-31,true
+VERM-0045,OperatingIncomeLoss,Operating income,income_statement,6250512.83,USD,FY2026,2026-12-31,true
+VERM-0045,OperatingIncomeLoss,Operating income,income_statement,7435322.40,USD,FY2025,2025-12-31,true
+VERM-0045,Revenues,Total revenue,income_statement,55000000.00,USD,FY2026,2026-12-31,true
+VERM-0045,Revenues,Total revenue,income_statement,63254744.10,USD,FY2025,2025-12-31,true
+VERM-0045,Revenues,Total revenue,income_statement,75833017.44,USD,FY2024,2024-12-31,true
+VERM-0045,Revenues,Total revenue,income_statement,90912493.85,USD,FY2023,2023-12-31,true
+WAWO-0046,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,16785218.31,USD,FY2023,2023-12-31,true
+WAWO-0046,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,17389557.00,USD,FY2024,2024-12-31,true
+WAWO-0046,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,24736559.45,USD,FY2025,2025-12-31,true
+WAWO-0046,CashAndCashEquivalentsAtCarryingValue,Cash and cash equivalents,balance_sheet,4513593.44,USD,FY2026,2026-12-31,true
+WAWO-0046,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,41164325.77,USD,FY2024,2024-12-31,true
+WAWO-0046,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,55594060.23,USD,FY2023,2023-12-31,true
+WAWO-0046,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,78499617.65,USD,FY2026,2026-12-31,true
+WAWO-0046,DebtLongtermAndShorttermCombinedAmount,Total debt,balance_sheet,87307992.73,USD,FY2025,2025-12-31,true
+WAWO-0046,GrossProfit,Gross profit,income_statement,23157582.56,USD,FY2026,2026-12-31,true
+WAWO-0046,GrossProfit,Gross profit,income_statement,30871300.13,USD,FY2024,2024-12-31,true
+WAWO-0046,GrossProfit,Gross profit,income_statement,33486541.86,USD,FY2025,2025-12-31,true
+WAWO-0046,GrossProfit,Gross profit,income_statement,34051361.53,USD,FY2023,2023-12-31,true
+WAWO-0046,InventoryNet,Inventory,balance_sheet,36257862.58,USD,FY2024,2024-12-31,true
+WAWO-0046,InventoryNet,Inventory,balance_sheet,42215524.11,USD,FY2025,2025-12-31,true
+WAWO-0046,InventoryNet,Inventory,balance_sheet,43624930.77,USD,FY2023,2023-12-31,true
+WAWO-0046,InventoryNet,Inventory,balance_sheet,56534996.30,USD,FY2026,2026-12-31,true
+WAWO-0046,NetIncomeLoss,Net income,income_statement,26904286.02,USD,FY2023,2023-12-31,true
+WAWO-0046,NetIncomeLoss,Net income,income_statement,26985420.13,USD,FY2024,2024-12-31,true
+WAWO-0046,NetIncomeLoss,Net income,income_statement,27601649.93,USD,FY2025,2025-12-31,true
+WAWO-0046,NetIncomeLoss,Net income,income_statement,6538611.55,USD,FY2026,2026-12-31,true
+WAWO-0046,OperatingIncomeLoss,Operating income,income_statement,24697040.10,USD,FY2024,2024-12-31,true
+WAWO-0046,OperatingIncomeLoss,Operating income,income_statement,26789233.49,USD,FY2025,2025-12-31,true
+WAWO-0046,OperatingIncomeLoss,Operating income,income_statement,27241089.22,USD,FY2023,2023-12-31,true
+WAWO-0046,OperatingIncomeLoss,Operating income,income_statement,8718148.73,USD,FY2026,2026-12-31,true
+WAWO-0046,Revenues,Total revenue,income_statement,272442147.77,USD,FY2026,2026-12-31,true
+WAWO-0046,Revenues,Total revenue,income_statement,284397197.11,USD,FY2023,2023-12-31,true
+WAWO-0046,Revenues,Total revenue,income_statement,295446867.78,USD,FY2024,2024-12-31,true
+WAWO-0046,Revenues,Total revenue,income_statement,298403228.66,USD,FY2025,2025-12-31,true

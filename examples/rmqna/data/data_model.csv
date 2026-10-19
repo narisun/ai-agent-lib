@@ -1,0 +1,311 @@
+domain,table,column,datatype,nullable,pk,uk,fk,description
+crm,accounts,uen,string,N,Y,,,Unique Entity Number - the client identifier at legal-entity level and the universal join key of the model. Produced by identity mastering (resolve every source system's ids and name variants to one legal entity); stable across refreshes; never taken from a single source column.
+crm,accounts,connected_uen,string,Y,,,crm.accounts.uen (each entry; may be outside the book),"Semicolon-separated list of related legal entities (parent, subsidiaries, affiliates) forming the connected relationship group. Related entities stay separate rows - never merged."
+crm,accounts,name,string,N,,Y,,Client display name (legal name incl. suffixes). Must be unique across clients: name-based lookup resolves exact match then unique substring.
+crm,accounts,industry,string,Y,,,,Free-text industry description. Advisor context and news-search seasoning.
+crm,accounts,sic_code,string,Y,,,,SIC classification kept for cross-referencing older bank/credit systems. String - leading zeros matter.
+crm,accounts,naics_code,string,Y,,,industry.benchmarks.naics_industry (via first 5 digits),"NAICS classification. Calculated join: substr(naics_code,1,5) selects the client's industry benchmark set. Empty naics_code means no industry comparison (honest empty state)."
+crm,accounts,annual_revenue,decimal,Y,,,,"The CLIENT's annual business revenue in USD (their sales, not the bank's revenue from them). Source: prefer latest fiscal-year Revenues fact from financials; else the CRM-entered figure. Gates product eligibility (min_annual_revenue)."
+crm,accounts,employees,integer,Y,,,,Headcount. Context only.
+crm,accounts,city,string,Y,,,,Headquarters city.
+crm,accounts,state,string,Y,,,,"HQ state; carries the PROVINCE code for Canadian clients (e.g. ON, BC)."
+crm,accounts,country,string,N,,,,HQ country. Allowed: USA | Canada. Required - drives currency declaration and vocabulary expectations.
+crm,accounts,currency,string,N,,,,"Declared: the client's primary operating currency, set once from domicile (CAD for Canadian clients, else USD) and never re-derived downstream. Allowed: USD | CAD. Transactions/accounts still carry their own currency."
+crm,accounts,relationship_manager,string,Y,,,,Covering RM's name. Memo header.
+crm,accounts,segment,string,Y,,,,Bank segment label (e.g. Middle Market).
+crm,accounts,customer_since,date,Y,,,,Relationship start date (first account-open if CRM lacks it). Tenure framing.
+crm,accounts,founded_year,integer,Y,,,,Company founding year (memo shows the year only).
+crm,accounts,business_description,string,Y,,,,1-3 sentence description of what the client does. Advisor grounding.
+crm,accounts,locations,string,Y,,,,"Operating footprint, HQ first (e.g. 'Stamford CT (HQ); 278 showrooms nationwide')."
+crm,accounts,nps,string,Y,,,,"Derived: NPS BAND mapped from the raw score (9-10 Promoter, 7-8 Passive, 0-6 Detractor). Allowed: Promoter | Passive | Detractor. Detractor fires the attrition-risk watch signal."
+crm,accounts,logo_url,string,Y,,,,Client logo URL for the memo header. Cosmetic.
+crm,contacts,uen,string,N,Y,,crm.accounts.uen,Client key. Contacts carry no synthetic id - a client simply has multiple contact rows; raw CRM contact ids are dropped at mapping time.
+crm,contacts,first_name,string,N,Y,,,Contact first name.
+crm,contacts,last_name,string,N,Y,,,Contact last name.
+crm,contacts,title,string,Y,,,,Job title.
+crm,contacts,email,string,Y,,,,Email address.
+crm,contacts,phone,string,Y,,,,Phone number.
+crm,contacts,is_primary,boolean,Y,,,,Primary relationship contact flag (Yes|No); sorts contacts in the memo. Exactly one Yes per client preferred.
+crm,contacts,role,string,Y,,,,"Buying role (e.g. 'Economic buyer', 'Treasury lead') - who owns which decision."
+crm,contacts,department,string,Y,,,,Organizational unit.
+crm,opportunities,opportunity_id,string,N,Y,,,Stable deal key from the source CRM.
+crm,opportunities,uen,string,N,,,crm.accounts.uen,Client key.
+crm,opportunities,name,string,N,,,,Deal name as the RM knows it.
+crm,opportunities,product,string,Y,,,products.catalog.name (soft reference),Bank product being sold; align with catalog names so pipeline ties to whitespace analysis.
+crm,opportunities,stage,string,N,,,reference.xref (opportunity_stage),Pipeline stage. Allowed: Prospecting | Qualification | Proposal | Negotiation | Closed Won | Closed Lost. Translate source stages via xref.
+crm,opportunities,amount,decimal,Y,,,,"Deal size, USD."
+crm,opportunities,probability,decimal,Y,,,,Win probability 0-100 (no % sign). Weighted-pipeline math.
+crm,opportunities,close_date,date,Y,,,,Expected close date.
+crm,opportunities,competitor,string,Y,,,,Named competitor on the deal. Displacement talk track.
+crm,opportunities,owner,string,Y,,,,Deal owner on the bank side.
+crm,opportunities,created_date,date,Y,,,,Creation date. The pipeline-stagnation signal ages open deals by this (45-day threshold).
+crm,opportunities,next_step,string,Y,,,,Free-text next action; shown verbatim in the memo.
+crm,activities,activity_id,string,N,Y,,,Stable key from the source CRM.
+crm,activities,uen,string,N,,,crm.accounts.uen,Client key.
+crm,activities,type,string,N,,,reference.xref (activity_type),Interaction kind. Allowed: Call | Email | Meeting. Drop internal-only activity types at mapping.
+crm,activities,subject,string,Y,,,,"What happened, condensed."
+crm,activities,activity_date,date,N,,,,When it happened - THE field the relationship-neglect signal reads (90-day threshold).
+crm,activities,owner,string,Y,,,,Who logged it.
+crm,activities,notes,string,Y,,,,"Details, truncated to a sentence or two."
+crm,service_requests,uen,string,N,Y,,crm.accounts.uen,Client key. No synthetic ticket id in the canonical model.
+crm,service_requests,request,string,N,Y,,,What the client asked for / reported (ticket subject).
+crm,service_requests,product,string,Y,,,products.catalog.name (soft reference),Affected product.
+crm,service_requests,close_date,date,Y,,,,Close date; empty while open.
+crm,service_requests,status,string,N,,,,Ticket state. Allowed: Open | Closed (map in-flight workflow states to Open). The operational-friction signal counts Open rows (threshold: 2 or more).
+crm,service_requests,category,string,Y,,,,Classification for triage.
+crm,service_requests,priority,string,Y,,,,Urgency for triage.
+crm,service_requests,opened_date,date,Y,,,,"Open date, for aging."
+crm,relationship,uen,string,N,Y,,crm.accounts.uen,Client key; one row per client.
+crm,relationship,nii,decimal,Y,,,profitability.product_profitability.revenue_nii (reconciliation),"Source-of-record: net interest income attributed to the relationship (FTP system), USD, current period. Never recompute from product data. Invariant: equals the per-period sum of profitability revenue_nii exactly. Total Revenue KPI = nii + nir (the BANK's revenue, not the client's)."
+crm,relationship,nir,decimal,Y,,,profitability.product_profitability.revenue_fee (reconciliation),"Source-of-record: non-interest (fee) revenue attributed to the relationship (FTP system), USD. Invariant: equals the per-period sum of profitability revenue_fee exactly."
+crm,relationship,total_deposits,decimal,Y,,,deposits.balances (consistency),"Aggregated: client's total deposit balances with the bank, USD - consistent with the sum of latest positions in deposits/balances."
+crm,relationship,roe,decimal,Y,,,,"Relationship return on equity, %. FTP system figure."
+crm,relationship,coverage_team,string,Y,,,,Semicolon list of 'Name (Role)' covering the client beyond the RM.
+crm,relationship,strategic_priorities,string,Y,,,,Semicolon list of the client's stated priorities; the advisor aligns recommendations to these.
+crm,relationship,ask,string,Y,,,,One sentence: what the bank currently wants from the relationship. Anchors recommendations.
+crm,relationship,commercial,boolean,Y,,,,Derived engagement flag (Yes|No): any active product or material revenue in Commercial Banking. Part of the relationship-depth vector for whitespace analysis.
+crm,relationship,tps,boolean,Y,,,,Derived engagement flag (Yes|No) for Treasury & Payment Solutions.
+crm,relationship,capital_markets,boolean,Y,,,,Derived engagement flag (Yes|No) for Capital Markets.
+crm,relationship,wealth,boolean,Y,,,,Derived engagement flag (Yes|No) for Wealth.
+crm,relationship,retail,boolean,Y,,,,Derived engagement flag (Yes|No) for Retail.
+crm,relationship,products_held,string,Y,,,products.catalog.name (soft reference),Semicolon list of product names the client uses (catalog display names). Whitespace and payment-adoption analysis.
+crm,relationship,total_exposure,decimal,Y,,,lending.facilities.our_hold (consistency),"Aggregated: total committed credit exposure to the client, USD (credit-system aggregate). Invariant: at least the sum of facility our_hold amounts."
+crm,relationship,primary_operating_account,boolean,Y,,,,Derived (Yes|No): does the client's main operating account sit with us (balance/volume dominance in the deposit system)? The anchor of relationship stickiness.
+crm,relationship,last_review_date,date,Y,,,,Last annual review.
+crm,relationship,next_review_date,date,Y,,,,Next annual review; overdue becomes a watch item.
+crm,relationship,wallet_share_pct,decimal,Y,,,,"Estimated share of the client's banking wallet, %. FTP/analytics estimate; empty if the bank does not compute one."
+crm,relationship,raroc_pct,decimal,Y,,,,"Relationship risk-adjusted return on capital, %. FTP system figure; consistent with profitability totals."
+crm,commitments,commitment_id,string,N,Y,,,Stable commitment key (COM-XXXX-nnn style).
+crm,commitments,uen,string,N,,,crm.accounts.uen,Client key.
+crm,commitments,meeting_date,date,N,,,,Meeting where the commitment was made.
+crm,commitments,owner,string,Y,,,,Who owns the commitment - a bank employee or a client role (e.g. 'Client CFO').
+crm,commitments,commitment,string,N,,,,"What was promised, one sentence."
+crm,commitments,due_date,date,Y,,,,When the commitment is due; overdue open commitments feed the unresolved-client-commitment signal.
+crm,commitments,status,string,N,,,,Commitment state. Allowed: Open | Complete.
+crm,commitments,client_or_bank,string,Y,,,,Which side owes the commitment. Allowed: Client | Bank.
+crm,commitments,priority,string,Y,,,,Urgency for follow-up. Allowed: Critical | High | Medium | Low.
+crm,commitments,last_updated,date,Y,,,,Last touch date of the record.
+crm,operational_service_cases,uen,string,N,Y,,crm.accounts.uen,"Client key. Like service_requests, rows carry no synthetic ticket id."
+crm,operational_service_cases,request,string,N,Y,,,What the client asked for / reported - operational cases severe enough to surface to the RM.
+crm,operational_service_cases,product,string,Y,,,products.catalog.name (soft reference),Affected product.
+crm,operational_service_cases,close_date,date,Y,,,,Close date; empty while the case is open.
+crm,operational_service_cases,status,string,N,,,,Case workflow state. Allowed: New | In Progress | Closed.
+crm,operational_service_cases,category,string,Y,,,,"Classification for triage (e.g. Fees, Access, Payments)."
+crm,operational_service_cases,priority,string,Y,,,,Ranked urgency label. Allowed: 1 - Critical | 2 - High | 3 - Medium | 4 - Low. Critical open cases feed the critical-service-issue signal.
+crm,operational_service_cases,opened_date,date,Y,,,,"Open date, for aging."
+lending,facilities,facility_id,string,N,Y,,,Stable facility key; joins utilization and covenants.
+lending,facilities,uen,string,N,,,crm.accounts.uen,Borrowing client.
+lending,facilities,lender,string,Y,,,,"Lender of record - our bank, or the agent bank on syndications."
+lending,facilities,facility_type,string,N,,,reference.xref (facility_type),"Structural type. Allowed: revolving | term_loan | equipment_finance. LCs ride under revolving; equipment-secured term debt is equipment_finance (check collateral, not just the name)."
+lending,facilities,commitment,decimal,N,,,,"Total committed amount, USD - the utilization denominator. Invariant: >= outstanding."
+lending,facilities,outstanding,decimal,Y,,,,"Drawn balance, USD, as of the file date."
+lending,facilities,interest_rate_basis,string,Y,,,,Pricing basis as text (e.g. 'SOFR + 275bps'); compose from index + spread if not stored as text.
+lending,facilities,origination_date,date,Y,,,,Facility start.
+lending,facilities,maturity_date,date,Y,,,,CURRENT maturity after amendments (not origination schedule). Refinancing-urgency signal fires within 12 months of it.
+lending,facilities,purpose,string,Y,,,,What the facility finances.
+lending,facilities,collateral_type,string,Y,,,,Security package type; equipment collateral informs facility_type.
+lending,facilities,collateral_value,decimal,Y,,,,"Collateral value, USD."
+lending,facilities,ltv_pct,decimal,Y,,,,"Loan-to-value, %. Calculated as outstanding/collateral_value if the source does not store it."
+lending,facilities,our_hold,decimal,Y,,,,"Our bank's share of the commitment on syndications, USD - the true exposure. Equals commitment on bilateral deals."
+lending,facilities,facility_risk_rating,string,Y,,,,"Facility-level rating, bank scale (1 = best)."
+lending,facilities,spread_bps,integer,Y,,,,"Credit spread over the index, basis points."
+lending,facilities,all_in_rate_pct,decimal,Y,,,,"All-in rate, %."
+lending,facilities,unused_fee_bps,integer,Y,,,,"Unused/commitment fee, basis points."
+lending,utilization,facility_id,string,N,Y,,lending.facilities.facility_id,Facility key.
+lending,utilization,as_of,date,N,Y,,,Monthly snapshot date; 24 monthly rows per facility (history depth is required - trend signals need the series).
+lending,utilization,drawn,decimal,N,,,,"Drawn amount at the snapshot, USD (monthly balance snapshot)."
+lending,utilization,available,decimal,N,,,,"Calculated: commitment - drawn (adjusted for borrowing-base limits where the source tracks them), USD."
+lending,utilization,utilization_pct,decimal,N,,,,Calculated: drawn / commitment x 100. Invariant: equals drawn/(drawn+available) within rounding. Credit-squeeze signal reads this (revolver >= 80% with rising trend).
+lending,covenants,facility_id,string,N,Y,,lending.facilities.facility_id,Facility key.
+lending,covenants,name,string,N,Y,,,"Covenant name (e.g. 'Minimum DSCR', 'Minimum availability'). Unique per facility (composite key with facility_id)."
+lending,covenants,threshold,string,Y,,,,"Required level, human-readable text (units vary: ratio, USD, %)."
+lending,covenants,current_value,string,Y,,,,"Most recently tested value, same unit as threshold."
+lending,covenants,in_compliance,boolean,N,,,,The tested verdict (Yes|No) from the compliance workflow - prefer it over re-deriving. Any No fires the urgent covenant-breach signal.
+lending,covenants,next_test_date,date,Y,,,,Next compliance test; becomes a watch item.
+lending,credit_metrics,uen,string,N,Y,,crm.accounts.uen,Client key; one row per client.
+lending,credit_metrics,risk_rating,string,Y,,,,"Obligor rating, bank scale (1 = best; string - scales can be alphanumeric). Gates product eligibility vs catalog.max_risk_rating."
+lending,credit_metrics,prior_risk_rating,string,Y,,,,Previous rating - migration direction matters as much as level.
+lending,credit_metrics,risk_rating_as_of,date,Y,,,,Rating date.
+lending,credit_metrics,annual_review_date,date,Y,,,,Next annual review; overdue is a watch item.
+lending,credit_metrics,trigger_exceptions,string,Y,,,,Free-text exceptions/triggers noted by credit.
+lending,credit_metrics,ebitda,decimal,Y,,,,"EBITDA, USD, from the spreading system. Benchmark comparison."
+lending,credit_metrics,profit_margin_pct,decimal,Y,,,,"Spread ratio: profit margin, %."
+lending,credit_metrics,debt_to_net_worth,decimal,Y,,,,Spread ratio: leverage (lower is better).
+lending,credit_metrics,fixed_charge_coverage,decimal,Y,,,,Spread ratio: fixed charge coverage.
+lending,credit_metrics,debt_service_coverage,decimal,Y,,,,Spread ratio: DSCR - the busiest field: product-eligibility floors (catalog.min_dscr) and the benchmark table both read it.
+lending,credit_metrics,current_ratio,decimal,Y,,,,Spread ratio: current ratio (working capital).
+lending,credit_metrics,pd_pct,decimal,Y,,,,"Probability of default, %, from bank risk models."
+lending,credit_metrics,lgd_pct,decimal,Y,,,,"Loss given default, %, from bank risk models."
+lending,credit_metrics,rating_outlook,string,Y,,,,Credit's directional view. Allowed: Stable | Negative | Positive. Negative fires the risk-outlook watch signal.
+lending,credit_metrics,watch_status,string,Y,,,,"Regulatory classification. Allowed: Pass | Watch | Special Mention | classified grades. Non-Pass sharpens risk framing (context, not the trigger)."
+lending,borrowing_base,facility_id,string,N,Y,,lending.facilities.facility_id,Facility key - the asset-based revolver the certificate covers.
+lending,borrowing_base,uen,string,N,,,crm.accounts.uen,Borrowing client.
+lending,borrowing_base,as_of,date,N,Y,,,Certificate/snapshot date (composite key with facility_id).
+lending,borrowing_base,eligible_ar,decimal,N,,,,"Eligible accounts receivable in the borrowing base, USD."
+lending,borrowing_base,eligible_inventory,decimal,Y,,,,"Eligible inventory in the borrowing base, USD."
+lending,borrowing_base,advance_rate_ar_pct,decimal,Y,,,,"Advance rate applied to eligible AR, %."
+lending,borrowing_base,advance_rate_inventory_pct,decimal,Y,,,,"Advance rate applied to eligible inventory, %."
+lending,borrowing_base,availability,decimal,N,,,,"Excess availability after outstandings and reserves, USD. Thin availability vs commitment fires the borrowing-base-pressure signal."
+lending,borrowing_base,currency,string,Y,,,,Certificate currency. Allowed: USD | CAD.
+lending,credit_exceptions,exception_id,string,N,Y,,,Stable exception key (CE-XXXX-nnn style).
+lending,credit_exceptions,uen,string,N,,,crm.accounts.uen,Client key.
+lending,credit_exceptions,facility_id,string,Y,,,lending.facilities.facility_id,Facility the exception attaches to; empty for relationship-level exceptions (e.g. a waiver spanning facilities).
+lending,credit_exceptions,exception_type,string,N,,,,"Kind of documentation/credit exception (e.g. Financial Statements, Covenant Default, Borrowing Base Certificate, Insurance Certificate)."
+lending,credit_exceptions,requirement,string,N,,,,What must be delivered or executed to clear the exception.
+lending,credit_exceptions,due_date,date,Y,,,,When the item was/is due; past-due open exceptions feed the credit-document-exception signal.
+lending,credit_exceptions,received_date,date,Y,,,,When the item was received; empty while outstanding.
+lending,credit_exceptions,status,string,N,,,,Exception state. Allowed: Open | Resolved | Closed.
+lending,credit_exceptions,severity,string,Y,,,,Credit's severity grade. Allowed: Critical | High | Medium | Low.
+lending,credit_exceptions,owner,string,Y,,,,Bank-side owner chasing the exception.
+lending,credit_exceptions,waiver_expiry,date,Y,,,,Expiry of any waiver granted; becomes a watch item as it approaches.
+lending,credit_exceptions,cure_plan,string,Y,,,,"Agreed remediation path, one sentence."
+lending,credit_exceptions,last_updated,date,Y,,,,Last touch date of the record.
+lending,working_capital,uen,string,N,Y,,crm.accounts.uen,Client key (composite key with period_end).
+lending,working_capital,period_end,date,N,Y,,,Quarter-end the metrics are measured at; multiple periods per client enable trend signals.
+lending,working_capital,dso_days,integer,Y,,,,Days sales outstanding - receivables collection speed.
+lending,working_capital,dio_days,integer,Y,,,,Days inventory outstanding.
+lending,working_capital,dpo_days,integer,Y,,,,Days payables outstanding.
+lending,working_capital,cash_conversion_cycle_days,integer,Y,,,,Cash conversion cycle = DSO + DIO - DPO. A lengthening cycle feeds the working-capital-deterioration signal.
+lending,working_capital,ar_over_90_pct,decimal,Y,,,,"Share of receivables aged over 90 days, %."
+lending,working_capital,inventory_aging_pct,decimal,Y,,,,"Share of aged/slow-moving inventory, %; empty for service businesses with no inventory."
+lending,working_capital,net_working_capital,decimal,Y,,,,"Net working capital, in the row's currency."
+lending,working_capital,currency,string,Y,,,,Measurement currency. Allowed: USD | CAD.
+lending,working_capital,data_quality,string,Y,,,,Spreading-data quality flag from the source (e.g. Complete).
+payments,payment_summaries,uen,string,N,Y,,crm.accounts.uen,Client key.
+payments,payment_summaries,rail,string,N,Y,,reference.xref (payment_rail),Payment rail. Allowed: ach | eft | wire | card | check | rtp. eft is Canada's domestic batch rail. Canonicalize via xref BEFORE aggregating so source spellings merge into one bucket.
+payments,payment_summaries,direction,string,N,Y,,reference.xref (payment_direction),"Allowed: inbound (receivables) | outbound (payables), relative to the client."
+payments,payment_summaries,period_start,date,N,Y,,,First day of the covered calendar month. 24 months of history per active rail x direction.
+payments,payment_summaries,period_end,date,N,Y,,,Last day of the covered month.
+payments,payment_summaries,transaction_count,integer,N,,,payments.transactions (reconciliation),Aggregated: COUNT of the matching transactions.csv rows. Zero-fill placeholder rows (count=0) exist for clients with no payments - exclude them from averages.
+payments,payment_summaries,total_value,decimal,N,,,payments.transactions (reconciliation),Aggregated: SUM(amount) of the matching transaction rows. Notional across currencies within the bucket - per-currency detail lives in transactions.
+payments,payment_summaries,currency,string,N,Y,,,The bucket's modal currency (ISO code).
+payments,payment_summaries,fee_revenue,decimal,Y,,,payments.transactions (reconciliation),Aggregated: SUM(fee) of the matching transaction rows - GROSS rail fees the client paid. The bank's attributed share lives in profitability; do not confuse the two.
+payments,transactions,transaction_id,string,N,Y,,,Stable payment key.
+payments,transactions,uen,string,N,,,crm.accounts.uen,Client key.
+payments,transactions,rail,string,N,,,reference.xref (payment_rail),Allowed: ach | eft | wire | card | check | rtp (xref-translated).
+payments,transactions,direction,string,N,,,reference.xref (payment_direction),Allowed: inbound | outbound.
+payments,transactions,value_date,date,N,,,,Settlement date.
+payments,transactions,amount,decimal,N,,,,Payment amount in ITS OWN currency (a Canadian client's domestic payments are CAD on the eft rail).
+payments,transactions,currency,string,N,,,,"ISO currency code of this payment (USD, CAD, corridor currencies)."
+payments,transactions,fee,decimal,Y,,,,"Rail fee this payment carried, same currency. Summary fee_revenue is the sum of these."
+payments,transactions,counterparty,string,Y,,,,"Other party's name, if known."
+payments,transactions,memo,string,Y,,,,Payment reference text; scrub anything sensitive.
+payments,counterparties,uen,string,N,Y,,crm.accounts.uen,Client key. OPTIONAL TABLE - not currently delivered; when it arrives it activates supplier-concentration and FX-exposure analysis. Never fabricated: absent file degrades to an empty list.
+payments,counterparties,counterparty,string,N,Y,,,Named counterparty.
+payments,counterparties,role,string,Y,,,,"Counterparty role (supplier, customer, ...)."
+payments,counterparties,direction,string,N,Y,,reference.xref (payment_direction),Allowed: inbound | outbound.
+payments,counterparties,rail,string,N,Y,,reference.xref (payment_rail),Allowed: ach | eft | wire | card | check | rtp.
+payments,counterparties,country,string,Y,,,,Corridor country - FX-exposure input.
+payments,counterparties,currency,string,Y,,,,Corridor currency (ISO code).
+payments,counterparties,annual_value,decimal,Y,,,,"Aggregated: annual value moved with this counterparty, USD."
+payments,counterparties,counterparty_bank,string,Y,,,,Who the counterparty banks with - displacement intelligence.
+payments,counterparties,note,string,Y,,,,Context.
+deposits,balances,uen,string,N,Y,,crm.accounts.uen,Client key.
+deposits,balances,as_of,date,N,Y,,,Monthly snapshot date; 24 months per account type.
+deposits,balances,account_type,string,N,Y,,reference.xref (deposit_account_type),Allowed: Operating DDA | Operating DDA (CAD) | Operating DDA (Analyzed) | Money Market | Sweep | Collateral / Escrow. The idle-cash signal looks for types starting with 'Operating'.
+deposits,balances,avg_balance,decimal,N,Y,,,"Average collected balance for the month (account-analysis average, not point-in-time ledger), in the account's currency."
+deposits,balances,idle_estimate,decimal,Y,,,,Derived by the bank: portion of the balance not needed for operations - THE input to the idle-cash yield-gap pitch (idle x (SOFR - apy_pct)). Use the bank's target/excess-balance computation; leave empty rather than guessing.
+deposits,balances,apy_pct,decimal,Y,,,,"Rate currently paid on the balance, %."
+deposits,balances,currency,string,N,Y,,,Account currency. Allowed: USD | CAD.
+deposits,balances,period_end_balance,decimal,Y,,,,"Ledger balance at month-end, complementary to the average."
+deposits,balances,earnings_credit_rate_pct,decimal,Y,,,,"ECR offsetting fees on analyzed accounts, %. Sweep-vs-ECR analysis."
+deposits,balances,sweep_enabled,boolean,Y,,,,Product enrollment flag (Yes|No). 'No' plus idle cash = the sweep pitch.
+financials,company,uen,string,N,Y,,crm.accounts.uen,Client key; one row per client.
+financials,company,company_name,string,N,,,,Name as it appears on filings.
+financials,company,cik,string,Y,,Y,,SEC Central Index Key linking to public filings (provenance URLs). Empty for private companies; unique when present.
+financials,financial_facts,uen,string,N,Y,,crm.accounts.uen,Client key.
+financials,financial_facts,concept,string,N,Y,,,"Canonical fact name - XBRL US-GAAP tags ARE the vocabulary, for public AND private clients (spreading line items map onto the same tags). Allowed: Revenues | GrossProfit | OperatingIncomeLoss | NetIncomeLoss | CashAndCashEquivalentsAtCarryingValue | DebtLongtermAndShorttermCombinedAmount."
+financials,financial_facts,label,string,Y,,,,Human-readable label for display (e.g. 'Net sales').
+financials,financial_facts,statement,string,N,Y,,reference.xref (statement_type),Allowed: income_statement | balance_sheet | cash_flow.
+financials,financial_facts,value,decimal,N,Y,,,"The figure, full dollars (not thousands). Facts only - the platform calculates all ratios, margins and YoY itself."
+financials,financial_facts,unit,string,N,Y,,,Unit of the value (normally USD).
+financials,financial_facts,fiscal_year,string,N,Y,,,Derived from period_end using the CLIENT's actual fiscal calendar (never assume calendar years). Label like FY2026. Provide at least 3 fiscal years.
+financials,financial_facts,period_end,date,N,Y,,,Period end date (part of the unique grain with uen + concept).
+financials,financial_facts,is_annual,boolean,N,,,,Annual vs interim flag (Yes|No or 1|0).
+industry,benchmarks,naics_industry,string,N,Y,,,"The 5-digit NAICS industry this row set belongs to - the file's key (NOT client-keyed). Clients join via substr(crm.accounts.naics_code,1,5). Clients sharing an industry share one set."
+industry,benchmarks,sector,string,Y,,,,Display label of the 2-digit NAICS sector (e.g. 'Retail trade').
+industry,benchmarks,indicator,string,N,Y,,,The benchmarked metric - matched LITERALLY by the platform. Allowed (financial): Revenue | EBITDA | Profit Margin | Gross Margin | Debt/Net Worth (leverage) | Fixed Charge Coverage | Debt Service Coverage | Current Ratio. Allowed (adoption): OLBB | ACH Usage | EFT Usage | Wires Usage | Corporate Card | Cheques.
+industry,benchmarks,external_macro,decimal,Y,,,,"The published broad-market/sector (2-digit) value for the indicator, from the external vendor."
+industry,benchmarks,cohort_avg,decimal,Y,,,,"The internal peer-cohort average at industry grain - the primary comparison value for the Above/Below verdict. BENCHMARK data only: the client's own values are calculated at read time from financials/credit/payments, never stored here."
+industry,benchmarks,unit,string,N,,,,Allowed: usd | pct | ratio. Non-USD client figures convert at spot before comparison.
+industry,benchmarks,higher_is_better,boolean,N,,,,Direction of goodness (1|0); drives the Above/Below verdict. Leverage and Cheques are the 0s.
+market,rates,name,string,N,Y,,,"Canonical rate name, matched literally. Allowed: SOFR | Fed Funds Target (upper) | Prime Rate | Term SOFR 1M | Term SOFR 3M | Treasury 2Y | Treasury 5Y | Treasury 10Y | Treasury 30Y. SOFR feeds the idle-cash signal."
+market,rates,value,decimal,N,,,,The rate. Latest observation only - one row per rate.
+market,rates,unit,string,N,,,,pct.
+market,rates,as_of,date,N,,,,Observation date.
+market,rates,source,string,Y,,,,"Source attribution (e.g. FRED, CME)."
+market,fx,pair,string,N,Y,,,"Currency pair (e.g. USD/CAD, EUR/USD). USD/CAD also converts CAD client figures to USD for benchmark comparison."
+market,fx,rate,decimal,N,,,,Spot rate.
+market,fx,as_of,date,N,,,,Observation date.
+market,fx,source,string,Y,,,,Source attribution.
+market,fx,ytd_change_pct,decimal,Y,,,,"Year-to-date move, %."
+market,fx,fwd_3m_pct,decimal,Y,,,,3-month forward points as % of spot (signed). Hedging talk track.
+market,fx,fwd_12m_pct,decimal,Y,,,,12-month forward points as % of spot (signed).
+market,fx,implied_vol_3m_pct,decimal,Y,,,,"3-month implied volatility, %."
+market,commodities,name,string,N,Y,,,"Canonical commodity name (e.g. WTI Crude, Diesel, Copper, Steel HRC) - chosen for the industries the book contains."
+market,commodities,value,decimal,N,,,,Price.
+market,commodities,unit,string,N,,,,"Price unit (e.g. USD/ton, USD/bbl)."
+market,commodities,as_of,date,N,,,,Observation date.
+market,commodities,source,string,Y,,,,Source attribution (e.g. EIA).
+market,commodities,qoq_change_pct,decimal,Y,,,,"Quarter-over-quarter move, %."
+market,commodities,note,string,Y,,,,Context for the talk track.
+market,forward_curve,curve,string,N,Y,,,Which curve. Allowed: SOFR.
+market,forward_curve,tenor,string,N,Y,,,"Point on the curve (e.g. 3M, 6M, 1Y, 2Y)."
+market,forward_curve,rate,decimal,N,,,,"Forward rate, %. Rate-path context for refinancing timing."
+market,forward_curve,as_of,date,N,,,,Observation date.
+market,forward_curve,source,string,Y,,,,Source attribution (e.g. CME).
+products,catalog,product_id,string,N,Y,,,Stable product key.
+products,catalog,name,string,N,,Y,,Display name; 'name [family]' strings appear in whitespace lists. Unique.
+products,catalog,family,string,N,,,,"Product family - maps to a relationship-depth flag: Deposits & Liquidity, Lending -> commercial; Payments & TPS, Trade Finance -> tps; FX & Rates, Capital Markets -> capital_markets; Wealth -> wealth."
+products,catalog,description,string,Y,,,,"What the product is, condensed."
+products,catalog,client_benefit,string,Y,,,,"What it does FOR THE CLIENT, one sentence, outcome-first. The advisor quotes this verbatim - write deliberately."
+products,catalog,min_annual_revenue,decimal,Y,,,crm.accounts.annual_revenue (eligibility gate),"Revenue floor for eligibility, USD. Empty = no floor. Missing client data never disqualifies."
+products,catalog,min_dscr,decimal,Y,,,lending.credit_metrics.debt_service_coverage (eligibility gate),Minimum debt-service coverage for eligibility.
+products,catalog,max_risk_rating,string,Y,,,lending.credit_metrics.risk_rating (eligibility gate),"Worst acceptable risk rating (bank scale, 1 = best)."
+products,catalog,eligibility_criteria,string,Y,,,,Free-text criteria beyond the structured gates; shown to the advisor and RM.
+products,catalog,revenue_to_bank,string,Y,,,,"How the bank earns on it, as a band (e.g. '$10k-40k/yr'). Prioritization anchor."
+products,catalog,typical_pricing,string,Y,,,,Indicative pricing (e.g. '$250/mo'). Talk-track anchor.
+profitability,product_profitability,uen,string,N,Y,,crm.accounts.uen,Client key.
+profitability,product_profitability,period,string,N,Y,,,Attribution period label. Allowed forms: TTM-YYYY-MM (current trailing window) | FYYYYY (prior year). Two periods per client enable YoY.
+profitability,product_profitability,line_of_business,string,N,Y,,reference.xref (line_of_business),Allowed: Commercial Banking | Treasury & Payment Solutions | Capital Markets | Wealth ('TPS' is an accepted source variant).
+profitability,product_profitability,product,string,N,Y,,products.catalog.name (soft reference),Product the revenue is attributed to; align names with the catalog.
+profitability,product_profitability,revenue_nii,decimal,Y,,,crm.relationship.nii (reconciliation),"Source-of-record: attributed net interest income (FTP system), USD. Never derive from volumes. Invariant: per-period sum equals relationship.nii exactly."
+profitability,product_profitability,revenue_fee,decimal,Y,,,crm.relationship.nir (reconciliation),"Source-of-record: attributed fee revenue (FTP system), USD. Invariant: per-period sum equals relationship.nir exactly."
+profitability,product_profitability,expense_direct,decimal,Y,,,,"Direct cost allocated by the FTP system, USD."
+profitability,product_profitability,risk_cost,decimal,Y,,,,"Expected-loss charge, USD."
+profitability,product_profitability,allocated_capital,decimal,Y,,,,"Capital allocated to the position, USD - the RAROC denominator. RAROC itself is calculated by the platform, never stored."
+operations,source_readiness,readiness_id,string,N,Y,,,Stable readiness-check key (RDY-nnnn style).
+operations,source_readiness,uen,string,N,,,crm.accounts.uen,Client key.
+operations,source_readiness,domain,string,N,,,,Data domain the readiness check covers. Allowed: crm | lending | payments | deposits | financials | market | merchant.
+operations,source_readiness,as_of_date,date,N,,,,Freshness date of the domain's data for this client.
+operations,source_readiness,completeness_pct,decimal,Y,,,,"How complete the domain's delivery is for this client, %."
+operations,source_readiness,reconciliation_status,string,N,,,,Reconciliation verdict. Allowed: reconciled | partial | not_reconciled | exception.
+operations,source_readiness,quality_status,string,N,,,,Usability verdict for advisory use. Allowed: ready | review | stale. Non-ready rows fire the source-readiness-issue signal.
+operations,source_readiness,issue,string,Y,,,,"What is wrong, one sentence; empty when the source is clean."
+operations,source_readiness,owner,string,Y,,,,Data steward responsible for the source.
+operations,source_readiness,last_updated,date,Y,,,,Last check date.
+operations,treasury_controls,control_id,string,N,Y,,,Stable control-finding key (CTL-nnnn style).
+operations,treasury_controls,uen,string,N,,,crm.accounts.uen,Client key.
+operations,treasury_controls,product,string,Y,,,products.catalog.name (soft reference),Treasury product the control finding concerns.
+operations,treasury_controls,control_type,string,N,,,,"Kind of control (e.g. user_entitlement, security_token, positive_pay, dual_approval, implementation)."
+operations,treasury_controls,status,string,N,,,,Finding state. Allowed: open | pending_remediation | implementation_in_progress | not_enabled | underutilized | watch | ready. Non-ready rows feed the treasury-control-issue signal.
+operations,treasury_controls,severity,string,Y,,,,Risk severity. Allowed: critical | high | medium | low.
+operations,treasury_controls,observation,string,Y,,,,"What was observed, one sentence."
+operations,treasury_controls,detected_date,date,Y,,,,When the finding was detected.
+operations,treasury_controls,owner,string,Y,,,,Bank team that owns remediation.
+operations,treasury_controls,target_date,date,Y,,,,Target remediation date; overdue becomes a watch item.
+operations,treasury_controls,last_updated,date,Y,,,,Last touch date of the record.
+scenarios,rm_scenarios,scenario_id,string,N,Y,,,Stable scenario key (SCN-nnn style).
+scenarios,rm_scenarios,uen,string,N,,Y,crm.accounts.uen,Client the scenario is authored for; one scenario per client in the current book.
+scenarios,rm_scenarios,as_of_date,date,N,,,,Date the scenario set was authored.
+scenarios,rm_scenarios,scenario_name,string,N,,,,Short name of the test scenario.
+scenarios,rm_scenarios,primary_domain,string,Y,,,,Dominant theme of the scenario. Allowed: Credit | Treasury | Relationship | Working Capital | Capital Markets.
+scenarios,rm_scenarios,expected_signal_codes,string,Y,,,,Semicolon-separated list of signal codes the platform is expected to raise for this client (evaluation ground truth).
+scenarios,rm_scenarios,scenario_summary,string,Y,,,,"What the data has been arranged to exhibit, 1-2 sentences."
+scenarios,rm_scenarios,meeting_objective,string,Y,,,,What the RM meeting prepared from this scenario should accomplish.
+scenarios,rm_scenarios,control_notes,string,Y,,,,Constraints on how the platform must present or compute the scenario's findings.
+reference,xref,xref_id,string,N,Y,,,Row key (XR-0001 style).
+reference,xref,xref_type,string,N,,,,Which vocabulary the row belongs to. Allowed: payment_rail | payment_direction | facility_type | opportunity_stage | statement_type | source_type | deposit_account_type | activity_type | nps_band | line_of_business | signal_severity. Composite unique with xref_value.
+reference,xref,xref_name,string,N,,,,The canonical value within the vocabulary. Adding a NEW canonical name is a deliberate model change (code and reference move together).
+reference,xref,xref_value,string,N,,,,An accepted incoming spelling that maps to xref_name (canonical rows repeat the name). Matching is case-insensitive; every source spelling encountered during mapping is recorded here. Composite unique with xref_type.
+reference,xref,xref_description,string,Y,,,,Business meaning of the canonical value (populated on canonical rows).

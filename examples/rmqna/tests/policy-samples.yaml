@@ -1,0 +1,74 @@
+# Sample requests for the rules in policies/agentlib/rules/data.yaml.
+# Each says who asks for what, and what the answer should be.
+#
+#   agentlib policy test          decide them with the rules, as the services do locally
+#   agentlib policy test --opa    also with OPA, as deployed services do; the two must agree
+#
+# This file is yours. agentlib appends samples for a new service and never
+# changes or removes one that is here.
+schema: agentlib.policy-samples/v1
+samples:
+  - name: an analyst calls a tool of rmqna-data
+    action: tool.call
+    application: rmqna-data
+    resource: "rmqna-data/rmqna-data.people_by_team"
+    classification: confidential
+    roles: [analyst]
+    expect: allow
+    reason: rmqna-data-staff-call-the-tools
+
+  - name: anyone else is denied at rmqna-data
+    action: tool.call
+    application: rmqna-data
+    resource: "rmqna-data/rmqna-data.people_by_team"
+    classification: confidential
+    roles: [intern]
+    expect: deny
+    reason: no_matching_rule
+
+  - name: a manager sees every column of rmqna-data
+    action: data.query
+    application: rmqna-data
+    resource: people.people_by_team
+    classification: confidential
+    roles: [manager]
+    expect: allow
+    reason: rmqna-data-managers-see-everything
+
+  - name: an analyst sees rmqna-data without email
+    action: data.query
+    application: rmqna-data
+    resource: people.people_by_team
+    classification: confidential
+    roles: [analyst]
+    expect: allow
+    reason: rmqna-data-analysts-see-no-email
+
+  - name: rmqna uses its default model
+    action: model.route
+    application: rmqna
+    resource: default
+    expect: allow
+    reason: rmqna-uses-its-models
+
+  - name: rmqna calls its own tool
+    action: tool.call
+    application: rmqna
+    resource: greet
+    expect: allow
+    reason: rmqna-calls-its-own-tools
+
+  - name: rmqna may not call a tool no rule names
+    action: tool.call
+    application: rmqna
+    resource: delete_everything
+    expect: deny
+    reason: no_matching_rule
+
+  - name: rmqna calls a tool of rmqna-data
+    action: tool.call
+    application: rmqna
+    resource: "rmqna-data/rmqna-data.people_by_team"
+    classification: confidential
+    expect: allow
+    reason: rmqna-calls-rmqna-data

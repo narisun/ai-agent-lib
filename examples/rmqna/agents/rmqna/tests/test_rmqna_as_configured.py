@@ -1,0 +1,48 @@
+"""The agent with its own configuration: the real rules, registry and audit log.
+
+Only the model is scripted. These tests read `.env.example`, so they show
+what the service does as it is set up, and they fail when a rule is missing.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from ai_agent_lib_core import ServiceContainer
+from ai_agent_lib_core.testing import (
+    audit_records,
+    calls_tool,
+    last_shown_to_model,
+    load_test_config,
+    scripted_providers,
+)
+
+from rmqna import APPLICATION, answer, build_graph
+
+SERVICE = Path(__file__).resolve().parents[1]
+
+
+async def test_the_rules_allow_the_agent_its_model_and_its_tool(tmp_path: Path) -> None:
+    config = load_test_config(SERVICE / ".env.example", state_dir=tmp_path)
+    providers = scripted_providers(calls_tool("greet", name="Ada"), "I said hello to Ada.")
+    async with ServiceContainer(config, providers) as services:
+        await services.validate()
+        # No token: on a developer's machine the development identity stands in.
+        context = await services.authenticate(None, application=APPLICATION, thread_id="th-1")
+        reply = await answer(build_graph(services), services, context, "Say hello to Ada.")
+        shown = last_shown_to_model(services)
+
+    assert reply == "I said hello to Ada."
+    # Before its last reply the model was shown what the tool returned.
+    assert "Hello, Ada!" in shown
+    # Each step was allowed by a rule in policies/agentlib/rules/data.yaml.
+    decided = [
+        (record["event"], record["outcome"], record["attributes"]["policy_reason_code"])
+        for record in audit_records(tmp_path)
+    ]
+    assert decided == [
+        ("model.call", "success", "rmqna-uses-its-models"),
+        ("tool.call", "success", "rmqna-calls-its-own-tools"),
+        ("model.call", "success", "rmqna-uses-its-models"),
+    ]
+    assert {record["subject"] for record in audit_records(tmp_path)} == {"dev-user"}

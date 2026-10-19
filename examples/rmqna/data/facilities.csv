@@ -1,0 +1,55 @@
+facility_id,uen,lender,facility_type,commitment,outstanding,interest_rate_basis,origination_date,maturity_date,purpose,collateral_type,collateral_value,ltv_pct,our_hold,facility_risk_rating,spread_bps,all_in_rate_pct,unused_fee_bps
+FAC000000000,BOBS-0006,Regional Syndicate (agent),term_loan,11451782.85,9064083.81,SOFR + 3.69%,2020-09-28,2027-07-29,Refinance existing debt,Real Estate,10305579.88,87.95,5029895.53,Excellent,369,9.01,36
+FAC000000010,SIMM-0040,Regional Syndicate (agent),term_loan,59527620.05,24753665.23,Prime + 2.27%,2021-03-30,2027-07-04,Working capital,Inventory,30125143.51,82.17,44018801.61,Good,227,10.77,49
+FAC000000020,SHIN-0039,This Bank (sole lender),revolving,49891183.24,35921651.93,FedFunds + 1.79%,2018-12-09,2026-08-28,Acquisition financing,Receivables,31411476.05,139.34,43219751.54,Watch,179,7.12,32
+FAC000000030,SEBA-0037,This Bank (sole lender),term_loan,27601656.04,5302181.94,Prime + 2.81%,2019-10-02,2029-07-12,Equipment acquisition,,,,25944558.85,Watch,281,11.31,32
+FAC000000031,SEBA-0037,Regional Syndicate (agent),equipment_finance,53135124.59,13020296.66,Prime + 2.77%,2018-04-05,2027-05-14,Refinance existing debt,Equipment,11730954.34,110.99,30405746.79,Watch,277,11.27,50
+FAC000000032,SEBA-0037,This Bank (sole lender),revolving,48984621.96,38208005.13,FedFunds + 2.40%,2023-11-20,2030-12-15,Refinance existing debt,Equipment,24212607.92,119.24,26211924.93,Watch,240,7.73,48
+FAC000000040,GUID-0020,This Bank (sole lender),revolving,36281875.67,17677912.28,Prime + 1.93%,2022-09-16,2027-03-24,General corporate purposes,Equipment,23412743.95,75.51,13309172.84,Good,193,10.43,19
+FAC000000050,CHAN-0011,This Bank (sole lender),revolving,28032755.29,19337104.75,FedFunds + 2.45%,2019-10-04,2027-11-15,Refinance existing debt,Receivables,24515692.27,78.88,17125541.93,Good,245,7.78,31
+FAC000000051,CHAN-0011,Regional Syndicate (agent),term_loan,23776559.31,10223014.96,SOFR + 2.52%,2022-04-26,2028-02-22,Equipment acquisition,,,,16608912.49,Good,252,7.84,44
+FAC000000052,CHAN-0011,Regional Syndicate (agent),revolving,36092700.29,25769685.05,FedFunds + 2.78%,2023-11-05,2026-08-07,General corporate purposes,,,,32391060.63,Good,278,8.11,16
+FAC000000060,ESTW-0015,This Bank (agent),term_loan,49790021.12,46476718.84,Prime + 3.43%,2021-01-14,2027-01-14,Acquisition financing,Real Estate,38157178.67,121.80,36155735.51,Good,343,11.93,23
+FAC000000070,REMB-0036,This Bank (sole lender),revolving,42932827.91,32199620.93,Prime + 2.61%,2023-07-30,2027-05-24,General corporate purposes,,,,29483502.25,Watch,261,11.11,40
+FAC000000071,REMB-0036,Regional Syndicate (agent),term_loan,15285820.52,4586411.84,Prime + 2.65%,2018-02-25,2029-04-02,Equipment acquisition,Blanket Lien,19655813.03,23.33,14255717.42,Watch,265,11.15,21
+FAC000000080,BUSH-0009,Regional Syndicate (agent),revolving,37577998.60,15796286.83,SOFR + 1.99%,2022-06-30,2028-09-01,Refinance existing debt,Inventory,5039364.87,313.46,19738622.13,Very Good,199,7.31,18
+FAC000000081,BUSH-0009,This Bank (agent),term_loan,58101702.47,33799656.33,FedFunds + 3.21%,2018-03-29,2028-05-14,Acquisition financing,Blanket Lien,51235107.52,65.97,48792428.42,Very Good,321,8.54,28
+FAC000000090,DGYU-0012,Regional Syndicate (agent),revolving,50840446.83,21783258.36,FedFunds + 1.75%,2022-06-04,2029-05-29,Refinance existing debt,Receivables,50449041.31,43.18,46771637.20,Very Good,175,7.08,36
+FAC000000100,BUCK-0008,This Bank (sole lender),revolving,38613331.84,31910810.12,Prime + 1.62%,2023-06-27,2028-08-24,Equipment acquisition,Real Estate,66805243.62,47.77,26728931.92,Excellent,162,10.12,47
+FAC000000110,IGLO-0021,This Bank (sole lender),revolving,44213642.25,34134669.53,FedFunds + 3.37%,2022-05-19,2028-07-13,Refinance existing debt,Equipment,45021861.01,75.82,39229989.69,Good,337,8.70,33
+FAC000000120,FARI-0016,This Bank (agent),revolving,61981785.76,22591361.07,SOFR + 2.65%,2021-01-01,2027-03-09,Acquisition financing,Equipment,63012666.45,35.85,32617299.92,Good,265,7.97,48
+FAC000000130,JONE-0022,Regional Syndicate (agent),term_loan,47781696.31,14761995.31,SOFR + 1.61%,2020-12-24,2027-12-11,Equipment acquisition,Receivables,52201085.79,28.28,23010337.50,Unstable,161,6.93,50
+FAC000000140,MCCO-0030,This Bank (sole lender),term_loan,40183720.16,6860723.64,FedFunds + 2.52%,2019-05-29,2027-04-20,General corporate purposes,,,,25992463.67,Watch,252,7.85,21
+FAC000000141,MCCO-0030,This Bank (sole lender),revolving,30187535.26,19342389.26,FedFunds + 2.75%,2018-06-21,2027-12-18,General corporate purposes,Real Estate,51265557.85,37.73,28166274.69,Watch,275,8.08,20
+FAC000000150,LIFE-0025,Regional Syndicate (agent),term_loan,18363226.65,13633274.68,SOFR + 2.85%,2019-11-23,2031-02-23,Working capital,Inventory,61777161.42,22.07,14139427.17,Watch,285,8.17,36
+FAC000000160,ALLO-0001,This Bank (agent),term_loan,13269167.41,6871855.26,Prime + 2.18%,2019-06-28,2029-03-30,Refinance existing debt,Blanket Lien,22783094.99,30.16,11762255.15,Excellent,218,10.68,15
+FAC000000161,ALLO-0001,Regional Syndicate (agent),term_loan,60359304.76,33734727.96,FedFunds + 3.56%,2022-08-06,2027-06-02,Refinance existing debt,Blanket Lien,11788909.58,286.16,25080759.51,Excellent,356,8.89,27
+FAC000000162,ALLO-0001,This Bank (agent),revolving,58591400.14,45460057.39,SOFR + 2.24%,2019-08-01,2029-02-28,General corporate purposes,,,,51732713.14,Excellent,224,7.56,26
+FAC000000170,NEWM-0031,This Bank (agent),term_loan,42998727.21,26212378.47,FedFunds + 2.01%,2018-11-02,2031-05-07,Refinance existing debt,,,,21803000.27,Good,201,7.34,27
+FAC000000180,BLOU-0005,This Bank (sole lender),term_loan,40742334.35,16893303.61,Prime + 1.71%,2022-06-03,2028-09-15,Working capital,Blanket Lien,40239558.62,41.98,22032534.93,Good,171,10.21,17
+FAC000000181,BLOU-0005,This Bank (agent),term_loan,13156874.13,13008696.27,Prime + 2.62%,2022-01-21,2029-02-04,Acquisition financing,Blanket Lien,27922851.71,46.59,9123665.62,Very Good,262,11.12,45
+FAC000000182,BLOU-0005,This Bank (sole lender),term_loan,28015524.47,2187526.86,SOFR + 2.28%,2020-05-07,2030-01-17,Equipment acquisition,,,,20693637.41,Good,228,7.60,36
+FAC000000190,WAWO-0046,Regional Syndicate (agent),revolving,15841693.67,13940690.43,FedFunds + 2.13%,2022-01-10,2029-11-30,Working capital,Inventory,24443877.78,25.36,13056359.76,Watch,213,7.46,16
+FAC000000200,SUNM-0043,This Bank (agent),revolving,23464814.24,17464446.05,SOFR + 3.05%,2018-07-23,2026-10-15,General corporate purposes,,,,22891892.13,Good,305,8.37,36
+FAC000000201,SUNM-0043,Regional Syndicate (agent),term_loan,26377708.71,6071267.24,Prime + 3.58%,2023-11-20,2029-03-05,Working capital,Inventory,16530064.18,36.73,12339935.37,Good,358,12.08,40
+FAC000000202,SUNM-0043,This Bank (agent),revolving,28395056.86,6091975.55,Prime + 3.31%,2019-08-16,2030-10-04,Acquisition financing,,,,21805842.55,Good,331,11.81,43
+FAC000000210,SHAM-0038,Regional Syndicate (agent),revolving,49709186.74,43128670.51,SOFR + 1.50%,2018-11-18,2030-10-11,Equipment acquisition,Real Estate,41467902.44,104.00,28203291.09,Good,150,6.82,49
+FAC000000211,SHAM-0038,This Bank (agent),revolving,41284725.00,18411623.06,FedFunds + 3.43%,2019-04-09,2028-07-24,Working capital,Receivables,7824446.41,235.31,37259121.00,Good,343,8.76,46
+FAC000000220,ADUD-0013,This Bank (sole lender),term_loan,27897498.01,3862154.36,Prime + 2.34%,2018-12-24,2028-01-31,Refinance existing debt,Receivables,75698245.93,5.10,18777881.76,Good,234,10.84,29
+FAC000000230,LIPM-0026,This Bank (sole lender),term_loan,34758544.88,1859467.18,FedFunds + 2.62%,2019-06-07,2029-03-14,Refinance existing debt,Inventory,28151806.79,6.61,27134457.94,Good,262,7.95,36
+FAC000000240,OLSS-0032,This Bank (agent),revolving,10277779.02,3761754.51,SOFR + 3.08%,2022-03-17,2028-03-26,Acquisition financing,,,,7689983.13,Very Good,308,8.40,25
+FAC000000241,OLSS-0032,This Bank (agent),term_loan,39162196.44,13116770.55,FedFunds + 1.47%,2023-09-14,2029-08-22,Working capital,Receivables,64817651.64,20.24,21117562.39,Very Good,147,6.80,48
+FAC000000250,SLEE-0041,This Bank (sole lender),term_loan,26451933.72,21880923.87,FedFunds + 2.19%,2018-11-01,2030-04-06,Equipment acquisition,,,,13316944.18,Very Good,219,7.52,33
+FAC000000251,SLEE-0041,This Bank (agent),revolving,21357503.48,17773527.24,FedFunds + 3.23%,2019-03-01,2030-05-15,Acquisition financing,Blanket Lien,19015632.86,93.47,10813895.63,Very Good,323,8.56,37
+FAC000000260,BOST-0007,This Bank (sole lender),term_loan,29635051.22,26656849.86,SOFR + 3.24%,2020-10-23,2028-03-03,General corporate purposes,Receivables,19869532.59,134.16,27991323.39,Very Good,324,8.56,50
+FAC000000270,STHU-0042,This Bank (agent),revolving,60347089.18,8284367.23,SOFR + 1.69%,2019-01-26,2029-04-16,General corporate purposes,Real Estate,57958873.79,14.29,27280409.15,Very Good,169,7.01,19
+FAC000000271,STHU-0042,This Bank (agent),revolving,45378569.38,43343356.28,Prime + 3.66%,2023-06-03,2030-12-15,Equipment acquisition,,,,43006420.02,Very Good,366,12.16,31
+FAC000000280,MAPL-0028,This Bank (agent),revolving,24319767.22,8029065.24,SOFR + 2.57%,2018-08-17,2029-06-12,General corporate purposes,,,,17646163.39,Good,257,7.89,42
+FAC000000281,MAPL-0028,This Bank (sole lender),equipment_finance,56956379.75,46391030.16,Prime + 2.28%,2020-12-13,2030-05-18,Acquisition financing,Equipment,33290925.03,139.35,56873225.28,Very Good,228,10.78,17
+FAC000000290,MAST-0029,Regional Syndicate (agent),term_loan,19034746.89,3197920.99,FedFunds + 3.15%,2018-02-09,2027-10-08,Refinance existing debt,Real Estate,8960882.55,35.69,15594456.64,Watch,315,8.48,24
+FAC000000300,FRES-0018,Regional Syndicate (agent),revolving,27547348.83,17079356.27,FedFunds + 2.76%,2022-02-12,2027-04-02,Equipment acquisition,Receivables,33063053.25,39.17,17314394.52,Good,276,8.09,47
+FAC000000310,CANA-0010,This Bank (agent),revolving,28300153.79,14677005.41,FedFunds + 3.45%,2018-06-16,2029-03-06,Equipment acquisition,,,,13933640.50,Very Good,345,8.78,43
+FAC000000311,CANA-0010,Regional Syndicate (agent),revolving,18445882.44,7615740.93,Prime + 3.44%,2019-09-08,2028-09-23,Equipment acquisition,Equipment,26016005.25,29.27,7083195.92,Very Good,344,11.94,15
+FAC000000320,PRAI-0034,Regional Syndicate (agent),term_loan,54493195.59,29376345.77,Prime + 2.06%,2023-07-01,2030-07-27,General corporate purposes,Blanket Lien,31915971.04,92.04,26823015.17,Very Good,206,10.56,35
+FAC000000321,PRAI-0034,This Bank (agent),revolving,35658774.90,14296483.70,SOFR + 2.18%,2022-11-30,2027-06-22,Working capital,,,,31630593.44,Good,218,7.50,43
+FAC000000330,REMB-0036,This Bank (agent),revolving,34161067.08,13664426.83,SOFR + 2.16%,2022-01-20,2030-05-16,Equipment acquisition,Real Estate,58996260.62,10.30,23720287.39,Watch,216,7.48,27

@@ -1,0 +1,54 @@
+# What the services of this workspace allow. The first rule that matches a
+# request allows it; a request that no rule matches is denied.
+#
+# One document, two engines. In local development the in-process `rules`
+# provider reads this file. A deployed service asks OPA, which loads the
+# `policies` folder as a bundle (this file becomes `data.agentlib.rules`).
+#
+# This file is yours. agentlib appends the rules a new service needs and never
+# changes or removes a rule that is here.
+schema: agentlib.rules/v1
+rules:
+  # rmqna-data: who may call its tools, and what each role sees of the data.
+  # Analysts see people but not their email; managers see every column.
+  - id: rmqna-data-staff-call-the-tools
+    actions: [tool.call]
+    applications: [rmqna-data]
+    roles: [analyst, manager]
+    resources: ["rmqna-data/*"]
+    max_classification: confidential
+
+  - id: rmqna-data-managers-see-everything
+    actions: [data.query]
+    applications: [rmqna-data]
+    roles: [manager]
+    resources: ["people.*"]
+    max_classification: confidential
+
+  - id: rmqna-data-analysts-see-no-email
+    actions: [data.query]
+    applications: [rmqna-data]
+    roles: [analyst]
+    resources: ["people.*"]
+    max_classification: confidential
+    obligations:
+      mask_columns: [email]
+      max_rows: 50
+
+  # rmqna: the models and tools it may use. A tool of an MCP server is
+  # named <server>/<tool>; the server decides for itself what the caller may see.
+  - id: rmqna-uses-its-models
+    actions: [model.route]
+    applications: [rmqna]
+    resources: [default]
+
+  - id: rmqna-calls-its-own-tools
+    actions: [tool.call]
+    applications: [rmqna]
+    resources: [greet]
+
+  - id: rmqna-calls-rmqna-data
+    actions: [tool.call]
+    applications: [rmqna]
+    resources: ["rmqna-data/*"]
+    max_classification: confidential

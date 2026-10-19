@@ -1,0 +1,12 @@
+commitment_id,uen,meeting_date,owner,commitment,due_date,status,client_or_bank,priority,last_updated
+COM-ALLO-001,ALLO-0001,2026-06-25,Erica Baker,Deliver a consolidated response and credit for the disputed wire and analysis fees,2026-07-10,Open,Bank,High,2026-07-29
+COM-ALLO-002,ALLO-0001,2026-07-24,Client Treasurer,Provide the twelve-month foreign-currency purchase forecast,2026-08-07,Open,Client,Medium,2026-07-24
+COM-BARG-001,BARG-0002,2026-07-09,Kathryn Young,Issue the covenant waiver term sheet with reporting conditions,2026-07-25,Open,Bank,Critical,2026-07-31
+COM-JONE-001,JONE-0022,2026-07-10,Client CFO,Provide weekly liquidity reporting and a thirteen-week cash-flow forecast,2026-07-24,Open,Client,Critical,2026-08-01
+COM-SHIN-001,SHIN-0039,2026-07-08,Credit Underwriter,Complete the renewal package and circulate approval conditions,2026-07-20,Open,Bank,Critical,2026-07-30
+COM-BUSH-001,BUSH-0009,2026-06-12,Client CFO,Deliver audited financial statements and the compliance certificate,2026-06-30,Open,Client,Critical,2026-07-28
+COM-MALO-001,MALO-0027,2026-07-15,Client CFO,Deliver the thirteen-week cash-flow forecast supporting the revolver request,2026-07-31,Open,Client,High,2026-08-01
+COM-CANA-001,CANA-0010,2026-07-22,Stephanie Webster,Provide a revised treasury fee package and implementation timeline,2026-08-05,Open,Bank,High,2026-07-31
+COM-BOST-001,BOST-0007,2026-07-30,Client Treasurer,Provide merchant settlement and chargeback detail for the pricing review,2026-08-14,Open,Client,Medium,2026-07-30
+COM-FARI-001,FARI-0016,2026-07-28,Client CFO,Obtain board approval for the foreign-exchange risk policy,2026-08-15,Open,Client,Medium,2026-07-28
+COM-PEND-001,PEND-0033,2026-07-18,Haley Brown,Confirm onboarding completion and close the implementation checklist,2026-07-28,Complete,Bank,Low,2026-07-28

@@ -1,0 +1,7 @@
+pair,rate,as_of,source,ytd_change_pct,fwd_3m_pct,fwd_12m_pct,implied_vol_3m_pct
+EUR/USD,1.18,2026-06-30,"FRED series EXUSEU (Board of Governors of the Federal Reserve System, H.10)",14.14,1.20,1.35,7.00
+GBP/USD,1.35,2026-06-30,"FRED series EXUSUK (Board of Governors of the Federal Reserve System, H.10)",9.32,-0.15,-0.10,7.50
+USD/CAD,1.40,2026-06-30,"FRED series EXCAUS (Board of Governors of the Federal Reserve System, H.10)",-2.88,-1.50,-1.70,6.00
+USD/CNY,7.02,2026-06-30,"FRED series EXCHUS (Board of Governors of the Federal Reserve System, H.10)",-3.85,-1.00,-1.20,4.00
+USD/JPY,158.14,2026-06-30,"FRED series EXJPUS (Board of Governors of the Federal Reserve System, H.10)",1.06,-4.30,-4.50,9.50
+USD/MXN,18.12,2026-06-30,"FRED series EXMXUS (Board of Governors of the Federal Reserve System, H.10)",-11.78,5.50,5.00,13.00
