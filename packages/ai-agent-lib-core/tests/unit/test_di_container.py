@@ -636,9 +636,9 @@ async def test_every_model_provider_named_by_an_alias_must_be_registered() -> No
 async def test_from_env_resolves_configuration_from_the_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("EAP_MODEL_PROVIDER", "fake")
+    monkeypatch.setenv("AC2_MODEL_PROVIDER", "fake")
     for section in Section:
-        monkeypatch.setenv(f"EAP_{section.name}_PROVIDER", "fake")
+        monkeypatch.setenv(f"AC2_{section.name}_PROVIDER", "fake")
     services = ServiceContainer.from_env(dotenv_path=None, providers=fake_registry([]))
     assert services.config.model.provider == "fake"
     async with services:

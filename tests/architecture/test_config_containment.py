@@ -9,7 +9,13 @@ import pytest
 from architecture.containment import find_violations
 
 from ai_agent_lib_core.config import DEFAULT_BINDINGS
-from ai_agent_lib_core.config.bindings import PREFIX, SECRET_VARIABLE_PREFIX, secret_name
+from ai_agent_lib_core.config.bindings import (
+    LEGACY_PREFIX,
+    LEGACY_SECRET_VARIABLE_PREFIX,
+    PREFIX,
+    SECRET_VARIABLE_PREFIX,
+    secret_name,
+)
 from ai_agent_lib_core.config.phoenix import PHOENIX_VARIABLES
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -54,8 +60,11 @@ def test_no_module_outside_config_knows_a_variable_name_or_reads_the_environment
         ('import os as system\nvalue = system.environ.get("HOME")\n', "os.environ"),
         ("from os import environ\n", "imports os.environ"),
         ("from os import getenv\n", "imports os.getenv"),
+        ('NAME = "AC2_MODEL_PROVIDER"\n', "literal"),
         ('NAME = "EAP_MODEL_PROVIDER"\n', "literal"),
+        ('def f(section: str) -> str:\n    return f"AC2_{section}_PROVIDER"\n', "literal"),
         ('def f(section: str) -> str:\n    return f"EAP_{section}_PROVIDER"\n', "literal"),
+        ('"""Set AC2_PROFILE to choose a profile."""\n', "literal"),
         ('"""Set EAP_PROFILE to choose a profile."""\n', "literal"),
         ("from dotenv import dotenv_values\n", "imports dotenv"),
         ("import dotenv\n", "imports dotenv"),
@@ -85,7 +94,10 @@ def test_ordinary_code_is_not_flagged(clean: str) -> None:
 # told what to set. What they may not do is name a variable that does not
 # exist, which is how a renamed variable lives on in a guide.
 
-_VARIABLE = re.compile(r"\b" + re.escape(PREFIX) + r"[A-Z0-9_]*[A-Z0-9]")
+# Both spellings are checked: a legacy mention is valid for as long as an alias accepts it.
+_VARIABLE = re.compile(
+    r"\b(?:" + re.escape(PREFIX) + "|" + re.escape(LEGACY_PREFIX) + r")[A-Z0-9_]*[A-Z0-9]"
+)
 
 
 def _documents() -> list[Path]:
@@ -121,7 +133,9 @@ def _templates() -> list[Path]:
 
 def test_every_variable_a_document_names_exists() -> None:
     known = {name for binding in DEFAULT_BINDINGS for name in binding.all_names}
-    known.update(PHOENIX_VARIABLES)
+    for phoenix in PHOENIX_VARIABLES:
+        stem = phoenix.removeprefix(PREFIX).removeprefix(LEGACY_PREFIX)
+        known.update({PREFIX + stem, LEGACY_PREFIX + stem})
     documents = _documents()
     assert any(path.name == "getting-started.md" for path in documents)
     unknown = sorted(
@@ -129,7 +143,9 @@ def test_every_variable_a_document_names_exists() -> None:
         for path in documents
         for name in set(_VARIABLE.findall(path.read_text(encoding="utf-8")))
         # "<prefix>SECRET_<NAME>" is how a document writes the pattern of a secret's variable.
-        if name not in known and secret_name(name) is None and name + "_" != SECRET_VARIABLE_PREFIX
+        if name not in known
+        and secret_name(name) is None
+        and name + "_" not in (SECRET_VARIABLE_PREFIX, LEGACY_SECRET_VARIABLE_PREFIX)
     )
     assert not unknown, "these documents name variables that do not exist:\n" + "\n".join(unknown)
 

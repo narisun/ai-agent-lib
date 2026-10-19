@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 
 import pytest
@@ -39,7 +40,7 @@ def test_nothing_set_gives_the_local_profile() -> None:
 
 
 def test_aws_profile_selects_the_server_side_adapters() -> None:
-    config = resolve({"EAP_PROFILE": "aws", "EAP_DEPLOYMENT_ENV": "prod"})
+    config = resolve({"AC2_PROFILE": "aws", "AC2_DEPLOYMENT_ENV": "prod"})
     assert config.profile is Profile.AWS
     assert config.deployment_env is DeploymentEnv.PROD
     assert config.model.provider == "bedrock"
@@ -51,7 +52,7 @@ def test_aws_profile_selects_the_server_side_adapters() -> None:
 
 
 def test_a_selector_beats_the_profile() -> None:
-    config = resolve({"EAP_PROFILE": "aws", "EAP_AUDIT_PROVIDER": "jsonl"})
+    config = resolve({"AC2_PROFILE": "aws", "AC2_AUDIT_PROVIDER": "jsonl"})
     assert config.section(Section.AUDIT).provider == "jsonl"
     assert config.section(Section.SECRETS).provider == "secrets_manager"
 
@@ -59,9 +60,9 @@ def test_a_selector_beats_the_profile() -> None:
 def test_local_profile_can_mix_in_a_server_side_model_provider() -> None:
     config = resolve(
         {
-            "EAP_PROFILE": "local",
-            "EAP_MODEL_PROVIDER": "bedrock",
-            "EAP_MODEL_ID": "model-a",
+            "AC2_PROFILE": "local",
+            "AC2_MODEL_PROVIDER": "bedrock",
+            "AC2_MODEL_ID": "model-a",
             "AWS_PROFILE": "dev-sso",
             "AWS_REGION": "us-east-1",
             "AWS_CA_BUNDLE": "/etc/ssl/enterprise-ca.pem",
@@ -76,9 +77,9 @@ def test_local_profile_can_mix_in_a_server_side_model_provider() -> None:
 
 def test_explain_reports_where_each_choice_came_from() -> None:
     resolution = ConfigResolver(
-        MappingConfigSource({"EAP_MODEL_PROVIDER": "bedrock", "EAP_PROFILE": "local"})
+        MappingConfigSource({"AC2_MODEL_PROVIDER": "bedrock", "AC2_PROFILE": "local"})
     ).explain()
-    assert resolution.origins[Key.MODEL_PROVIDER] == "variable EAP_MODEL_PROVIDER"
+    assert resolution.origins[Key.MODEL_PROVIDER] == "variable AC2_MODEL_PROVIDER"
     assert resolution.origins["section.audit.provider"] == "profile local"
     assert resolution.warnings == ()
 
@@ -88,9 +89,9 @@ def test_explain_reports_where_each_choice_came_from() -> None:
 
 def test_an_unknown_owned_variable_stops_startup_with_a_suggestion() -> None:
     with pytest.raises(ConfigurationError) as caught:
-        resolve({"EAP_MODEL_PROVIDR": "bedrock"})
-    assert "EAP_MODEL_PROVIDR" in str(caught.value)
-    assert "did you mean EAP_MODEL_PROVIDER" in str(caught.value)
+        resolve({"AC2_MODEL_PROVIDR": "bedrock"})
+    assert "AC2_MODEL_PROVIDR" in str(caught.value)
+    assert "did you mean AC2_MODEL_PROVIDER" in str(caught.value)
 
 
 def test_variables_without_the_prefix_are_ignored() -> None:
@@ -99,39 +100,39 @@ def test_variables_without_the_prefix_are_ignored() -> None:
 
 @pytest.mark.parametrize("blank", ["", "   "])
 def test_a_blank_value_counts_as_not_set(blank: str) -> None:
-    assert resolve({"EAP_MODEL_PROVIDER": blank}).model.provider == "anthropic"
+    assert resolve({"AC2_MODEL_PROVIDER": blank}).model.provider == "anthropic"
 
 
 def test_enum_values_are_validated_and_case_insensitive() -> None:
-    assert resolve({"EAP_PROFILE": "AWS"}).profile is Profile.AWS
+    assert resolve({"AC2_PROFILE": "AWS"}).profile is Profile.AWS
     with pytest.raises(ConfigurationError) as caught:
-        resolve({"EAP_PROFILE": "moon"})
+        resolve({"AC2_PROFILE": "moon"})
     error = caught.value
-    assert error.message == "EAP_PROFILE is not one of the values it takes"
+    assert error.message == "AC2_PROFILE is not one of the values it takes"
     assert (error.expected, error.actual) == ("one of: local, aws", "'moon'")
-    assert error.fix == "set EAP_PROFILE=local"
+    assert error.fix == "set AC2_PROFILE=local"
     with pytest.raises(ConfigurationError) as near:
-        resolve({"EAP_PROFILE": "aw"})
-    assert near.value.fix == "set EAP_PROFILE=aws"
-    with pytest.raises(ConfigurationError, match="EAP_DEPLOYMENT_ENV"):
-        resolve({"EAP_DEPLOYMENT_ENV": "staging"})
+        resolve({"AC2_PROFILE": "aw"})
+    assert near.value.fix == "set AC2_PROFILE=aws"
+    with pytest.raises(ConfigurationError, match="AC2_DEPLOYMENT_ENV"):
+        resolve({"AC2_DEPLOYMENT_ENV": "staging"})
 
 
 def test_section_options_are_parsed_from_json() -> None:
-    config = resolve({"EAP_AUDIT_OPTIONS": '{"path": "audit.jsonl", "fsync": true}'})
+    config = resolve({"AC2_AUDIT_OPTIONS": '{"path": "audit.jsonl", "fsync": true}'})
     assert dict(config.section(Section.AUDIT).options) == {"path": "audit.jsonl", "fsync": True}
 
 
 def test_invalid_json_names_the_variable_and_never_repeats_the_value() -> None:
     with pytest.raises(ConfigurationError) as caught:
-        resolve({"EAP_AUDIT_OPTIONS": '{"token": "s3cr3t-value"'})
-    assert "EAP_AUDIT_OPTIONS" in str(caught.value)
+        resolve({"AC2_AUDIT_OPTIONS": '{"token": "s3cr3t-value"'})
+    assert "AC2_AUDIT_OPTIONS" in str(caught.value)
     assert "s3cr3t-value" not in str(caught.value)
 
 
 def test_options_must_be_a_json_object() -> None:
-    with pytest.raises(ConfigurationError, match="EAP_AUDIT_OPTIONS is not a JSON object"):
-        resolve({"EAP_AUDIT_OPTIONS": "[1, 2]"})
+    with pytest.raises(ConfigurationError, match="AC2_AUDIT_OPTIONS is not a JSON object"):
+        resolve({"AC2_AUDIT_OPTIONS": "[1, 2]"})
 
 
 # -------------------------------------------------------------------- models
@@ -140,9 +141,9 @@ def test_options_must_be_a_json_object() -> None:
 def test_model_aliases_accept_objects_and_plain_ids() -> None:
     config = resolve(
         {
-            "EAP_MODEL_PROVIDER": "bedrock",
-            "EAP_MODEL_ID": "model-a",
-            "EAP_MODEL_ALIASES": (
+            "AC2_MODEL_PROVIDER": "bedrock",
+            "AC2_MODEL_ID": "model-a",
+            "AC2_MODEL_ALIASES": (
                 '{"fast": "model-f", "judge": {"provider": "anthropic", "model_id": "model-j"}}'
             ),
         }
@@ -162,8 +163,8 @@ def test_model_aliases_accept_objects_and_plain_ids() -> None:
     ],
 )
 def test_malformed_model_aliases_are_rejected(aliases: str) -> None:
-    with pytest.raises(ConfigurationError, match="EAP_MODEL_ALIASES"):
-        resolve({"EAP_MODEL_ALIASES": aliases})
+    with pytest.raises(ConfigurationError, match="AC2_MODEL_ALIASES"):
+        resolve({"AC2_MODEL_ALIASES": aliases})
 
 
 # ---------------------------------------------------- secrets and third-party
@@ -188,7 +189,7 @@ def test_proxy_settings_are_read_in_either_case() -> None:
 
 
 def test_tls_ca_bundle_becomes_a_path() -> None:
-    assert resolve({"EAP_TLS_CA_BUNDLE": "/etc/ssl/ca.pem"}).tls_ca_bundle == Path(
+    assert resolve({"AC2_TLS_CA_BUNDLE": "/etc/ssl/ca.pem"}).tls_ca_bundle == Path(
         "/etc/ssl/ca.pem"
     )
 
@@ -198,10 +199,10 @@ def test_tls_ca_bundle_becomes_a_path() -> None:
 RENAMED = (
     *(binding for binding in DEFAULT_BINDINGS if binding.key != Key.MODEL_PROVIDER),
     Binding(
-        name="EAP_LLM_PROVIDER",
+        name="AC2_LLM_PROVIDER",
         key=Key.MODEL_PROVIDER,
         description="Provider of the default model alias.",
-        deprecated_names=("EAP_MODEL_PROVIDER",),
+        deprecated_names=("AC2_MODEL_PROVIDER",),
     ),
 )
 
@@ -211,37 +212,38 @@ def resolve_renamed(values: dict[str, str]) -> ServiceConfig:
 
 
 def test_renaming_a_variable_only_needs_a_new_binding() -> None:
-    assert resolve_renamed({"EAP_LLM_PROVIDER": "bedrock"}).model.provider == "bedrock"
+    assert resolve_renamed({"AC2_LLM_PROVIDER": "bedrock"}).model.provider == "bedrock"
 
 
 def test_a_deprecated_name_still_works_and_warns() -> None:
-    with pytest.warns(DeprecationWarning, match="use EAP_LLM_PROVIDER instead"):
-        config = resolve_renamed({"EAP_MODEL_PROVIDER": "bedrock"})
+    with pytest.warns(DeprecationWarning, match="use AC2_LLM_PROVIDER instead"):
+        config = resolve_renamed({"AC2_MODEL_PROVIDER": "bedrock"})
     assert config.model.provider == "bedrock"
 
 
-def test_deprecated_and_current_names_may_agree() -> None:
-    with pytest.warns(DeprecationWarning, match="EAP_MODEL_PROVIDER is deprecated"):
-        config = resolve_renamed({"EAP_MODEL_PROVIDER": "bedrock", "EAP_LLM_PROVIDER": "bedrock"})
+def test_deprecated_and_current_names_may_agree_without_a_warning() -> None:
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        config = resolve_renamed({"AC2_MODEL_PROVIDER": "bedrock", "AC2_LLM_PROVIDER": "bedrock"})
     assert config.model.provider == "bedrock"
 
 
 def test_deprecated_and_current_names_must_not_disagree() -> None:
-    with pytest.raises(ConfigurationError, match="conflicts with EAP_LLM_PROVIDER"):
-        resolve_renamed({"EAP_MODEL_PROVIDER": "anthropic", "EAP_LLM_PROVIDER": "bedrock"})
+    with pytest.raises(ConfigurationError, match="conflicts with AC2_LLM_PROVIDER"):
+        resolve_renamed({"AC2_MODEL_PROVIDER": "anthropic", "AC2_LLM_PROVIDER": "bedrock"})
 
 
 def test_errors_name_the_current_variable_from_the_table() -> None:
     table = (
         *(binding for binding in DEFAULT_BINDINGS if binding.key != Key.PROFILE),
-        Binding(name="EAP_PRESET", key=Key.PROFILE, description="Default adapter set."),
+        Binding(name="AC2_PRESET", key=Key.PROFILE, description="Default adapter set."),
     )
-    with pytest.raises(ConfigurationError, match="EAP_PRESET is not one of the values it takes"):
-        ConfigResolver(MappingConfigSource({"EAP_PRESET": "moon"}), bindings=table).resolve()
+    with pytest.raises(ConfigurationError, match="AC2_PRESET is not one of the values it takes"):
+        ConfigResolver(MappingConfigSource({"AC2_PRESET": "moon"}), bindings=table).resolve()
 
 
 def test_a_malformed_table_is_rejected_by_the_resolver() -> None:
-    table = [Binding("EAP_A", "k", "d", kind=ValueKind.TEXT), Binding("EAP_A", "k2", "d")]
+    table = [Binding("AC2_A", "k", "d", kind=ValueKind.TEXT), Binding("AC2_A", "k2", "d")]
     with pytest.raises(ValueError, match="more than once"):
         ConfigResolver(MappingConfigSource({}), bindings=table)
 
@@ -256,7 +258,7 @@ def test_no_data_sources_are_configured_by_default() -> None:
 def test_named_data_sources_each_select_an_adapter_with_its_own_options() -> None:
     config = resolve(
         {
-            "EAP_DATA_SOURCES": (
+            "AC2_DATA_SOURCES": (
                 '{"accounts": {"kind": "duckdb_csv", "data_dir": "data"},'
                 ' "rates": {"kind": "rest"}}'
             )
@@ -282,8 +284,8 @@ def test_named_data_sources_each_select_an_adapter_with_its_own_options() -> Non
 )
 def test_a_malformed_data_source_map_is_rejected(value: str, problem: str) -> None:
     with pytest.raises(ConfigurationError, match=problem) as caught:
-        resolve({"EAP_DATA_SOURCES": value})
-    assert "EAP_DATA_SOURCES" in str(caught.value)
+        resolve({"AC2_DATA_SOURCES": value})
+    assert "AC2_DATA_SOURCES" in str(caught.value)
 
 
 # ------------------------------------------------------------- named secrets
@@ -291,24 +293,24 @@ def test_a_malformed_data_source_map_is_rejected(value: str, problem: str) -> No
 
 def test_a_secret_variable_supplies_a_named_secret() -> None:
     resolution = ConfigResolver(
-        MappingConfigSource({"EAP_SECRET_RATES_TOKEN": "t0ken", "EAP_SECRET_EMPTY": " "})
+        MappingConfigSource({"AC2_SECRET_RATES_TOKEN": "t0ken", "AC2_SECRET_EMPTY": " "})
     ).explain()
     assert resolution.config.secrets["rates_token"].get_secret_value() == "t0ken"
     assert "empty" not in resolution.config.secrets
-    assert resolution.origins["secret.rates_token"] == "variable EAP_SECRET_RATES_TOKEN"
+    assert resolution.origins["secret.rates_token"] == "variable AC2_SECRET_RATES_TOKEN"
     assert "t0ken" not in repr(resolution.config)
 
 
 def test_a_secret_set_twice_with_different_values_is_a_conflict() -> None:
-    same = resolve({"ANTHROPIC_API_KEY": "sk-1", "EAP_SECRET_ANTHROPIC_API_KEY": "sk-1"})
+    same = resolve({"ANTHROPIC_API_KEY": "sk-1", "AC2_SECRET_ANTHROPIC_API_KEY": "sk-1"})
     assert same.secrets["anthropic_api_key"].get_secret_value() == "sk-1"
     with pytest.raises(ConfigurationError, match="both set the secret") as caught:
-        resolve({"ANTHROPIC_API_KEY": "sk-1", "EAP_SECRET_ANTHROPIC_API_KEY": "sk-2"})
+        resolve({"ANTHROPIC_API_KEY": "sk-1", "AC2_SECRET_ANTHROPIC_API_KEY": "sk-2"})
     assert "sk-" not in str(caught.value)
 
 
 @pytest.mark.parametrize(
-    "name", ["EAP_SECRET_", "EAP_SECRET_rates", "EAP_SECRET__X", "EAP_SECRET_1X"]
+    "name", ["AC2_SECRET_", "AC2_SECRET_rates", "AC2_SECRET__X", "AC2_SECRET_1X"]
 )
 def test_a_malformed_secret_variable_is_an_unknown_variable(name: str) -> None:
     with pytest.raises(ConfigurationError, match="unknown configuration variable"):
@@ -319,19 +321,19 @@ def test_a_malformed_secret_variable_is_an_unknown_variable(name: str) -> None:
 
 
 @pytest.mark.parametrize("runtime", ["AWS_ECS_FARGATE", "AWS_ECS_EC2", "AWS_Lambda_python3.12"])
-@pytest.mark.parametrize("declared", [{}, {"EAP_DEPLOYMENT_ENV": "local"}])
+@pytest.mark.parametrize("declared", [{}, {"AC2_DEPLOYMENT_ENV": "local"}])
 def test_a_service_on_managed_compute_cannot_run_as_a_developers_machine(
     runtime: str, declared: dict[str, str]
 ) -> None:
     with pytest.raises(
-        ConfigurationError, match="EAP_DEPLOYMENT_ENV must be dev or prod"
+        ConfigurationError, match="AC2_DEPLOYMENT_ENV must be dev or prod"
     ) as caught:
         resolve({"AWS_EXECUTION_ENV": runtime, **declared})
     assert "AWS_EXECUTION_ENV" in str(caught.value)
 
 
 def test_a_service_on_managed_compute_starts_once_it_names_its_environment() -> None:
-    config = resolve({"AWS_EXECUTION_ENV": "AWS_ECS_FARGATE", "EAP_DEPLOYMENT_ENV": "dev"})
+    config = resolve({"AWS_EXECUTION_ENV": "AWS_ECS_FARGATE", "AC2_DEPLOYMENT_ENV": "dev"})
     assert config.deployment_env is DeploymentEnv.DEV
 
 

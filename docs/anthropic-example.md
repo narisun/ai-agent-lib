@@ -53,8 +53,8 @@ notepad agents\helper\.env
 Update these settings, replacing the example values with your model ID and key:
 
 ```dotenv
-EAP_MODEL_PROVIDER=anthropic
-EAP_MODEL_ID=your-model-id
+AC2_MODEL_PROVIDER=anthropic
+AC2_MODEL_ID=your-model-id
 ANTHROPIC_API_KEY=your-api-key
 ```
 
@@ -64,7 +64,7 @@ process environment, use that existing mechanism instead. Environment values
 take precedence over `.env` values.
 
 The example enables tracing in its own configuration. You do not need to set
-`EAP_MODEL_TRACE_PATH` for this script. It uses the configured checkpoint store;
+`AC2_MODEL_TRACE_PATH` for this script. It uses the configured checkpoint store;
 the tutorial's local defaults use SQLite under `agents/helper/.agentlib/`.
 
 ## 3. Run both questions
@@ -150,8 +150,8 @@ trace file. Use the default fresh thread when you want to compare clean runs.
 
 **Why is a model ID or credential rejected?** Check the `.env` values and any
 Command Prompt environment overrides. Use a model ID your account can access
-and a valid API key. If you configured a `default` entry in `EAP_MODEL_ALIASES`,
-that entry selects the model instead of `EAP_MODEL_ID`.
+and a valid API key. If you configured a `default` entry in `AC2_MODEL_ALIASES`,
+that entry selects the model instead of `AC2_MODEL_ID`.
 
 **Why did the model skip the tool?** The question asks it to use `greet`, but
 tool choice remains the model's decision. Use the

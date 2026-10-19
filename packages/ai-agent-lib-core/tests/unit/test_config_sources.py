@@ -16,21 +16,21 @@ from ai_agent_lib_core.contracts import ConfigurationError
 
 
 def test_mapping_source_keeps_a_copy() -> None:
-    values = {"EAP_PROFILE": "local"}
+    values = {"AC2_PROFILE": "local"}
     source = MappingConfigSource(values)
-    values["EAP_PROFILE"] = "aws"
-    assert source.get("EAP_PROFILE") == "local"
+    values["AC2_PROFILE"] = "aws"
+    assert source.get("AC2_PROFILE") == "local"
     assert source.get("MISSING") is None
-    assert tuple(source.names()) == ("EAP_PROFILE",)
+    assert tuple(source.names()) == ("AC2_PROFILE",)
 
 
 def test_environment_source_is_a_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("EAP_PROFILE", "local")
+    monkeypatch.setenv("AC2_PROFILE", "local")
     source = EnvironConfigSource()
-    monkeypatch.setenv("EAP_PROFILE", "aws")
-    monkeypatch.setenv("EAP_ADDED_LATER", "x")
-    assert source.get("EAP_PROFILE") == "local"
-    assert "EAP_ADDED_LATER" not in source.names()
+    monkeypatch.setenv("AC2_PROFILE", "aws")
+    monkeypatch.setenv("AC2_ADDED_LATER", "x")
+    assert source.get("AC2_PROFILE") == "local"
+    assert "AC2_ADDED_LATER" not in source.names()
 
 
 def test_dotenv_source_parses_comments_quotes_and_json(tmp_path: Path) -> None:
@@ -39,31 +39,31 @@ def test_dotenv_source_parses_comments_quotes_and_json(tmp_path: Path) -> None:
         "\n".join(
             [
                 "# a comment line",
-                "EAP_PROFILE=local                  # trailing comment",
-                'EAP_MODEL_ID="model with spaces"',
-                'EAP_AUDIT_OPTIONS={"path": "audit.jsonl", "fsync": true}',
+                "AC2_PROFILE=local                  # trailing comment",
+                'AC2_MODEL_ID="model with spaces"',
+                'AC2_AUDIT_OPTIONS={"path": "audit.jsonl", "fsync": true}',
                 "export AWS_PROFILE=dev-sso",
-                "EAP_EMPTY=",
+                "AC2_EMPTY=",
             ]
         ),
         encoding="utf-8",
     )
     source = DotenvConfigSource(env_file)
-    assert source.get("EAP_PROFILE") == "local"
-    assert source.get("EAP_MODEL_ID") == "model with spaces"
-    assert source.get("EAP_AUDIT_OPTIONS") == '{"path": "audit.jsonl", "fsync": true}'
+    assert source.get("AC2_PROFILE") == "local"
+    assert source.get("AC2_MODEL_ID") == "model with spaces"
+    assert source.get("AC2_AUDIT_OPTIONS") == '{"path": "audit.jsonl", "fsync": true}'
     assert source.get("AWS_PROFILE") == "dev-sso"
-    assert source.get("EAP_EMPTY") == ""
+    assert source.get("AC2_EMPTY") == ""
 
 
 def test_dotenv_source_does_not_touch_the_process_environment(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.delenv("EAP_FROM_FILE", raising=False)
+    monkeypatch.delenv("AC2_FROM_FILE", raising=False)
     env_file = tmp_path / ".env"
-    env_file.write_text("EAP_FROM_FILE=1\n", encoding="utf-8")
+    env_file.write_text("AC2_FROM_FILE=1\n", encoding="utf-8")
     DotenvConfigSource(env_file)
-    assert EnvironConfigSource().get("EAP_FROM_FILE") is None
+    assert EnvironConfigSource().get("AC2_FROM_FILE") is None
 
 
 def test_missing_dotenv_file_is_empty_unless_required(tmp_path: Path) -> None:

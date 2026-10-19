@@ -10,6 +10,7 @@ from pathlib import Path
 
 from ai_agent_lib_core.config.bindings import (
     DEFAULT_BINDINGS,
+    LEGACY_PREFIX,
     PREFIX,
     Binding,
     Key,
@@ -18,6 +19,7 @@ from ai_agent_lib_core.config.bindings import (
     provider_key,
     secret_key,
 )
+from ai_agent_lib_core.config.deprecations import log_resolution_warnings
 from ai_agent_lib_core.config.profiles import PROFILE_DEFAULTS, ProfileDefaults
 from ai_agent_lib_core.config.reference import (
     EnvSetting,
@@ -38,6 +40,7 @@ from ai_agent_lib_core.contracts import ConfigSource, ServiceConfig
 
 __all__ = [
     "DEFAULT_BINDINGS",
+    "LEGACY_PREFIX",
     "MASKED",
     "PREFIX",
     "PROFILE_DEFAULTS",
@@ -53,6 +56,7 @@ __all__ = [
     "Resolution",
     "ValueKind",
     "load_service_config",
+    "log_resolution_warnings",
     "options_key",
     "provider_key",
     "render_env_example",

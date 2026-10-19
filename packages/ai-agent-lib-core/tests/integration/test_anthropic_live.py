@@ -21,9 +21,9 @@ pytestmark = [pytest.mark.integration, pytest.mark.enable_socket]
 
 async def test_the_live_api_answers_a_one_line_prompt() -> None:
     api_key = os.environ.get("ANTHROPIC_API_KEY")
-    model_id = os.environ.get("EAP_MODEL_ID")
+    model_id = os.environ.get("AC2_MODEL_ID")
     if not api_key or not model_id:
-        pytest.skip("set ANTHROPIC_API_KEY and EAP_MODEL_ID to run the live smoke test")
+        pytest.skip("set ANTHROPIC_API_KEY and AC2_MODEL_ID to run the live smoke test")
     model = AnthropicChatModelProvider(SecretStr(api_key)).create(model_id)
     assert isinstance(model, BaseChatModel)
     reply = await model.ainvoke([HumanMessage("Reply with the single word: ready")])

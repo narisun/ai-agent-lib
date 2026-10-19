@@ -77,7 +77,7 @@ async def test_a_mistyped_adapter_option_stops_startup(tmp_path: Path) -> None:
     assert error.expected == "only known options: fsync, path, tracing"
     assert error.actual == "an unknown option 'fsynk' (did you mean 'fsync'?)"
     # Which variable to correct is named on the way out of the container.
-    assert any("EAP_AUDIT_OPTIONS" in note for note in error.__notes__)
+    assert any("AC2_AUDIT_OPTIONS" in note for note in error.__notes__)
 
 
 async def test_a_wrong_option_value_says_what_was_expected_and_what_was_given(
@@ -139,7 +139,7 @@ async def test_a_wrong_tracing_switch_names_the_value_and_the_variable(tmp_path:
     # A long value could be a credential pasted in the wrong place: it is described.
     assert (error.expected, error.actual) == ("true or false", "text of 60 characters")
     assert error.fix is not None
-    assert "EAP_AUDIT_OPTIONS" in error.fix
+    assert "AC2_AUDIT_OPTIONS" in error.fix
 
 
 def test_every_adapter_that_ships_declares_its_options() -> None:
@@ -190,6 +190,6 @@ async def test_every_options_problem_is_reported_before_anything_is_built(
     assert error.message == "the options of 2 adapters are not valid"
     assert error.actual is not None
     assert "an unknown option 'prefix'" in error.actual
-    assert "EAP_SECRETS_OPTIONS" in error.actual
+    assert "AC2_SECRETS_OPTIONS" in error.actual
     assert "did you mean 'fsync'?" in error.actual
     assert built == []

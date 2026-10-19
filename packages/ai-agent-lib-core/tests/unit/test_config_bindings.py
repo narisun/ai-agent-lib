@@ -15,15 +15,15 @@ from ai_agent_lib_core.config.bindings import validate_bindings
 from ai_agent_lib_core.contracts import Section
 
 
-def test_prefix_is_eap() -> None:
-    assert PREFIX == "EAP_"
+def test_prefix_is_ac2() -> None:
+    assert PREFIX == "AC2_"
 
 
 def test_every_section_has_a_selector_and_an_options_variable() -> None:
     names = {binding.name for binding in DEFAULT_BINDINGS}
     for section in Section:
-        assert f"EAP_{section.name}_PROVIDER" in names
-        assert f"EAP_{section.name}_OPTIONS" in names
+        assert f"AC2_{section.name}_PROVIDER" in names
+        assert f"AC2_{section.name}_OPTIONS" in names
 
 
 def test_third_party_variables_keep_their_own_names() -> None:
@@ -47,15 +47,15 @@ def test_credentials_are_marked_sensitive() -> None:
 @pytest.mark.parametrize(
     ("bindings", "problem"),
     [
-        ([Binding("EAP_A", "k", "d"), Binding("EAP_B", "k", "d")], "key 'k'"),
-        ([Binding("EAP_A", "k1", "d"), Binding("EAP_A", "k2", "d")], "variable 'EAP_A'"),
+        ([Binding("AC2_A", "k", "d"), Binding("AC2_B", "k", "d")], "key 'k'"),
+        ([Binding("AC2_A", "k1", "d"), Binding("AC2_A", "k2", "d")], "variable 'AC2_A'"),
         (
-            [Binding("EAP_A", "k1", "d"), Binding("EAP_B", "k2", "d", deprecated_names=("EAP_A",))],
-            "variable 'EAP_A'",
+            [Binding("AC2_A", "k1", "d"), Binding("AC2_B", "k2", "d", deprecated_names=("AC2_A",))],
+            "variable 'AC2_A'",
         ),
-        ([Binding("EAP_lower", "k", "d")], "malformed"),
-        ([Binding("EAP__DOUBLE", "k", "d")], "malformed"),
-        ([Binding("EAP_A", "k", "d", deprecated_names=("has space",))], "malformed"),
+        ([Binding("AC2_lower", "k", "d")], "malformed"),
+        ([Binding("AC2__DOUBLE", "k", "d")], "malformed"),
+        ([Binding("AC2_A", "k", "d", deprecated_names=("has space",))], "malformed"),
     ],
 )
 def test_malformed_tables_are_rejected(bindings: list[Binding], problem: str) -> None:
@@ -72,8 +72,8 @@ def test_reference_lists_every_variable_once() -> None:
 
 
 def test_reference_shows_deprecated_names() -> None:
-    table = [Binding("EAP_NEW", "k", "The setting.", deprecated_names=("EAP_OLD",))]
-    assert "replaces `EAP_OLD`" in render_reference(table)
+    table = [Binding("AC2_NEW", "k", "The setting.", deprecated_names=("AC2_OLD",))]
+    assert "replaces `AC2_OLD`" in render_reference(table)
 
 
 def test_env_example_lists_every_variable_commented_out() -> None:

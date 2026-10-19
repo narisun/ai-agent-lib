@@ -11,13 +11,15 @@ from __future__ import annotations
 import enum
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import MappingProxyType
 
 from ai_agent_lib_core.contracts import Section
 
 __all__ = [
     "DEFAULT_BINDINGS",
+    "LEGACY_PREFIX",
+    "LEGACY_SECRET_VARIABLE_PREFIX",
     "LOCAL_ONLY_ADAPTERS",
     "PREFIX",
     "SECRET_KEY_PREFIX",
@@ -25,6 +27,7 @@ __all__ = [
     "Binding",
     "Key",
     "ValueKind",
+    "legacy_spelling",
     "options_key",
     "provider_key",
     "secret_key",
@@ -32,8 +35,11 @@ __all__ = [
     "validate_bindings",
 ]
 
-PREFIX = "EAP_"
-"""Prefix of every variable the library owns: Enterprise Agentic Platform."""
+PREFIX = "AC2_"
+"""Prefix of every variable the library owns."""
+
+LEGACY_PREFIX = "EAP_"
+"""The earlier prefix. Its spellings keep working for one minor release, with a warning."""
 
 _OWNED_NAME = re.compile(rf"^{PREFIX}[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$")
 _ANY_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
@@ -94,13 +100,27 @@ Adapters ask the secrets port for a secret by name. In local development the
 ``<prefix>RATES_TOKEN`` supplies the secret ``rates_token``.
 """
 
-_SECRET_VARIABLE = re.compile(rf"^{SECRET_VARIABLE_PREFIX}(?P<name>[A-Z][A-Z0-9]*(_[A-Z0-9]+)*)$")
+LEGACY_SECRET_VARIABLE_PREFIX = f"{LEGACY_PREFIX}SECRET_"
+"""The earlier prefix of the secret variables, accepted with a warning."""
+
+_SECRET_VARIABLE = re.compile(
+    rf"^(?:{SECRET_VARIABLE_PREFIX}|{LEGACY_SECRET_VARIABLE_PREFIX})"
+    r"(?P<name>[A-Z][A-Z0-9]*(_[A-Z0-9]+)*)$"
+)
 
 
 def secret_name(variable: str) -> str | None:
-    """Return the secret a variable supplies, or ``None`` if it is not a secret variable."""
+    """Return the secret a variable supplies, or ``None`` if it is not a secret variable.
+
+    Both the current and the legacy spelling of the variable are recognised.
+    """
     match = _SECRET_VARIABLE.match(variable)
     return match.group("name").lower() if match is not None else None
+
+
+def legacy_spelling(name: str) -> str:
+    """Return the legacy spelling of an owned variable name."""
+    return LEGACY_PREFIX + name.removeprefix(PREFIX)
 
 
 @dataclass(frozen=True, slots=True)
@@ -168,7 +188,7 @@ _LOCAL_ONLY_PHRASES = ", ".join(LOCAL_ONLY_ADAPTERS.values())
 
 _SECTION_DETAILS = {
     Section.SECRETS: (
-        "Where adapters get credentials by name: `env` reads `EAP_SECRET_<NAME>` variables "
+        "Where adapters get credentials by name: `env` reads `AC2_SECRET_<NAME>` variables "
         "locally, `secrets_manager` is the AWS option."
     ),
     Section.AUDIT: (
@@ -228,7 +248,20 @@ def _section_bindings() -> list[Binding]:
     return bindings
 
 
+def _with_legacy_spelling(binding: Binding) -> Binding:
+    """Return an owned binding that also accepts its legacy spelling, with a warning."""
+    if not binding.owned:
+        return binding
+    return replace(
+        binding, deprecated_names=(*binding.deprecated_names, legacy_spelling(binding.name))
+    )
+
+
 def _default_bindings() -> tuple[Binding, ...]:
+    return tuple(_with_legacy_spelling(binding) for binding in _owned_and_external_bindings())
+
+
+def _owned_and_external_bindings() -> tuple[Binding, ...]:
     return (
         Binding(
             name=f"{PREFIX}PROFILE",
@@ -239,7 +272,7 @@ def _default_bindings() -> tuple[Binding, ...]:
                 "`local` selects file storage, SQLite, local rules, a development identity, "
                 "and the Anthropic model provider. `aws` selects the AWS deployment defaults. "
                 "Override individual providers to match your environment; use "
-                "`EAP_MODEL_PROVIDER=fake` for the local tutorial."
+                "`AC2_MODEL_PROVIDER=fake` for the local tutorial."
             ),
         ),
         Binding(
@@ -401,7 +434,7 @@ def _default_bindings() -> tuple[Binding, ...]:
                 "name its deployment environment as dev or prod."
             ),
             details=(
-                "Set by AWS on its managed runtimes. Its presence with `EAP_DEPLOYMENT_ENV=local` "
+                "Set by AWS on its managed runtimes. Its presence with `AC2_DEPLOYMENT_ENV=local` "
                 "stops startup, so a container never runs with development adapters by accident."
             ),
         ),

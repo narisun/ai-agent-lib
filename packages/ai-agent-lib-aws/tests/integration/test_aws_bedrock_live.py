@@ -4,8 +4,8 @@ Sign in and point the configuration at Bedrock, then run it::
 
     aws sso login --profile dev-sso
     export AWS_PROFILE=dev-sso AWS_REGION=us-east-1
-    export EAP_MODEL_PROVIDER=bedrock EAP_MODEL_ID=<model or inference-profile ID>
-    export EAP_TLS_CA_BUNDLE=/path/to/enterprise-ca.pem   # only behind a TLS-inspecting proxy
+    export AC2_MODEL_PROVIDER=bedrock AC2_MODEL_ID=<model or inference-profile ID>
+    export AC2_TLS_CA_BUNDLE=/path/to/enterprise-ca.pem   # only behind a TLS-inspecting proxy
     python -m pytest -m integration packages/ai-agent-lib-aws/tests/integration
 """
 

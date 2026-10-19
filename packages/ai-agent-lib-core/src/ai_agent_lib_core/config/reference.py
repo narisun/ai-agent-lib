@@ -7,16 +7,19 @@ table the resolver reads, so they cannot drift from the code.
 from __future__ import annotations
 
 import json
+import textwrap
 from collections.abc import Sequence
 from dataclasses import dataclass
 
 from ai_agent_lib_core.config.bindings import (
     DEFAULT_BINDINGS,
+    LEGACY_PREFIX,
     SECRET_KEY_PREFIX,
     SECRET_VARIABLE_PREFIX,
     Binding,
     Key,
     ValueKind,
+    legacy_spelling,
     provider_key,
 )
 from ai_agent_lib_core.config.phoenix import PHOENIX_VARIABLES, phoenix_env_example
@@ -36,14 +39,18 @@ _SECRET_PATTERN = f"{SECRET_VARIABLE_PREFIX}<NAME>"
 _LOCAL_FIRST = (
     "With nothing set, every provider is local: files, SQLite and in-process engines, with no "
     "cloud infrastructure (the model's local default is `anthropic`, a hosted API; use "
-    "`EAP_MODEL_PROVIDER=fake` to stay fully offline). `EAP_PROFILE=aws` switches every section "
-    "to its AWS provider, and any single `EAP_<SECTION>_PROVIDER` opts one section in. A few "
-    "local adapters are local only: the one-way guard (`EAP_DEPLOYMENT_ENV`) refuses them "
+    "`AC2_MODEL_PROVIDER=fake` to stay fully offline). `AC2_PROFILE=aws` switches every section "
+    "to its AWS provider, and any single `AC2_<SECTION>_PROVIDER` opts one section in. A few "
+    "local adapters are local only: the one-way guard (`AC2_DEPLOYMENT_ENV`) refuses them "
     "anywhere but local development."
 )
+_RENAME_NOTE = (
+    f"Variables were previously spelled `{LEGACY_PREFIX}*`; the old spellings keep working for "
+    "one minor release and warn."
+)
 _PROFILE_TABLE_INTRO = (
-    "What each profile selects when nothing else is set. `EAP_MODEL_PROVIDER` and each "
-    "`EAP_<SECTION>_PROVIDER` override one row."
+    "What each profile selects when nothing else is set. `AC2_MODEL_PROVIDER` and each "
+    "`AC2_<SECTION>_PROVIDER` override one row."
 )
 _SECRET_PURPOSE = (
     "A named secret for the env secrets adapter. "
@@ -59,8 +66,11 @@ def _notes(binding: Binding) -> str:
         notes.append("sensitive")
     if binding.alternate_names:
         notes.append("also read from " + ", ".join(f"`{n}`" for n in binding.alternate_names))
-    if binding.deprecated_names:
-        notes.append("replaces " + ", ".join(f"`{n}`" for n in binding.deprecated_names))
+    # The legacy spelling of every owned variable is stated once, in the preamble.
+    legacy = legacy_spelling(binding.name) if binding.owned else None
+    replaced = [n for n in binding.deprecated_names if n != legacy]
+    if replaced:
+        notes.append("replaces " + ", ".join(f"`{n}`" for n in replaced))
     return "; ".join(notes)
 
 
@@ -125,6 +135,8 @@ def render_reference(bindings: Sequence[Binding] = DEFAULT_BINDINGS) -> str:
         lines += [
             _LOCAL_FIRST,
             "",
+            _RENAME_NOTE,
+            "",
             "## Profile defaults",
             "",
             _PROFILE_TABLE_INTRO,
@@ -163,8 +175,9 @@ def render_env_example(bindings: Sequence[Binding] = DEFAULT_BINDINGS) -> str:
     """Return a commented ``.env.example`` listing every variable."""
     lines = [
         "# Generated from the binding table. Do not edit by hand.",
-        "# With nothing set, every provider is local: no cloud infrastructure. EAP_PROFILE=aws",
-        "# or one EAP_<SECTION>_PROVIDER opts into AWS. Copy to .env and uncomment what you need.",
+        "# With nothing set, every provider is local: no cloud infrastructure. AC2_PROFILE=aws",
+        "# or one AC2_<SECTION>_PROVIDER opts into AWS. Copy to .env and uncomment what you need.",
+        *(f"# {line}" for line in textwrap.wrap(_RENAME_NOTE.replace("`", ""), width=96)),
         "",
     ]
     for binding in bindings:
