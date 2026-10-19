@@ -177,9 +177,11 @@ def render_env_example(bindings: Sequence[Binding] = DEFAULT_BINDINGS) -> str:
         "# Generated from the binding table. Do not edit by hand.",
         "# With nothing set, every provider is local: no cloud infrastructure. AC2_PROFILE=aws",
         "# or one AC2_<SECTION>_PROVIDER opts into AWS. Copy to .env and uncomment what you need.",
-        *(f"# {line}" for line in textwrap.wrap(_RENAME_NOTE.replace("`", ""), width=96)),
-        "",
     ]
+    if bindings is DEFAULT_BINDINGS:
+        # The rename belongs to the library's own table, not to a custom one.
+        lines += (f"# {line}" for line in textwrap.wrap(_RENAME_NOTE.replace("`", ""), width=96))
+    lines.append("")
     for binding in bindings:
         lines.append(f"# {binding.description}")
         lines.append(f"# Default: {default_text(binding).replace('`', '')}")

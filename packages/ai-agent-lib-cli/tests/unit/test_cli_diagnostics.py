@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import signal
 import subprocess
 import sys
@@ -29,7 +30,7 @@ from ai_agent_lib_cli.workspace import (
     WorkspaceAnswers,
 )
 from ai_agent_lib_core.adapters import OpaPolicyDecisionPoint
-from ai_agent_lib_core.config import Key, secret_key, variable_for
+from ai_agent_lib_core.config import Key, deprecations, secret_key, variable_for
 from ai_agent_lib_core.config.bindings import legacy_spelling
 
 PINS = {"hello.greet": "ab" * 32, "hello.people_by_team": "cd" * 32}
@@ -180,6 +181,34 @@ def test_doctor_tells_a_deprecated_phoenix_spelling_after_the_phoenix_check(
         "warning: EAP_PHOENIX_ENABLED is deprecated; use AC2_PHOENIX_ENABLED instead"
         in capsys.readouterr().err
     )
+
+
+def test_a_deprecated_phoenix_spelling_is_not_also_logged_bare_by_doctor_or_explain(
+    workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # The loader tells a service's log once per process; start from a process that has not.
+    monkeypatch.setattr(deprecations, "_LOGGED", set())
+    env = workspace / "agents/hello-agent/.env"
+    env.write_text(env.read_text(encoding="utf-8") + "EAP_PHOENIX_ENABLED=true\n", encoding="utf-8")
+    logger = logging.getLogger("ai_agent_lib_core.config")
+    level = logger.level
+    capsys.readouterr()
+
+    with caplog.at_level(logging.WARNING):
+        assert run("doctor", "hello-agent", "--workspace", workspace) == 0
+        doctor = capsys.readouterr()
+        assert run("config", "explain", "hello-agent", "--workspace", workspace) == 0
+        explain = capsys.readouterr()
+
+    # The report names the spelling once; the library's log line would be a bare duplicate.
+    assert [r for r in caplog.records if r.name == "ai_agent_lib_core.config"] == []
+    assert doctor.out.count("EAP_PHOENIX_ENABLED is deprecated") == 1
+    assert "is deprecated" not in doctor.err
+    assert explain.err.count("EAP_PHOENIX_ENABLED is deprecated") == 1
+    assert logger.level == level  # the quiet is lifted when the command is done
 
 
 def test_doctor_fails_a_setting_that_carries_both_spellings_with_different_values(

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import logging
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from warnings import catch_warnings, simplefilter
@@ -35,6 +37,28 @@ __all__ = [
 
 _ENV = ".env"
 _MAX_VALUE = 120
+_CONFIG_LOGGER = "ai_agent_lib_core.config"
+"""The logger the library tells a deprecated variable on, as a running service's log shows it."""
+
+
+@contextmanager
+def _reported_here() -> Iterator[None]:
+    """Resolve without telling a deprecated spelling twice.
+
+    A report below names each deprecated spelling itself, as a check or a warning
+    line. The resolver's ``DeprecationWarning`` and the Phoenix loader's log line are
+    for a program and for a running service, so neither is raised here as well; this
+    command has no logging set up, and the log line would come out bare on standard error.
+    """
+    logger = logging.getLogger(_CONFIG_LOGGER)
+    level = logger.level
+    logger.setLevel(logging.CRITICAL)
+    try:
+        with catch_warnings():
+            simplefilter("ignore", DeprecationWarning)
+            yield
+    finally:
+        logger.setLevel(level)
 
 
 def service_folder(root: Path, answers: WorkspaceAnswers, name: str) -> Path:
@@ -65,17 +89,15 @@ async def check_service(folder: Path) -> tuple[CheckResult, ...]:
             ),
         )
     try:
-        # The report below names each deprecated spelling itself, so the resolver's
-        # DeprecationWarning is not raised as well.
-        with catch_warnings():
-            simplefilter("ignore", DeprecationWarning)
+        with _reported_here():
             resolution = service_resolver(dotenv).explain()
     except AgentLibError as problem:
         return (CheckResult.failed("settings", problem),)
     config = resolution.config
     phoenix_warnings: tuple[str, ...] = ()
     try:
-        phoenix_resolution = resolve_phoenix_settings(dotenv)
+        with _reported_here():
+            phoenix_resolution = resolve_phoenix_settings(dotenv)
     except AgentLibError as problem:
         phoenix = CheckResult.failed("phoenix", problem)
     else:
@@ -199,8 +221,9 @@ def explain_service(folder: Path) -> tuple[Sequence[Setting], Sequence[str]]:
         CliError: If the configuration is not valid.
     """
     try:
-        resolution = service_resolver(folder / _ENV).explain()
-        phoenix = resolve_phoenix_settings(folder / _ENV)
+        with _reported_here():
+            resolution = service_resolver(folder / _ENV).explain()
+            phoenix = resolve_phoenix_settings(folder / _ENV)
     except AgentLibError as problem:
         raise CliError.from_error(problem) from None
     by_key = {binding.key: binding.name for binding in DEFAULT_BINDINGS}

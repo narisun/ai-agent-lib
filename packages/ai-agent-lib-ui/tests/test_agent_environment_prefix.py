@@ -7,7 +7,10 @@ errors), so a deprecation is a WARNING on the library's configuration logger, on
 
 import json
 import logging
+import threading
+import time
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -153,3 +156,30 @@ def test_defaults_apply_when_neither_spelling_is_set(tmp_path: Path) -> None:
     assert agents == (tmp_path / "registry/agents.yaml").resolve()
     assert tools == (tmp_path / "registry/mcp-tools.yaml").resolve()
     assert identity == LocalIdentity(subject="dev-user", tenant="dev-tenant", roles=())
+
+
+def test_a_legacy_name_is_reported_once_even_when_threads_read_it_together(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    class SlowSet(set[str]):
+        """Widens the gap between looking a message up and adding it."""
+
+        def __contains__(self, item: object) -> bool:
+            found = super().__contains__(item)
+            time.sleep(0.02)
+            return found
+
+    monkeypatch.setattr(settings_module, "_REPORTED", SlowSet())
+    start = threading.Barrier(8)
+
+    def read() -> str | None:
+        start.wait()
+        return settings_module._setting({"EAP_PROFILE": "local"}, "PROFILE")
+
+    with (
+        caplog.at_level(logging.WARNING, logger=CHANNEL),
+        ThreadPoolExecutor(max_workers=8) as pool,
+    ):
+        values = list(pool.map(lambda _: read(), range(8)))
+    assert values == ["local"] * 8
+    assert deprecations(caplog) == ["EAP_PROFILE is deprecated; use AC2_PROFILE instead"]

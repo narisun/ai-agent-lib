@@ -21,6 +21,7 @@ from ai_agent_lib_core.config import (
     MappingConfigSource,
     Resolution,
     log_resolution_warnings,
+    render_env_example,
     render_reference,
 )
 from ai_agent_lib_core.config import deprecations as deprecations_module
@@ -85,6 +86,12 @@ def test_a_custom_table_is_rendered_untouched() -> None:
     reference = render_reference(table)
     assert "replaces `AC2_OLD`" in reference
     assert "EAP_" not in reference
+    assert "EAP_" not in render_env_example(table)
+
+
+def test_the_env_example_states_the_rename_for_the_library_table_only() -> None:
+    assert "previously spelled EAP_*" in render_env_example()
+    assert "previously spelled" not in render_env_example([Binding("AC2_NEW", "k", "A setting.")])
 
 
 # ------------------------------------------------------------ bound variables

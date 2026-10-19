@@ -2,6 +2,7 @@
 
 import json
 import logging
+import threading
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Annotated, Literal
@@ -82,6 +83,7 @@ class Settings(BaseModel):
 # looks for the same notice from the agent, and once per process however often it is read.
 _LOG = logging.getLogger("ai_agent_lib_core.config")
 _REPORTED: set[str] = set()
+_LOCK = threading.Lock()
 _PREFIX = "AC2_"
 _LEGACY_PREFIX = "EAP_"  # Deprecation window: accepted for one minor release, with a warning.
 
@@ -98,8 +100,10 @@ def _setting(values: Mapping[str, str | None], stem: str, default: str | None = 
         return default if value is None else value
     if value is None:
         message = f"{old_name} is deprecated; use {name} instead"
-        if message not in _REPORTED:
+        with _LOCK:
+            first = message not in _REPORTED
             _REPORTED.add(message)
+        if first:
             _LOG.warning("%s", message)
         return old_value
     if value != old_value:
