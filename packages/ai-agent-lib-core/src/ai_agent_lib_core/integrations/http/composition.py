@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from ai_agent_lib_core.config import load_service_config
+from ai_agent_lib_core.config import log_resolution_warnings, service_resolver
 from ai_agent_lib_core.contracts import (
     RequestContext,
     ServiceConfig,
@@ -243,12 +243,16 @@ def run_agent(service: AgentService, argv: Sequence[str] | None = None) -> int:
     arguments = parser.parse_args(argv)
     config: ServiceConfig | None = None
     try:
-        config = (
-            load_service_config(service.env_file)
+        # explain() rather than resolve(): the same configuration, plus the deprecation
+        # warnings, which a running service shows in its log once logging is set up.
+        resolution = (
+            service_resolver(service.env_file)
             if service.env_file is not None
-            else load_service_config()
-        )
+            else service_resolver()
+        ).explain()
+        config = resolution.config
         configure_logging(service.application, details=shows_details(config))
+        log_resolution_warnings(resolution)
         stop_telemetry = start_telemetry(service.application, config)
         try:
             asyncio.run(_serve(service, config, arguments.host, arguments.port))

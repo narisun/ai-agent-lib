@@ -36,7 +36,7 @@ def test_one_adapter_shows_each_option_with_its_default_and_meaning(
     assert run("config", "options", "audit", "jsonl") == 0
     lines = capsys.readouterr().out.splitlines()
     assert lines[0] == "audit jsonl (local only): Options for the JSONL audit sink."
-    assert lines[1] == "Set them as one JSON object in EAP_AUDIT_OPTIONS."
+    assert lines[1] == "Set them as one JSON object in AC2_AUDIT_OPTIONS."
     assert '  path  (path; default ".agentlib/audit.jsonl")' in lines
     assert "      Force each record to disk before write returns." in lines
 
@@ -44,7 +44,7 @@ def test_one_adapter_shows_each_option_with_its_default_and_meaning(
 def test_data_source_options_say_where_they_go(capsys: pytest.CaptureFixture[str]) -> None:
     assert run("config", "options", "data", "duckdb_csv") == 0
     out = capsys.readouterr().out
-    assert 'Set them beside "kind" in each entry of EAP_DATA_SOURCES.' in out
+    assert 'Set them beside "kind" in each entry of AC2_DATA_SOURCES.' in out
     assert "  queries_dir  (path; required)" in out
 
 
@@ -71,6 +71,6 @@ def test_schema_prints_json_schema_for_an_editor(capsys: pytest.CaptureFixture[s
 def test_limits_lists_the_timeouts_retries_and_budgets(capsys: pytest.CaptureFixture[str]) -> None:
     assert run("config", "options", "limits") == 0
     out = capsys.readouterr().out
-    assert "Set them as one JSON object in EAP_LIMITS" in out
+    assert "Set them as one JSON object in AC2_LIMITS" in out
     assert "  budget.model_calls  (integer; default 50)" in out
     assert "  model.timeout_seconds  (number; default 120.0)" in out

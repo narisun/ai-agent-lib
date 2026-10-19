@@ -22,11 +22,14 @@ from importlib import metadata
 from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import urlsplit
+from warnings import catch_warnings, simplefilter
 
 from ai_agent_lib_cli.errors import CliError
 from ai_agent_lib_cli.render import TemplateRenderer
 from ai_agent_lib_cli.workspace import AGENTS_FOLDER, SERVERS_FOLDER, WorkspaceAnswers
 from ai_agent_lib_core.config import (
+    LEGACY_PREFIX,
+    PREFIX,
     ConfigResolver,
     DotenvConfigSource,
     EnvSetting,
@@ -145,6 +148,9 @@ class DeploymentPlan:
         collector: Whether the task needs the telemetry collector sidecar.
         problems: What stops the deployment. Nothing is written while any remain.
         warnings: What a person should know or check.
+        deprecated: Each retired spelling that ``deploy.env`` uses, with the
+            current spelling that replaces it. The task's environment still
+            carries the name as written.
     """
 
     target: Target
@@ -154,6 +160,7 @@ class DeploymentPlan:
     collector: bool = False
     problems: tuple[str, ...] = ()
     warnings: tuple[str, ...] = field(default=())
+    deprecated: tuple[tuple[str, str], ...] = field(default=())
 
 
 def _read_settings(root: Path, target: Target) -> tuple[ServiceConfig, list[tuple[str, str]]]:
@@ -167,7 +174,10 @@ def _read_settings(root: Path, target: Target) -> tuple[ServiceConfig, list[tupl
         )
     source = DotenvConfigSource(path, required=True)
     try:
-        resolution = ConfigResolver(source, base_dir=path.parent).explain()
+        # The plan reports retired spellings itself, so the resolver's warning is not raised too.
+        with catch_warnings():
+            simplefilter("ignore", DeprecationWarning)
+            resolution = ConfigResolver(source, base_dir=path.parent).explain()
     except ConfigurationError as error:
         error.add_note(f"in {target.settings}")
         raise
@@ -360,6 +370,11 @@ def plan_deployment(
         )
     return DeploymentPlan(
         target=target,
+        deprecated=tuple(
+            (name, PREFIX + name.removeprefix(LEGACY_PREFIX))
+            for name, _ in environment
+            if name.startswith(LEGACY_PREFIX)
+        ),
         environment=tuple(environment),
         access=access,
         opa=_uses_opa_beside_it(config),
@@ -396,6 +411,15 @@ def plan_lines(plan: DeploymentPlan) -> list[str]:
         lines.append("  collector: sends traces to X-Ray and metrics to CloudWatch")
     lines += ["", f"Environment: {len(plan.environment)} variables from {target.settings}."]
     lines += [f"  {name}" for name, _ in plan.environment]
+    if plan.deprecated:
+        lines += [
+            "",
+            f"Deprecated spellings in {target.settings} (the task gets each name as written, "
+            "and the service accepts it for now):",
+            *(f"  {old} -> {new}" for old, new in plan.deprecated),
+            "Rename them before the deprecation window ends: each old spelling stops working "
+            "after the deprecation window.",
+        ]
     if plan.warnings:
         lines += ["", "Warnings:", *(f"  - {warning}" for warning in plan.warnings)]
     if plan.problems:

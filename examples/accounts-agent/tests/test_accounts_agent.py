@@ -101,13 +101,13 @@ async def test_the_agent_runs_on_the_local_adapters_with_no_network(tmp_path: Pa
     config = ConfigResolver(
         MappingConfigSource(
             {
-                "EAP_PROFILE": "local",
-                "EAP_MODEL_PROVIDER": "fake",
-                "EAP_MODEL_ID": "fake-model",
-                "EAP_AUDIT_OPTIONS": json.dumps({"path": str(audit_path)}),
-                "EAP_CHECKPOINT_OPTIONS": json.dumps({"path": str(checkpoint_path)}),
-                "EAP_IDENTITY_OPTIONS": json.dumps({"subject": "dev", "tenant": "acme"}),
-                "EAP_POLICY_OPTIONS": json.dumps({"path": str(RULES)}),
+                "AC2_PROFILE": "local",
+                "AC2_MODEL_PROVIDER": "fake",
+                "AC2_MODEL_ID": "fake-model",
+                "AC2_AUDIT_OPTIONS": json.dumps({"path": str(audit_path)}),
+                "AC2_CHECKPOINT_OPTIONS": json.dumps({"path": str(checkpoint_path)}),
+                "AC2_IDENTITY_OPTIONS": json.dumps({"subject": "dev", "tenant": "acme"}),
+                "AC2_POLICY_OPTIONS": json.dumps({"path": str(RULES)}),
             }
         )
     ).resolve()
@@ -133,9 +133,9 @@ def test_the_command_line_prints_the_answer(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("EAP_MODEL_PROVIDER", "fake")
-    monkeypatch.setenv("EAP_MODEL_ID", "fake-model")
-    monkeypatch.setenv("EAP_POLICY_OPTIONS", json.dumps({"path": str(RULES)}))
+    monkeypatch.setenv("AC2_MODEL_PROVIDER", "fake")
+    monkeypatch.setenv("AC2_MODEL_ID", "fake-model")
+    monkeypatch.setenv("AC2_POLICY_OPTIONS", json.dumps({"path": str(RULES)}))
     assert main(["Hello there"]) == 0
     assert capsys.readouterr().out == "fake: Hello there\n"
     assert (tmp_path / ".agentlib" / "audit.jsonl").exists()
@@ -146,6 +146,6 @@ def test_the_command_line_reports_configuration_problems(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("EAP_MODEL_PROVIDR", "fake")
+    monkeypatch.setenv("AC2_MODEL_PROVIDR", "fake")
     assert main(["Hello"]) == 1
-    assert "did you mean EAP_MODEL_PROVIDER" in capsys.readouterr().err
+    assert "did you mean AC2_MODEL_PROVIDER" in capsys.readouterr().err

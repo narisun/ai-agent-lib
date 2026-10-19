@@ -257,6 +257,35 @@ def test_run_agent_without_an_env_file_reads_the_working_directorys_dotenv(
     assert captured["config"].deployment_env.value == "local"
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
+def test_run_agent_logs_a_deprecation_for_each_legacy_spelling_in_its_env_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A service read through its logs is told when its file uses a retired name."""
+    from ai_agent_lib_core.config import deprecations
+
+    deprecations._LOGGED.clear()
+    env_file = tmp_path / "service.env"
+    env_file.write_text("EAP_DEPLOYMENT_ENV=dev\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    async def fake_serve(
+        service: AgentService, config: ServiceConfig, host: str, port: int
+    ) -> None:
+        return None
+
+    monkeypatch.setattr(composition, "_serve", fake_serve)
+    service = AgentService(
+        application="probe", build_graph=_build_graph, respond=_respond, env_file=env_file
+    )
+
+    with caplog.at_level("WARNING"):
+        assert run_agent(service, []) == 0
+    deprecations._LOGGED.clear()
+
+    assert "EAP_DEPLOYMENT_ENV is deprecated; use AC2_DEPLOYMENT_ENV instead" in caplog.text
+
+
 def test_run_agent_reports_a_configuration_error_from_a_bad_env_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -21,7 +21,7 @@ source = "rmprep"
 kind = "duckdb_csv"
 options = "{}"
 deployed = "{}"
-notes = ["Runtime CSV files are in workspace data/; EAP_DATA_SOURCES sets ../../data.", "This catalog records the query inventory. Custom server.py exposes four composite tools.", "Copy this example to retain its business logic; generation inputs recreate only scaffolding."]
+notes = ["Runtime CSV files are in workspace data/; AC2_DATA_SOURCES sets ../../data.", "This catalog records the query inventory. Custom server.py exposes four composite tools.", "Copy this example to retain its business logic; generation inputs recreate only scaffolding."]
 
 [[mcp_servers.data.queries]]
 name = "activities"

@@ -95,7 +95,7 @@ def opa_url() -> Iterator[str]:
 async def served(tmp_path: Path, opa_url: str) -> AsyncIterator[int]:
     """The MCP server over Streamable HTTP on a free port, deciding with OPA."""
     config = server_config(
-        tmp_path, EAP_POLICY_PROVIDER="opa", EAP_POLICY_OPTIONS=json.dumps({"url": opa_url})
+        tmp_path, AC2_POLICY_PROVIDER="opa", AC2_POLICY_OPTIONS=json.dumps({"url": opa_url})
     )
     port = free_port()
     async with ServiceContainer(config) as services:
@@ -234,19 +234,19 @@ async def test_a_signed_in_user_reaches_the_tool_through_token_exchange_and_opa_
 
     server = server_config(
         tmp_path,
-        EAP_IDENTITY_PROVIDER="jwt",
-        EAP_IDENTITY_OPTIONS=json.dumps(idp.options([MCP_CLIENT, MCP_AUDIENCE])),
-        EAP_POLICY_PROVIDER="opa",
-        EAP_POLICY_OPTIONS=json.dumps({"url": opa_url}),
-        EAP_REGISTRY_OPTIONS=registry_options,
+        AC2_IDENTITY_PROVIDER="jwt",
+        AC2_IDENTITY_OPTIONS=json.dumps(idp.options([MCP_CLIENT, MCP_AUDIENCE])),
+        AC2_POLICY_PROVIDER="opa",
+        AC2_POLICY_OPTIONS=json.dumps({"url": opa_url}),
+        AC2_REGISTRY_OPTIONS=registry_options,
     )
     agent = ConfigResolver(
         MappingConfigSource(
             {
-                "EAP_MODEL_PROVIDER": "fake",
-                "EAP_MODEL_ID": "fake-model",
-                "EAP_IDENTITY_PROVIDER": "jwt",
-                "EAP_IDENTITY_OPTIONS": json.dumps(
+                "AC2_MODEL_PROVIDER": "fake",
+                "AC2_MODEL_ID": "fake-model",
+                "AC2_IDENTITY_PROVIDER": "jwt",
+                "AC2_IDENTITY_OPTIONS": json.dumps(
                     idp.options(
                         AGENT_CLIENT,
                         exchange={
@@ -255,13 +255,13 @@ async def test_a_signed_in_user_reaches_the_tool_through_token_exchange_and_opa_
                         },
                     )
                 ),
-                "EAP_SECRET_ENTRA_CLIENT_SECRET": "agent-s3cret",
-                "EAP_POLICY_OPTIONS": json.dumps(
+                "AC2_SECRET_ENTRA_CLIENT_SECRET": "agent-s3cret",
+                "AC2_POLICY_OPTIONS": json.dumps(
                     {"path": str(HERE.parent / "accounts-agent/policies/agentlib/rules/data.yaml")}
                 ),
-                "EAP_REGISTRY_OPTIONS": registry_options,
-                "EAP_AUDIT_OPTIONS": json.dumps({"path": str(tmp_path / "agent-audit.jsonl")}),
-                "EAP_CHECKPOINT_OPTIONS": json.dumps({"path": str(tmp_path / "agent-cp.sqlite")}),
+                "AC2_REGISTRY_OPTIONS": registry_options,
+                "AC2_AUDIT_OPTIONS": json.dumps({"path": str(tmp_path / "agent-audit.jsonl")}),
+                "AC2_CHECKPOINT_OPTIONS": json.dumps({"path": str(tmp_path / "agent-cp.sqlite")}),
             }
         )
     ).resolve()

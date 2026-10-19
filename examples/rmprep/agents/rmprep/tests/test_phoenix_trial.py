@@ -31,8 +31,8 @@ def test_service_closes_exporter_when_container_construction_fails(
     trial = Mock()
     env_file = WORKSPACE / "agents/rmprep/.env.example"
     # The real entry path: main loads the budget, run_agent starts Phoenix, then the container fails.
-    monkeypatch.setenv("EAP_PHOENIX_ENABLED", "true")
-    monkeypatch.setenv("EAP_PHOENIX_ENV_FILE", "")
+    monkeypatch.setenv("AC2_PHOENIX_ENABLED", "true")
+    monkeypatch.setenv("AC2_PHOENIX_ENV_FILE", "")
     monkeypatch.setattr(service, "ENV_FILE", env_file)
     monkeypatch.setattr(service, "SERVICE", replace(service.SERVICE, env_file=env_file))
     monkeypatch.setattr(phoenix, "PhoenixTracing", Mock(return_value=trial))

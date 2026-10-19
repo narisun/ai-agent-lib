@@ -65,10 +65,10 @@ if not exist mcp-servers\rmprep-data\.env copy mcp-servers\rmprep-data\.env.exam
 ```
 
 Keep existing `.env` files if you have configured them already. Check that the
-MCP service's `EAP_DATA_SOURCES` setting points to the supplied folder:
+MCP service's `AC2_DATA_SOURCES` setting points to the supplied folder:
 
 ```dotenv
-EAP_DATA_SOURCES={"rmprep":{"kind":"duckdb_csv","data_dir":"../../data","queries_dir":"queries"}}
+AC2_DATA_SOURCES={"rmprep":{"kind":"duckdb_csv","data_dir":"../../data","queries_dir":"queries"}}
 ```
 
 Paths are relative to the MCP service's `.env`. The CSV files stay in
@@ -140,11 +140,11 @@ python -m ai_agent_lib_cli install
 notepad agents\rmprep\.env
 ```
 
-Set `EAP_MODEL_PROVIDER=anthropic`, your available `EAP_MODEL_ID`, and
+Set `AC2_MODEL_PROVIDER=anthropic`, your available `AC2_MODEL_ID`, and
 `ANTHROPIC_API_KEY`. Enable prompt caching in the same file:
 
 ```dotenv
-EAP_MODEL_OPTIONS={"anthropic":{"prompt_caching":true,"cache_ttl":"5m"}}
+AC2_MODEL_OPTIONS={"anthropic":{"prompt_caching":true,"cache_ttl":"5m"}}
 ```
 
 Restart the agent after changing this setting. Keep the registry, policy and identity settings. The
@@ -199,7 +199,7 @@ with Ctrl+C.
 To capture model inputs and outputs, add this to the agent's `.env`:
 
 ```dotenv
-EAP_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl
+AC2_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl
 ```
 
 Traces contain client evidence and conversation content. Keep them in the ignored

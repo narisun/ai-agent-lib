@@ -25,7 +25,7 @@ REGISTRY = {
 def server_config(tmp_path: Path, **overrides: str) -> ServiceConfig:
     """The server's configuration as its .env gives it, with local state in a temporary folder."""
     source = {
-        "EAP_DATA_SOURCES": json.dumps(
+        "AC2_DATA_SOURCES": json.dumps(
             {
                 "ledger": {
                     "kind": "duckdb_csv",
@@ -34,14 +34,14 @@ def server_config(tmp_path: Path, **overrides: str) -> ServiceConfig:
                 }
             }
         ),
-        "EAP_IDENTITY_OPTIONS": json.dumps({"audience": APPLICATION, "roles": ["analyst"]}),
-        "EAP_POLICY_OPTIONS": json.dumps(
+        "AC2_IDENTITY_OPTIONS": json.dumps({"audience": APPLICATION, "roles": ["analyst"]}),
+        "AC2_POLICY_OPTIONS": json.dumps(
             {"path": str(HERE / "policies" / "agentlib" / "rules" / "data.yaml")}
         ),
-        "EAP_REGISTRY_OPTIONS": json.dumps(REGISTRY),
-        "EAP_AUDIT_OPTIONS": json.dumps({"path": str(tmp_path / "server-audit.jsonl")}),
+        "AC2_REGISTRY_OPTIONS": json.dumps(REGISTRY),
+        "AC2_AUDIT_OPTIONS": json.dumps({"path": str(tmp_path / "server-audit.jsonl")}),
         # The server compiles no graph, so it keeps no checkpoint store.
-        "EAP_CHECKPOINT_PROVIDER": "none",
+        "AC2_CHECKPOINT_PROVIDER": "none",
         **overrides,
     }
     return ConfigResolver(MappingConfigSource(source)).resolve()
@@ -49,13 +49,13 @@ def server_config(tmp_path: Path, **overrides: str) -> ServiceConfig:
 
 def agent_config(tmp_path: Path, roles: list[str]) -> ServiceConfig:
     source = {
-        "EAP_MODEL_PROVIDER": "fake",
-        "EAP_MODEL_ID": "fake-model",
-        "EAP_IDENTITY_OPTIONS": json.dumps({"subject": "u-7", "tenant": "acme", "roles": roles}),
-        "EAP_POLICY_OPTIONS": json.dumps({"path": str(AGENT_RULES)}),
-        "EAP_REGISTRY_OPTIONS": json.dumps(REGISTRY),
-        "EAP_AUDIT_OPTIONS": json.dumps({"path": str(tmp_path / "agent-audit.jsonl")}),
-        "EAP_CHECKPOINT_OPTIONS": json.dumps({"path": str(tmp_path / "agent-cp.sqlite")}),
+        "AC2_MODEL_PROVIDER": "fake",
+        "AC2_MODEL_ID": "fake-model",
+        "AC2_IDENTITY_OPTIONS": json.dumps({"subject": "u-7", "tenant": "acme", "roles": roles}),
+        "AC2_POLICY_OPTIONS": json.dumps({"path": str(AGENT_RULES)}),
+        "AC2_REGISTRY_OPTIONS": json.dumps(REGISTRY),
+        "AC2_AUDIT_OPTIONS": json.dumps({"path": str(tmp_path / "agent-audit.jsonl")}),
+        "AC2_CHECKPOINT_OPTIONS": json.dumps({"path": str(tmp_path / "agent-cp.sqlite")}),
     }
     return ConfigResolver(MappingConfigSource(source)).resolve()
 

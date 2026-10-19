@@ -69,7 +69,7 @@ def test_the_first_run_writes_a_starting_settings_file_and_nothing_else(
     assert "created  agents/helper/deploy.env" in out
     assert 'add "ai-agent-lib-aws[bedrock,postgres]" to the dependencies' in out
     text = _settings(workspace).read_text(encoding="utf-8")
-    assert "EAP_PROFILE=aws" in text
+    assert "AC2_PROFILE=aws" in text
     assert "never put a secret here" in text
     assert not (workspace / "deploy").exists()
 
@@ -125,7 +125,7 @@ def test_deploy_writes_the_module_and_the_files_derived_from_the_settings(
     ) in permissions
     settings = (ready / "deploy/helper/settings.tf").read_text(encoding="utf-8")
     assert "  uses_opa  = true\n" in settings
-    assert '    EAP_AUDIT_OPTIONS      = "{\\"stream\\": \\"eap-audit\\"}"\n' in settings
+    assert '    AC2_AUDIT_OPTIONS      = "{\\"stream\\": \\"eap-audit\\"}"\n' in settings
     dockerfile = (ready / "deploy/helper/Dockerfile").read_text(encoding="utf-8")
     assert "python -m pip install --no-cache-dir --require-hashes" in dockerfile
     assert "COPY agents/helper agents/helper" in dockerfile
@@ -240,16 +240,46 @@ def test_running_again_rewrites_what_is_derived_and_keeps_what_is_yours(
     assert "other-audit" in (ready / "deploy/helper/permissions.tf").read_text(encoding="utf-8")
 
 
+def test_legacy_spellings_in_the_settings_are_flagged_in_the_plan_and_passed_through_verbatim(
+    ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    settings = _settings(ready)
+    text = settings.read_text(encoding="utf-8")
+    settings.write_text(text.replace("AC2_AUDIT_OPTIONS", "EAP_AUDIT_OPTIONS"), encoding="utf-8")
+
+    assert run("deploy", "helper", "--plan", "--workspace", ready) == 0
+    out = capsys.readouterr().out
+    assert "Deprecated spellings in agents/helper/deploy.env" in out
+    assert "  EAP_AUDIT_OPTIONS -> AC2_AUDIT_OPTIONS" in out
+    assert "stops working after the deprecation window" in out
+    assert "  EAP_AUDIT_OPTIONS\n" in out  # the environment lists the name as written
+    assert "AC2_PROFILE\n" in out
+    assert "  AC2_PROFILE ->" not in out
+
+    assert run("deploy", "helper", "--workspace", ready) == 0
+    capsys.readouterr()
+    tasks = (ready / "deploy/helper/settings.tf").read_text(encoding="utf-8")
+    assert '    EAP_AUDIT_OPTIONS      = "{\\"stream\\": \\"eap-audit\\"}"\n' in tasks
+    assert "AC2_AUDIT_OPTIONS" not in tasks
+
+
+def test_canonical_settings_have_no_deprecated_spellings_section(
+    ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert run("deploy", "helper", "--plan", "--workspace", ready) == 0
+    assert "Deprecated spellings" not in capsys.readouterr().out
+
+
 def test_a_secret_in_the_settings_is_refused_and_its_value_never_shown(
     ready: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     with _settings(ready).open("a", encoding="utf-8") as file:
-        file.write("EAP_SECRET_RATES_TOKEN=s3cr3t-value\n")
+        file.write("AC2_SECRET_RATES_TOKEN=s3cr3t-value\n")
 
     assert run("deploy", "helper", "--plan", "--workspace", ready) == 1
     captured = capsys.readouterr()
     assert "holds secrets" in captured.err
-    assert "EAP_SECRET_RATES_TOKEN" in captured.err
+    assert "AC2_SECRET_RATES_TOKEN" in captured.err
     assert "s3cr3t-value" not in captured.out + captured.err
 
 
@@ -259,22 +289,22 @@ def test_settings_for_a_developers_machine_are_refused(
     settings = _settings(ready)
     settings.write_text(
         settings.read_text(encoding="utf-8").replace(
-            "EAP_DEPLOYMENT_ENV=dev", "EAP_DEPLOYMENT_ENV=local"
+            "AC2_DEPLOYMENT_ENV=dev", "AC2_DEPLOYMENT_ENV=local"
         ),
         encoding="utf-8",
     )
 
     assert run("deploy", "helper", "--plan", "--workspace", ready) == 1
     err = capsys.readouterr().err
-    assert "expected: EAP_DEPLOYMENT_ENV=dev or EAP_DEPLOYMENT_ENV=prod" in err
-    assert "got: EAP_DEPLOYMENT_ENV is local" in err
+    assert "expected: AC2_DEPLOYMENT_ENV=dev or AC2_DEPLOYMENT_ENV=prod" in err
+    assert "got: AC2_DEPLOYMENT_ENV is local" in err
 
 
 def test_a_local_only_adapter_is_a_problem_that_names_itself(
     ready: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     with _settings(ready).open("a", encoding="utf-8") as file:
-        file.write("EAP_AUDIT_PROVIDER=jsonl\nEAP_AUDIT_OPTIONS={}\n")
+        file.write("AC2_AUDIT_PROVIDER=jsonl\nAC2_AUDIT_OPTIONS={}\n")
 
     assert run("deploy", "helper", "--plan", "--workspace", ready) == 1
     out = capsys.readouterr().out
@@ -285,7 +315,7 @@ def test_a_bad_option_says_which_adapter_and_which_file(
     ready: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     with _settings(ready).open("a", encoding="utf-8") as file:
-        file.write('EAP_AUDIT_OPTIONS={"stream": "has spaces"}\n')
+        file.write('AC2_AUDIT_OPTIONS={"stream": "has spaces"}\n')
 
     assert run("deploy", "helper", "--plan", "--workspace", ready) == 1
     err = capsys.readouterr().err
@@ -299,10 +329,10 @@ def test_an_mcp_server_keeps_no_conversations_and_is_served_by_its_own_command(
     assert run("deploy", "people", "--workspace", workspace) == 0
     _depend_on_aws(workspace, "mcp-servers/people")
     settings = _settings(workspace, "mcp-servers/people")
-    assert "EAP_CHECKPOINT_PROVIDER=none" in settings.read_text(encoding="utf-8")
+    assert "AC2_CHECKPOINT_PROVIDER=none" in settings.read_text(encoding="utf-8")
     # An OPA server elsewhere needs no sidecar.
     with settings.open("a", encoding="utf-8") as file:
-        file.write('EAP_POLICY_OPTIONS={"url": "https://opa.internal:8181"}\n')
+        file.write('AC2_POLICY_OPTIONS={"url": "https://opa.internal:8181"}\n')
     capsys.readouterr()
 
     assert run("deploy", "people", "--workspace", workspace) == 0
@@ -374,7 +404,7 @@ def _plan_with(root: Path, factory: Any, *, extra: str | None = None) -> Any:
     from ai_agent_lib_core.di import ServiceProviders
 
     with _settings(root).open("a", encoding="utf-8") as file:
-        file.write("EAP_AUDIT_PROVIDER=own_audit\nEAP_AUDIT_OPTIONS={}\n")
+        file.write("AC2_AUDIT_PROVIDER=own_audit\nAC2_AUDIT_OPTIONS={}\n")
     registry = ServiceProviders.default().register("audit", "own_audit", factory, extra=extra)
     answers = load_answers(root)
     return plan_deployment(root, answers, target_of(answers, "helper"), providers=registry)
@@ -435,10 +465,10 @@ def test_f7_the_collector_and_the_sdk_follow_the_same_switch_as_the_service(
 ) -> None:
     settings = _settings(ready)
     text = settings.read_text(encoding="utf-8")
-    text = text.replace("EAP_TELEMETRY=opentelemetry", f"EAP_TELEMETRY={telemetry}")
+    text = text.replace("AC2_TELEMETRY=opentelemetry", f"AC2_TELEMETRY={telemetry}")
     text = text.replace(
-        'EAP_AUDIT_OPTIONS={"stream": "eap-audit"}',
-        f'EAP_AUDIT_OPTIONS={{"stream": "eap-audit", "tracing": {str(tracing).lower()}}}',
+        'AC2_AUDIT_OPTIONS={"stream": "eap-audit"}',
+        f'AC2_AUDIT_OPTIONS={{"stream": "eap-audit", "tracing": {str(tracing).lower()}}}',
     )
     settings.write_text(text, encoding="utf-8")
     pyproject = ready / "agents/helper/pyproject.toml"

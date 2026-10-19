@@ -210,7 +210,7 @@ def test_new_mcp_from_redshift_writes_a_server_that_runs_locally_on_stand_ins(
     assert "## Review data settings for deployment" in readme
     assert "search path of the server's database user to `sales`" in readme
     assert '{"sales": {"kind": "redshift_data", "database": "dev", "workgroup": "eap"' in readme
-    assert "EAP_DATA_SOURCES" in readme
+    assert "AC2_DATA_SOURCES" in readme
     tests = (service / "tests/test_sales_mcp.py").read_text(encoding="utf-8")
     assert "{'order_id': 1}" in tests
     assert "rest_stub_providers" not in tests
