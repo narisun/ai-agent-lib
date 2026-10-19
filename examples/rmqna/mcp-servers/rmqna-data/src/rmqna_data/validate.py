@@ -18,7 +18,7 @@ do instead (the agent's repair loop reads these):
 4. No function that reads a file, the environment or the system catalog, no function in a
    ``FROM`` position at all (``read_csv``, ``glob``...), and no row or memory generator anywhere
    (``range``, ``generate_series``, ``unnest``, ``repeat``, ``list_resize``, ``rpad``, ``lpad``,
-   ``printf``, ``format``): ``forbidden_function``.
+   ``printf``, ``format``, ``equi_width_bins``): ``forbidden_function``.
 5. No PIVOT or UNPIVOT in any form: ``not_a_select``. DuckDB expands a statement-form PIVOT into
    more than one statement, one of which creates a type.
 6. Structural caps on the shape of the statement (:data:`MAX_JOIN_SOURCES`,
@@ -44,7 +44,7 @@ from contextlib import contextmanager
 from typing import Final, Literal
 
 import sqlglot
-from sqlglot import exp
+from sqlglot import TokenType, exp
 from sqlglot.errors import ErrorLevel, ParseError, SqlglotError
 from sqlglot.optimizer.scope import Scope, ScopeType, traverse_scope
 
@@ -173,6 +173,9 @@ _GENERATORS: Final = frozenset(
         "lpad",
         "printf",
         "format",
+        # A list of any length out of one number: equi_width_bins(0.0, amount, 1000000, false) per
+        # row took 11 GB and ran 15 seconds past its timeout.
+        "equi_width_bins",
     }
 )
 
@@ -321,13 +324,21 @@ def _statement_name(statement: exp.Expr, sql: str = "") -> str:
     return _first_word(sql)
 
 
+# A token that is a value, not a word the statement starts with: 'x', "x", 1, E'x', X'ff'...
+_VALUE_TOKENS: Final = frozenset(
+    {kind for kind in TokenType if kind.name.endswith("STRING")}
+    | {TokenType.NUMBER, TokenType.IDENTIFIER}
+)
+
+
 def _first_word(sql: str) -> str:
     try:
         tokens = sqlglot.tokenize(sql, read=_DIALECT)
     except (SqlglotError, RecursionError):
         return "This statement"
-    word = tokens[0].text if tokens else ""
-    return word.upper() if word.isalpha() else "This statement"
+    if not tokens or tokens[0].token_type in _VALUE_TOKENS or not tokens[0].text.isalpha():
+        return "This statement"
+    return tokens[0].text.upper()
 
 
 def _not_a_select(name: str) -> SqlRefused:

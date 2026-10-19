@@ -282,11 +282,13 @@ async def test_quotes_and_backslashes_in_a_string_cannot_break_out(engine: Rmqna
     assert scalar(await engine.execute("SELECT count(*) FROM accounts")) > 0
 
 
-# A 4-way cross join with a predicate DuckDB cannot turn into a hash join: about 10^17 row pairs,
-# so it never finishes, but its executor checks for an interrupt every few thousand rows.
+# A 6-way cross join of the 46 clients, hashing each combination: about 9 billion rows, so it never
+# finishes, yet it streams in a few megabytes (the engine has no temp directory, so a statement that
+# had to materialize its join would fail at the memory limit instead of running), and its executor
+# checks for an interrupt every few thousand rows.
 TORTURE = (
-    "SELECT count(*) FROM transactions a, transactions b, transactions c, transactions d "
-    "WHERE (a.amount * b.amount + c.amount) % 7 = d.amount % 5"
+    "SELECT sum(length(md5(a.uen || b.uen || c.uen || d.uen || e.uen || f.uen))) "
+    "FROM accounts a, accounts b, accounts c, accounts d, accounts e, accounts f"
 )
 
 
@@ -299,13 +301,13 @@ async def settled(engine: RmqnaEngine, within: float) -> bool:
 
 
 @pytest.fixture
-def transactions_only(tmp_path: Path) -> Path:
-    shutil.copy(DATA_DIR / "transactions.csv", tmp_path / "transactions.csv")
+def accounts_only(tmp_path: Path) -> Path:
+    shutil.copy(DATA_DIR / "accounts.csv", tmp_path / "accounts.csv")
     return tmp_path
 
 
-async def test_a_timeout_interrupts_the_query(transactions_only: Path) -> None:
-    quick = RmqnaEngine(transactions_only, timeout_seconds=0.5)
+async def test_a_timeout_interrupts_the_query(accounts_only: Path) -> None:
+    quick = RmqnaEngine(accounts_only, timeout_seconds=0.5)
     try:
         started = time.perf_counter()
         error = await refusal(quick, TORTURE)
@@ -321,14 +323,14 @@ async def test_a_timeout_interrupts_the_query(transactions_only: Path) -> None:
         assert quick.running == 0
 
         # And the interrupted query left the engine usable.
-        result = await quick.execute("SELECT count(*) AS n FROM transactions")
+        result = await quick.execute("SELECT count(*) AS n FROM accounts")
         assert scalar(result) > 0
     finally:
         quick.close()
 
 
-async def test_a_cancelled_call_interrupts_the_query(transactions_only: Path) -> None:
-    patient = RmqnaEngine(transactions_only, timeout_seconds=60)
+async def test_a_cancelled_call_interrupts_the_query(accounts_only: Path) -> None:
+    patient = RmqnaEngine(accounts_only, timeout_seconds=60)
     try:
         task = asyncio.create_task(patient.execute(TORTURE))
         await asyncio.sleep(0.3)
@@ -344,14 +346,14 @@ async def test_a_cancelled_call_interrupts_the_query(transactions_only: Path) ->
 
 
 async def test_the_interrupt_tests_can_fail_when_nothing_is_interrupted(
-    transactions_only: Path, monkeypatch: pytest.MonkeyPatch
+    accounts_only: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # A test that passes whatever the code does proves nothing. Take the interrupt away and the
     # worker keeps going after the caller was answered: the same check the two tests above make
     # (settled) now says no. The cursors are kept so that the test can stop the worker itself.
     cursors: list[duckdb.DuckDBPyConnection] = []
     monkeypatch.setattr("rmqna_data.engine._interrupt", cursors.append)
-    quick = RmqnaEngine(transactions_only, timeout_seconds=0.3)
+    quick = RmqnaEngine(accounts_only, timeout_seconds=0.3)
     try:
         error = await refusal(quick, TORTURE)
         assert error.error_kind == "timeout"
@@ -592,6 +594,45 @@ async def test_the_memory_limit_is_set_and_locked(engine: RmqnaEngine) -> None:
         assert raw.execute("SELECT current_setting('memory_limit')").fetchone() == ("953.6 MiB",)
         with pytest.raises(duckdb.Error, match="configuration has been locked"):
             raw.execute("SET memory_limit = '64GB'")
+    finally:
+        raw.close()
+
+
+async def test_nothing_is_written_to_disk_when_a_statement_does_not_fit_in_memory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # DuckDB spills what does not fit in memory to a .tmp folder in the working directory, bounded
+    # only by free disk space: this shape (a window function over a cross join) wrote 3.6 GB in
+    # 8 seconds in review. With no temp directory it fails at the memory limit instead.
+    work = tmp_path / "cwd"
+    data = tmp_path / "data"
+    work.mkdir()
+    data.mkdir()
+    shutil.copy(DATA_DIR / "transactions.csv", data / "transactions.csv")
+    monkeypatch.chdir(work)
+    small = RmqnaEngine(data, memory_limit="256MB", timeout_seconds=5)
+    try:
+        error = await refusal(
+            small,
+            "SELECT max(rn) FROM (SELECT row_number() OVER (ORDER BY a.amount, b.amount) AS rn "
+            "FROM transactions a, transactions b)",
+        )
+
+        assert error.error_kind == "execution_error"  # not a timeout: it failed at the limit
+        assert "Out of Memory" in error.message
+        assert list(work.iterdir()) == []  # no .tmp, nothing at all
+        assert await settled(small, within=3)
+        assert (await small.execute("SELECT 1")).rows == [[1]]
+    finally:
+        small.close()
+
+
+async def test_the_temp_directory_is_empty_and_locked(engine: RmqnaEngine) -> None:
+    raw = raw_cursor(engine)
+    try:
+        assert raw.execute("SELECT current_setting('temp_directory')").fetchone() == ("",)
+        with pytest.raises(duckdb.Error, match="configuration has been locked"):
+            raw.execute("SET temp_directory = '/tmp/spill'")
     finally:
         raw.close()
 

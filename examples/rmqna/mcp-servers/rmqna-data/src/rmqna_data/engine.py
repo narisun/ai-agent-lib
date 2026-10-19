@@ -2,16 +2,18 @@
 
 The load follows ``ai_agent_lib_core.adapters.data_duckdb`` step for step: each content CSV is read
 with a plain ``read_csv`` into an in-memory DuckDB table named after its file (lower case, letters,
-digits and underscores), and then the engine is forbidden from touching the file system or the
-network, so nothing a query says can read anything but those tables. The schema document the agent
+digits and underscores), and then the engine is forbidden from reaching the file system or the
+network and from spilling to disk, so nothing a query says can read anything but those tables or
+leave a file behind. The schema document the agent
 reasons over is rendered from the same load, so its column types are the types a query sees.
 
 What this module adds to that discipline, because the SQL here is written by a model:
 
 * every statement goes through :func:`rmqna_data.validate.validate_sql` first, and only the
   rewritten statement is run;
-* the configuration is locked after loading, so nothing can turn external access back on, and
-  DuckDB is given a memory limit (which it does not always honour);
+* the configuration is locked after loading, so nothing can turn external access back on; DuckDB
+  is given a memory limit (which it does not always honour) and no temp directory, so a statement
+  that does not fit in memory fails instead of spilling to disk;
 * each call runs on its own cursor, in a worker thread, under a timeout that interrupts the
   query. Interrupting does not reach everything: DuckDB's binder and optimizer, and a single huge
   scalar, run to completion. :attr:`RmqnaEngine.running` counts the workers still going, including
@@ -450,13 +452,19 @@ def _load(
             "WHERE table_schema = 'main' ORDER BY table_name, ordinal_position"
         ).fetchall():
             column_types.setdefault(str(table), {})[str(column)] = str(kind)
-        # From here on the engine can read only what was loaded above, and nothing can say
-        # otherwise: the configuration is locked, so a statement cannot re-enable file access.
-        connection.execute("SET enable_external_access = false")
         connection.execute(f"SET memory_limit = '{memory_limit}'")
+        # No spilling to disk. DuckDB writes what does not fit in memory to a .tmp folder in the
+        # working directory, bounded only by the free space (a window function over a cross join
+        # wrote 3.6 GB in 8 seconds). With no temp directory such a statement fails at the memory
+        # limit with a clean Out of Memory Error, and the engine writes no file at all. This is set
+        # before external access is turned off, which forbids changing the temp directory.
+        connection.execute("SET temp_directory = ''")
         # A time zone with an offset (now(), a TIMESTAMPTZ) is shown in the session's zone, which
         # DuckDB takes from the machine. UTC makes an answer the same wherever the server runs.
         connection.execute("SET GLOBAL TimeZone = 'UTC'")
+        # From here on the engine can read only what was loaded above, and nothing can say
+        # otherwise: the configuration is locked, so a statement cannot re-enable file access.
+        connection.execute("SET enable_external_access = false")
         connection.execute("SET lock_configuration = true")
     except BaseException:
         connection.close()

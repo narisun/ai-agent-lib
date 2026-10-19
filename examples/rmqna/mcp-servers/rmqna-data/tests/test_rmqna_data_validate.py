@@ -340,6 +340,12 @@ def test_table_functions_are_refused(sql: str, function: str) -> None:
         ),
         ("SELECT lpad(name, 20000000, 'y') FROM accounts", "lpad"),
         ("SELECT rpad('', 1900000, chr(1))", "rpad"),  # 11 MB of JSON escapes in review
+        # A list of any length out of one number: 11 GB, 15 seconds past the timeout, in review.
+        (
+            "SELECT max(len(equi_width_bins(0.0, amount::DOUBLE, 1000000, false))) "
+            "FROM transactions",
+            "equi_width_bins",
+        ),
         ("SELECT printf('%2000000000d', 1)", "printf"),
         ("SELECT PRINTF('%5d', employees) FROM accounts", "printf"),
         ("SELECT format('{:>2000000000}', 1)", "format"),
@@ -651,6 +657,18 @@ def test_subqueries_count_toward_the_same_cap() -> None:
     )
 
     assert refused(sql).error_kind == "parse_error"
+
+
+@pytest.mark.parametrize(
+    "sql",
+    ["'x'", '"x"', "1", "/**/ " * 400 + "'x'", "-- c\n'x'", "E'x'", "[1, 2]", "(1)"],
+)
+def test_a_statement_that_starts_with_a_value_is_not_named_after_the_value(sql: str) -> None:
+    error = refused(sql)
+
+    assert error.error_kind == "not_a_select"
+    assert error.message.startswith("This statement is not allowed")
+    assert "X is not allowed" not in error.message
 
 
 def test_naming_a_refused_statement_cannot_be_made_to_take_forever() -> None:
