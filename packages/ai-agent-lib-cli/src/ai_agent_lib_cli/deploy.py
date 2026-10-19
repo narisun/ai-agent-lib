@@ -417,8 +417,7 @@ def plan_lines(plan: DeploymentPlan) -> list[str]:
             f"Deprecated spellings in {target.settings} (the task gets each name as written, "
             "and the service accepts it for now):",
             *(f"  {old} -> {new}" for old, new in plan.deprecated),
-            "Rename them before the deprecation window ends: each old spelling stops working "
-            "after the deprecation window.",
+            "Rename them now: each old spelling stops working after one minor release.",
         ]
     if plan.warnings:
         lines += ["", "Warnings:", *(f"  - {warning}" for warning in plan.warnings)]

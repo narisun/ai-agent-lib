@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -259,9 +260,14 @@ def test_run_agent_without_an_env_file_reads_the_working_directorys_dotenv(
 
 @pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_run_agent_logs_a_deprecation_for_each_legacy_spelling_in_its_env_file(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """A service read through its logs is told when its file uses a retired name."""
+    """A service read through its logs is told when its file uses a retired name.
+
+    The warning is read from standard output, where ``configure_logging`` writes
+    its JSON lines, so the test pins that it is emitted after logging is set up:
+    a record sent earlier would not arrive there as a structured line.
+    """
     from ai_agent_lib_core.config import deprecations
 
     deprecations._LOGGED.clear()
@@ -279,11 +285,17 @@ def test_run_agent_logs_a_deprecation_for_each_legacy_spelling_in_its_env_file(
         application="probe", build_graph=_build_graph, respond=_respond, env_file=env_file
     )
 
-    with caplog.at_level("WARNING"):
-        assert run_agent(service, []) == 0
+    assert run_agent(service, []) == 0
     deprecations._LOGGED.clear()
 
-    assert "EAP_DEPLOYMENT_ENV is deprecated; use AC2_DEPLOYMENT_ENV instead" in caplog.text
+    lines = [
+        json.loads(line) for line in capsys.readouterr().out.splitlines() if line.startswith("{")
+    ]
+    told = [line for line in lines if "EAP_DEPLOYMENT_ENV" in line["message"]]
+    assert len(told) == 1
+    assert told[0]["level"] == "WARNING"
+    assert told[0]["service"] == "probe"
+    assert told[0]["message"] == "EAP_DEPLOYMENT_ENV is deprecated; use AC2_DEPLOYMENT_ENV instead"
 
 
 def test_run_agent_reports_a_configuration_error_from_a_bad_env_file(

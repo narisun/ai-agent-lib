@@ -251,7 +251,7 @@ def test_legacy_spellings_in_the_settings_are_flagged_in_the_plan_and_passed_thr
     out = capsys.readouterr().out
     assert "Deprecated spellings in agents/helper/deploy.env" in out
     assert "  EAP_AUDIT_OPTIONS -> AC2_AUDIT_OPTIONS" in out
-    assert "stops working after the deprecation window" in out
+    assert "stops working after one minor release" in out
     assert "  EAP_AUDIT_OPTIONS\n" in out  # the environment lists the name as written
     assert "AC2_PROFILE\n" in out
     assert "  AC2_PROFILE ->" not in out
