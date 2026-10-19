@@ -8,7 +8,7 @@ from collections.abc import Sequence
 
 from accounts_mcp.server import APPLICATION, SERVER_ID, build_server
 from ai_agent_lib_core import ServiceConfig, ServiceContainer
-from ai_agent_lib_core.config import load_service_config
+from ai_agent_lib_core.config import log_resolution_warnings, service_resolver
 from ai_agent_lib_core.contracts import DeploymentEnv
 from ai_agent_lib_core.integrations.http import ServiceLifecycle, add_health_routes, serve
 from ai_agent_lib_core.integrations.mcp import verify_registration
@@ -47,11 +47,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     arguments = parser.parse_args(argv)
     config: ServiceConfig | None = None
     try:
-        config = load_service_config()
+        # explain() rather than resolve(): the same configuration, plus the deprecation
+        # warnings, which the service's log shows once logging is set up.
+        resolution = service_resolver().explain()
+        config = resolution.config
         # One line of JSON per event on standard output, set up before the server
         # is built so that nothing else sets up logging first. On a developer's
         # machine a line about an error also says what the error said.
         configure_logging(APPLICATION, details=shows_details(config))
+        log_resolution_warnings(resolution)
         # Traces and metrics go to the collector when the settings turn them on.
         stop_telemetry = start_telemetry(APPLICATION, config)
         try:
