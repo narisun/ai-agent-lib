@@ -1843,9 +1843,8 @@ async def classify(
     replace service names, endpoints, IDs, and paths with values supplied by your
     team. Set only the variables your service needs. Variables were previously
     spelled <code>EAP_*</code>; the old spellings keep working for one minor
-    release and warn in the service log and in <code>agentlib config explain</code>.
-    Each row names the old spelling it replaces, so Find on an old name lands on
-    its replacement.</p>
+    release and warn in the service log, in <code>agentlib doctor</code> and in
+    <code>agentlib config explain</code>. The table lists the current names only.</p>
 
     <h3 id="aws-platform-settings">How the settings fit the AWS design</h3>
     <p>Run agents and MCP servers as ECS Fargate services. The generated deployment

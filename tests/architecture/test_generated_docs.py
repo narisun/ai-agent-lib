@@ -16,7 +16,12 @@ import pytest
 from configuration_examples import AWS_DATA, LOCAL_DATA, configuration_examples
 
 from ai_agent_lib_core.config import DEFAULT_BINDINGS, render_env_example, render_reference
-from ai_agent_lib_core.config.bindings import options_key, provider_key
+from ai_agent_lib_core.config.bindings import (
+    LEGACY_PREFIX,
+    legacy_spelling,
+    options_key,
+    provider_key,
+)
 from ai_agent_lib_core.config.phoenix import PHOENIX_VARIABLES
 from ai_agent_lib_core.contracts import NoOptions, Section
 from ai_agent_lib_core.di import ServiceProviders
@@ -123,10 +128,21 @@ def test_configuration_table_covers_every_binding_and_accepted_name_once() -> No
     for binding in DEFAULT_BINDINGS:
         matching = [cells for cells in rows[1:] if f">{binding.name}</span>" in cells[0]]
         assert len(matching) == 1, binding.name
+        # The systematic legacy spelling is stated once, in the guide's prose, not on every row.
+        legacy = legacy_spelling(binding.name) if binding.owned else None
         for name in binding.all_names:
-            assert name in html.unescape(" ".join(matching[0]))
+            if name != legacy:
+                assert name in html.unescape(" ".join(matching[0]))
     for name in PHOENIX_VARIABLES:
         assert sum(f">{name}</span>" in cells[0] for cells in rows[1:]) == 1
+
+
+def test_the_guide_states_the_rename_once_and_its_table_lists_current_names_only() -> None:
+    assert LEGACY_PREFIX not in build_guide.configuration_variables()
+    guide = build_guide.guide_html()
+    statement = rf"previously\s+spelled\s+<code>{re.escape(LEGACY_PREFIX)}\*</code>"
+    assert len(re.findall(statement, guide)) == 1
+    assert re.search(r"keep\s+working\s+for\s+one\s+minor\s+release", guide)
 
 
 @pytest.mark.parametrize("environment", ["local", "aws"])

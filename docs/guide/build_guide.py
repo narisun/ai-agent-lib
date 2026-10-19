@@ -41,6 +41,7 @@ from ai_agent_lib_core.config.bindings import (
     SECRET_VARIABLE_PREFIX,
     Binding,
     ValueKind,
+    legacy_spelling,
     options_key,
     provider_key,
 )
@@ -197,8 +198,12 @@ def _notes(binding: Binding) -> str:
         notes.append('<span class="tag warn">sensitive</span>')
     if binding.alternate_names:
         notes.append("also " + ", ".join(_code(n) for n in binding.alternate_names))
-    if binding.deprecated_names:
-        notes.append("replaces " + ", ".join(_code(n) for n in binding.deprecated_names))
+    # The legacy spelling of every owned variable is stated once, in the guide's prose;
+    # a row names only a variable it replaces by another route.
+    legacy = legacy_spelling(binding.name) if binding.owned else None
+    replaced = [n for n in binding.deprecated_names if n != legacy]
+    if replaced:
+        notes.append("replaces " + ", ".join(_code(n) for n in replaced))
     return " ".join(notes)
 
 
