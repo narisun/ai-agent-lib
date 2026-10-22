@@ -7,7 +7,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from ai_agent_lib_core import Principal, RequestContext, ValidationFailed
+from ai_agent_lib_core import IntegrityError, Principal, RequestContext, ValidationFailed
 from ai_agent_lib_core.integrations.http import ServiceLifecycle, SqliteOutcomeJournal, agent_app
 from ai_agent_lib_core.testing import FakeIdentityVerifier, Fakes
 
@@ -100,4 +100,19 @@ async def test_incomplete_reservation_never_becomes_a_confirmed_failure(tmp_path
     journal = SqliteOutcomeJournal(tmp_path / "outcomes.sqlite")
     assert await journal.begin(context)
     assert not await journal.begin(context)
+    assert await journal.read(context, "request") is None
+
+
+async def test_an_oversized_outcome_is_refused_as_an_integrity_failure(tmp_path: Path) -> None:
+    context = RequestContext(
+        principal=Principal(subject="owner", tenant="bank"),
+        application="demo",
+        thread_id="thread",
+        request_id="request",
+    )
+    journal = SqliteOutcomeJournal(tmp_path / "outcomes.sqlite")
+    assert await journal.begin(context)
+    with pytest.raises(IntegrityError, match="could not be journaled") as refused:
+        await journal.finish(context, {"output": "x" * (8 * 1024 * 1024 + 1)})
+    assert refused.value.fix is not None
     assert await journal.read(context, "request") is None

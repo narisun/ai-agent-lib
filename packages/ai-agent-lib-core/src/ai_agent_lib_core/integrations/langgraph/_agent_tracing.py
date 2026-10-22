@@ -154,7 +154,12 @@ class AgentTracing:
         checkpoint_timeout_seconds: float = 1.0,
     ) -> None:
         if not math.isfinite(checkpoint_timeout_seconds) or checkpoint_timeout_seconds <= 0:
-            raise ValueError("checkpoint_timeout_seconds must be finite and positive")
+            raise ConfigurationError(
+                "agent tracing: checkpoint_timeout_seconds is not usable",
+                expected="a finite number of seconds greater than zero",
+                actual=repr(checkpoint_timeout_seconds),
+                fix="give the tracing a positive checkpoint read deadline, such as 1.0",
+            )
         self.checkpoint_timeout_seconds = checkpoint_timeout_seconds
         try:
             from opentelemetry.sdk.resources import Resource
@@ -181,13 +186,22 @@ class AgentTracing:
         """Fan out sanitized provider events; each diagnostic destination fails independently."""
         try:
             self._model_event(record)
-        except Exception:  # noqa: BLE001 - diagnostics must not discard an accepted answer
-            _LOG.warning("agent_tracing.model_record_failed")
+        except Exception as error:  # noqa: BLE001 - diagnostics must not discard an accepted answer
+            _LOG.warning(
+                "agent_tracing.model_record_failed",
+                extra={"error_type": type(error).__name__, "request_id": record.get("request_id")},
+            )
         if self.local_sink is not None:
             try:
                 await self.local_sink.write(record)
-            except Exception:  # noqa: BLE001 - destinations fail independently
-                _LOG.warning("agent_tracing.local_record_failed")
+            except Exception as error:  # noqa: BLE001 - destinations fail independently
+                _LOG.warning(
+                    "agent_tracing.local_record_failed",
+                    extra={
+                        "error_type": type(error).__name__,
+                        "request_id": record.get("request_id"),
+                    },
+                )
 
     def _model_event(self, record: Mapping[str, object]) -> None:
         turn = _current.get()

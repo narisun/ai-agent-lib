@@ -482,12 +482,20 @@ class ServiceConfig:
         """Return the adapter selection for ``name``.
 
         Raises:
-            ConfigurationError: If the section has no selection.
+            ConfigurationError: If ``name`` is not a section, or the section has no selection.
         """
         try:
-            return self.sections[Section(name)]
+            section = Section(name)
+        except ValueError:
+            raise ConfigurationError(
+                f"{shown_value(name)} is not a configuration section",
+                expected="one of " + ", ".join(member.value for member in Section),
+                actual=shown_value(name),
+            ) from None
+        try:
+            return self.sections[section]
         except KeyError:
-            raise ConfigurationError(f"section {name!r} is not configured") from None
+            raise ConfigurationError(f"section {section.value!r} is not configured") from None
 
     def with_section(self, name: Section, selection: ProviderSelection) -> ServiceConfig:
         """Return a copy with one section replaced."""

@@ -325,14 +325,25 @@ async def test_uncertain_outcome_holds_admission_without_retry(
 
 @pytest.mark.parametrize("mode", ["failed", "thread_busy"])
 async def test_definitive_http_failure_allows_new_turn_but_never_replays_old_key(
-    chat: tuple[ChatService, ScriptedAgent, SqliteThreads], settings: Settings, mode: str
+    chat: tuple[ChatService, ScriptedAgent, SqliteThreads],
+    settings: Settings,
+    mode: str,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     service, agent, _ = chat
     principal = settings.identity.principal()
     thread = (await service.create(principal, "memo")).thread.thread_id
     agent.mode = mode
-    failed = await service.submit(principal, thread, "one", "hello")
+    with caplog.at_level("WARNING"):
+        failed = await service.submit(principal, thread, "one", "hello")
     assert failed.state == "failed"
+    if mode == "failed":
+        # A refusal without an envelope reaches the log with its status, never its body.
+        degraded = [r for r in caplog.records if r.getMessage().startswith("agent dispatch")]
+        assert len(degraded) == 1
+        assert getattr(degraded[0], "status", None) == 403
+        assert getattr(degraded[0], "request_id", None) == failed.request_id
+        assert "denied" not in caplog.text
     agent.mode = "ok"
     assert await service.submit(principal, thread, "one", "hello") == failed
     assert (await service.submit(principal, thread, "two", "new question")).state == "completed"
@@ -376,14 +387,20 @@ async def test_failed_result_commit_preserves_admission_and_restart_marks_unknow
 
 
 async def test_registry_change_after_selection_fails_before_http(
-    chat: tuple[ChatService, ScriptedAgent, SqliteThreads], settings: Settings
+    chat: tuple[ChatService, ScriptedAgent, SqliteThreads],
+    settings: Settings,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     service, agent, _ = chat
     principal = settings.identity.principal()
     thread = (await service.create(principal, "memo")).thread.thread_id
     settings.agents_path.write_text(settings.agents_path.read_text().replace('"1"', '"2"'))
-    assert (await service.submit(principal, thread, "one", "hello")).state == "failed"
+    with caplog.at_level("WARNING"):
+        assert (await service.submit(principal, thread, "one", "hello")).state == "failed"
     assert agent.calls == []
+    before = [r for r in caplog.records if r.getMessage().startswith("catalog resolution failed")]
+    assert len(before) == 1
+    assert getattr(before[0], "error_type", None) == "ContractError"
     with pytest.raises(ContractError, match="stale_binding"):
         await service.create(principal, "memo")
 

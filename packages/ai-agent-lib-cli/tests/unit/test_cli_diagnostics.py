@@ -710,3 +710,16 @@ def test_a_lock_file_that_cannot_be_read_stops_the_command(
     assert run("update", "--workspace", workspace) == 1
     assert "delete it to start a new record" in capsys.readouterr().err
     assert isinstance(jinja2.__version__, str)
+
+
+def test_an_opa_that_exits_early_reports_its_own_last_lines(tmp_path: Path) -> None:
+    # The interpreter stands in for opa: it exits at once and says why on stderr.
+    (tmp_path / "bundle").mkdir()
+    with (
+        pytest.raises(CliError, match="OPA did not start") as refused,
+        opa_server(tmp_path / "bundle", tmp_path, find_program=lambda name: sys.executable),
+    ):
+        pass
+    assert refused.value.actual is not None
+    assert "exited with code" in refused.value.actual
+    assert "run" in refused.value.actual  # the interpreter names the argument it could not open

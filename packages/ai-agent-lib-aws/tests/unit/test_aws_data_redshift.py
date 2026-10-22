@@ -27,6 +27,7 @@ from ai_agent_lib_core.contracts import (
     RowFilter,
     ServiceConfig,
     TransientError,
+    UpstreamError,
 )
 from ai_agent_lib_core.di import ServiceContainer
 from ai_agent_lib_core.testing import Fakes, FrozenClock, write_accounts_files
@@ -305,7 +306,7 @@ async def test_a_statement_that_gets_no_id_fails(tmp_path: Path) -> None:
     client = Scripted([("a", "int4")], [{"longValue": 1}])
     client.statement_id = None
     source = await scripted_source(tmp_path, client)
-    with pytest.raises(AgentLibError, match="was not accepted"):
+    with pytest.raises(UpstreamError, match="was not accepted"):
         await source.query("everything")
 
 
@@ -338,7 +339,7 @@ async def test_waiting_backs_off_and_stays_under_two_seconds_a_check(tmp_path: P
 async def test_a_statement_the_database_rejects_fails_without_its_message(tmp_path: Path) -> None:
     source, database, _ = await started(tmp_path)
     database.end_as = "FAILED"
-    with pytest.raises(AgentLibError, match="statement-1") as caught:
+    with pytest.raises(UpstreamError, match="statement-1") as caught:
         await source.query("accounts_by_region", {"region": "a-secret-value"})
     assert not isinstance(caught.value, TransientError | ConfigurationError)
     assert "a-secret-value" not in str(caught.value)
@@ -396,7 +397,7 @@ async def test_a_cancelled_call_cancels_its_statement(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("failure", "expected", "text"),
     [
-        (client_error("ValidationException", "ExecuteStatement"), AgentLibError, "Validation"),
+        (client_error("ValidationException", "ExecuteStatement"), UpstreamError, "Validation"),
         (
             client_error("AccessDeniedException", "ExecuteStatement", status=403),
             ConfigurationError,
@@ -572,3 +573,42 @@ async def test_f4_cancelling_close_itself_does_not_lose_the_statement(
     await until(lambda: bool(database.cancelled))
     await asyncio.sleep(0.05)
     assert database.cancelled == ["statement-1"]
+
+
+async def test_a_rejected_statement_carries_the_database_status_as_its_code(
+    tmp_path: Path,
+) -> None:
+    source, database, _ = await started(tmp_path)
+    database.end_as = "FAILED"
+    with pytest.raises(UpstreamError) as caught:
+        await source.query("all_accounts")
+    assert caught.value.code == "FAILED"
+    assert "code: FAILED" in str(caught.value)
+
+
+async def test_a_cancellation_that_fails_is_logged_with_the_statement_id(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    source, database, _ = await started(tmp_path, timeout_seconds=0.05)
+    database.end_as = "STARTED"
+
+    def refuse(*, Id: str) -> dict[str, Any]:  # noqa: N803 - the SDK's name
+        raise client_error("ValidationException", "CancelStatement")
+
+    database.cancel_statement = refuse  # type: ignore[method-assign]
+    with caplog.at_level("WARNING"), pytest.raises(TransientError, match="longer than"):
+        await source.query("all_accounts")
+    warnings = [r for r in caplog.records if r.getMessage() == "redshift.cancel_failed"]
+    assert len(warnings) == 1
+    assert getattr(warnings[0], "statement_id", None) == "statement-1"
+    assert getattr(warnings[0], "error_type", None) == "ValidationException"
+
+
+async def test_an_sdk_failure_keeps_the_sdk_error_as_its_cause(tmp_path: Path) -> None:
+    source, database, _ = await started(tmp_path)
+    database.fail_with = client_error("ValidationException", "ExecuteStatement")
+    with pytest.raises(UpstreamError) as caught:
+        await source.query("accounts_by_region", {"region": "west"})
+    assert isinstance(caught.value.__cause__, aws.ClientError)
+    assert caught.value.code == "ValidationException"
+    assert "the service's own message" not in str(caught.value)

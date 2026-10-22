@@ -12,6 +12,7 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
+from architecture.launchers import interpreter_first_environment
 from tools import local_dev, local_processes, package_runtime
 from tools.local_environment import agent_environment
 from tools.local_processes import RunningService, Service
@@ -356,6 +357,7 @@ def test_batch_help_runs_from_another_directory(tmp_path: Path, name: str) -> No
         capture_output=True,
         text=True,
         check=False,
+        env=interpreter_first_environment(),
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "--smoke-test" in result.stdout

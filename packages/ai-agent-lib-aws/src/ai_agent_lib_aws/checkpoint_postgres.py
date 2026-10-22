@@ -209,15 +209,15 @@ class PostgresCheckpointBackend:
             async with pool.connection() as connection:
                 cursor = await connection.execute(_VERSION_QUERY)
                 row = await cursor.fetchone()
-        except psycopg.errors.UndefinedTable:
+        except psycopg.errors.UndefinedTable as exc:
             raise ConfigurationError(
                 f"{_WHAT}: the checkpoint tables do not exist. An administrator creates them "
                 "once; the service does not."
-            ) from None
-        except psycopg.errors.InsufficientPrivilege:
+            ) from exc
+        except psycopg.errors.InsufficientPrivilege as exc:
             raise ConfigurationError(
                 f"{_WHAT}: database role {self._options.user!r} may not read the checkpoint tables"
-            ) from None
+            ) from exc
         except (psycopg.Error, PoolTimeout) as exc:
             raise self._unreachable(exc) from exc
         except AgentLibError as exc:

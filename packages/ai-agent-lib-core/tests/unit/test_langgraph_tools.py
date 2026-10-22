@@ -7,7 +7,13 @@ import asyncio
 import pytest
 from langchain_core.tools import BaseTool, tool
 
-from ai_agent_lib_core.contracts import AuditOutcome, PolicyDenied, Principal, RequestContext
+from ai_agent_lib_core.contracts import (
+    AuditOutcome,
+    ConfigurationError,
+    PolicyDenied,
+    Principal,
+    RequestContext,
+)
 from ai_agent_lib_core.integrations.langgraph import GovernedTool
 from ai_agent_lib_core.pipeline import bind_request_context, frame_untrusted
 from ai_agent_lib_core.testing import Fakes
@@ -126,10 +132,11 @@ async def test_the_synchronous_api_works_from_a_worker_thread() -> None:
 
 async def test_tool_lists_are_validated() -> None:
     async with Fakes().container() as services:
-        with pytest.raises(ValueError, match="two tools are named 'close_account'"):
+        with pytest.raises(ConfigurationError, match="two tools are named 'close_account'"):
             services.tools([close_account, close_account])
-        with pytest.raises(ValueError, match="not given"):
+        with pytest.raises(ConfigurationError, match="not given") as unknown:
             services.tools([close_account], read_only=["lookup_account"])
+        assert unknown.value.fix is not None
         governed = services.tools([close_account])
-        with pytest.raises(ValueError, match="already governed"):
+        with pytest.raises(ConfigurationError, match="already governed"):
             services.tools(governed)

@@ -449,3 +449,14 @@ def test_f7_the_collector_and_the_sdk_follow_the_same_switch_as_the_service(
     assert ("collector:" in out) is on
     assert ("does not install the OpenTelemetry SDK" in out) is on
     assert code == (1 if on else 0)
+
+
+def test_a_corrupt_service_pyproject_is_named_instead_of_misread(
+    ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (ready / "agents/helper/pyproject.toml").write_text("[project\nname = ", encoding="utf-8")
+    assert run("deploy", "helper", "--plan", "--workspace", ready) == 1
+    err = capsys.readouterr().err
+    assert "agents/helper/pyproject.toml could not be read" in err
+    assert "TOMLDecodeError" in err
+    assert "does not install" not in err

@@ -10,6 +10,7 @@ import pytest
 from langgraph.graph import END, START, StateGraph
 
 from ai_agent_lib_core.contracts import PolicyDenied, Principal, RequestContext
+from ai_agent_lib_core.contracts.inspection import TurnInspection
 from ai_agent_lib_core.integrations.http import ServiceLifecycle, agent_app
 from ai_agent_lib_core.integrations.langgraph.inspection import GraphCheckpointPreview
 from ai_agent_lib_core.observability.inspection import LocalTurnInspector, read_records
@@ -157,3 +158,43 @@ async def test_endpoint_authorizes_before_read_and_never_executes_agent(tmp_path
             )
             assert response.status_code == 404
             assert "only this turn" not in response.text
+
+
+async def test_endpoint_logs_an_inspector_failure_and_answers_unavailable(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    principal = owner().principal
+    kit = Fakes(identity=FakeIdentityVerifier({"owner": principal}))
+
+    class BrokenInspector:
+        async def read(self, context: RequestContext, request_id: str) -> TurnInspection:
+            raise OSError("the private diagnostics volume is gone")
+
+    async def run(context: RequestContext, given: object) -> object:
+        pytest.fail("inspection must not invoke the graph")
+
+    async def ready() -> None:
+        pass
+
+    async with kit.container() as services:
+        lifecycle = ServiceLifecycle(ready)
+        await lifecycle.start()
+        app = agent_app(
+            services, run, application="memo", lifecycle=lifecycle, inspector=BrokenInspector()
+        )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            with caplog.at_level("ERROR"):
+                response = await client.get(
+                    "/requests/request/inspection?thread_id=thread",
+                    headers={"authorization": "Bearer owner"},
+                )
+    assert response.status_code == 503
+    assert response.json()["error"] == "unavailable"
+    assert "private diagnostics" not in response.text
+    failures = [record for record in caplog.records if record.levelname == "ERROR"]
+    assert len(failures) == 1
+    assert failures[0].exc_info is not None
+    assert failures[0].exc_info[0] is OSError
+    assert getattr(failures[0], "request_id", None) == "request"

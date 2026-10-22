@@ -16,6 +16,7 @@ from ai_agent_lib_core.contracts import (
     AgentLibError,
     ConfigurationError,
     CredentialsExpiredError,
+    NotStartedError,
     PolicyDenied,
     ProviderSelection,
     ServiceConfig,
@@ -493,7 +494,7 @@ async def test_a_ca_file_that_cannot_be_read_stops_startup(tmp_path: Path) -> No
 
 async def test_lifecycle_is_checked(tmp_path: Path) -> None:
     source = RestDataSource("bank", options(tmp_path / "absent"), FrozenClock())
-    with pytest.raises(RuntimeError, match="not started"):
+    with pytest.raises(NotStartedError, match="not started"):
         source.describe()
     with pytest.raises(ConfigurationError, match="not started"):
         await source.validate()

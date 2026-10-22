@@ -85,10 +85,10 @@ class SecretsManagerProvider:
         except aws.ClientError as exc:
             code = exc.response.get("Error", {}).get("Code", "")
             if code == "ResourceNotFoundException":
-                raise ConfigurationError(f"secret {name!r} is not configured") from None
+                raise ConfigurationError(f"secret {name!r} is not configured") from exc
             raise ConfigurationError(
                 f"{_WHAT}: secret {name!r} could not be read ({code or 'error'})"
-            ) from None
+            ) from exc
         text = reply.get("SecretString")
         if not isinstance(text, str):
             raise ConfigurationError(f"{_WHAT}: secret {name!r} is not text")

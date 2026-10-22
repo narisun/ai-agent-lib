@@ -14,6 +14,7 @@ from typing import Any
 from unittest.mock import Mock
 
 import pytest
+from architecture.launchers import interpreter_first_environment
 from tools import local_processes, stop_local
 from tools.local_control import RunControl, active, status
 from tools.local_processes import Service
@@ -305,6 +306,7 @@ def test_stop_batch_runs_from_another_directory_with_spaces(tmp_path: Path) -> N
             text=True,
             check=False,
             timeout=15,
+            env=interpreter_first_environment(),
         )
         assert result.returncode == 0, result.stdout + result.stderr
         assert ("usage:" if argument else "No managed local launchers") in result.stdout

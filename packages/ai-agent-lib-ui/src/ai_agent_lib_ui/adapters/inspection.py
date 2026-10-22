@@ -1,6 +1,7 @@
 """Read bounded diagnostics from a registry-approved agent, with no browser URLs."""
 
 import asyncio
+import logging
 from urllib.parse import quote
 
 import httpx
@@ -10,6 +11,8 @@ from ai_agent_lib_core.contracts.inspection import InspectionSection, TurnInspec
 from ai_agent_lib_ui.contracts.catalog import AgentBinding
 from ai_agent_lib_ui.contracts.conversations import RunRecord
 from ai_agent_lib_ui.contracts.queries import ContractError, ErrorCode, ViewContext
+
+logger = logging.getLogger(__name__)
 
 
 async def fetch_inspection(
@@ -52,5 +55,15 @@ async def fetch_inspection(
         ):
             return unavailable
         return result
-    except (httpx.HTTPError, TimeoutError, ValidationError, ValueError):
+    except (httpx.HTTPError, TimeoutError, ValidationError, ValueError) as error:
+        # The panel says "unavailable"; the log says which agent and turn, and why.
+        logger.warning(
+            "inspection unavailable",
+            extra={
+                "error_type": type(error).__name__,
+                "agent_id": binding.manifest.agent_id,
+                "thread_id": run.thread_id,
+                "request_id": run.request_id,
+            },
+        )
         return unavailable

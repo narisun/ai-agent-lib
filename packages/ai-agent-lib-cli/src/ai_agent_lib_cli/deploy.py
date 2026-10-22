@@ -44,6 +44,7 @@ from ai_agent_lib_core.contracts import (
     DeploymentEnv,
     Section,
     ServiceConfig,
+    describe,
 )
 from ai_agent_lib_core.contracts.access import ACCOUNT, REGION
 from ai_agent_lib_core.di import AccessPlan, ServiceProviders, access_plan
@@ -225,11 +226,21 @@ def _normalized(name: str) -> str:
 
 
 def _project(root: Path, target: Target) -> dict[str, Any]:
+    """Return the ``[project]`` table of the service's pyproject.toml.
+
+    Raises:
+        CliError: If the file cannot be read or is not valid TOML. A silently
+            empty table would turn into a wrong list of missing dependencies.
+    """
     path = root.joinpath(*target.folder.parts, "pyproject.toml")
     try:
         project = tomllib.loads(path.read_text(encoding="utf-8")).get("project", {})
-    except (OSError, tomllib.TOMLDecodeError):
-        return {}
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        raise CliError(
+            f"{target.folder}/pyproject.toml could not be read ({describe(exc)})",
+            expected="the service's pyproject.toml with a [project] table",
+            fix="repair the file, or regenerate the service with 'agentlib new'",
+        ) from exc
     return project if isinstance(project, dict) else {}
 
 

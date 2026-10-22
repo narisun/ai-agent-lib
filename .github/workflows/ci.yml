@@ -24,6 +24,12 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: python -m pip install -e packages/ai-agent-lib-core -e "packages/ai-agent-lib-ui[chat,dev]"
+      - run: python -m ruff check .
+        working-directory: packages/ai-agent-lib-ui
+      - run: python -m ruff format --check .
+        working-directory: packages/ai-agent-lib-ui
+      - run: lint-imports
+        working-directory: packages/ai-agent-lib-ui
       - run: python -m pytest
         working-directory: packages/ai-agent-lib-ui
       - run: python -m mypy

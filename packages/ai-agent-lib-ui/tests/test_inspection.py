@@ -45,7 +45,9 @@ def run() -> RunRecord:
     "mode",
     ["ok", "thread", "request", "subject", "schema", "large", "redirect", "404", "500", "timeout"],
 )
-async def test_inspection_transport_validates_identity_and_bounds(mode: str) -> None:
+async def test_inspection_transport_validates_identity_and_bounds(
+    mode: str, caplog: pytest.LogCaptureFixture
+) -> None:
     calls: list[httpx.Request] = []
 
     def respond(request: httpx.Request) -> httpx.Response:
@@ -77,10 +79,18 @@ async def test_inspection_transport_validates_identity_and_bounds(mode: str) -> 
         return httpx.Response(200, json=data)
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(respond), trust_env=False) as client:
-        result = await fetch_inspection(client, VIEW, BINDING, run())
+        with caplog.at_level("WARNING"):
+            result = await fetch_inspection(client, VIEW, BINDING, run())
     expected = "available" if mode == "ok" else "unsupported" if mode == "404" else "unavailable"
     assert result.model_inputs.availability == expected
     assert len(calls) == 1
+    if mode == "timeout":
+        # The panel says unavailable; the log names the agent, the turn and the error type.
+        warned = [r for r in caplog.records if r.getMessage() == "inspection unavailable"]
+        assert len(warned) == 1
+        assert getattr(warned[0], "error_type", None) == "ReadTimeout"
+        assert getattr(warned[0], "request_id", None) == "request"
+        assert "do not leak" not in caplog.text
 
 
 async def test_content_permission_can_be_disabled_without_disabling_chat(tmp_path: Path) -> None:

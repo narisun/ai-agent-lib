@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import time
 from contextlib import suppress
 from datetime import UTC, datetime
@@ -17,6 +18,11 @@ from ai_agent_lib_ui.contracts.chat import StoredTurn
 from ai_agent_lib_ui.contracts.conversations import RunRecord, TurnAdmission
 from ai_agent_lib_ui.contracts.queries import ContractError, ErrorCode, ViewContext
 from ai_agent_lib_ui.contracts.traces import TraceLink
+
+# Operational records only: a status, a path and identifiers. Never a body.
+logger = logging.getLogger(__name__)
+
+_TERMINAL_FAILURES = frozenset({"invalid", "denied", "unauthorized", "budget_exceeded", "paused"})
 
 
 class HttpDispatcher:
@@ -83,11 +89,7 @@ class HttpDispatcher:
                     "updated_at": datetime.now(UTC),
                 }
             )
-        elif (
-            envelope.get("error")
-            in {"invalid", "denied", "unauthorized", "budget_exceeded", "paused"}
-            and "output" not in envelope
-        ):
+        elif envelope.get("error") in _TERMINAL_FAILURES and "output" not in envelope:
             result = _failed_run(run, time.monotonic(), bytes(body))
         else:
             return None
@@ -132,6 +134,7 @@ class HttpDispatcher:
                 or response.status_code == 408
                 or response.status_code >= 500
             ):
+                _log_degraded("outcome unknown", response.status_code, binding, run)
                 raise ContractError(ErrorCode.INVALID_RESPONSE)
             if response.status_code >= 400:
                 body = await _bounded_body(response, binding.manifest.max_response_bytes)
@@ -143,11 +146,13 @@ class HttpDispatcher:
                     isinstance(envelope, dict)
                     and envelope.get("thread_id") == run.thread_id
                     and envelope.get("request_id") == run.request_id
-                    and envelope.get("error")
-                    in {"invalid", "denied", "unauthorized", "budget_exceeded", "paused"}
+                    and envelope.get("error") in _TERMINAL_FAILURES
                     and "output" not in envelope
                 ):
                     return _failed_run(run, started, body)
+                # A refusal the agent did not describe in its envelope: the user sees
+                # "failed"; the log keeps the status so an operator can find the cause.
+                _log_degraded("failed without an envelope", response.status_code, binding, run)
                 return run.model_copy(
                     update={
                         "state": "failed",
@@ -192,6 +197,20 @@ async def _bounded_body(response: httpx.Response, limit: int) -> bytes:
         if len(body) > limit:
             raise ContractError(ErrorCode.INVALID_RESPONSE)
     return bytes(body)
+
+
+def _log_degraded(what: str, status: int, binding: AgentBinding, run: RunRecord) -> None:
+    logger.warning(
+        "agent dispatch %s",
+        what,
+        extra={
+            "status": status,
+            "path": "/invoke",
+            "agent_id": binding.manifest.agent_id,
+            "thread_id": run.thread_id,
+            "request_id": run.request_id,
+        },
+    )
 
 
 def _failed_run(run: RunRecord, started: float, body: bytes) -> RunRecord:

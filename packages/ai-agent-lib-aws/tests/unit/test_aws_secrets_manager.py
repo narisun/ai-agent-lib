@@ -92,6 +92,7 @@ async def test_a_failed_read_never_repeats_what_the_service_said(
         with pytest.raises(expected, match=said) as caught:
             await secrets.get_secret("token")
     assert "arn:aws" not in str(caught.value)
+    assert caught.value.__cause__ is not None, "the SDK error stays as the cause"
 
 
 def test_the_options_are_checked() -> None:

@@ -298,7 +298,8 @@ class AwsSessionFactory:
             mapped = classify_aws_error(exc, what=what, sign_in=self.sign_in)
             if mapped is None:
                 raise
-            raise mapped from None
+            # The SDK error stays as the cause: describe() never copies its text into a message.
+            raise mapped from exc
 
     def classify(self, error: BaseException, *, what: str) -> AgentLibError | None:
         """Map an SDK error to the taxonomy, naming this session's sign-in command."""

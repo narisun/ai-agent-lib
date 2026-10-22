@@ -97,6 +97,12 @@ future work. The [ADRs](adr/README.md) record decisions; the
 The [code structure and reliability review](design/code-structure-review-2026-10-13.md)
 records three resolved issues, reproduction evidence, and proposed simplifications.
 Its proposed commands are recommendations, not commands available in this checkout.
+The [code structure, exception handling, and test review](design/code-review-2026-10-22.md)
+records the follow-up pass over the whole checkout with prioritized findings and a
+suggested fix order; nothing in it has been applied yet. The
+[implementation plan](design/implementation-plan-2026-10-22.md) sequences those
+fixes and the changes needed to deploy agents and MCP servers to Amazon Bedrock
+AgentCore; it is a proposal, not implemented behavior.
 
 ## Keep documentation in sync
 

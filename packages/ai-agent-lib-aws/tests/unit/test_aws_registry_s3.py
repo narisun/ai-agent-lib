@@ -207,3 +207,20 @@ async def test_a_service_gets_the_registry_from_configuration() -> None:
             assert isinstance(services.registry, S3RegistrySource)
             assert services.registry.agents.revision == "s3-version:a1"
             assert services.registry.tools.get("accounts") is not None
+
+
+async def test_an_oversized_object_is_refused_and_its_body_closed() -> None:
+    held = storage(AGENTS, "x" * (5 * 1024 * 1024 + 1))
+    bodies: list[io.BytesIO] = []
+    get_object = held.get_object
+
+    def observed(**request: Any) -> dict[str, Any]:
+        reply = get_object(**request)
+        bodies.append(reply["Body"])
+        return reply
+
+    held.get_object = observed  # type: ignore[method-assign]
+    with pytest.raises(ConfigurationError, match="larger than"):
+        await source(held).start()
+    assert bodies
+    assert all(body.closed for body in bodies)

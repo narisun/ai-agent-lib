@@ -98,6 +98,26 @@ class NewTurn(BaseModel):
     idempotency_key: Annotated[str, Field(min_length=1, max_length=200)]
 
 
+# Every contract error names its HTTP status here; a missing entry is a test failure,
+# not a silent 409.
+_HTTP_STATUS: dict[ErrorCode, int] = {
+    ErrorCode.NOT_FOUND: 404,
+    ErrorCode.INVALID_INPUT: 400,
+    ErrorCode.UNSUPPORTED_SCHEMA: 422,
+    ErrorCode.UNSUPPORTED_ADAPTER: 422,
+    ErrorCode.STALE_BINDING: 409,
+    ErrorCode.DESTINATION_DENIED: 403,
+    ErrorCode.CONFLICT: 409,
+    ErrorCode.UNAVAILABLE: 503,
+    ErrorCode.INVALID_RESPONSE: 502,
+}
+
+
+def status_for(code: ErrorCode) -> int:
+    """Return the HTTP status that reports ``code`` to the browser."""
+    return _HTTP_STATUS[code]
+
+
 def create_app(resources: Runtime) -> FastAPI:
     """Build routes after writable shell configuration has been prepared."""
     from chainlit.utils import mount_chainlit
@@ -124,9 +144,8 @@ def create_app(resources: Runtime) -> FastAPI:
 
     @app.exception_handler(ContractError)
     async def contract_error(_request: Request, error: ContractError) -> JSONResponse:
-        status = {ErrorCode.NOT_FOUND: 404, ErrorCode.INVALID_INPUT: 400}.get(error.code, 409)
         response = ErrorResponse(code=error.code, request_id=str(uuid4()))
-        return JSONResponse(response.model_dump(mode="json"), status_code=status)
+        return JSONResponse(response.model_dump(mode="json"), status_code=status_for(error.code))
 
     @app.get("/healthz")
     async def health() -> dict[str, str]:

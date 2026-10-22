@@ -145,7 +145,8 @@ async def check_queries(
         try:
             kept += await _try(open_source, suffix, [query])
         except AgentLibError as problem:
-            notes.append(f"dropped {query.name}: {type(problem).__name__}")
+            # The summary keeps the facts and the fix; the class name alone says nothing.
+            notes.append(f"dropped {query.name}: {problem.summary}")
     return kept, notes
 
 

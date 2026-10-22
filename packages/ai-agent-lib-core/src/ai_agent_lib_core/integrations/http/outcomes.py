@@ -8,7 +8,9 @@ from contextlib import closing
 from pathlib import Path
 from typing import Protocol
 
-from ai_agent_lib_core.contracts import RequestContext
+from ai_agent_lib_core.contracts import IntegrityError, RequestContext
+
+_MAX_ENVELOPE_BYTES = 8 * 1024 * 1024
 
 
 class OutcomeJournal(Protocol):
@@ -74,8 +76,17 @@ class SqliteOutcomeJournal:
                 )
             if operation == "finish":
                 body = json.dumps(envelope)
-                if len(body.encode()) > 8 * 1024 * 1024:
-                    raise ValueError("terminal outcome exceeds journal limit")
+                if len(body.encode()) > _MAX_ENVELOPE_BYTES:
+                    # The answer was produced but cannot be recorded for recovery.
+                    raise IntegrityError(
+                        "the terminal outcome could not be journaled",
+                        expected=f"an envelope of at most {_MAX_ENVELOPE_BYTES} bytes",
+                        actual=f"an envelope of {len(body.encode())} bytes",
+                        fix=(
+                            "lower the agent's response size, or inject a journal "
+                            "with a higher limit"
+                        ),
+                    )
                 db.execute(
                     "UPDATE outcomes SET body=? WHERE owner=? AND thread=? "
                     "AND request=? AND body IS NULL",

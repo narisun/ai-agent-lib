@@ -99,7 +99,7 @@ class FirehoseAuditSink:
             code = exc.response.get("Error", {}).get("Code", "error")
             raise ConfigurationError(
                 f"{_WHAT}: stream {self._stream!r} cannot be used ({code})"
-            ) from None
+            ) from exc
         except AgentLibError as exc:
             raise ConfigurationError.from_error(exc) from exc
         status = reply.get("DeliveryStreamDescription", {}).get("DeliveryStreamStatus")

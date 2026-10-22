@@ -4,12 +4,18 @@ import argparse
 import asyncio
 import json
 import sys
+import traceback
 from pathlib import Path
 
 
 def arguments() -> argparse.Namespace:
     """Parse commands without importing optional runtime dependencies."""
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="also print the error's type and traceback to stderr when a command fails",
+    )
     commands = parser.add_subparsers(dest="command", required=True)
     for name in ("init", "check", "serve"):
         command = commands.add_parser(name)
@@ -55,7 +61,7 @@ def main() -> int:
         )
         from ai_agent_lib_ui.config.settings import Settings, agent_environment
         from ai_agent_lib_ui.config.shell import prepare_shell
-        from ai_agent_lib_ui.contracts.queries import ContractError, PageRequest
+        from ai_agent_lib_ui.contracts.queries import PageRequest
         from ai_agent_lib_ui.integrations.runtime import compose
 
         path = args.config.resolve()
@@ -117,33 +123,46 @@ def main() -> int:
                 "another UI server owns this state folder; stop it before restarting"
             ) from None
         return 0
-    except ImportError:
+    except ImportError as error:
+        # Name the module that is missing: the hint is wrong when the UI is
+        # installed and some other import failed.
+        missing = f" (missing: {error.name})" if error.name else ""
         print(
-            'Install the UI in its own environment: python -m pip install "ai-agent-lib-ui[chat]"',
+            "Install the UI in its own environment: "
+            f'python -m pip install "ai-agent-lib-ui[chat]"{missing}',
             file=sys.stderr,
         )
+        if args.verbose:
+            traceback.print_exc()
     except Exception as error:  # noqa: BLE001 - CLI boundary must not print secrets
-        # Pydantic/provider errors may contain configuration inputs. Do not print
-        # their repr or a traceback, which can accidentally disclose .env content.
-        from pydantic import ValidationError
-
-        from ai_agent_lib_core.contracts import ConfigurationError
-        from ai_agent_lib_ui.contracts.queries import ContractError
-
-        if isinstance(error, ContractError):
-            message = error.code.value + "; check registry IDs, urls and configuration pins"
-        elif isinstance(error, (ValidationError, ConfigurationError, json.JSONDecodeError)):
-            message = "invalid settings or registry; check the documented field names and values"
-        elif isinstance(error, OSError):
-            message = (
-                "a required file could not be read or written; check paths and folder permissions"
-            )
-        elif isinstance(error, ValueError):
-            message = str(error)
-        else:
-            message = "UI startup failed; verify the separate UI environment and configuration"
-        print("UI error: " + message, file=sys.stderr)
+        print(f"UI error: {_safe_message(error)} ({type(error).__name__})", file=sys.stderr)
+        if args.verbose:
+            # Opt-in only: a traceback can repeat configuration values.
+            traceback.print_exc()
     return 2
+
+
+def _safe_message(error: Exception) -> str:
+    """Describe a startup failure without its text, which may repeat .env content.
+
+    Pydantic and provider errors quote the values they rejected, so only the
+    kind of failure and where to look are printed. A ValueError is one of this
+    module's own messages, written to be shown.
+    """
+    from pydantic import ValidationError
+
+    from ai_agent_lib_core.contracts import ConfigurationError
+    from ai_agent_lib_ui.contracts.queries import ContractError
+
+    if isinstance(error, ContractError):
+        return error.code.value + "; check registry IDs, urls and configuration pins"
+    if isinstance(error, (ValidationError, ConfigurationError, json.JSONDecodeError)):
+        return "invalid settings or registry; check the documented field names and values"
+    if isinstance(error, OSError):
+        return "a required file could not be read or written; check paths and folder permissions"
+    if isinstance(error, ValueError):
+        return str(error)
+    return "UI startup failed; verify the separate UI environment and configuration"
 
 
 if __name__ == "__main__":

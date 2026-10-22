@@ -394,6 +394,11 @@ class _Invoke:
         except PolicyDenied:
             return _error(404, "not_found")
         except Exception:  # noqa: BLE001 - never return raw diagnostic exceptions
+            # The reply says only "unavailable"; the log says what the inspector raised.
+            _LOG.exception(
+                "the inspection could not be read",
+                extra={"request_id": request_id, "route": "inspection"},
+            )
             return _error(503, "unavailable")
         return JSONResponse(
             result.model_dump(mode="json", by_alias=True), headers={"cache-control": "no-store"}

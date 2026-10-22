@@ -19,7 +19,13 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from ai_agent_lib_core.adapters.checkpoint_options import SqliteCheckpointOptions
-from ai_agent_lib_core.contracts import ConfigurationError, PolicyDenied, RequestContext, Scope
+from ai_agent_lib_core.contracts import (
+    ConfigurationError,
+    NotStartedError,
+    PolicyDenied,
+    RequestContext,
+    Scope,
+)
 from ai_agent_lib_core.pipeline import bound_request_context
 
 __all__ = [
@@ -332,10 +338,10 @@ class SqliteCheckpointBackend:
         """The SQLite checkpointer.
 
         Raises:
-            RuntimeError: If the backend has not been started.
+            NotStartedError: If the backend has not been started.
         """
         if self._saver is None:
-            raise RuntimeError("the SQLite checkpoint backend is not started")
+            raise NotStartedError("the SQLite checkpoint backend")
         return self._saver
 
     async def aclose(self) -> None:

@@ -15,6 +15,7 @@ from langchain_core.tools import tool as as_tool
 from langchain_core.utils.pydantic import get_fields
 from pydantic import PrivateAttr
 
+from ai_agent_lib_core.contracts import ConfigurationError
 from ai_agent_lib_core.integrations.langgraph.bridge import LoopBridge
 from ai_agent_lib_core.integrations.langgraph.context import current_request_context
 from ai_agent_lib_core.pipeline import (
@@ -277,17 +278,26 @@ def govern_tools(
         read_only: Names of tools that only read. Only these may be retried.
 
     Raises:
-        ValueError: If two tools share a name, a ``read_only`` name is unknown,
-            or a tool is already governed.
+        ConfigurationError: If two tools share a name, a ``read_only`` name is
+            unknown, or a tool is already governed.
     """
     governed: list[BaseTool] = []
     names: set[str] = set()
     for item in tools:
         if isinstance(item, GovernedTool):
-            raise ValueError(f"tool {item.name!r} is already governed")
+            raise ConfigurationError(
+                f"tool {item.name!r} is already governed",
+                expected="plain tools or functions, each governed once",
+                actual="a tool that services.tools() already wrapped",
+                fix="pass the original tool or function, not the governed one",
+            )
         inner = item if isinstance(item, BaseTool) else as_tool(item)
         if inner.name in names:
-            raise ValueError(f"two tools are named {inner.name!r}")
+            raise ConfigurationError(
+                f"two tools are named {inner.name!r}",
+                expected="a distinct name for every tool",
+                fix="rename one of them; the model tells tools apart by name only",
+            )
         names.add(inner.name)
         governed.append(
             GovernedTool.wrap(
@@ -296,5 +306,10 @@ def govern_tools(
         )
     unknown = sorted(set(read_only) - names)
     if unknown:
-        raise ValueError(f"read_only names tools that were not given: {unknown}")
+        raise ConfigurationError(
+            f"read_only names tools that were not given: {unknown}",
+            expected="only names of the tools passed in the same call",
+            actual=f"the names {', '.join(sorted(names)) or 'none'} were given",
+            fix="name the read-only tools exactly as they are named in the list",
+        )
     return governed

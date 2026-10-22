@@ -33,6 +33,7 @@ from ai_agent_lib_core.contracts import (
     GuardrailPoint,
     GuardrailVerdict,
     RequestContext,
+    UpstreamError,
     describe,
 )
 from ai_agent_lib_core.kit import GuardrailsOptions
@@ -225,9 +226,15 @@ class BedrockGuardrails:
                 else None
             )
             # The service's message can repeat the text, so it stays in the cause.
-            raise AgentLibError(
-                f"{_WHAT} could not check the text ({code or describe(exc)})"
+            raise UpstreamError(
+                f"{_WHAT} could not check the text ({code or describe(exc)})",
+                code=code,
+                fix="check the guardrail ID and version, and the model's region",
             ) from exc
         if not isinstance(reply, Mapping) or not isinstance(reply.get("action"), str):
-            raise AgentLibError(f"{_WHAT} gave no verdict")
+            raise UpstreamError(
+                f"{_WHAT} gave no verdict",
+                expected="a reply with an 'action' of GUARDRAIL_INTERVENED or NONE",
+                actual="a reply without one",
+            )
         return reply

@@ -160,3 +160,11 @@ def test_missing_section_is_a_configuration_error() -> None:
     config = ServiceConfig(sections={})
     with pytest.raises(ConfigurationError, match="audit"):
         config.section(Section.AUDIT)
+
+
+def test_an_unknown_section_name_is_a_configuration_error() -> None:
+    config = ServiceConfig.for_testing()
+    with pytest.raises(ConfigurationError, match="not a configuration section") as refused:
+        config.section("moon")  # type: ignore[arg-type]
+    assert refused.value.expected is not None
+    assert "audit" in refused.value.expected
