@@ -206,18 +206,18 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
-name = "only integrations.langgraph imports langgraph"
-type = "forbidden"
-source_modules = [
-    "ai_agent_lib_core.adapters",
-    "ai_agent_lib_core.config",
-[[tool.importlinter.contracts]]
 # observability formats what the pipeline records; the pipeline must not depend on it.
 name = "pipeline stays below observability"
 type = "forbidden"
 source_modules = ["ai_agent_lib_core.pipeline"]
 forbidden_modules = ["ai_agent_lib_core.observability"]
 
+[[tool.importlinter.contracts]]
+name = "only integrations.langgraph imports langgraph"
+type = "forbidden"
+source_modules = [
+    "ai_agent_lib_core.adapters",
+    "ai_agent_lib_core.config",
     "ai_agent_lib_core.contracts",
     "ai_agent_lib_core.di",
     "ai_agent_lib_core.integrations.http",
