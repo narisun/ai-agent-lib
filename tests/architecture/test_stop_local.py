@@ -172,6 +172,7 @@ def test_shutdown_requires_confirmed_normal_exit(
     child.kill.assert_not_called()
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("uvicorn_server", [False, True])
 def test_real_supervisor_stops_in_reverse_order_and_preserves_saved_files(
     tmp_path: Path,
@@ -285,6 +286,7 @@ finally:
             assert listener.connect_ex(("127.0.0.1", port)) != 0
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(sys.platform != "win32", reason="Command Prompt batch entry point")
 def test_stop_batch_runs_from_another_directory_with_spaces(tmp_path: Path) -> None:
     root = tmp_path / "checkout with spaces"

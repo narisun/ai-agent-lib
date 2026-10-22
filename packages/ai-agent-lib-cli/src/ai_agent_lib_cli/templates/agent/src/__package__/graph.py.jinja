@@ -21,7 +21,6 @@ __all__ = [
     "answer",
     "ask",
     "build_graph",
-    "registered_mcp_tools",
     "steps",
 ]
 
@@ -38,15 +37,6 @@ class State(TypedDict):
     """The graph state: the conversation so far."""
 
     messages: Annotated[list[AnyMessage], add_messages]
-
-
-async def registered_mcp_tools(services: ServiceContainer) -> list[BaseTool]:
-    """Return the tools of every MCP server the registry lists for this agent."""
-    entry = services.registry.agents.get(APPLICATION)
-    tools: list[BaseTool] = []
-    for server in entry.mcp_servers if entry is not None else ():
-        tools += await services.mcp_tools(server)  # touchpoint 2
-    return tools
 
 
 def build_graph(
@@ -126,5 +116,6 @@ async def ask(services: ServiceContainer, context: RequestContext, question: str
     The command line uses this. A service builds the graph once and calls
     :func:`answer` for every request.
     """
-    graph = build_graph(services, await registered_mcp_tools(services))
+    mcp_tools = await services.registered_mcp_tools(APPLICATION)  # touchpoint 2
+    graph = build_graph(services, mcp_tools)
     return await answer(graph, services, context, question)

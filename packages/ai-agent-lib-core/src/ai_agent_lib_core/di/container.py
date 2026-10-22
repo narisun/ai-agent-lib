@@ -501,6 +501,15 @@ class ServiceContainer:
         """
         return await self._mcp_bindings().mcp_tools(server)
 
+    async def registered_mcp_tools(self, application: str) -> list[BaseTool]:
+        """Return the governed tools of every MCP server registered for ``application``.
+
+        The agent's entry names its servers; each is loaded as :meth:`mcp_tools`
+        loads it, and the lists are joined in registry order. An agent that is
+        not registered gets no tools.
+        """
+        return await self._mcp_bindings().registered_mcp_tools(application)
+
     def mcp_middleware(
         self,
         server: str,

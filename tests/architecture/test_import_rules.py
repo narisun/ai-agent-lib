@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.slow  # every test runs import-linter in a subprocess
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PACKAGES = ("ai_agent_lib_core", "ai_agent_lib_aws", "ai_agent_lib_cli")
 _RUN_LINTER = (

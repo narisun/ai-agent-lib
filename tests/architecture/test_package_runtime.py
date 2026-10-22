@@ -13,6 +13,7 @@ from tools import package_runtime
 ROOT = Path(__file__).resolve().parents[2]
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("version_key", ["version", "version_info"])
 def test_existing_environment_packages_use_default_python_not_local_binaries(
     tmp_path: Path, version_key: str
@@ -60,6 +61,7 @@ def test_existing_environment_with_a_different_base_requires_setup(tmp_path: Pat
         package_runtime.validate_packages(folder)
 
 
+@pytest.mark.slow
 def test_isolated_default_python_writes_utf8_logs(tmp_path: Path) -> None:
     (tmp_path / "tools").mkdir()
     (tmp_path / "tools/package_runtime.py").write_bytes(
@@ -93,6 +95,7 @@ def test_terminal_interrupt_does_not_kill_the_supervisor_during_cleanup(
     child.terminate.assert_not_called()
 
 
+@pytest.mark.slow
 def test_package_bootstrap_isolates_versions_and_processes_editable_paths(tmp_path: Path) -> None:
     foreign = tmp_path / "foreign"
     foreign.mkdir()
@@ -137,6 +140,7 @@ def test_package_bootstrap_isolates_versions_and_processes_editable_paths(tmp_pa
     assert not list(tmp_path.rglob("pyvenv.cfg"))
 
 
+@pytest.mark.slow
 def test_bootstrap_rejects_packages_from_another_python(tmp_path: Path) -> None:
     (tmp_path / package_runtime.MANIFEST).write_text('{"version": [0, 0]}')
     result = subprocess.run(  # noqa: S603 - controlled isolated interpreter probe

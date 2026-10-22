@@ -80,6 +80,10 @@ class SyncServices:
         """Return the governed tools of a registered MCP server."""
         return self.run(lambda: self.container.mcp_tools(server))
 
+    def registered_mcp_tools(self, application: str) -> list[BaseTool]:
+        """Return the governed tools of every MCP server the registry lists for an agent."""
+        return self.run(lambda: self.container.registered_mcp_tools(application))
+
     def invoke(self, graph: Any, given: Any, context: RequestContext) -> Any:
         """Run a compiled graph for one request on behalf of ``context`` and return its result."""
         return self.run(lambda: graph.ainvoke(given, **self.container.invocation(context)))

@@ -10,7 +10,10 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="Windows console process groups")
+pytestmark = [
+    pytest.mark.slow,
+    pytest.mark.skipif(sys.platform != "win32", reason="Windows console process groups"),
+]
 
 
 def test_ctrl_break_returns_from_serve_and_restores_handler(tmp_path: Path) -> None:

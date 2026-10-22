@@ -57,6 +57,7 @@ def test_the_top_level_package_offers_the_names_applications_need() -> None:
         assert name in ai_agent_lib_core.__all__
 
 
+@pytest.mark.slow
 def test_importing_the_package_does_not_load_langgraph() -> None:
     code = "import sys, ai_agent_lib_core; sys.exit(int('langgraph' in sys.modules))"
     result = subprocess.run(  # noqa: S603 - fixed command, no untrusted input
@@ -65,6 +66,7 @@ def test_importing_the_package_does_not_load_langgraph() -> None:
     assert result.returncode == 0, "importing ai_agent_lib_core must not import langgraph"
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize(
     "module",
     ["ai_agent_lib_core", "ai_agent_lib_core.testing", "ai_agent_lib_core.integrations.langgraph"],
@@ -77,6 +79,7 @@ def test_the_mcp_sdk_is_loaded_only_by_code_that_uses_mcp(module: str) -> None:
     assert result.returncode == 0, f"importing {module} must not import the MCP SDK"
 
 
+@pytest.mark.slow
 def test_an_mcp_server_does_not_load_langgraph() -> None:
     code = (
         "import sys, ai_agent_lib_core.integrations.mcp; sys.exit(int('langgraph' in sys.modules))"

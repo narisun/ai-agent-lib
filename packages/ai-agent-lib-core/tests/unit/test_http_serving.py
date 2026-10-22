@@ -136,7 +136,9 @@ async def test_a_request_in_flight_finishes_before_the_service_returns(running: 
 
         running.stop.set()
         await running.until(ServiceState.STOPPING)
-        await asyncio.sleep(0.3)
+        # Stopping with a request held: the service is still running and the
+        # request has not finished. The 200 reply below proves the listener
+        # stayed open until the run completed; no wait on the clock is needed.
         assert not running.task.done(), "the service returned with a request still running"
         assert running.agent.finished == []
 

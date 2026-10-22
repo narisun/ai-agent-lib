@@ -132,6 +132,19 @@ class McpBindings:
             require_pins=not local,
         )
 
+    async def registered_mcp_tools(self, application: str) -> list[BaseTool]:
+        """Return the governed tools of every MCP server the registry lists for an agent.
+
+        An agent that is not in the agent registry has no servers, so it gets
+        no tools. The public contract is documented on
+        ``ServiceContainer.registered_mcp_tools``.
+        """
+        entry = self.registry.agents.get(application)
+        tools: list[BaseTool] = []
+        for server in entry.mcp_servers if entry is not None else ():
+            tools += await self.mcp_tools(server)
+        return tools
+
     def mcp_middleware(
         self,
         server: str,

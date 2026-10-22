@@ -8,7 +8,7 @@ import json
 import secrets
 import sqlite3
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from importlib.resources import files
@@ -46,10 +46,21 @@ class SqliteThreads:
     Each method opens its own connection. The unique active-run index coordinates
     competing callers even when they use different connections. A server holds a
     separate process lock before recovering unfinished work after a restart.
+
+    ``commit_hook`` is a test seam: it runs inside each write transaction before it
+    commits; tests use it to hold a commit open. Production callers leave it unset.
     """
 
-    def __init__(self, path: Path, authorizer: Authorizer, cursor_secret: bytes) -> None:
+    def __init__(
+        self,
+        path: Path,
+        authorizer: Authorizer,
+        cursor_secret: bytes,
+        *,
+        commit_hook: Callable[[], None] | None = None,
+    ) -> None:
         self.path, self.authorizer, self.cursor_secret = path, authorizer, cursor_secret
+        self.commit_hook = commit_hook
         path.parent.mkdir(parents=True, exist_ok=True)
         with self.connection() as db:
             db.executescript(
@@ -307,6 +318,8 @@ class SqliteThreads:
                         ),
                     )
                     self._touch(db, conversation.thread, stamp)
+                    if self.commit_hook is not None:
+                        self.commit_hook()
             except sqlite3.IntegrityError:
                 raise ContractError(ErrorCode.CONFLICT) from None
             return run
@@ -384,6 +397,8 @@ class SqliteThreads:
                                 ),
                             )
                     self._touch(db, conversation.thread, run.updated_at)
+                    if self.commit_hook is not None:
+                        self.commit_hook()
                     if reconciled:
                         db.execute(
                             "CREATE TABLE IF NOT EXISTS reconciliations "

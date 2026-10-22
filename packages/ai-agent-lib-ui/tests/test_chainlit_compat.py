@@ -4,7 +4,10 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
 from python_runtime import python_command
+
+pytestmark = pytest.mark.slow
 
 
 def test_profile_config_is_shared_without_creating_a_coroutine(tmp_path: Path) -> None:

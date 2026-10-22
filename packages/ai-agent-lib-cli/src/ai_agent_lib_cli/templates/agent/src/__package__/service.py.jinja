@@ -3,24 +3,22 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
 from collections.abc import AsyncIterator, Sequence
 from typing import Any
 
-from ai_agent_lib_core import RequestContext, ServiceConfig, ServiceContainer, ValidationFailed
-from ai_agent_lib_core.config import load_service_config
+from ai_agent_lib_core import RequestContext, ServiceConfig, ServiceContainer
 from ai_agent_lib_core.integrations.http import (
-    OutcomeJournal, ServiceLifecycle, SqliteOutcomeJournal, agent_app, serve,
+    OutcomeJournal,
+    ServiceLifecycle,
+    SqliteOutcomeJournal,
+    agent_app,
+    question_input,
+    run_service,
+    serve,
 )
 from ai_agent_lib_core.integrations.langgraph.langfuse import LangfuseTracing, langfuse_tracing
-from ai_agent_lib_core.observability import (
-    configure_logging,
-    report_error,
-    shows_details,
-    start_telemetry,
-)
 
-from {{ package }}.graph import APPLICATION, answer, build_graph, registered_mcp_tools, steps
+from {{ package }}.graph import APPLICATION, answer, build_graph, steps
 from {{ package }}.settings import ENV_FILE
 
 __all__ = ["build_app", "main"]
@@ -47,7 +45,7 @@ async def build_app(
     async def prepare() -> None:
         # Admission stays closed until discovery and graph compilation succeed.
         nonlocal graph
-        graph = build_graph(services, await registered_mcp_tools(services))
+        graph = build_graph(services, await services.registered_mcp_tools(APPLICATION))
 
     lifecycle.prepare(prepare)
 
@@ -56,31 +54,20 @@ async def build_app(
         return {"answer": await answer(current_graph, container, context, question)}
 
     async def run(context: RequestContext, given: Any) -> dict[str, Any]:
-        question = _question(given)
+        question = question_input(given)
         if tracing is not None:
             return await tracing.run(graph, services, context, question, respond=respond)
         return await respond(graph, services, context, question)
 
     async def stream(context: RequestContext, given: Any) -> AsyncIterator[dict[str, Any]]:
         # POST /invoke/stream sends each step as a server-sent event.
-        async for step in steps(graph, services, context, _question(given)):
+        async for step in steps(graph, services, context, question_input(given)):
             yield step
 
     return agent_app(
         services, run, application=APPLICATION, lifecycle=lifecycle, stream=stream,
         live_updates=True, outcomes=outcomes,
     )
-
-
-def _question(given: Any) -> str:
-    question = given.get("question") if isinstance(given, dict) else None
-    if not isinstance(question, str) or not question.strip():
-        raise ValidationFailed(
-            "the input is not a question",
-            expected='an object such as {"question": "Say hello to Ada."}',
-            actual="no non-empty 'question' in it",
-        )
-    return question
 
 
 async def _serve(config: ServiceConfig, host: str, port: int) -> None:
@@ -109,22 +96,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--host", default="127.0.0.1", help="address to listen on")
     parser.add_argument("--port", type=int, default={{ port }}, help="port to listen on")
     arguments = parser.parse_args(argv)
-    config: ServiceConfig | None = None
-    try:
-        config = load_service_config(ENV_FILE)
-        # One line of JSON per event on standard output. On a developer's
-        # machine a line about an error also says what the error said.
-        configure_logging(APPLICATION, details=shows_details(config))
-        # Traces and metrics go to the collector when the settings turn them on.
-        stop_telemetry = start_telemetry(APPLICATION, config)
-        try:
-            asyncio.run(_serve(config, arguments.host, arguments.port))
-        finally:
-            stop_telemetry()  # the last spans and metrics are flushed
-    except Exception as error:
-        # What went wrong, what was expected, and the line of this code to look at.
-        return report_error("{{ name }}-serve", error, details=shows_details(config))
-    return 0
+    # Configuration, logging, telemetry and the explanation of a failure are
+    # the library's entry-point wiring; this module only says what to serve.
+    return run_service(
+        APPLICATION,
+        lambda config: _serve(config, arguments.host, arguments.port),
+        env_file=ENV_FILE,
+        program="{{ name }}-serve",
+    )
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

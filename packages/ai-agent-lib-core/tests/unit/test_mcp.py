@@ -239,6 +239,22 @@ async def test_only_registered_tools_are_offered_to_the_model() -> None:
     assert tool.read_only is True
 
 
+async def test_an_agent_gets_the_tools_of_every_server_its_registry_entry_lists() -> None:
+    async with World() as world:
+        # The registry lists "accounts" for "accounts-agent" and nothing for anyone else.
+        unregistered = await world.agent_services.registered_mcp_tools("nobody-agent")
+        registered = await world.agent_services.registered_mcp_tools(AGENT.id)
+        per_server = [
+            tool
+            for server in AGENT.mcp_servers
+            for tool in await world.agent_services.mcp_tools(server)
+        ]
+    assert unregistered == []
+    assert [tool.name for tool in registered] == [tool.name for tool in per_server]
+    assert [tool.name for tool in registered] == ["accounts_lookup"]
+    assert all(isinstance(tool, GovernedMcpTool) for tool in registered)
+
+
 # ------------------------------------------------------------ registry checks
 
 

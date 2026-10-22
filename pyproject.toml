@@ -159,6 +159,7 @@ filterwarnings = [
 markers = [
     "container: needs a container runtime",
     "integration: needs something outside the process, such as an opa binary or an AWS account",
+    "slow: spawns other processes or depends on the real clock; deselect with -m 'not slow'",
 ]
 
 # ------------------------------------------------------------------ import-linter

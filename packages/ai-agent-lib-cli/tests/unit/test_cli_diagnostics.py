@@ -514,6 +514,7 @@ def service(tmp_path: Path, **modules: str) -> Path:
     return tmp_path
 
 
+@pytest.mark.slow
 def test_a_service_runs_in_its_own_folder_with_its_arguments(tmp_path: Path) -> None:
     body = (
         "import pathlib, sys\n"
@@ -544,6 +545,7 @@ RUN_IT = (
 )
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(sys.platform == "win32", reason="one process cannot ask another to stop")
 @pytest.mark.parametrize("asked", [signal.SIGTERM, signal.SIGINT])
 def test_a_request_to_stop_only_the_command_still_stops_the_service_in_its_own_way(
@@ -568,6 +570,7 @@ def test_a_request_to_stop_only_the_command_still_stops_the_service_in_its_own_w
     assert (folder / "stopped.txt").read_text(encoding="utf-8") == asked.name
 
 
+@pytest.mark.slow
 def test_code_that_fails_is_reported_by_its_last_line(tmp_path: Path) -> None:
     assert run_code(tmp_path, "print('hello')") == "hello\n"
     with pytest.raises(CliError, match="failed: ValueError: no"):
@@ -601,6 +604,7 @@ def test_run_and_graph_start_the_right_module_of_the_right_service(
     assert run("run", "nobody", "--workspace", workspace, tools=tools) == 1
 
 
+@pytest.mark.slow
 def test_the_graph_reader_runs_the_agents_own_graph_module(tmp_path: Path) -> None:
     folder = service(tmp_path, graph="raise SystemExit('the graph module was imported')\n")
     with pytest.raises(CliError, match="the graph module was imported"):
@@ -712,6 +716,7 @@ def test_a_lock_file_that_cannot_be_read_stops_the_command(
     assert isinstance(jinja2.__version__, str)
 
 
+@pytest.mark.slow
 def test_an_opa_that_exits_early_reports_its_own_last_lines(tmp_path: Path) -> None:
     # The interpreter stands in for opa: it exits at once and says why on stderr.
     (tmp_path / "bundle").mkdir()

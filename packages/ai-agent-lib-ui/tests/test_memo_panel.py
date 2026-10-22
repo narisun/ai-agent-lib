@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.slow
+
 
 def test_switch_back_to_rendered_memo_while_another_version_is_loading() -> None:
     node = shutil.which("node")

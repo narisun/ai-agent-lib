@@ -335,6 +335,7 @@ def test_shutdown_kills_unresponsive_child_and_continues(tmp_path: Path) -> None
     stopped.send_signal.assert_not_called()
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(sys.platform != "win32", reason="Command Prompt batch entry points")
 @pytest.mark.parametrize("name", ["start-local.bat", "setup-local.bat"])
 def test_batch_help_runs_from_another_directory(tmp_path: Path, name: str) -> None:

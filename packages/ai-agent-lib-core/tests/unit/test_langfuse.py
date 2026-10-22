@@ -254,6 +254,7 @@ async def test_concurrent_agents_and_cancelled_attempts_do_not_leak_context() ->
             tracer.close()
 
 
+@pytest.mark.slow
 def test_disabled_integration_needs_no_optional_otel_sdk() -> None:
     script = """
 import sys, importlib.abc, asyncio

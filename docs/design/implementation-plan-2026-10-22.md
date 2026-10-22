@@ -39,8 +39,9 @@ Each workstream lists what changes, which review findings it closes, the tests
 that prove it, and its size (S: under a day, M: one to three days, L: a week).
 Public names and signatures stay compatible unless stated.
 
-**Status, 22 October 2026:** A1 and A2 (Phase 0) and A3, A4 and A6 (Phase 1)
-are implemented. Deviations from the text below, with the reason:
+**Status, 22 October 2026:** A1 and A2 (Phase 0), A3, A4 and A6 (Phase 1) and
+A5 and A7 (Phase 2) are implemented. Deviations from the text below, with the
+reason:
 
 - Diagnostics warnings carry the error type and request id but no traceback,
   because the logging policy forbids exception text in logs.
@@ -71,6 +72,26 @@ are implemented. Deviations from the text below, with the reason:
 - Still over 500 lines and left for later: `adapters/data_rest.py` (648),
   `integrations/langgraph/model.py` (590), `cli/scaffold.py` (591), and the
   shipped contract suites in `testing/contracts.py` (812).
+- The `slow` marker (registered in the root and UI `pyproject.toml`) marks
+  tests that spawn processes or depend on the real clock; the default suite
+  still runs them, and `-m "not slow"` is the quick loop. The limits suite
+  keeps one real-clock test, the blocking call that cannot be cancelled. The
+  Redshift adapter's query deadline is asyncio's own timeout, not the injected
+  clock, so four of its tests stay on the real clock, marked `slow`, waiting
+  on held events rather than sleeps.
+- The UI's `test_browser_protocol.py` became four modules sharing one
+  session-scoped server whose fake-agent steering is reset per test, and
+  `test_chat.py` became four modules; `SqliteThreads` gained a `commit_hook`
+  seam in place of the patched `_touch`.
+- The live Anthropic test is documented as manual rather than wired to a CI
+  secret.
+- `registered_mcp_tools` is a method on `ServiceContainer` (and the sync
+  facade) rather than a free function, because the container already owns the
+  registry and `mcp_tools`. The entry-point helpers live in
+  `integrations/http/entrypoint.py`: `run_service`, `run_command` (the one-shot
+  variant with no logging or telemetry, since the answer owns stdout) and
+  `question_input`. The three templates call them; the examples still carry
+  their own copies.
 
 ### A1. Green gates and CI coverage (S)
 

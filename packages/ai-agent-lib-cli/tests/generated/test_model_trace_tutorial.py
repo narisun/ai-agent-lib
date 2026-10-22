@@ -22,6 +22,8 @@ from ai_agent_lib_cli.testing import as_written, toolbox_for_tests
 from ai_agent_lib_core.contracts import ModelSection
 from ai_agent_lib_core.testing import load_test_config
 
+pytestmark = pytest.mark.slow  # runs the generated tutorial scripts in subprocesses
+
 REPO = Path(__file__).resolve().parents[4]
 
 

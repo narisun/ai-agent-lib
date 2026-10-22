@@ -18,11 +18,18 @@ from ai_agent_lib_core.integrations.http.agent import (
     agent_app,
     health_routes,
 )
+from ai_agent_lib_core.integrations.http.entrypoint import (
+    EXIT_INTERRUPTED,
+    question_input,
+    run_command,
+    run_service,
+)
 from ai_agent_lib_core.integrations.http.lifecycle import ServiceLifecycle, ServiceState
 from ai_agent_lib_core.integrations.http.outcomes import OutcomeJournal, SqliteOutcomeJournal
 from ai_agent_lib_core.integrations.http.serving import serve
 
 __all__ = [
+    "EXIT_INTERRUPTED",
     "HEALTH_PATH",
     "INVOKE_PATH",
     "READY_PATH",
@@ -40,5 +47,8 @@ __all__ = [
     "add_health_routes",
     "agent_app",
     "health_routes",
+    "question_input",
+    "run_command",
+    "run_service",
     "serve",
 ]
