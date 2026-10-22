@@ -94,11 +94,11 @@ def agent_environment(path: Path) -> tuple[Path, Path, LocalIdentity]:
         raise ValueError("the --env-file must name an existing agent .env file")
     values = dotenv_values(path, interpolate=False)
     if values.get("EAP_PROFILE", "local") != "local":
-        raise ValueError("Phase 2 requires EAP_PROFILE=local")
+        raise ValueError("the local UI requires EAP_PROFILE=local")
     if values.get("EAP_REGISTRY_PROVIDER", "file") != "file":
-        raise ValueError("Phase 2 supports EAP_REGISTRY_PROVIDER=file")
+        raise ValueError("the local UI supports EAP_REGISTRY_PROVIDER=file")
     if values.get("EAP_IDENTITY_PROVIDER", "static") != "static":
-        raise ValueError("Phase 2 supports EAP_IDENTITY_PROVIDER=static on loopback")
+        raise ValueError("the local UI supports EAP_IDENTITY_PROVIDER=static on loopback")
     registry = json.loads(values.get("EAP_REGISTRY_OPTIONS") or "{}")
     if not isinstance(registry, dict) or set(registry) - {"agents_path", "tools_path"}:
         raise ValueError("use file registry options: agents_path and tools_path")

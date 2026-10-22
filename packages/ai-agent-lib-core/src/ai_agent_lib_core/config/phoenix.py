@@ -1,16 +1,14 @@
 """Opt-in Phoenix tracing settings, separate from service and operational telemetry."""
 
-import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from types import MappingProxyType
-from urllib.parse import urlsplit
 
-from ai_agent_lib_core.config.sources import (
-    DotenvConfigSource,
-    EnvironConfigSource,
-    MappingConfigSource,
+from ai_agent_lib_core.config._tracing_support import (
+    IDENTIFIER,
+    resolve_variables,
+    tracing_layers,
+    validate_origin,
 )
 from ai_agent_lib_core.contracts import ConfigSource, ConfigurationError
 
@@ -23,6 +21,13 @@ PHOENIX_VARIABLES = (
     "PHOENIX_API_KEY",
 )
 
+_DEFAULTS = {
+    "EAP_PHOENIX_ENABLED": "false",
+    "EAP_PHOENIX_CAPTURE_CONTENT": "false",
+    "PHOENIX_COLLECTOR_ENDPOINT": "http://127.0.0.1:6006",
+    "PHOENIX_PROJECT_NAME": "agent-lab",
+}
+
 
 @dataclass(frozen=True)
 class PhoenixSettings:
@@ -34,28 +39,8 @@ class PhoenixSettings:
     api_key: str = field(default="", repr=False)
 
     def __post_init__(self) -> None:
-        try:
-            parts = urlsplit(self.base_url)
-            _ = parts.port
-        except ValueError as error:
-            raise ConfigurationError("PHOENIX_COLLECTOR_ENDPOINT must be a valid origin") from error
-        if (
-            not parts.hostname
-            or parts.username is not None
-            or parts.password is not None
-            or parts.query
-            or parts.fragment
-            or parts.path not in {"", "/"}
-            or re.search(r"[\s\x00-\x1f\x7f<>\\()]", self.base_url)
-            or not (
-                parts.scheme == "https"
-                or (parts.scheme == "http" and parts.hostname in {"localhost", "127.0.0.1", "::1"})
-            )
-        ):
-            raise ConfigurationError(
-                "PHOENIX_COLLECTOR_ENDPOINT must be an HTTPS origin (HTTP for loopback)"
-            )
-        if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", self.project_name):
+        validate_origin(self.base_url, variable="PHOENIX_COLLECTOR_ENDPOINT")
+        if not IDENTIFIER.fullmatch(self.project_name):
             raise ConfigurationError(
                 "PHOENIX_PROJECT_NAME must contain 1-128 letters, digits, underscores or hyphens"
             )
@@ -97,58 +82,26 @@ def resolve_phoenix_settings(
     working_dir: Path | None = None,
 ) -> PhoenixResolution:
     """Resolve the runtime settings for diagnostics or a planned child process."""
-    if source is not None and environment is not None:
-        raise ValueError("Supply either source or environment to load_phoenix_settings")
-    if source is None:
-        environment = environment if environment is not None else EnvironConfigSource()
-        service = DotenvConfigSource(dotenv_path) if dotenv_path else MappingConfigSource({})
-        layers: list[tuple[str, ConfigSource]] = [("process environment", environment)]
-        if (environment.get("EAP_PHOENIX_ENABLED") or "").lower() != "false":
-            extra = environment.get("EAP_PHOENIX_ENV_FILE")
-            if extra and working_dir is not None:
-                extra = str(working_dir / extra)
-            if not extra and (extra := service.get("EAP_PHOENIX_ENV_FILE")):
-                extra = str((dotenv_path.parent if dotenv_path else Path.cwd()) / extra)
-            if extra:
-                layers.append(
-                    (str(Path(extra).resolve()), DotenvConfigSource(Path(extra), required=True))
-                )
-        layers.append((str(dotenv_path.resolve()) if dotenv_path else "service settings", service))
-    else:
-        layers = [("injected source", source)]
-    defaults = {
-        "EAP_PHOENIX_ENABLED": "false",
-        "EAP_PHOENIX_CAPTURE_CONTENT": "false",
-        "PHOENIX_COLLECTOR_ENDPOINT": "http://127.0.0.1:6006",
-        "PHOENIX_PROJECT_NAME": "agent-lab",
-    }
-    values, origins = {}, {}
-    for name in PHOENIX_VARIABLES:
-        found = next(
-            (
-                (value, f"{label}: {name}")
-                for label, layer in layers
-                if (value := layer.get(name)) is not None
-            ),
-            None,
-        )
-        values[name], origins[name] = found or (defaults.get(name, ""), "default")
-
-    def flag(name: str) -> bool:
-        value = values[name] or "false"
-        if value.lower() not in {"true", "false"}:
-            raise ConfigurationError(f"{name} must be true or false")
-        return value.lower() == "true"
-
+    layers = tracing_layers(
+        dotenv_path,
+        source=source,
+        environment=environment,
+        working_dir=working_dir,
+        enabled="EAP_PHOENIX_ENABLED",
+        env_file="EAP_PHOENIX_ENV_FILE",
+        caller="load_phoenix_settings",
+    )
+    resolved = resolve_variables(layers, PHOENIX_VARIABLES, defaults=_DEFAULTS)
+    values = resolved.values
     settings = (
         PhoenixSettings(
-            base_url=values["PHOENIX_COLLECTOR_ENDPOINT"] or defaults["PHOENIX_COLLECTOR_ENDPOINT"],
-            project_name=values["PHOENIX_PROJECT_NAME"] or defaults["PHOENIX_PROJECT_NAME"],
-            capture_content=flag("EAP_PHOENIX_CAPTURE_CONTENT"),
+            base_url=values["PHOENIX_COLLECTOR_ENDPOINT"]
+            or _DEFAULTS["PHOENIX_COLLECTOR_ENDPOINT"],
+            project_name=values["PHOENIX_PROJECT_NAME"] or _DEFAULTS["PHOENIX_PROJECT_NAME"],
+            capture_content=resolved.flag("EAP_PHOENIX_CAPTURE_CONTENT"),
             api_key=values["PHOENIX_API_KEY"],
         )
-        if flag("EAP_PHOENIX_ENABLED")
+        if resolved.flag("EAP_PHOENIX_ENABLED")
         else None
     )
-    shown = {**values, "PHOENIX_API_KEY": "********" if values["PHOENIX_API_KEY"] else ""}
-    return PhoenixResolution(settings, MappingProxyType(shown), MappingProxyType(origins))
+    return PhoenixResolution(settings, resolved.shown(("PHOENIX_API_KEY",)), resolved.origins)

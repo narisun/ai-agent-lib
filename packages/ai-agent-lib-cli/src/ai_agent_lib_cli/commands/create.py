@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import difflib
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -17,15 +18,14 @@ from ai_agent_lib_cli.commands.common import (
     workspace_root,
 )
 from ai_agent_lib_cli.commands.data_options import print_proposal, proposal_for, redshift_options
+from ai_agent_lib_cli.create_mcp import create_mcp, default_description
 from ai_agent_lib_cli.errors import CliError
 from ai_agent_lib_cli.names import check_name, server_id_for
 from ai_agent_lib_cli.toolbox import Toolbox
 from ai_agent_lib_cli.workspace import (
     AGENTS_FOLDER,
     MODEL_PROVIDERS,
-    SERVERS_FOLDER,
     AgentAnswers,
-    McpAnswers,
     WorkspaceAnswers,
     load_answers,
 )
@@ -80,13 +80,7 @@ def init(
             answers_file.read_text(encoding="utf-8"), what=str(answers_file)
         )
         if lib_path is not None or lib_version is not None:
-            answers = WorkspaceAnswers(
-                name=answers.name,
-                owner=answers.owner,
-                library=library_source(lib_path, lib_version),
-                agents=answers.agents,
-                mcp_servers=answers.mcp_servers,
-            )
+            answers = replace(answers, library=library_source(lib_path, lib_version))
     else:
         if name is None:
             raise click.UsageError("give the workspace a NAME, or --answers <agentlib.toml>")
@@ -155,10 +149,10 @@ def new_agent(
     )
     if agent.model_provider not in MODEL_PROVIDERS:
         raise CliError(f"the model provider must be one of: {', '.join(MODEL_PROVIDERS)}")
-    report = tools.scaffolder().add_agent(root, agent, force=force)
+    report = tools.scaffolder().add_agent(root, agent, force=force, answers=answers)
     click.echo(f"Agent {agent.name} in {AGENTS_FOLDER}/{agent.name}")
     print_report(report, root)
-    linked = [load_answers(root).mcp_server(name) for name in mcp_servers]
+    linked = [answers.mcp_server(name) for name in mcp_servers]
     start = "".join(
         f"  {server.name}        # in another terminal: the agent calls it\n"
         for server in linked
@@ -257,49 +251,25 @@ def new_mcp(
         raise CliError("--propose needs a data option such as --from-csv")
     if propose:
         return
-    server = McpAnswers(
+    created = create_mcp(
+        tools.scaffolder(),
+        root,
+        answers,
         name=name,
         server_id=sid,
         description=tools.ask(
-            description,
-            "What does the server offer?",
-            proposal.description
-            if proposal is not None
-            else "A greeting and a people directory, over sample data.",
+            description, "What does the server offer?", default_description(proposal)
         ),
         port=port or port_of(answers.mcp_server(name), answers, _FIRST_SERVER_PORT),
-        data=proposal.plan if proposal is not None else None,
-    )
-    scaffolder = tools.scaffolder()
-    report = scaffolder.add_mcp(
-        root,
-        server,
-        pin=False,
+        proposal=proposal,
+        pin=not no_pin,
         force=force,
-        data_files=proposal.data_files if proposal is not None else None,
-        extra_files=proposal.extra_files if proposal is not None else None,
     )
-    click.echo(
-        f"MCP server {server.name} (registry ID {server.server_id}) in "
-        f"{SERVERS_FOLDER}/{server.name}"
-    )
-    print_report(report, root)
-    if not no_pin:
-        try:
-            scaffolder.pin(root, server.name)
-            click.echo("  pinned   the input schema of each tool in registry/mcp-tools.yaml")
-        except CliError as problem:
-            click.echo(
-                f"  not pinned: {problem}\n"
-                f"  Pin later with: agentlib registry pin {server.server_id}",
-                err=True,
-            )
-    click.echo(
-        "\nNext:\n"
-        "  python -m ai_agent_lib_cli install\n"
-        f"  python -m pytest {SERVERS_FOLDER}/{server.name}\n"
-        f"  {server.name}"
-    )
+    click.echo(created.headline)
+    print_report(created.report, root)
+    if created.pin_note is not None:
+        click.echo(created.pin_note, err=created.not_pinned is not None)
+    click.echo("\nNext:\n" + "\n".join(f"  {step}" for step in created.next_steps))
 
 
 @click.command()
@@ -310,10 +280,11 @@ def new_mcp(
 def link(tools: Toolbox, agent: str, server: str, workspace: Path | None) -> None:
     """Let AGENT call the tools of the MCP server SERVER."""
     root = workspace_root(workspace)
-    report = tools.scaffolder().link(root, agent, server)
+    answers = load_answers(root)
+    report = tools.scaffolder().link(root, agent, server, answers=answers)
     click.echo(f"{agent} may now call the tools of {server}")
     print_report(report, root)
-    linked = load_answers(root).mcp_server(server)
+    linked = answers.mcp_server(server)
     if linked is not None:
         click.echo(
             f"\nFrom now on {agent} needs {linked.name} running: {linked.name}\n"

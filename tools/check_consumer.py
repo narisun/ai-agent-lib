@@ -125,7 +125,7 @@ def main() -> None:
                 "import sys, importlib.util; "
                 "import ai_agent_lib_ui as ui; "
                 "from ai_agent_lib_ui.application.question_answer import QuestionAnswerAdapter; "
-                "from ai_agent_lib_ui.contracts.ports import DiagnosticReader; "
+                "from ai_agent_lib_ui.contracts.ports import ConversationStore; "
                 "from ai_agent_lib_core.contracts.diagnostics import ModelAttempt; "
                 "assert 'site-packages' in ui.__file__; "
                 "assert not any(n.split('.')[0] in {'langgraph','langchain_core','mcp','chainlit'} "

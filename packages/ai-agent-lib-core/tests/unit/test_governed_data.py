@@ -99,6 +99,7 @@ async def test_an_allowed_query_runs_and_leaves_one_metadata_only_record() -> No
         "truncated": False,
         "masked_columns": "",
         "duration_ms": 0.0,
+        "attempts": 1,
         "principal_kind": "user",
     }
     recorded = json.dumps(record.to_dict())

@@ -2,6 +2,7 @@
 
 from ai_agent_lib_core.pipeline.assembly import (
     Operations,
+    build_data_pipeline,
     build_model_pipeline,
     build_tool_pipeline,
 )
@@ -76,6 +77,7 @@ __all__ = [
     "allowed_agent",
     "bind_request_context",
     "bound_request_context",
+    "build_data_pipeline",
     "build_model_pipeline",
     "build_tool_pipeline",
     "compose",

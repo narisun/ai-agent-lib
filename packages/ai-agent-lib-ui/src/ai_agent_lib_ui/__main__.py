@@ -38,7 +38,7 @@ def arguments() -> argparse.Namespace:
             command.add_argument(
                 "--artifacts-agent",
                 action="append",
-                default=[],
+                default=None,
                 help="selected agent that returns versioned inline documents; repeat as needed",
             )
             command.add_argument(
@@ -73,7 +73,8 @@ def main() -> int:
             agents_path, tools_path, identity = agent_environment(args.env_file.resolve())
             agents, _ = read_registries(agents_path, tools_path)
             allowed = frozenset(args.allow_url)
-            if not set(args.artifacts_agent) <= set(args.agent):
+            artifact_agents = args.artifacts_agent or []
+            if not set(artifact_agents) <= set(args.agent):
                 raise ValueError("--artifacts-agent must also be selected with --agent")
             settings = Settings(
                 agents_path=agents_path,
@@ -83,7 +84,7 @@ def main() -> int:
                     agents,
                     tuple(args.agent),
                     allowed,
-                    artifact_agent_ids=frozenset(args.artifacts_agent),
+                    artifact_agent_ids=frozenset(artifact_agents),
                 ),
                 allowed_urls=allowed,
                 port=args.port,

@@ -4,7 +4,15 @@ This package imports nothing else from the library, no agent framework and no
 cloud SDK. Everything else depends on it.
 """
 
-from ai_agent_lib_core.contracts.access import Access, AccessQuery, AccessRule, no_access
+from ai_agent_lib_core.contracts.access import (
+    ACCOUNT,
+    NO_ACCESS,
+    REGION,
+    Access,
+    AccessQuery,
+    AccessRule,
+    no_access,
+)
 from ai_agent_lib_core.contracts.audit import AUDIT_SCHEMA, AuditOutcome, AuditRecord, AuditValue
 from ai_agent_lib_core.contracts.checks import CheckResult, generic_fix
 from ai_agent_lib_core.contracts.data import (
@@ -18,6 +26,20 @@ from ai_agent_lib_core.contracts.data import (
     RowFilter,
     Scalar,
     SourceMetadata,
+)
+from ai_agent_lib_core.contracts.diagnostics import (
+    AttemptRef,
+    DiagnosticLinks,
+    DiagnosticSink,
+    DiagnosticValue,
+    ModelAttempt,
+    OperationDecision,
+    OperationSummary,
+    RequestOutcome,
+    RequestOutcomeJournal,
+    RequestRecord,
+    TokenUsage,
+    UsageField,
 )
 from ai_agent_lib_core.contracts.errors import (
     AgentLibError,
@@ -41,12 +63,18 @@ from ai_agent_lib_core.contracts.guardrails import (
     GuardrailFinding,
     GuardrailPoint,
     GuardrailVerdict,
+    StreamingGuardrailCheck,
 )
 from ai_agent_lib_core.contracts.identity import (
     Classification,
     Principal,
     PrincipalKind,
     RequestContext,
+)
+from ai_agent_lib_core.contracts.inspection import (
+    InspectionSection,
+    TurnInspection,
+    TurnInspector,
 )
 from ai_agent_lib_core.contracts.options import (
     DEFAULT_MODEL_ALIAS,
@@ -66,6 +94,12 @@ from ai_agent_lib_core.contracts.options import (
     ServiceConfig,
     TelemetryMode,
     options_error,
+)
+from ai_agent_lib_core.contracts.options_help import (
+    OptionHelp,
+    options_help,
+    options_summary,
+    type_words,
 )
 from ai_agent_lib_core.contracts.policy import (
     DECISION_SCHEMA,
@@ -93,6 +127,12 @@ from ai_agent_lib_core.contracts.ports import (
     TokenAuthenticator,
     TokenExchanger,
 )
+from ai_agent_lib_core.contracts.redaction import (
+    REDACTED,
+    query_parameters,
+    redact,
+    shorten,
+)
 from ai_agent_lib_core.contracts.registry import (
     REGISTRY_SCHEMA,
     AgentEntry,
@@ -107,13 +147,21 @@ from ai_agent_lib_core.contracts.registry import (
     schema_fingerprint,
 )
 from ai_agent_lib_core.contracts.scope import Scope
-from ai_agent_lib_core.contracts.structured import StructuredOutput
+from ai_agent_lib_core.contracts.structured import (
+    SchemaMismatch,
+    StructuredOutput,
+    schema_mismatch,
+)
 
 __all__ = [
+    "ACCOUNT",
     "AUDIT_SCHEMA",
     "DECISION_SCHEMA",
     "DEFAULT_MODEL_ALIAS",
     "MASK",
+    "NO_ACCESS",
+    "REDACTED",
+    "REGION",
     "REGISTRY_SCHEMA",
     "Access",
     "AccessQuery",
@@ -122,6 +170,7 @@ __all__ = [
     "AgentLibError",
     "AgentRegistry",
     "AgentSnapshot",
+    "AttemptRef",
     "AuditOptions",
     "AuditOutcome",
     "AuditRecord",
@@ -141,6 +190,9 @@ __all__ = [
     "DataSource",
     "Decision",
     "DeploymentEnv",
+    "DiagnosticLinks",
+    "DiagnosticSink",
+    "DiagnosticValue",
     "EntryStatus",
     "ExecutionPaused",
     "ExternalSettings",
@@ -150,8 +202,10 @@ __all__ = [
     "GuardrailVerdict",
     "IdGenerator",
     "IdentityVerifier",
+    "InspectionSection",
     "IntegrityError",
     "Limits",
+    "ModelAttempt",
     "ModelCapabilities",
     "ModelRef",
     "ModelSection",
@@ -159,6 +213,9 @@ __all__ = [
     "NoOptions",
     "NotStartedError",
     "Obligations",
+    "OperationDecision",
+    "OperationSummary",
+    "OptionHelp",
     "OptionsModel",
     "ParameterType",
     "PolicyAction",
@@ -175,8 +232,12 @@ __all__ = [
     "QueryResult",
     "RegistrySource",
     "RequestContext",
+    "RequestOutcome",
+    "RequestOutcomeJournal",
+    "RequestRecord",
     "RowFilter",
     "Scalar",
+    "SchemaMismatch",
     "Scope",
     "SecretsProvider",
     "Section",
@@ -184,6 +245,7 @@ __all__ = [
     "ServiceConfig",
     "SourceMetadata",
     "SpanNotes",
+    "StreamingGuardrailCheck",
     "StructuredOutput",
     "SupportsAsyncClose",
     "SupportsValidation",
@@ -191,11 +253,15 @@ __all__ = [
     "TelemetryMode",
     "TokenAuthenticator",
     "TokenExchanger",
+    "TokenUsage",
     "ToolEntry",
     "ToolRegistry",
     "ToolSnapshot",
     "TransientError",
+    "TurnInspection",
+    "TurnInspector",
     "UpstreamError",
+    "UsageField",
     "ValidationFailed",
     "causes",
     "describe",
@@ -203,6 +269,13 @@ __all__ = [
     "kind_of",
     "no_access",
     "options_error",
+    "options_help",
+    "options_summary",
+    "query_parameters",
+    "redact",
     "schema_fingerprint",
+    "schema_mismatch",
+    "shorten",
     "shown_value",
+    "type_words",
 ]

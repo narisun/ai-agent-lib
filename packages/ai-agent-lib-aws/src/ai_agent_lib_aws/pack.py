@@ -121,10 +121,7 @@ def register_aws_adapters(
     async def postgres_checkpoint(context: BuildContext) -> CheckpointBackend:
         try:
             # Imported here so that a service without this store needs no database driver.
-            from ai_agent_lib_aws.checkpoint_postgres import (
-                PostgresCheckpointBackend,
-                PostgresCheckpointOptions,
-            )
+            from ai_agent_lib_aws.checkpoint_postgres import PostgresCheckpointBackend
         except ImportError as exc:
             raise ConfigurationError(
                 "the postgres checkpoint store needs a database driver; install it with "

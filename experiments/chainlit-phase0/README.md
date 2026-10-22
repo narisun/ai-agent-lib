@@ -1,5 +1,11 @@
 # Chainlit Phase 0: try the agent interface
 
+> **Retained as evidence only.** The experiment's code was removed on 22 October
+> 2026 once the production package `packages/ai-agent-lib-ui` (Agent Lab) had
+> shipped the same features. The `evidence/` folder keeps the screenshots and
+> dependency inventories that the [Phase 0 review](../../docs/frontend-phase0-review.md)
+> cites; the instructions below describe the removed experiment and no longer run.
+
 This experiment checks whether Chainlit can provide the planned chat interface.
 It includes agent selection, saved conversations, a memo panel, response metrics,
 and a separate inspector. Read the [decision and evidence](../../docs/frontend-phase0-review.md)

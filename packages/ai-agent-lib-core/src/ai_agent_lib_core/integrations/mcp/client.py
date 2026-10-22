@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Callable, Mapping
+from collections.abc import AsyncIterator, Callable, Generator, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from contextvars import ContextVar
 from typing import Any, Protocol
 
 import httpx2
@@ -20,6 +21,7 @@ from pydantic import PrivateAttr, SecretStr
 from ai_agent_lib_core.contracts import (
     AgentLibError,
     IntegrityError,
+    NotStartedError,
     PolicyDenied,
     RequestContext,
     ServerEntry,
@@ -33,7 +35,7 @@ from ai_agent_lib_core.contracts import (
 from ai_agent_lib_core.contracts.structured import model_safe_name, schema_mismatch
 from ai_agent_lib_core.integrations.langgraph.bridge import LoopBridge
 from ai_agent_lib_core.integrations.langgraph.context import current_request_context
-from ai_agent_lib_core.integrations.langgraph.tools import GovernedTool
+from ai_agent_lib_core.integrations.langgraph.tools import GovernedToolBase
 from ai_agent_lib_core.integrations.mcp.wire import (
     META_CLASSIFICATION_CEILING,
     META_REQUEST_ID,
@@ -63,40 +65,105 @@ class McpConnector(Protocol):
         ...
 
 
+_REFUSED_STATUS = frozenset({401, 403})
+
+# The token of the call in progress. ``HttpMcpConnector.connect`` binds it for the
+# enclosed block; the SDK's transport tasks, started inside that block, inherit it.
+_CALL_TOKEN: ContextVar[SecretStr | None] = ContextVar("agentlib_mcp_call_token", default=None)
+
+
+class _TokenOfTheCall(httpx2.Auth):
+    """Puts the token bound for the current call on each request of the shared client."""
+
+    requires_request_body = False
+    requires_response_body = False
+
+    def auth_flow(
+        self, request: httpx2.Request
+    ) -> Generator[httpx2.Request, httpx2.Response, None]:
+        token = _CALL_TOKEN.get()
+        if token is not None:
+            request.headers["Authorization"] = f"Bearer {token.get_secret_value()}"
+        yield request
+
+
+async def _refuse_at_the_door(response: httpx2.Response) -> None:
+    """Raise for a 401 or a 403, which the MCP SDK would otherwise fold into a generic error.
+
+    The SDK answers any 4xx or 5xx with an ``MCPError`` that no longer says which
+    status it was. Raised here, on the HTTP client, the status is kept, so the
+    caller can tell a refused token from a server that cannot be reached.
+    """
+    if response.status_code in _REFUSED_STATUS:
+        response.raise_for_status()
+
+
 class HttpMcpConnector:
     """Connects over Streamable HTTP, with the token in the ``Authorization`` header.
 
+    What is reused: one ``httpx2.AsyncClient``, with its connection pool, TLS
+    sessions and timeouts, lives as long as the connector and serves every call
+    to every server. The container closes it through ``aclose``.
+
+    What is per call: the MCP session. The SDK's ``Client`` opens one over the
+    shared HTTP client, runs the initialize handshake, makes the call and ends
+    the session when the block closes; the SDK offers no session that outlives
+    its context. The caller's token is per call as well, since each request is
+    made for a different caller: ``connect`` binds it for the enclosed block and
+    an ``httpx2.Auth`` puts it on each request. It is never stored on the shared
+    client's default headers.
+
     Args:
-        timeout_seconds: How long one HTTP exchange may take.
+        timeout_seconds: How long one HTTP exchange may take; ``None`` for no
+            limit. The composition root passes the configured tool call limit.
+        transport: The HTTP transport, for a test; by default the real one.
     """
 
-    def __init__(self, *, timeout_seconds: float = 30.0) -> None:
-        self._timeout = timeout_seconds
+    def __init__(
+        self,
+        *,
+        timeout_seconds: float | None,
+        transport: httpx2.AsyncBaseTransport | None = None,
+    ) -> None:
+        self._timeout_seconds = timeout_seconds
+        self._closed = False
+        self._http = httpx2.AsyncClient(
+            auth=_TokenOfTheCall(),
+            event_hooks={"response": [_refuse_at_the_door]},
+            timeout=httpx2.Timeout(timeout_seconds),
+            follow_redirects=False,
+            # The environment is read by the configuration layer only.
+            trust_env=False,
+            transport=transport,
+        )
+
+    @property
+    def timeout_seconds(self) -> float | None:
+        """How long one HTTP exchange may take; ``None`` for no limit."""
+        return self._timeout_seconds
 
     @asynccontextmanager
     async def connect(self, server: ServerEntry, token: SecretStr | None) -> AsyncIterator[Client]:
-        """Open one HTTP client and one MCP session for the enclosed block."""
-        headers = {}
-        if token is not None:
-            headers["Authorization"] = f"Bearer {token.get_secret_value()}"
-        async with (
-            httpx2.AsyncClient(
-                headers=headers,
-                timeout=self._timeout,
-                follow_redirects=False,
-                # The environment is read by the configuration layer only.
-                trust_env=False,
-            ) as http,
-            Client(streamable_http_client(server.url, http_client=http)) as client,
-        ):
-            yield client
+        """Open one MCP session over the shared HTTP client for the enclosed block."""
+        if self._closed:
+            raise NotStartedError(f"the HTTP connector for MCP server {server.id!r}")
+        bound = _CALL_TOKEN.set(token)
+        try:
+            async with Client(streamable_http_client(server.url, http_client=self._http)) as client:
+                yield client
+        finally:
+            _CALL_TOKEN.reset(bound)
 
     def credential_meta(self, token: SecretStr | None) -> Mapping[str, str]:  # noqa: ARG002
         """Return nothing: over HTTP the token is in a header."""
         return {}
 
-
-_REFUSED_STATUS = frozenset({401, 403})
+    async def aclose(self) -> None:
+        """Close the shared HTTP client. Safe to call more than once."""
+        if self._closed:
+            return
+        self._closed = True
+        await self._http.aclose()
 
 
 def _refused_at_the_door(error: BaseException) -> bool:
@@ -113,13 +180,16 @@ def _unwrap(error: BaseException) -> BaseException:
     return error
 
 
-class GovernedMcpTool(GovernedTool):
+class GovernedMcpTool(GovernedToolBase):
     """A registered MCP tool, called through the agent's tool pipeline.
 
     To a model and to a ``ToolNode`` it is an ordinary tool. Each call is
     checked against the registries and the policy, the caller's identity is
     exchanged for a token bound to the server, and the result comes back
     framed as untrusted data.
+
+    There is no wrapped LangChain tool here: the arguments are the MCP tool's
+    input schema, and the call goes to the server.
     """
 
     _server: ServerEntry = PrivateAttr()
@@ -127,6 +197,7 @@ class GovernedMcpTool(GovernedTool):
     _connector: McpConnector = PrivateAttr()
     _exchanger: TokenExchanger | None = PrivateAttr(default=None)
     _validator: Draft202012Validator = PrivateAttr()
+    _input_schema: dict[str, Any] = PrivateAttr(default_factory=dict)
 
     @classmethod
     def build(
@@ -158,9 +229,14 @@ class GovernedMcpTool(GovernedTool):
         tool._connector = connector
         tool._exchanger = exchanger
         tool._validator = Draft202012Validator(offered.input_schema)
+        tool._input_schema = dict(offered.input_schema)
         tool._handler = pipeline.bind(tool._call_inner)
         tool._bridge = bridge
         return tool
+
+    def _argument_names(self) -> Sequence[str]:
+        properties = self._input_schema.get("properties")
+        return list(properties) if isinstance(properties, Mapping) else []
 
     def _make_call(self, arguments: dict[str, Any], config: RunnableConfig) -> ToolCall:
         return ToolCall(

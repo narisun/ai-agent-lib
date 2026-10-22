@@ -7,13 +7,14 @@ import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from types import MappingProxyType
-from urllib.parse import urlsplit
 
-from ai_agent_lib_core.config.sources import (
-    DotenvConfigSource,
-    EnvironConfigSource,
-    MappingConfigSource,
+from ai_agent_lib_core.config._tracing_support import (
+    IDENTIFIER,
+    Lookup,
+    read_variable,
+    resolve_variables,
+    tracing_layers,
+    validate_origin,
 )
 from ai_agent_lib_core.contracts import ConfigSource, ConfigurationError
 
@@ -37,6 +38,11 @@ LANGFUSE_VARIABLES = {
 }
 """Names used by the loader, generated projects and configuration reference."""
 
+_ALIASED = ("enabled", "capture_content", "env_file")
+"""The labels a migrating application may still set under its own prefix."""
+
+_SECRETS = (LANGFUSE_VARIABLES["public_key"], LANGFUSE_VARIABLES["secret_key"])
+
 
 @dataclass(frozen=True)
 class LangfuseSettings:
@@ -49,29 +55,8 @@ class LangfuseSettings:
     capture_content: bool = False
 
     def __post_init__(self) -> None:
-        try:
-            parts = urlsplit(self.base_url)
-            # Accessing port also validates malformed or out-of-range port numbers.
-            _ = parts.port
-        except ValueError as error:
-            raise ConfigurationError("LANGFUSE_BASE_URL is not a valid origin") from error
-        if (
-            not parts.hostname
-            or parts.username is not None
-            or parts.password is not None
-            or parts.query
-            or parts.fragment
-            or parts.path not in {"", "/"}
-            or re.search(r"[\s\x00-\x1f\x7f<>\\()]", self.base_url)
-            or not (
-                parts.scheme == "https"
-                or (parts.scheme == "http" and parts.hostname in {"localhost", "127.0.0.1", "::1"})
-            )
-        ):
-            raise ConfigurationError(
-                "LANGFUSE_BASE_URL must be an HTTPS origin (HTTP for loopback)"
-            )
-        if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", self.project_id):
+        validate_origin(self.base_url, variable=LANGFUSE_VARIABLES["base_url"])
+        if not IDENTIFIER.fullmatch(self.project_id):
             raise ConfigurationError("LANGFUSE_PROJECT_ID must be the project ID from its URL")
         if not self.public_key or not self.secret_key:
             raise ConfigurationError("Langfuse requires public and secret project keys")
@@ -110,25 +95,22 @@ def _project_prefix(dotenv_path: Path | None) -> str | None:
     return prefix
 
 
-@dataclass(frozen=True)
-class _Layer:
-    source: ConfigSource
-    origin: str
-    prefix: str | None
+def _lookup(prefix: str | None) -> Lookup:
+    """Read the canonical name first, then a prefixed alias for the switches only."""
+    if prefix is None:
+        return read_variable
+    aliases = {
+        LANGFUSE_VARIABLES[label]: f"{prefix}_LANGFUSE_{label.upper()}" for label in _ALIASED
+    }
 
-    def find(self, label: str) -> tuple[str, str] | None:
-        name = LANGFUSE_VARIABLES[label]
-        if (value := self.source.get(name)) is not None:
-            return value, f"{self.origin}: {name}"
-        if self.prefix and label in {"enabled", "capture_content", "env_file"}:
-            alias = f"{self.prefix}_LANGFUSE_{label.upper()}"
-            if value := self.source.get(alias):
-                return value, f"{self.origin}: {alias}"
+    def find(source: ConfigSource, name: str) -> tuple[str, str] | None:
+        if (value := source.get(name)) is not None:
+            return value, name
+        if (alias := aliases.get(name)) and (value := source.get(alias)):
+            return value, alias
         return None
 
-    def value(self, label: str) -> str:
-        found = self.find(label)
-        return found[0] if found else ""
+    return find
 
 
 def load_langfuse_settings(
@@ -165,56 +147,29 @@ def resolve_langfuse_settings(
     table ``[tool.ai-agent-lib.langfuse]``. An explicit argument takes precedence.
     Disabled tracing does not validate inactive credentials or contact a server.
     """
-    if source is not None and environment is not None:
-        raise ValueError("Supply either source or environment to resolve_langfuse_settings")
     prefix = legacy_prefix
-    if source is None:
-        if prefix is None:
-            prefix = _project_prefix(dotenv_path)
-        process = _Layer(
-            environment if environment is not None else EnvironConfigSource(),
-            "process environment",
-            prefix,
-        )
-        service = _Layer(
-            DotenvConfigSource(dotenv_path) if dotenv_path else MappingConfigSource({}),
-            str(dotenv_path.resolve()) if dotenv_path else "service settings",
-            prefix,
-        )
-        layers = [process]
-        # An explicit process disable must also bypass a missing separate file.
-        if process.value("enabled").lower() != "false":
-            extra = process.value("env_file")
-            if extra and working_dir is not None:
-                extra = str(working_dir / extra)
-            if not extra and (extra := service.value("env_file")):
-                extra = str((dotenv_path.parent if dotenv_path else Path.cwd()) / extra)
-            if extra:
-                path = Path(extra)
-                layers.append(
-                    _Layer(DotenvConfigSource(path, required=True), str(path.resolve()), prefix)
-                )
-        layers.append(service)
-    else:
-        layers = [_Layer(source, "injected source", prefix)]
-
-    values: dict[str, str] = {}
-    origins: dict[str, str] = {}
-    for label, name in LANGFUSE_VARIABLES.items():
-        found = next((found for layer in layers if (found := layer.find(label)) is not None), None)
-        values[label], origins[name] = found or (
-            "false" if label in {"enabled", "capture_content"} else "",
-            "default",
-        )
+    if source is None and prefix is None:
+        prefix = _project_prefix(dotenv_path)
+    lookup = _lookup(prefix)
+    layers = tracing_layers(
+        dotenv_path,
+        source=source,
+        environment=environment,
+        working_dir=working_dir,
+        enabled=LANGFUSE_VARIABLES["enabled"],
+        env_file=LANGFUSE_VARIABLES["env_file"],
+        lookup=lookup,
+        caller="resolve_langfuse_settings",
+    )
+    resolved = resolve_variables(
+        layers,
+        LANGFUSE_VARIABLES.values(),
+        defaults={LANGFUSE_VARIABLES[label]: "false" for label in ("enabled", "capture_content")},
+        lookup=lookup,
+    )
 
     def value(label: str) -> str:
-        return values[label]
-
-    def flag(label: str) -> bool:
-        raw = value(label) or "false"
-        if raw.lower() not in {"true", "false"}:
-            raise ConfigurationError(f"{LANGFUSE_VARIABLES[label]} must be true or false")
-        return raw.lower() == "true"
+        return resolved.values[LANGFUSE_VARIABLES[label]]
 
     settings = (
         LangfuseSettings(
@@ -222,18 +177,12 @@ def resolve_langfuse_settings(
             project_id=value("project_id"),
             public_key=value("public_key"),
             secret_key=value("secret_key"),
-            capture_content=flag("capture_content"),
+            capture_content=resolved.flag(LANGFUSE_VARIABLES["capture_content"]),
         )
-        if flag("enabled")
+        if resolved.flag(LANGFUSE_VARIABLES["enabled"])
         else None
     )
-    shown = {
-        name: "********"
-        if label in {"public_key", "secret_key"} and values[label]
-        else values[label]
-        for label, name in LANGFUSE_VARIABLES.items()
-    }
-    return LangfuseResolution(settings, MappingProxyType(shown), MappingProxyType(origins))
+    return LangfuseResolution(settings, resolved.shown(_SECRETS), resolved.origins)
 
 
 def langfuse_env_example() -> str:

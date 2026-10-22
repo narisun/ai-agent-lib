@@ -58,17 +58,6 @@ from ai_agent_lib_core.di.ports import (
 
 if TYPE_CHECKING:
     from ai_agent_lib_core.contracts import CheckpointBackend
-    from ai_agent_lib_core.di.ports import (
-        AUDIT,
-        CHECKPOINT,
-        DATA,
-        GUARDRAILS,
-        IDENTITY,
-        MODEL,
-        POLICY,
-        REGISTRY,
-        SECRETS,
-    )
 from ai_agent_lib_core.di.providers import BuildContext, ServiceProviders
 
 __all__ = ["register_local_adapters"]

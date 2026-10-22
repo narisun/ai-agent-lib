@@ -15,6 +15,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from ai_agent_lib_aws.audit_firehose import FirehoseAuditOptions
+from ai_agent_lib_aws.checkpoint_options import PostgresCheckpointOptions
 from ai_agent_lib_aws.data_redshift import RedshiftDataOptions
 from ai_agent_lib_aws.guardrails_bedrock import BedrockGuardrailsOptions
 from ai_agent_lib_aws.registry_s3 import S3RegistryOptions
@@ -263,12 +264,7 @@ def redshift_data_access(query: AccessQuery) -> Sequence[Access]:
 
 
 def _postgres_user(query: AccessQuery) -> str:
-    try:
-        from ai_agent_lib_aws.checkpoint_postgres import PostgresCheckpointOptions
-    except ImportError:
-        # Without the driver the options model is not importable; the user is enough.
-        user = query.selection.options.get("user")
-        return user if isinstance(user, str) and user else "*"
+    # The options model lives apart from the driver, so it is always importable.
     return query.selection.parse_options(PostgresCheckpointOptions).user
 
 

@@ -1,16 +1,18 @@
 # Frontend Phase 0: Chainlit validation
 
 Reviewed on 11 October 2026 against Chainlit **2.12.0**, Windows x64 and
-Python **3.11.15**. The runnable sample is
-[experiments/chainlit-phase0](../experiments/chainlit-phase0/README.md).
+Python **3.11.15**. The throwaway sample's code has since been removed; its
+screenshots and check output are retained as evidence under
+`experiments/chainlit-phase0/evidence/`.
 
 ## Decision
 
 **Conditional go for Chainlit as the chat shell.** The required chat, history,
 memo, metrics, and inspector integration works through supported hooks. The
 sample does not modify installed Chainlit code or create a second transcript
-database. Keep it isolated until the remaining enterprise checks below are closed.
-The production package remains unimplemented.
+database. The production package, `packages/ai-agent-lib-ui`, has since shipped
+on this design; this document is kept as the evidence behind that decision, and
+the remaining enterprise checks below are tracked separately.
 
 Three findings affect the planned implementation:
 

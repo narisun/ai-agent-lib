@@ -168,6 +168,7 @@ class Scaffolder:
         force: bool = False,
         data_files: Mapping[str, Path] | None = None,
         extra_files: Mapping[PurePosixPath, str] | None = None,
+        answers: WorkspaceAnswers | None = None,
     ) -> Report:
         """Add an MCP server to the workspace at ``root``.
 
@@ -179,12 +180,13 @@ class Scaffolder:
             data_files: Files to copy into the server's ``data`` folder, by
                 the name each gets there. They are the developer's data.
             extra_files: More text files for the server's folder.
+            answers: The workspace's answers, when the caller has read them already.
 
         Raises:
             CliError: If the name or the registry ID is taken, or a file would
                 be overwritten.
         """
-        answers = load_answers(root)
+        answers = answers if answers is not None else load_answers(root)
         check_name("MCP server", server.name)
         check_name("server ID", server.server_id)
         self._check_free(answers, server.name, replacing=answers.mcp_server(server.name))
@@ -224,15 +226,25 @@ class Scaffolder:
         files[PurePosixPath(WORKSPACE_FILE)] = answers.to_toml()
         report = self._write(root, files, answers, force=force)
         report = report.merged(self._copy(copies))
-        return report.merged(self.pin(root, server.name)) if pin else report
+        if not pin:
+            return report
+        return report.merged(self.pin(root, server.name, answers=answers))
 
-    def pin(self, root: Path, name_or_id: str) -> Report:
+    def pin(
+        self, root: Path, name_or_id: str, *, answers: WorkspaceAnswers | None = None
+    ) -> Report:
         """Write the schema pin of every tool of one MCP server to the registry.
+
+        Args:
+            root: The workspace.
+            name_or_id: The server's name or registry ID.
+            answers: The workspace's answers, when the caller has read them already.
 
         Raises:
             CliError: If the server is not in the workspace or cannot be asked.
         """
-        server = load_answers(root).mcp_server(name_or_id)
+        answers = answers if answers is not None else load_answers(root)
+        server = answers.mcp_server(name_or_id)
         if server is None:
             raise CliError(f"there is no MCP server called {name_or_id!r} in this workspace")
         pins = self._pin_reader(root / SERVERS_FOLDER / server.name, package_name(server.name))
@@ -244,14 +256,27 @@ class Scaffolder:
 
     # ----------------------------------------------------------------- agents
 
-    def add_agent(self, root: Path, agent: AgentAnswers, *, force: bool = False) -> Report:
+    def add_agent(
+        self,
+        root: Path,
+        agent: AgentAnswers,
+        *,
+        force: bool = False,
+        answers: WorkspaceAnswers | None = None,
+    ) -> Report:
         """Add an agent to the workspace at ``root``, linked to its MCP servers.
+
+        Args:
+            root: The workspace.
+            agent: The answers the agent is generated from.
+            force: Overwrite files that exist and differ.
+            answers: The workspace's answers, when the caller has read them already.
 
         Raises:
             CliError: If the name is taken, an MCP server is not in the
                 workspace, or a file would be overwritten.
         """
-        answers = load_answers(root)
+        answers = answers if answers is not None else load_answers(root)
         check_name("agent", agent.name)
         self._check_free(answers, agent.name, replacing=answers.agent(agent.name))
         servers = [self._server(answers, name) for name in agent.mcp_servers]
@@ -286,13 +311,26 @@ class Scaffolder:
         files[PurePosixPath(WORKSPACE_FILE)] = answers.to_toml()
         return self._write(root, files, answers, force=force)
 
-    def link(self, root: Path, agent_name: str, server_name: str) -> Report:
+    def link(
+        self,
+        root: Path,
+        agent_name: str,
+        server_name: str,
+        *,
+        answers: WorkspaceAnswers | None = None,
+    ) -> Report:
         """Let an agent call the tools of an MCP server of the same workspace.
+
+        Args:
+            root: The workspace.
+            agent_name: The agent.
+            server_name: The MCP server, by name or registry ID.
+            answers: The workspace's answers, when the caller has read them already.
 
         Raises:
             CliError: If either is not in the workspace.
         """
-        answers = load_answers(root)
+        answers = answers if answers is not None else load_answers(root)
         agent = answers.agent(agent_name)
         if agent is None:
             raise CliError(f"there is no agent called {agent_name!r} in this workspace")

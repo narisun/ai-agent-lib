@@ -35,6 +35,7 @@ from ai_agent_lib_ui.contracts.queries import (
     Permission,
     ViewContext,
 )
+from ai_agent_lib_ui.integrations.answer_format import outcome_text
 
 
 def settings_at(path: Path) -> Settings:
@@ -186,16 +187,9 @@ async def test_enabling_optional_artifacts_keeps_existing_chats_usable(
     assert len(agent.calls) == 1
 
 
-@pytest.mark.filterwarnings("ignore::DeprecationWarning")  # Chainlit's transitive imports.
 async def test_invalid_document_warning_survives_dispatch_and_restart(
-    chat: tuple[ChatService, ScriptedAgent, SqliteThreads],
-    settings: Settings,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    chat: tuple[ChatService, ScriptedAgent, SqliteThreads], settings: Settings
 ) -> None:
-    monkeypatch.setenv("CHAINLIT_APP_ROOT", str(tmp_path))
-    from ai_agent_lib_ui.integrations.data_layer import outcome_text
-
     service, agent, store = chat
     bindings = tuple(
         binding.model_copy(

@@ -1,8 +1,0 @@
-# Generated on Windows / Python 3.11; regenerate when dependencies change.
--r requirements.lock
-iniconfig==2.3.1
-pluggy==1.6.0
-pygments==2.21.0
-pytest==9.1.1
-pytest-asyncio==1.4.0
-python-socketio[asyncio_client]==5.17.0

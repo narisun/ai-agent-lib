@@ -22,6 +22,8 @@ import pytest
 import socketio  # type: ignore[import-untyped]
 from python_runtime import python_command
 
+from ai_agent_lib_ui.contracts.traces import TraceLink
+
 
 def free_port() -> int:
     with socket.socket() as listener:
@@ -916,7 +918,7 @@ async def test_trace_link_and_metrics_survive_resume(
                 assert turns[0]["run"]["trace"] == server.trace
                 restored = [v for n, v in resumed.events_seen if n == "resume_thread"][-1]
                 text = restored["steps"][-1]["output"]
-                label = "Agent Lab" if provider == "phoenix" else provider.title()
+                label = TraceLink.model_validate(server.trace).label
                 assert f"[Open trace in {label}]({url})" in text
                 assert "Open trace in Phoenix" not in text
                 assert "Input tokens:" in text

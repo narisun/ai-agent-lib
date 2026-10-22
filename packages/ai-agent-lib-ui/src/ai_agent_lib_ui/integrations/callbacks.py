@@ -1,4 +1,11 @@
-"""Thin supported Chainlit hooks over the framework-independent chat service."""
+"""Thin supported Chainlit hooks over the framework-independent chat service.
+
+Chainlit's ``mount_chainlit`` executes this file by path (``load_module``) and
+invokes the decorated hooks with framework arguments only; it offers no way to
+hand them application objects. This module is therefore the one reader of the
+``runtime()`` slot that ``create_app`` publishes. Each hook resolves the served
+Runtime once and passes it on; the rest of the package receives it explicitly.
+"""
 
 import logging
 from datetime import UTC, datetime
@@ -10,11 +17,8 @@ from starlette.datastructures import Headers
 
 from ai_agent_lib_ui.application.progress import Draft
 from ai_agent_lib_ui.contracts.queries import ContractError, PageRequest
-from ai_agent_lib_ui.integrations.data_layer import (
-    DataLayer,
-    answer_id,
-    outcome_text,
-)
+from ai_agent_lib_ui.integrations.answer_format import answer_id, outcome_text
+from ai_agent_lib_ui.integrations.data_layer import DataLayer
 from ai_agent_lib_ui.integrations.runtime import runtime
 from ai_agent_lib_ui.integrations.security import current_principal, session_token
 
@@ -22,9 +26,10 @@ from ai_agent_lib_ui.integrations.security import current_principal, session_tok
 @cl.header_auth_callback
 async def authenticate(headers: Headers) -> cl.User:
     """The parent session establishes identity; caller-supplied headers grant nothing."""
-    principal = current_principal()
+    resources = runtime()
+    principal = await current_principal(resources)
     return cl.User(
-        identifier=runtime().identity,
+        identifier=resources.identity,
         display_name=principal.subject,
         metadata={"provider": "header"},
     )
@@ -33,13 +38,13 @@ async def authenticate(headers: Headers) -> cl.User:
 @cl.data_layer
 def data_layer() -> DataLayer:
     """Supply the application-owned persistence adapter."""
-    return DataLayer()
+    return DataLayer(runtime())
 
 
 @cl.on_logout
 async def logout(request: Request, response: Response) -> dict[str, bool]:
     """Revoke the parent session, including future operations on existing sockets."""
-    runtime().store.revoke(session_token.get())
+    await runtime().store.revoke(session_token.get())
     response.delete_cookie("agentlib_session")
     return {"success": True}
 
@@ -49,10 +54,11 @@ async def profiles(
     current_user: cl.User | None, language: str | None = None
 ) -> list[cl.ChatProfile]:
     """Show registered agents permitted for the verified local identity."""
-    principal = current_principal()
-    if current_user is None or current_user.identifier != runtime().identity:
+    resources = runtime()
+    principal = await current_principal(resources)
+    if current_user is None or current_user.identifier != resources.identity:
         return []
-    page = await runtime().catalog.agents(principal, PageRequest(limit=200))
+    page = await resources.catalog.agents(principal, PageRequest(limit=200))
     return [
         cl.ChatProfile(
             name=binding.manifest.agent_id,
@@ -74,18 +80,20 @@ async def profiles(
 @cl.on_chat_start
 async def start() -> None:
     """Persist selection before accepting messages on a new thread."""
-    principal = current_principal()
+    resources = runtime()
+    principal = await current_principal(resources)
     profile = (
-        cl.user_session.get("chat_profile") or runtime().settings.bindings[0].manifest.agent_id
+        cl.user_session.get("chat_profile") or resources.settings.bindings[0].manifest.agent_id
     )
-    await runtime().chat.create(principal, str(profile), thread_id=cl.context.session.thread_id)
+    await resources.chat.create(principal, str(profile), thread_id=cl.context.session.thread_id)
 
 
 @cl.on_chat_resume
 async def resume(thread: ThreadDict) -> None:
     """Reattach to an admitted request and restore its saved outcome without replay."""
-    await runtime().chat.reattach(current_principal(), thread["id"])
-    restored = await DataLayer().get_thread(thread["id"])
+    resources = runtime()
+    await resources.chat.reattach(await current_principal(resources), thread["id"])
+    restored = await DataLayer(resources).get_thread(thread["id"])
     if restored:
         thread.update(restored)
 
@@ -93,13 +101,15 @@ async def resume(thread: ThreadDict) -> None:
 @cl.on_message
 async def respond(message: cl.Message) -> None:
     """Display provisional text, then remove it when the saved outcome is ready."""
-    principal = current_principal()
+    resources = runtime()
+    # The principal is resolved once per message. Draft ticks arrive up to twenty
+    # times a second and must not each revalidate the session against SQLite.
+    principal = await current_principal(resources)
     draft_step: cl.Step | None = None
     displayed_call = 0
 
     async def show_draft(draft: Draft) -> None:
         nonlocal draft_step, displayed_call
-        current_principal()
         if draft_step is None:
             draft_step = cl.Step(
                 name=f"Live draft (model call {draft.call}; provisional)",
@@ -120,7 +130,6 @@ async def respond(message: cl.Message) -> None:
 
     async def remove_draft() -> None:
         if draft_step is not None:
-            current_principal()
             # This step exists only in the browser. Delete its presentation
             # through Chainlit's emitter, not the immutable transcript API.
             await cl.context.emitter.delete_step(draft_step.to_dict())
@@ -129,7 +138,7 @@ async def respond(message: cl.Message) -> None:
         if message.thread_id != cl.context.session.thread_id:
             await cl.Message(content="This message belongs to another thread.").send()
             return
-        run = await runtime().chat.submit(
+        run = await resources.chat.submit(
             principal,
             cl.context.session.thread_id,
             message.id,
@@ -151,5 +160,6 @@ async def respond(message: cl.Message) -> None:
         return
     finally:
         await remove_draft()
-    current_principal()
+    # A request may outlive a sign-out: revalidate once more before pushing the answer.
+    await current_principal(resources)
     await cl.Message(id=answer_id(run), content=outcome_text(run)).send()

@@ -82,7 +82,7 @@ def test_phoenix_trace_link_is_correlated_and_named(host: str) -> None:
     answer = QuestionAnswerAdapter(manifest()).response(VIEW, TURN, json.dumps(value).encode())
     assert answer.trace is not None
     assert answer.trace.url == url
-    assert answer.trace.label == "Phoenix"
+    assert answer.trace.label == "Agent Lab"
     assert answer.trace.model_dump()["provider"] == "phoenix"
 
 

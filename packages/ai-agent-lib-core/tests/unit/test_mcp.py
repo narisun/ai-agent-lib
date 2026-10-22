@@ -344,6 +344,36 @@ async def test_arguments_are_checked_against_the_schema_before_anything_is_sent(
     assert world.ran == []
 
 
+async def test_a_plain_string_input_is_named_like_langchain_does_or_refused_as_invalid() -> None:
+    # A single plain value goes to the first argument, as LangChain does for a tool
+    # with one argument; there is no wrapped tool here, so this is the MCP tool's own.
+    async with World() as world:
+        tool = await world.lookup_tool()
+        with bind_request_context(CONTEXT):
+            result = await tool.ainvoke("west")
+    rows = '{"rows": [["5520", "Eve", "west", "12004.55"], ["5521", "Fay", "west", "1.0"]]}'
+    assert result == frame_untrusted("accounts.lookup", rows)
+
+    # A tool without arguments cannot name the value: that is the caller's mistake,
+    # reported as such, not a crash inside the tool.
+    no_arguments = ServerEntry(
+        id="accounts",
+        owner="treasury",
+        url="http://localhost:8001/mcp",
+        audience="accounts-mcp",
+        tools=(ToolEntry(name="accounts.broken", version="1.0.0"),),
+    )
+    async with World(server_entry=no_arguments) as world:
+        (no_argument_tool,) = await world.agent_services.mcp_tools("accounts")
+        with (
+            bind_request_context(CONTEXT),
+            pytest.raises(ValidationFailed, match="takes its arguments by name") as caught,
+        ):
+            await no_argument_tool.ainvoke("anything")
+    assert caught.value.expected == "no arguments at all"
+    assert world.ran == []
+
+
 async def test_a_tool_that_crashes_reports_an_error_without_its_details() -> None:
     crashing = ServerEntry(
         id="accounts",

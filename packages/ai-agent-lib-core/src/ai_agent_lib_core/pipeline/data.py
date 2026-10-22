@@ -15,11 +15,9 @@ from dataclasses import replace
 from typing import Generic, TypeVar
 
 from ai_agent_lib_core.contracts import (
-    AuditSink,
     AuditValue,
     Clock,
     DataSource,
-    IdGenerator,
     PolicyAction,
     PolicyDecisionPoint,
     PolicyDenied,
@@ -28,20 +26,19 @@ from ai_agent_lib_core.contracts import (
     QueryDescription,
     QueryResult,
     RequestContext,
-    Telemetry,
     ValidationFailed,
 )
-from ai_agent_lib_core.observability.query_logs import query_parameters
-from ai_agent_lib_core.pipeline.audit import AuditInterceptor
+from ai_agent_lib_core.contracts.redaction import query_parameters
 from ai_agent_lib_core.pipeline.calls import DataCall
 from ai_agent_lib_core.pipeline.context import bound_request_context
-from ai_agent_lib_core.pipeline.deadline import DeadlineInterceptor
 from ai_agent_lib_core.pipeline.identity import require_identified
 from ai_agent_lib_core.pipeline.interceptor import Handler, compose
 from ai_agent_lib_core.pipeline.policy import enforce_decision
 from ai_agent_lib_core.pipeline.stages import DataStage, Pipeline
 
 __all__ = ["DataPolicyInterceptor", "GovernedDataSource", "describe_query_result"]
+
+_LOG = logging.getLogger(__name__)
 
 ResponseT = TypeVar("ResponseT")
 
@@ -112,15 +109,13 @@ class DataPolicyInterceptor(Generic[ResponseT]):
 class GovernedDataSource:
     """A data source whose every query passes policy and leaves an audit record.
 
+    The stages come from ``build_data_pipeline`` in ``pipeline.assembly``, the
+    one place that decides which stages a pipeline has.
+
     Args:
         name: The name of the data source.
         source: The adapter that runs the queries.
-        policy: The policy decision point.
-        audit: The audit port.
-        telemetry: The telemetry port.
-        clock: The clock port.
-        ids: The identifier port.
-        environment: Where the process is running, as the policy is told.
+        pipeline: The data pipeline, with at least the audit stage filled.
     """
 
     def __init__(
@@ -128,30 +123,13 @@ class GovernedDataSource:
         name: str,
         source: DataSource,
         *,
-        policy: PolicyDecisionPoint,
-        audit: AuditSink,
-        telemetry: Telemetry,
-        clock: Clock,
-        ids: IdGenerator,
-        environment: str,
+        pipeline: Pipeline[DataStage, DataCall, QueryResult],
     ) -> None:
         self._name = name
         self._source = source
-        audit_stage: AuditInterceptor[DataCall, QueryResult] = AuditInterceptor(
-            audit, telemetry, clock, ids, describe_query_result
-        )
-        policy_stage: DataPolicyInterceptor[QueryResult] = DataPolicyInterceptor(
-            policy, clock, environment
-        )
-        pipeline = (
-            Pipeline[DataStage, DataCall, QueryResult]()
-            .with_stage(DataStage.AUDIT, audit_stage)
-            .with_stage(DataStage.DEADLINE, DeadlineInterceptor(clock, "data query"))
-            .with_stage(DataStage.POLICY, policy_stage)
-        )
         self._handler = pipeline.bind(self._run)
         # An unknown query is refused before the policy is asked, and still recorded.
-        self._refuse_unknown = compose([audit_stage], self._unknown)
+        self._refuse_unknown = compose([pipeline.interceptor(DataStage.AUDIT)], self._unknown)
 
     @property
     def name(self) -> str:
@@ -212,7 +190,7 @@ class GovernedDataSource:
         finally:
             # Only admitted, named queries reach here. Audit remains content-free;
             # the standard formatter shows parameter values only in local mode.
-            logging.getLogger(__name__).info(
+            _LOG.info(
                 "data_query",
                 extra={
                     "data_source": call.source,

@@ -44,5 +44,9 @@ class TraceLink(DiagnosticValue):
 
     @property
     def label(self) -> str:
-        """Use a fixed display label for the validated provider."""
-        return {"langfuse": "Langfuse", "phoenix": "Phoenix"}[self.provider]
+        """The one display name for this provider's trace viewer.
+
+        Phoenix runs as part of the local Agent Lab stack, so its traces open
+        "in Agent Lab"; Langfuse is a separate product and keeps its own name.
+        """
+        return {"langfuse": "Langfuse", "phoenix": "Agent Lab"}[self.provider]

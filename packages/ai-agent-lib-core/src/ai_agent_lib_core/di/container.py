@@ -1,33 +1,37 @@
 """Assemble configured adapters and own their lifetime for one service.
 
-The public facade delegates dependency ordering, adapter lifetime, authentication,
-and MCP assembly to focused collaborators in this package. Framework bindings
-are loaded on demand; business rules belong in the pipeline and adapters.
+The public facade keeps the accessors and the framework entry points. The
+work is done by focused collaborators in this package: ``selection`` decides
+what the configuration asks for and whether its options parse, ``AdapterGraph``
+builds and closes the adapters in dependency order, ``RequestAuthenticator``
+signs callers in, and ``McpBindings`` assembles MCP tools and middleware.
+Framework bindings are loaded on demand; business rules belong in the
+pipeline and adapters.
 """
 
 from __future__ import annotations
 
 import asyncio
-import inspect
 from collections.abc import Awaitable, Callable, Collection, Sequence
 from datetime import datetime
 from pathlib import Path
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Self, TypeVar, cast, overload
 
+from pydantic import ConfigDict, StrictBool
+
+from ai_agent_lib_core.adapters.guardrails_patterns import GuardrailsOptions
 from ai_agent_lib_core.adapters.system import SystemClock, UuidGenerator
 from ai_agent_lib_core.adapters.telemetry import NullTelemetry, OpenTelemetryTelemetry
 from ai_agent_lib_core.config import (
     Key,
     load_service_config,
     options_key,
-    provider_key,
     telemetry_enabled,
     variable_for,
 )
 from ai_agent_lib_core.contracts import (
     DEFAULT_MODEL_ALIAS,
-    AgentLibError,
     AuditSink,
     ChatModelProvider,
     CheckpointBackend,
@@ -36,43 +40,30 @@ from ai_agent_lib_core.contracts import (
     Clock,
     ConfigurationError,
     DataSource,
-    DeploymentEnv,
     GuardrailCheck,
     IdentityVerifier,
     IdGenerator,
     ModelRef,
     ModelTraceSink,
     PolicyDecisionPoint,
-    ProviderSelection,
     RegistrySource,
     RequestContext,
     SecretsProvider,
     Section,
     ServiceConfig,
-    SupportsAsyncClose,
-    SupportsValidation,
     Telemetry,
     generic_fix,
     shown_value,
 )
-from ai_agent_lib_core.di.access import selected_models
-from ai_agent_lib_core.di.dependencies import build_order
-from ai_agent_lib_core.di.lifetime import AdapterLifetime
-from ai_agent_lib_core.di.providers import (
-    DATA_PORT,
-    MODEL_PORT,
-    BuildContext,
-    BuildResources,
-    ProviderSpec,
-    ServicePort,
-    ServiceProviders,
-)
+from ai_agent_lib_core.di.graph import AdapterGraph
+from ai_agent_lib_core.di.providers import DATA_PORT, MODEL_PORT, ServicePort, ServiceProviders
 from ai_agent_lib_core.observability.diagnostics import Diagnostics
 from ai_agent_lib_core.observability.model_trace import JsonlModelTraceSink
 from ai_agent_lib_core.pipeline import (
     BudgetLedger,
     GovernedDataSource,
     Operations,
+    build_data_pipeline,
 )
 
 if TYPE_CHECKING:
@@ -89,8 +80,6 @@ if TYPE_CHECKING:
 
 __all__ = ["ServiceContainer", "fix_for"]
 
-_Key = tuple[str, str, str]
-"""Identifies one built adapter: its port, its adapter name and its instance name."""
 _ServiceT = TypeVar("_ServiceT")
 
 
@@ -154,19 +143,7 @@ class ServiceContainer:
         self._diagnostics = diagnostics
         if self._model_trace is None and config.model_trace_path is not None:
             self._model_trace = JsonlModelTraceSink(config.model_trace_path)
-        self._services: dict[_Key, object] = {}
-        self._build_order: list[_Key] = []
-        self._building: list[_Key] = []
-        self._started = False
-        self._closed = False
-        self._closing: asyncio.Task[None] | None = None
-        self._owner: asyncio.Task[None] | None = None
-        self._background_failure = False
-        self._stop = asyncio.Event()
-        self._resources = BuildResources()
-        self._lifetimes: list[AdapterLifetime] = []
-        self._claimed_adapters: set[int] = set()
-        self._loop: asyncio.AbstractEventLoop | None = None
+        self._graph = AdapterGraph(config, self._providers, clock=self._clock, ids=self._ids)
         self._langgraph: LangGraphBindings | None = None
         self._mcp: McpBindings | None = None
         self._governed_sources: dict[str, GovernedDataSource] = {}
@@ -218,59 +195,7 @@ class ServiceContainer:
                 are invalid, or declared dependencies cannot be resolved.
             RuntimeError: If the container was already started or closed.
         """
-        if self._started or self._closed or self._closing is not None:
-            raise RuntimeError("a container can be started only once")
-        selected = self._selected()
-        for port, name, _ in selected:
-            self._check_allowed(self._providers.lookup(port, name))
-        self._check_options(selected)
-        selected = build_order(selected, self._providers)
-        self._providers.freeze()
-        self._loop = asyncio.get_running_loop()
-        self._started = True
-        ready: asyncio.Future[None] = self._loop.create_future()
-        self._owner = asyncio.create_task(self._own_lifecycle(selected, ready))
-        try:
-            await asyncio.shield(ready)
-        except asyncio.CancelledError:
-            self._owner.cancel()
-            try:
-                await self.aclose()
-            finally:
-                if ready.done():
-                    ready.exception()  # retrieve a construction failure after caller cancellation
-            raise
-
-    async def _own_lifecycle(self, selected: Sequence[_Key], ready: asyncio.Future[None]) -> None:
-        """Order isolated adapter lifetimes and collect their failures."""
-        try:
-            for key in selected:
-                await self._build(key)
-        except BaseException as startup_error:  # noqa: BLE001 - delivered through startup future
-            try:
-                await self._close_all()
-            except BaseException as cleanup_error:  # noqa: BLE001 - preserve both failures
-                if self._background_failure and isinstance(startup_error, asyncio.CancelledError):
-                    startup_error = cleanup_error
-                else:
-                    startup_error = BaseExceptionGroup(
-                        "startup failed and cleanup also failed", [startup_error, cleanup_error]
-                    )
-            ready.set_exception(startup_error)
-            return
-        ready.set_result(None)
-        try:
-            await self._stop.wait()
-        finally:
-            await self._close_all()
-
-    def _adapter_failed(self) -> None:
-        """Interrupt pending construction when an already-built adapter fails."""
-        if not self._stop.is_set():
-            self._background_failure = True
-            self._stop.set()
-            if self._owner is not None:
-                self._owner.cancel()
+        await self._graph.start()
 
     async def validate(self) -> None:
         """Run readiness checks on adapters that implement ``SupportsValidation``.
@@ -282,22 +207,7 @@ class ServiceContainer:
             ConfigurationError: Summarizing the adapters that reported a
                 configuration failure.
         """
-        self._require_started()
-        problems: list[str] = []
-        for key in self._build_order:
-            service = self._services[key]
-            if isinstance(service, SupportsValidation):
-                try:
-                    await service.validate()
-                except ConfigurationError as exc:
-                    problems.append(f"{self._label(key)}: {exc.summary}")
-        if problems:
-            count = len(problems)
-            raise ConfigurationError(
-                f"startup validation failed for {count} adapter{'s' if count != 1 else ''}",
-                actual=" | ".join(problems),
-                fix="run 'agentlib doctor' for one line per adapter with what to do",
-            )
+        await self._graph.validate()
 
     async def check(self) -> tuple[CheckResult, ...]:
         """Return diagnostic results for the built adapters.
@@ -306,29 +216,14 @@ class ServiceContainer:
         suggested fixes. Unexpected exceptions still propagate. An adapter with
         no readiness check is reported as built, not independently verified.
         """
-        self._require_started()
-        results: list[CheckResult] = []
-        for key in self._build_order:
-            service = self._services[key]
-            label = self._label(key)
-            if not isinstance(service, SupportsValidation):
-                results.append(CheckResult(label, ok=True, detail="built"))
-                continue
-            try:
-                await service.validate()
-            except AgentLibError as problem:
-                results.append(CheckResult.failed(label, problem))
-            else:
-                results.append(CheckResult(label, ok=True, detail="checked"))
-        return tuple(results)
+        return await self._graph.check()
 
     async def aclose(self) -> None:
         """Close adapters in reverse build order. Safe to call more than once.
 
         Cleanup is attempted for every owned adapter even if an earlier close
-        fails or is cancelled. Shared build resources are closed afterwards.
-        Concurrent callers await the same teardown. Cancelling a caller waits
-        for teardown before propagating cancellation.
+        fails or is cancelled. Concurrent callers await the same teardown.
+        Cancelling a caller waits for teardown before propagating cancellation.
 
         Raises:
             BaseExceptionGroup: Collected cleanup failures when no cancellation
@@ -336,62 +231,22 @@ class ServiceContainer:
             asyncio.CancelledError: After cleanup completes if the caller or an
                 adapter close was cancelled. Cleanup errors are chained to it.
         """
-        if self._closed and (self._owner is None or self._closing is not None):
-            return
-        if self._closing is None:
-            self._stop.set()
-            self._closing = (
-                self._owner if self._owner is not None else asyncio.create_task(self._close_all())
-            )
-        cancelled: asyncio.CancelledError | None = None
-        while not self._closing.done():
-            try:
-                await asyncio.shield(self._closing)
-            except asyncio.CancelledError as exc:
-                cancelled = exc
-            except BaseException:  # noqa: BLE001 - retrieved and raised below
-                break  # retrieve the error below, preserving a caller's cancellation
+        mcp, self._mcp = self._mcp, None
         try:
-            self._closing.result()
-        except BaseException as error:
-            if cancelled is not None:
-                raise cancelled from error
-            raise
-        if cancelled is not None:
-            raise cancelled
+            # The MCP bindings own the HTTP client they created; it goes before the adapters.
+            if mcp is not None:
+                await mcp.aclose()
+        finally:
+            try:
+                await self._graph.aclose()
+            finally:
+                self._langgraph = None
+                self._governed_sources.clear()
 
-    async def _close_all(self) -> None:
-        self._stop.set()  # a later background failure must not interrupt teardown
-        errors: list[BaseException] = []
-        services: list[object] = list(reversed(self._lifetimes))
-        services.extend(
-            resource
-            for resource in self._resources.take()
-            if id(resource) not in self._claimed_adapters
-        )
-        closed: set[int] = set()
-        for service in services:
-            if id(service) in closed:
-                continue
-            closed.add(id(service))
-            if isinstance(service, SupportsAsyncClose):
-                try:
-                    await service.aclose()
-                except BaseException as exc:  # noqa: BLE001 - all resources must get their turn
-                    errors.append(exc)
-        self._services.clear()
-        self._build_order.clear()
-        self._lifetimes.clear()
-        self._claimed_adapters.clear()
-        self._langgraph = None
-        self._mcp = None
-        self._governed_sources.clear()
-        self._closed = True
-        if errors:
-            cancellation = next((e for e in errors if isinstance(e, asyncio.CancelledError)), None)
-            if cancellation is not None:
-                raise cancellation from BaseExceptionGroup("errors while closing", errors)
-            raise BaseExceptionGroup("errors while closing the service container", errors)
+    @property
+    def closed(self) -> bool:
+        """Whether the adapters have been closed; a closed container cannot be reused."""
+        return self._graph.closed
 
     # ------------------------------------------------------------------ accessors
 
@@ -462,11 +317,11 @@ class ServiceContainer:
         The container must be started. Use ``model_provider`` for model provider
         names and ``data_source`` for named, governed data sources.
         """
-        self._require_started()
+        self._graph.require_started()
         if isinstance(section, ServicePort):
-            return section.checked(self._resolve_built(section.name))
+            return section.checked(self._graph.resolve_built(section.name))
         selection = self._config.section(section)
-        return self._services[(section.value, selection.provider, "")]
+        return self._graph.get((section.value, selection.provider, ""))
 
     def model_provider(self, name: str) -> ChatModelProvider:
         """Return the chat model provider called ``name``.
@@ -477,9 +332,9 @@ class ServiceContainer:
         Raises:
             ConfigurationError: If no configured alias uses that provider.
         """
-        self._require_started()
+        self._graph.require_started()
         try:
-            return cast(ChatModelProvider, self._services[(MODEL_PORT, name, "")])
+            return cast(ChatModelProvider, self._graph.get((MODEL_PORT, name, "")))
         except KeyError:
             raise ConfigurationError(
                 f"model provider {name!r} is not used by any configured alias"
@@ -490,17 +345,20 @@ class ServiceContainer:
         try:
             ref = self._config.model.resolve(alias)
         except ConfigurationError as error:
+            # The resolver knows the alias table; the container knows the variables.
             if alias == DEFAULT_MODEL_ALIAS:
-                error.fix = (
+                fix = (
                     f"set {variable_for(Key.MODEL_ID)} to a model ID, for example in the "
                     "service's .env; use 'fake-model' with the fake provider"
                 )
             else:
-                error.fix = (
+                fix = (
                     f'add "{alias}" to {variable_for(Key.MODEL_ALIASES)}, for example '
                     f'{{"{alias}": {{"model_id": "..."}}}}'
                 )
-            raise
+            raise ConfigurationError(
+                error.message, expected=error.expected, actual=error.actual, fix=fix
+            ) from error
         return ref, self.model_provider(ref.provider)
 
     def data_source(self, name: str) -> GovernedDataSource:
@@ -512,7 +370,7 @@ class ServiceContainer:
         Raises:
             ConfigurationError: If no data source of that name is configured.
         """
-        self._require_started()
+        self._graph.require_started()
         governed = self._governed_sources.get(name)
         if governed is not None:
             return governed
@@ -527,17 +385,17 @@ class ServiceContainer:
                     f'add {{"{name}": {{"kind": "...", ...}}}} to {variable_for(Key.DATA_SOURCES)}'
                 ),
             )
-        adapter = cast(DataSource, self._services[(DATA_PORT, selection.provider, name)])
-        governed = GovernedDataSource(
-            name,
-            adapter,
-            policy=self.policy,
+        adapter = cast(DataSource, self._graph.get((DATA_PORT, selection.provider, name)))
+        pipeline = build_data_pipeline(
             audit=self.audit,
             telemetry=self._telemetry,
             clock=self._clock,
             ids=self._ids,
+            policy=self.policy,
             environment=self._config.deployment_env.value,
+            operations=self._operations,
         )
+        governed = GovernedDataSource(name, adapter, pipeline=pipeline)
         self._governed_sources[name] = governed
         return governed
 
@@ -709,7 +567,7 @@ class ServiceContainer:
     def _mcp_bindings(self) -> McpBindings:
         from ai_agent_lib_core.di.mcp import McpBindings
 
-        self._require_started()
+        self._graph.require_started()
         if self._mcp is None:
             self._mcp = McpBindings(
                 audit=self.audit,
@@ -729,7 +587,7 @@ class ServiceContainer:
         return self._mcp
 
     def _bindings(self) -> LangGraphBindings:
-        self._require_started()
+        self._graph.require_started()
         if self._langgraph is None:
             # Imported here so that code which never builds a graph does not load LangGraph.
             from ai_agent_lib_core.integrations.langgraph import LangGraphBindings
@@ -756,12 +614,7 @@ class ServiceContainer:
     def _bridge(self) -> LoopBridge:
         from ai_agent_lib_core.integrations.langgraph import LoopBridge
 
-        if self._loop is None:
-            raise RuntimeError(
-                "the service container is not started: use it as "
-                "'async with ServiceContainer(config) as services:' or await start() first"
-            )
-        return LoopBridge(self._loop)
+        return LoopBridge(self._graph.loop)
 
     # ------------------------------------------------------------------ internals
 
@@ -770,177 +623,32 @@ class ServiceContainer:
         return OpenTelemetryTelemetry() if telemetry_enabled(config) else NullTelemetry()
 
     def _frame_tool_results(self) -> bool:
-        framing = self._config.section(Section.GUARDRAILS).options.get("frame_tool_results", True)
-        if not isinstance(framing, bool):
+        """Whether tool results are framed as untrusted: the shared guardrails option.
+
+        The option is read through the options model, strictly, whatever
+        provider is selected: a provider that declares no options model still
+        honours the shared switch.
+
+        Raises:
+            ConfigurationError: If the option is not true or false.
+        """
+        selection = self._config.section(Section.GUARDRAILS)
+        try:
+            return selection.parse_options(_FramingOption).frame_tool_results
+        except ConfigurationError as error:
             raise ConfigurationError(
                 "the guardrails option 'frame_tool_results' is not true or false",
                 expected="true or false",
-                actual=shown_value(framing),
+                actual=shown_value(selection.options.get("frame_tool_results")),
                 fix=(
                     'write "frame_tool_results": true in '
                     f"{variable_for(options_key(Section.GUARDRAILS))}"
                 ),
-            )
-        return framing
+            ) from error
 
-    def _require_started(self) -> None:
-        if self._closed or self._closing is not None:
-            raise RuntimeError("the container is closed")
-        if not self._started:
-            raise RuntimeError(
-                "the service container is not started: use it as "
-                "'async with ServiceContainer(config) as services:' or await start() first"
-            )
 
-    def _selected(self) -> list[_Key]:
-        """Return selected adapters in legacy order, before dependency ordering."""
-        selected: list[_Key] = [
-            (section.value, self._config.section(section).provider, "") for section in Section
-        ]
-        # The same choice the permission plan makes: no model configured, no provider.
-        selected.extend((MODEL_PORT, name, "") for name in selected_models(self._config))
-        selected.extend(
-            (DATA_PORT, selection.provider, source)
-            for source, selection in self._config.data_sources.items()
-        )
-        return selected
+class _FramingOption(GuardrailsOptions):
+    """The shared guardrails option only; a provider's own keys are parsed at start."""
 
-    @staticmethod
-    def _label(key: _Key) -> str:
-        port, name, instance = key
-        return f"{port} {instance!r} ({name})" if instance else f"{port} ({name})"
-
-    def _check_allowed(self, spec: ProviderSpec) -> None:
-        env = self._config.deployment_env
-        if spec.local_only and env is not DeploymentEnv.LOCAL:
-            raise ConfigurationError(
-                f"provider {spec.name!r} for {spec.port} is for local development only "
-                f"and cannot be used when the deployment environment is {env.value!r}",
-                expected=f"a {spec.port} provider meant for a deployed service",
-                actual=f"{spec.name!r}, which is local only",
-                fix=(
-                    f"select a server-side provider for {spec.port} (the aws profile does), "
-                    f"or set {variable_for(Key.DEPLOYMENT_ENV)}=local on a developer's machine"
-                ),
-            )
-
-    def _selection_for(self, key: _Key) -> ProviderSelection:
-        port, name, instance = key
-        if port == MODEL_PORT:
-            return self._config.model.selection(name)
-        if port == DATA_PORT:
-            return self._config.data_sources[instance]
-        return self._config.section(Section(port))
-
-    async def _build(self, key: _Key) -> object:
-        port, name, instance = key
-        if key in self._services:
-            return self._services[key]
-        if key in self._building:
-            cycle = " -> ".join(self._label(k) for k in [*self._building, key])
-            raise ConfigurationError(f"adapters depend on each other in a cycle: {cycle}")
-        spec = self._providers.lookup(port, name)
-
-        def resolve(dependency: str) -> object:
-            if spec.dependencies is not None and dependency not in spec.dependencies:
-                raise ConfigurationError(
-                    f"{port} ({name}) requested undeclared dependency {dependency!r}"
-                )
-            return self._resolve_built(dependency)
-
-        context = BuildContext(
-            port=port,
-            selection=self._selection_for(key),
-            deployment_env=self._config.deployment_env,
-            tls_ca_bundle=self._config.tls_ca_bundle,
-            external=self._config.external,
-            clock=self._clock,
-            ids=self._ids,
-            secret_values=self._config.secrets if port == Section.SECRETS.value else {},
-            resolver=resolve,
-            instance=instance,
-            resources=self._resources,
-        )
-        self._building.append(key)
-
-        async def create() -> object:
-            value = spec.factory(context)
-            return await value if inspect.isawaitable(value) else value
-
-        lifetime = AdapterLifetime(create, self._claimed_adapters, self._adapter_failed)
-        self._lifetimes.append(lifetime)
-        try:
-            service = await lifetime.start()
-        except AgentLibError as error:
-            error.add_note(self._where_configured(key))
-            raise
-        finally:
-            self._building.pop()
-        self._services[key] = service
-        self._build_order.append(key)
-        if spec.contract is not None:
-            spec.contract.checked(service)
-        return service
-
-    def _check_options(self, selected: Sequence[_Key]) -> None:
-        """Check every selected adapter's options before building any of them.
-
-        So a mistyped option stops startup at once, with every such problem
-        listed, rather than after a database or a stream has been reached.
-        """
-        problems: list[ConfigurationError] = []
-        # Validate named model options even when that provider is not active;
-        # misspellings must not silently leave caching disabled.
-        keys = dict.fromkeys(
-            [*selected, *((MODEL_PORT, name, "") for name in self._config.model.options)]
-        )
-        for key in keys:
-            port, name, _ = key
-            model = self._providers.lookup(port, name).options
-            if model is None:
-                continue
-            try:
-                self._selection_for(key).parse_options(model)
-            except ConfigurationError as error:
-                error.add_note(self._where_configured(key))
-                problems.append(error)
-        if len(problems) == 1:
-            raise problems[0]
-        if problems:
-            raise ConfigurationError(
-                f"the options of {len(problems)} adapters are not valid",
-                actual=" | ".join(f"{error.summary} [{error.__notes__[-1]}]" for error in problems),
-                fix="correct each; the developer guide lists every option with its default",
-            )
-
-    @staticmethod
-    def _where_configured(key: _Key) -> str:
-        """Name the variables that chose and configured the adapter being built."""
-        port, name, instance = key
-        if port == MODEL_PORT:
-            chosen = f"{variable_for(Key.MODEL_PROVIDER)} or {variable_for(Key.MODEL_ALIASES)}"
-            return (
-                f"while building the model provider {name!r}, chosen by {chosen}; "
-                f"options from {variable_for(Key.MODEL_OPTIONS)}"
-            )
-        if port == DATA_PORT:
-            return (
-                f"while building the data source {instance!r} of kind {name!r}, "
-                f"configured in {variable_for(Key.DATA_SOURCES)}"
-            )
-        section = Section(port)
-        return (
-            f"while building the {port} adapter {name!r}, chosen by "
-            f"{variable_for(provider_key(section))} with options from "
-            f"{variable_for(options_key(section))}"
-        )
-
-    def _resolve_built(self, port: str) -> object:
-        """Give a factory a dependency that was built before it."""
-        matches = [value for key, value in self._services.items() if key[0] == port and not key[2]]
-        if len(matches) != 1:
-            raise ConfigurationError(
-                f"{port} is not built yet or is ambiguous; declare a singleton dependency "
-                "when registering the adapter"
-            )
-        return matches[0]
+    model_config = ConfigDict(frozen=True, extra="ignore")
+    frame_tool_results: StrictBool = True

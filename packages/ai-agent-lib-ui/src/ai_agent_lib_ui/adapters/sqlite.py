@@ -506,34 +506,42 @@ class SqliteThreads:
                     (state, run.model_dump_json(), run_id),
                 )
 
-    def new_session(self, identity: str) -> str:
+    async def new_session(self, identity: str) -> str:
         """Persist only a digest of a random, expiring local login cookie."""
         token = secrets.token_urlsafe(32)
-        with self.connection() as db:
-            db.execute("DELETE FROM sessions WHERE expires<=?", (time.time(),))
-            db.execute(
-                "INSERT INTO sessions VALUES (?,?,?)",
-                (
-                    hashlib.sha256(token.encode()).hexdigest(),
-                    identity,
-                    time.time() + 3600,
-                ),
-            )
+        digest = hashlib.sha256(token.encode()).hexdigest()
+
+        def write() -> None:
+            with self.connection() as db:
+                db.execute("DELETE FROM sessions WHERE expires<=?", (time.time(),))
+                db.execute(
+                    "INSERT INTO sessions VALUES (?,?,?)", (digest, identity, time.time() + 3600)
+                )
+
+        await asyncio.to_thread(write)
         return token
 
-    def session(self, token: str, identity: str) -> None:
-        """Revalidate expiry and current configured identity on every operation."""
-        with self.connection() as db:
-            row = db.execute(
-                "SELECT identity,expires FROM sessions WHERE digest=?",
-                (hashlib.sha256(token.encode()).hexdigest(),),
-            ).fetchone()
+    async def session(self, token: str, identity: str) -> None:
+        """Revalidate expiry and current configured identity off the event loop."""
+        digest = hashlib.sha256(token.encode()).hexdigest()
+
+        def read() -> tuple[str, float] | None:
+            with self.connection() as db:
+                row = db.execute(
+                    "SELECT identity,expires FROM sessions WHERE digest=?", (digest,)
+                ).fetchone()
+            return None if row is None else (str(row[0]), float(row[1]))
+
+        row = await asyncio.to_thread(read)
         if row is None or row[0] != identity or row[1] <= time.time():
             raise ContractError(ErrorCode.NOT_FOUND)
 
-    def revoke(self, token: str) -> None:
+    async def revoke(self, token: str) -> None:
         """Signing out invalidates future operations on existing browser sockets too."""
-        with self.connection() as db:
-            db.execute(
-                "DELETE FROM sessions WHERE digest=?", (hashlib.sha256(token.encode()).hexdigest(),)
-            )
+        digest = hashlib.sha256(token.encode()).hexdigest()
+
+        def write() -> None:
+            with self.connection() as db:
+                db.execute("DELETE FROM sessions WHERE digest=?", (digest,))
+
+        await asyncio.to_thread(write)

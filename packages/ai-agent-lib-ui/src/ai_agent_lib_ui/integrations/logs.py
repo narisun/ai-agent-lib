@@ -23,7 +23,7 @@ def register_logs(
     async def logs(
         thread_id: str | None = None, cursor: str | None = None, search: str = ""
     ) -> HTMLResponse:
-        principal = current_principal()
+        principal = await current_principal(resources)
         body = (
             "<p>Choose a chat, then a turn to view <strong>LLM input and output</strong>, "
             "MCP calls, and checkpoints. Opening logs never reruns the agent.</p>"

@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-import sys
 import tarfile
-import types
 import uuid
+from collections.abc import Mapping
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -15,8 +14,17 @@ from typing import Any
 import pytest
 
 from ai_agent_lib_cli.__main__ import main
-from ai_agent_lib_cli.deploy import hcl_string
+from ai_agent_lib_cli.deploy import (
+    DistributionResolver,
+    ModuleOrigin,
+    hcl_string,
+    installed_origin,
+    plan_deployment,
+    target_of,
+)
 from ai_agent_lib_cli.testing import toolbox_for_tests
+from ai_agent_lib_cli.workspace import load_answers
+from ai_agent_lib_core.di import ServiceProviders
 
 TOOLS = toolbox_for_tests()
 
@@ -368,16 +376,20 @@ def test_r21_telemetry_on_needs_the_opentelemetry_sdk_in_the_image(
 # ------------- F6: an adapter is checked against the distribution that ships it
 
 
-def _plan_with(root: Path, factory: Any, *, extra: str | None = None) -> Any:
-    from ai_agent_lib_cli.deploy import plan_deployment, target_of
-    from ai_agent_lib_cli.workspace import load_answers
-    from ai_agent_lib_core.di import ServiceProviders
+def _resolver(origins: Mapping[str, ModuleOrigin]) -> DistributionResolver:
+    """A process that gets these import names from here, and the rest as the test process does."""
+    return lambda top: origins.get(top, installed_origin(top))
 
+
+def _plan_with(
+    root: Path, factory: Any, *, extra: str | None = None, resolve: DistributionResolver
+) -> Any:
     with _settings(root).open("a", encoding="utf-8") as file:
         file.write("EAP_AUDIT_PROVIDER=own_audit\nEAP_AUDIT_OPTIONS={}\n")
     registry = ServiceProviders.default().register("audit", "own_audit", factory, extra=extra)
     answers = load_answers(root)
-    return plan_deployment(root, answers, target_of(answers, "helper"), providers=registry)
+    target = target_of(answers, "helper")
+    return plan_deployment(root, answers, target, providers=registry, resolve=resolve)
 
 
 def _factory_in(module_name: str) -> Any:
@@ -388,37 +400,35 @@ def _factory_in(module_name: str) -> Any:
     return factory
 
 
-def test_f6_the_services_own_adapter_needs_no_dependency_on_itself(
-    ready: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    package = types.ModuleType("helper")
-    package.__file__ = str(ready / "agents/helper/src/helper/__init__.py")
-    monkeypatch.setitem(sys.modules, "helper", package)
+def test_f6_the_services_own_adapter_needs_no_dependency_on_itself(ready: Path) -> None:
+    own = ModuleOrigin(location=ready / "agents/helper/src/helper/__init__.py")
+    resolve = _resolver({"helper": own})
 
-    plan = _plan_with(ready, _factory_in("helper.providers"))
+    plan = _plan_with(ready, _factory_in("helper.providers"), resolve=resolve)
     assert plan.problems == ()
 
 
-def test_f6_a_pack_is_checked_by_its_distribution_not_its_import_name(
-    ready: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from importlib import metadata
-
-    shipped = metadata.packages_distributions()
-    monkeypatch.setattr(
-        metadata,
-        "packages_distributions",
-        lambda: {**shipped, "review_adapters": ["review-provider-pack"]},
-    )
+def test_f6_a_pack_is_checked_by_its_distribution_not_its_import_name(ready: Path) -> None:
+    pack = ModuleOrigin(distributions=frozenset({"review-provider-pack"}))
+    resolve = _resolver({"review_adapters": pack})
     factory = _factory_in("review_adapters.audit")
 
-    (problem,) = _plan_with(ready, factory, extra="fast").problems
+    (problem,) = _plan_with(ready, factory, extra="fast", resolve=resolve).problems
     assert "need review-provider-pack, which helper does not install" in problem
     assert 'list "review-provider-pack[fast]"' in problem
     assert "review-adapters" not in problem
 
     _depend_on_aws(ready, "agents/helper", "review-provider-pack[fast]")
-    assert _plan_with(ready, factory, extra="fast").problems == ()
+    assert _plan_with(ready, factory, extra="fast", resolve=resolve).problems == ()
+
+
+def test_f6_without_a_resolver_the_running_process_answers() -> None:
+    """The default looks at what this process has imported and installed."""
+    origin = installed_origin("click")  # imported by the command line, installed as 'click'
+    assert origin.distributions == frozenset({"click"})
+    assert origin.location is not None
+    assert origin.location.parent.name == "click"
+    assert installed_origin("no_such_import_name") == ModuleOrigin()
 
 
 @pytest.mark.parametrize(

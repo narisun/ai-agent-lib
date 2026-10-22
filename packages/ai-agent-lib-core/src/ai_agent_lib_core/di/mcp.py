@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from ai_agent_lib_core.adapters.http_support import checked_base_url
@@ -39,12 +39,29 @@ if TYPE_CHECKING:
 
     from ai_agent_lib_core.integrations.langgraph import LangGraphBindings
     from ai_agent_lib_core.integrations.mcp import GovernedToolsMiddleware
-    from ai_agent_lib_core.integrations.mcp.client import McpConnector
+    from ai_agent_lib_core.integrations.mcp.client import HttpMcpConnector, McpConnector
+
+
+class _OwnedConnector:
+    """The one connector these bindings create themselves, once it is needed.
+
+    Kept in its own object so that the frozen bindings can create it on first
+    use, and so that only a connector created here is closed here: an injected
+    connector belongs to whoever injected it.
+    """
+
+    def __init__(self) -> None:
+        self.connector: HttpMcpConnector | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class McpBindings:
-    """Compose governed MCP clients and servers without owning service lifecycle."""
+    """Compose governed MCP clients and servers without owning service lifecycle.
+
+    The one resource these bindings do own is the HTTP connector they create
+    when none is injected; ``aclose`` releases it. Its timeout is the configured
+    tool call limit, ``limits.tool.timeout_seconds``.
+    """
 
     audit: AuditSink
     telemetry: Telemetry
@@ -59,6 +76,30 @@ class McpBindings:
     operations: Operations
     connector: McpConnector | None
     bindings: Callable[[], LangGraphBindings]
+    _owned: _OwnedConnector = field(default_factory=_OwnedConnector, init=False, repr=False)
+
+    def mcp_connector(self) -> McpConnector:
+        """Return the connector that reaches MCP servers: the injected one, or one HTTP connector.
+
+        The HTTP connector is created on first use, so that a container which
+        serves MCP tools but calls none never loads the agent side, and it is
+        shared by every server and every call for as long as these bindings live.
+        """
+        if self.connector is not None:
+            return self.connector
+        if self._owned.connector is None:
+            # Imported here so that an agent which uses no MCP server does not load the SDK.
+            from ai_agent_lib_core.integrations.mcp.client import HttpMcpConnector
+
+            self._owned.connector = HttpMcpConnector(
+                timeout_seconds=self.operations.limits.tool.timeout_seconds
+            )
+        return self._owned.connector
+
+    async def aclose(self) -> None:
+        """Close the connector these bindings created; an injected one is left to its owner."""
+        if self._owned.connector is not None:
+            await self._owned.connector.aclose()
 
     async def mcp_tools(self, server: str) -> list[BaseTool]:
         """Check discovery requirements and delegate governed tool construction.
@@ -86,7 +127,7 @@ class McpBindings:
             )
         return await self.bindings().mcp_tools(
             entry,
-            connector=self.connector,
+            connector=self.mcp_connector(),
             exchanger=exchanger,
             require_pins=not local,
         )

@@ -346,9 +346,14 @@ Changing identity makes old ownership scopes inaccessible to the new identity.
 | `config/` | Translate explicit local settings and validate loopback destinations. |
 | `integrations/`, `assets/` | Assemble adapters and connect FastAPI/Chainlit to the application. |
 
-The application depends on interfaces. The composition root injects a catalog,
-repository and dispatcher. Tests substitute scripted HTTP endpoints and temporary
-SQLite files. The UI never imports an agent graph or reads its checkpoint database.
+The application depends on interfaces. The composition root (`integrations/runtime.py`)
+injects a catalog, repository and dispatcher, and `compose()` returns a `Runtime`
+that the session boundary, data layer and route factories receive as an argument.
+Only `integrations/callbacks.py`, which Chainlit executes by file path, reads the
+`Runtime` that `create_app` publishes for it. Tests substitute scripted HTTP
+endpoints and temporary SQLite files, and run the parent routes, the session
+boundary and the data layer in process. The UI never imports an agent graph or
+reads its checkpoint database.
 The catalog uses `ai_agent_lib_core.kit` for the shared parser; contracts and the
 application stay independent of Chainlit and agent framework imports.
 
@@ -397,8 +402,9 @@ as the page itself. Confirm that a wide response table or code block still scrol
 inside its own container. Restart the UI and reload the tab after changing assets.
 
 The UI has its own Windows/Linux CI job. Browser and enterprise release gates from
-the [Phase 0 review](../../docs/frontend-phase0-review.md) remain tracked separately;
-this local preview does not imply approval for shared production hosting.
+the [Phase 0 review](../../docs/frontend-phase0-review.md) (the framework-fit
+evidence that preceded this package) remain tracked separately; this local
+preview does not imply approval for shared production hosting.
 
 ## Local Phoenix tracing
 

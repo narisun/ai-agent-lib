@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ai_agent_lib_core.config.phoenix import PhoenixSettings, load_phoenix_settings
-from ai_agent_lib_core.contracts import ConfigurationError, ModelTraceSink, ServiceConfig
-from ai_agent_lib_core.integrations.langgraph._agent_tracing import AgentTracing
+from ai_agent_lib_core.contracts import ModelTraceSink, ServiceConfig
+from ai_agent_lib_core.integrations.langgraph._agent_tracing import (
+    AgentTracing,
+    local_model_trace,
+    otlp_exporter,
+    tracing_lifetime,
+)
 from ai_agent_lib_core.integrations.langgraph._openinference import PhoenixSchema
-from ai_agent_lib_core.observability.model_trace import JsonlModelTraceSink
 
 __all__ = ["PhoenixTracing", "phoenix_tracing"]
 
@@ -35,16 +38,10 @@ class PhoenixTracing(AgentTracing):
         checkpoint_timeout_seconds: float = 1.0,
     ) -> None:
         if exporter is None:
-            try:
-                from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-            except ImportError as error:
-                raise ConfigurationError(
-                    'Phoenix export needs: python -m pip install "ai-agent-lib-core[otel]"'
-                ) from error
-            exporter = OTLPSpanExporter(
-                endpoint=settings.base_url.rstrip("/") + "/v1/traces",
+            exporter = otlp_exporter(
+                settings.base_url.rstrip("/") + "/v1/traces",
                 headers={"Authorization": "Bearer " + settings.api_key} if settings.api_key else {},
-                timeout=5,
+                backend="Phoenix",
             )
         super().__init__(
             settings,
@@ -65,22 +62,24 @@ async def phoenix_tracing(
     *,
     dotenv_path: Path | None = Path(".env"),
     settings: PhoenixSettings | None = None,
+    local_sink: ModelTraceSink | None = None,
 ) -> AsyncIterator[PhoenixTracing | None]:
-    """Own the optional exporter until service shutdown, preserving local diagnostics."""
+    """Own the optional exporter until service shutdown, preserving local diagnostics.
+
+    The convenience entry point for a service's ``main``: settings are loaded
+    here, at the edge, unless ``settings`` is given, and ownership is delegated to
+    :func:`~ai_agent_lib_core.integrations.langgraph.tracing.tracing_lifetime`.
+    ``local_sink`` replaces the JSONL model trace ``config`` names.
+    """
     settings = settings or load_phoenix_settings(dotenv_path)
     tracing = (
         PhoenixTracing(
             settings,
             application=application,
-            local_sink=JsonlModelTraceSink(config.model_trace_path)
-            if config.model_trace_path
-            else None,
+            local_sink=local_sink if local_sink is not None else local_model_trace(config),
         )
         if settings is not None
         else None
     )
-    try:
-        yield tracing
-    finally:
-        if tracing is not None:
-            await asyncio.to_thread(tracing.close)
+    async with tracing_lifetime(tracing) as owned:
+        yield owned

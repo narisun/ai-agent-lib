@@ -39,12 +39,38 @@ Each workstream lists what changes, which review findings it closes, the tests
 that prove it, and its size (S: under a day, M: one to three days, L: a week).
 Public names and signatures stay compatible unless stated.
 
-**Status, 22 October 2026:** A1 and A2 (Phase 0) are implemented in the working
-tree. Two deviations from the text below: diagnostics warnings carry the error
-type and request id but no traceback, because the logging policy forbids
-exception text in logs; and the UI import-linter contracts live in the UI's own
-`pyproject.toml` and CI job rather than the root linter, because the UI is not
-installed in the root environment.
+**Status, 22 October 2026:** A1 and A2 (Phase 0) and A3, A4 and A6 (Phase 1)
+are implemented. Deviations from the text below, with the reason:
+
+- Diagnostics warnings carry the error type and request id but no traceback,
+  because the logging policy forbids exception text in logs.
+- The UI import-linter contracts live in the UI's own `pyproject.toml` and CI
+  job rather than the root linter, because the UI is not installed in the root
+  environment.
+- The container split produced `di/selection.py` (what the configuration
+  selects, option checks) and `di/graph.py` (`AdapterGraph`: build order,
+  lifetimes, close) rather than the `lifecycle`/`graph` pair named below;
+  `di/lifetime.py` already existed. `di/container.py` is 654 lines of facade
+  and docstrings, above the 500-line target; its responsibilities are now only
+  accessors and framework entry points.
+- The HTTP split added `http/prelude.py` (the shared request prelude) beside
+  the four modules named, because the stream route needs the prelude without
+  depending on the JSON route.
+- The data pipeline's resilience stage reuses the tool limits: a named query
+  only reads, so it is retried like a read-only tool. `Limits` gained no field.
+- The MCP connector's timeout is the configured tool-call timeout
+  (`EAP_LIMITS`, `tool.timeout_seconds`); no new option was added. Testing
+  showed the SDK folds 401/403 into a generic MCP error, so the connector now
+  raises for those statuses itself before the taxonomy mapping runs.
+- The tracing integration gained `AgentTracing.observe(...)` taking a registry
+  and an invocation callable; `run(graph, services, ...)` remains as the
+  compatibility path the examples use. Sink construction stayed in the
+  integration layer (`local_model_trace`) rather than `di/`.
+- Four UI contracts with no implementation were deleted; the consumer check
+  script now imports `ConversationStore` instead.
+- Still over 500 lines and left for later: `adapters/data_rest.py` (648),
+  `integrations/langgraph/model.py` (590), `cli/scaffold.py` (591), and the
+  shipped contract suites in `testing/contracts.py` (812).
 
 ### A1. Green gates and CI coverage (S)
 

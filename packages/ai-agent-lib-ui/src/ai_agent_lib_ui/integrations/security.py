@@ -12,16 +12,19 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from ai_agent_lib_core.contracts import Principal
 from ai_agent_lib_ui.contracts.queries import ContractError
 from ai_agent_lib_ui.integrations.navigation import is_page_path, login_destination
-from ai_agent_lib_ui.integrations.runtime import Runtime, runtime
+from ai_agent_lib_ui.integrations.runtime import Runtime
 
 session_token: contextvars.ContextVar[str] = contextvars.ContextVar("ui_session", default="")
 
 
-def current_principal() -> Principal:
-    """Revalidate stored sessions on each callback, including already-open sockets."""
-    resources = runtime()
+async def current_principal(resources: Runtime) -> Principal:
+    """Revalidate the stored session once per request or framework callback.
+
+    Callers resolve the principal when they start handling a request and pass it
+    down; progress ticks and other per-token work never call this again.
+    """
     try:
-        resources.store.session(session_token.get(), resources.identity)
+        await resources.store.session(session_token.get(), resources.identity)
     except ContractError:
         raise HTTPException(401, "Sign in to the local UI") from None
     return resources.settings.identity.principal()
@@ -63,7 +66,7 @@ class SessionBoundary:
             cookie = SimpleCookie()
             cookie.load(headers.get(b"cookie", b"").decode("latin1"))
             token = cookie["agentlib_session"].value if "agentlib_session" in cookie else ""
-            self.resources.store.session(token, self.resources.identity)
+            await self.resources.store.session(token, self.resources.identity)
             if path == "/chat/mcp" or path.startswith("/chat/project/file"):
                 raise HTTPException(404, "This feature is not enabled")
             if "agentlib_chat" in cookie and path != "/chat/auth/header":
