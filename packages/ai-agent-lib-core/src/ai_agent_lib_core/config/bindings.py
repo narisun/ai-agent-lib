@@ -239,7 +239,7 @@ def _section_bindings() -> list[Binding]:
                 example="{}",
                 details=(
                     f"Options of the selected {section.value} adapter, as one JSON object. "
-                    "Unknown keys stop startup. `agentlib config options "
+                    "Unknown keys stop startup. `agentcraft2 config options "
                     f"{section.value}` lists each adapter's options."
                 ),
                 default="`{}`: the adapter's defaults",
@@ -307,9 +307,9 @@ def _owned_and_external_bindings() -> tuple[Binding, ...]:
             name=f"{PREFIX}MODEL_TRACE_PATH",
             key=Key.MODEL_TRACE_PATH,
             description="Optional JSONL file for diagnostic model requests and responses.",
-            example=".agentlib/model-trace.jsonl",
+            example=".agentcraft2/model-trace.jsonl",
             details=(
-                "Set a path such as `.agentlib/model-trace.jsonl` to inspect complete "
+                "Set a path such as `.agentcraft2/model-trace.jsonl` to inspect complete "
                 "LangChain messages, tool definitions, and replies at the provider boundary. "
                 "Relative paths resolve from the service's `.env` folder. Unset or blank "
                 "disables capture. Credential patterns are masked, but conversation content "
@@ -329,7 +329,7 @@ def _owned_and_external_bindings() -> tuple[Binding, ...]:
                 "`backoff_seconds` and `max_backoff_seconds`, and `budget` with `model_calls`, "
                 "`tool_calls` and `tokens` per request. Only transient failures are tried "
                 "again, and a tool only when it only reads. A request over its budget stops "
-                "with BudgetExceeded. `agentlib config options limits` lists every key."
+                "with BudgetExceeded. `agentcraft2 config options limits` lists every key."
             ),
             default=(
                 "model: 120 s, 2 retries; tool: 60 s, 1 retry; budget: 50 model calls and "
@@ -390,7 +390,7 @@ def _owned_and_external_bindings() -> tuple[Binding, ...]:
             details=(
                 'For Anthropic prompt caching, use {"anthropic": {"prompt_caching": true, '
                 '"cache_ttl": "5m"}}. Options apply to every alias using that provider. '
-                "Unknown options stop startup. `agentlib config options model` lists options."
+                "Unknown options stop startup. `agentcraft2 config options model` lists options."
             ),
             default="`{}`: each provider's defaults; Anthropic prompt caching is off",
         ),

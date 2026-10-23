@@ -32,7 +32,7 @@ from ai_agent_lib_cli.workspace import (
 )
 from ai_agent_lib_core.contracts import Classification, ParameterType
 
-RULES = Path("policies/agentlib/rules/data.yaml")
+RULES = Path("policies/agentcraft2/rules/data.yaml")
 SAMPLES = Path("tests/policy-samples.yaml")
 
 CLAIMS = """\

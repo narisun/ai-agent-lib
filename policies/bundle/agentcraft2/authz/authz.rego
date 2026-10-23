@@ -1,21 +1,21 @@
 # The platform's authorization decision.
 #
 # The policy is a small, fixed evaluator. What is actually allowed lives in a
-# rules document, loaded as data at `data.agentlib.rules`. The first rule that
+# rules document, loaded as data at `data.agentcraft2.rules`. The first rule that
 # covers the request allows it and supplies its obligations; a request that no
 # rule covers is denied. The in-process `rules` provider of ai-agent-lib-core
 # evaluates the same document the same way, and one contract test suite runs
 # against both.
 #
 # Input:  the versioned decision input, schema `agentlib.decision/v1`.
-# Output: `data.agentlib.authz.decision`, an object with `allow`,
+# Output: `data.agentcraft2.authz.decision`, an object with `allow`,
 #         `reason_code` and, on an allow, `obligations`.
 #
 # The rules document is checked as strictly as the in-process engine checks
 # it. A rule with an unknown key, such as `role` for `roles`, would otherwise
 # lose its restriction and cover every caller, so a document that is not valid
 # denies every request (`invalid_rules`) until it is fixed.
-package agentlib.authz
+package agentcraft2.authz
 
 levels := {"public": 0, "internal": 1, "confidential": 2, "restricted": 3}
 
@@ -43,7 +43,7 @@ decision := {
 
 # Every rule that covers the request, in the order the document lists them.
 matching := [rule |
-	some rule in data.agentlib.rules.rules
+	some rule in data.agentcraft2.rules.rules
 	covers(rule)
 ]
 
@@ -115,10 +115,10 @@ actions := {
 obligation_keys := {"row_filter", "mask_columns", "max_rows", "require_approval"}
 
 # No rules document at all grants nothing, the same as an empty one.
-rules_valid if not data.agentlib.rules
+rules_valid if not data.agentcraft2.rules
 
 rules_valid if {
-	document := data.agentlib.rules
+	document := data.agentcraft2.rules
 	document.schema == "agentlib.rules/v1"
 	is_array(object.get(document, "rules", []))
 	count(object.keys(document) - {"schema", "rules"}) == 0

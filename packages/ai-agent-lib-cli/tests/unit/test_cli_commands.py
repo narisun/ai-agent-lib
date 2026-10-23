@@ -1,4 +1,4 @@
-"""The agentlib command line: what each command writes, and how it fails."""
+"""The agentcraft2 command line: what each command writes, and how it fails."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from ai_agent_lib_cli.workspace import (
 )
 from ai_agent_lib_core.adapters import FileRegistryOptions, FileRegistrySource
 
-RULES = Path("policies/agentlib/rules/data.yaml")
+RULES = Path("policies/agentcraft2/rules/data.yaml")
 
 
 # Generated code is left unformatted here: these tests are about which files are
@@ -59,7 +59,7 @@ def workspace(tmp_path: Path) -> Path:
 
 def test_the_version_and_the_help_exit_with_zero(capsys: pytest.CaptureFixture[str]) -> None:
     assert run("--version") == 0
-    assert capsys.readouterr().out == f"agentlib, version {__version__}\n"
+    assert capsys.readouterr().out == f"agentcraft2, version {__version__}\n"
     assert run("--help") == 0
     listed = capsys.readouterr().out
     for command in ("init", "new", "link", "registry"):
@@ -95,7 +95,7 @@ def test_a_command_that_cannot_be_done_exits_with_one_and_one_line(
 ) -> None:
     assert run("new", "agent", "hello-agent", "--workspace", tmp_path) == 1
     error = capsys.readouterr().err
-    assert error.startswith("agentlib: error: ")
+    assert error.startswith("agentcraft2: error: ")
     assert "not inside a workspace" in error
     assert len(error.strip().splitlines()) == 1
     assert run("init", "Not_A_Name", "--dir", tmp_path) == 1
@@ -120,8 +120,8 @@ def test_init_creates_workspace_docs_and_samples_without_services(
         ".github/workflows/check.yml",
         ".gitignore",
         "README.md",
-        "agentlib.lock",
-        "agentlib.toml",
+        "agentcraft2.lock",
+        "agentcraft2.toml",
         "agents/.gitkeep",
         "docs/samples/verified-anthropic/checkpoint-history.json",
         "docs/samples/verified-anthropic/model-trace.jsonl",
@@ -129,7 +129,7 @@ def test_init_creates_workspace_docs_and_samples_without_services(
         "examples/read_trace.py",
         "mcp-servers/.gitkeep",
         "policies/.manifest",
-        "policies/agentlib/rules/data.yaml",
+        "policies/agentcraft2/rules/data.yaml",
         "pyproject.toml",
         "registry/agents.yaml",
         "registry/mcp-tools.yaml",
@@ -449,11 +449,11 @@ def test_init_from_an_answers_file_on_the_command_line(
     copy = tmp_path / "copies"
     copy.mkdir()
     capsys.readouterr()
-    assert run("init", "--answers", workspace / "agentlib.toml", "--dir", copy) == 0
+    assert run("init", "--answers", workspace / "agentcraft2.toml", "--dir", copy) == 0
     assert "created  agents/hello-agent/src/hello_agent/graph.py" in capsys.readouterr().out
     assert tree(copy / "demo") == tree(workspace)
     assert (
-        run("init", "renamed", "--answers", workspace / "agentlib.toml", "--dir", copy,
+        run("init", "renamed", "--answers", workspace / "agentcraft2.toml", "--dir", copy,
             "--lib-version", ">=0.2") == 0
     )  # fmt: skip
     assert load_answers(copy / "renamed").library == LibrarySource(kind="index", version=">=0.2")
@@ -494,7 +494,7 @@ def test_a_server_that_cannot_be_pinned_yet_is_still_created(
     assert run("new", "mcp", "hello-mcp", "--workspace", workspace, tools=tools) == 0
     captured = capsys.readouterr()
     assert "not pinned: the tools of hello_mcp could not be pinned" in captured.err
-    assert "agentlib registry pin hello" in captured.err
+    assert "agentcraft2 registry pin hello" in captured.err
     assert (workspace / "mcp-servers/hello-mcp/src/hello_mcp/server.py").is_file()
     assert run("registry", "pin", "hello", "--workspace", workspace, tools=tools) == 1
 

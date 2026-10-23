@@ -48,7 +48,7 @@ These commands read the included files locally. They do not call a model.
 You can also open the [model trace](samples/verified-anthropic/model-trace.jsonl)
 and [checkpoint history](samples/verified-anthropic/checkpoint-history.json)
 in your editor. The sample files are part of the tutorial; future live runs
-still write their diagnostics under each agent's `.agentlib/anthropic-demo/` folder.
+still write their diagnostics under each agent's `.agentcraft2/anthropic-demo/` folder.
 
 ## 1. The first question reaches the model
 

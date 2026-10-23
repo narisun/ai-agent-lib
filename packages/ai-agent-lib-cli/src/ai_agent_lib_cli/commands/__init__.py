@@ -1,4 +1,4 @@
-"""The commands of ``agentlib``, by what they do.
+"""The commands of ``agentcraft2``, by what they do.
 
 ``create`` writes, ``look`` reads and runs, ``rules`` tries the policy and
 ``check`` runs the gate a change passes and

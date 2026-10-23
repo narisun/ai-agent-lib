@@ -31,7 +31,7 @@ DEV_ROLE = "analyst"
 _UP = "../../"
 _FAKE_MODEL_ID = "fake-model"
 _HEADER = (
-    "Local settings of {name}. agentlib wrote the same text to .env, which is yours to change\n"
+    "Local settings of {name}. agentcraft2 wrote the same text to .env, which is yours to change\n"
     "and is not committed. The tests read this file, not .env.\n"
     "A relative path is relative to this file."
 )
@@ -105,7 +105,7 @@ def agent_env(agent: AgentAnswers) -> str:
     settings += [
         EnvSetting(
             Key.MODEL_TRACE_PATH,
-            ".agentlib/model-trace.jsonl",
+            ".agentcraft2/model-trace.jsonl",
             comment="Optional model diagnostics: captures conversation content. Use test data.",
             enabled=False,
         ),

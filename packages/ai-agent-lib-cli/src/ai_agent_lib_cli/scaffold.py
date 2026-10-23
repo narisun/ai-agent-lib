@@ -64,7 +64,7 @@ _AGENT_EXTRAS = "jwt,mcp,otel,serve"
 _SERVER_EXTRAS = {"duckdb_csv": "duckdb,jwt,mcp,otel,serve", "rest": "jwt,mcp,otel,serve"}
 _ENV, _ENV_EXAMPLE = ".env", ".env.example"
 
-LOCK_FILE = "agentlib.lock"
+LOCK_FILE = "agentcraft2.lock"
 """Records what each generated file held when it was written, so that an update
 can tell a file the developer changed from one they did not."""
 
@@ -575,7 +575,7 @@ class Scaffolder:
             known = ", ".join(s.name for s in answers.mcp_servers) or "none"
             raise CliError(
                 f"there is no MCP server called {name_or_id!r} in this workspace "
-                f"(MCP servers: {known}). Add it first with 'agentlib new mcp'."
+                f"(MCP servers: {known}). Add it first with 'agentcraft2 new mcp'."
             )
         return server
 

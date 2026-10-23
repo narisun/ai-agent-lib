@@ -61,13 +61,13 @@ SAMPLES_FILE = PurePosixPath("tests/policy-samples.yaml")
 SAMPLES_SCHEMA = "agentlib.policy-samples/v1"
 
 _HEADER = f"""\
-# Sample requests for the rules in policies/agentlib/rules/data.yaml.
+# Sample requests for the rules in policies/agentcraft2/rules/data.yaml.
 # Each says who asks for what, and what the answer should be.
 #
-#   agentlib policy test          decide them with the rules, as the services do locally
-#   agentlib policy test --opa    also with OPA, as deployed services do; the two must agree
+#   agentcraft2 policy test          decide them with the rules, as the services do locally
+#   agentcraft2 policy test --opa    also with OPA, as deployed services do; the two must agree
 #
-# This file is yours. agentlib appends samples for a new service and never
+# This file is yours. agentcraft2 appends samples for a new service and never
 # changes or removes one that is here.
 schema: {SAMPLES_SCHEMA}
 samples: []
@@ -149,7 +149,7 @@ def _parse(text: str, what: str) -> list[Sample]:
             f"{what} is not a samples document",
             expected=found.expected,
             actual=found.actual,
-            fix="compare with the samples 'agentlib new' writes",
+            fix="compare with the samples 'agentcraft2 new' writes",
         ) from None
     names = [sample.name for sample in document.samples]
     repeated = sorted({name for name in names if names.count(name) > 1})

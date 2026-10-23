@@ -40,10 +40,11 @@ __all__ = [
 
 AGENTS_FILE = PurePosixPath("registry/agents.yaml")
 TOOLS_FILE = PurePosixPath("registry/mcp-tools.yaml")
-RULES_FILE = PurePosixPath("policies/agentlib/rules/data.yaml")
+RULES_FILE = PurePosixPath("policies/agentcraft2/rules/data.yaml")
 
 _MAINTAINED = (
-    "# agentlib rewrites this file when it adds, links or pins a service; comments are not kept.\n"
+    "# agentcraft2 rewrites this file when it adds, links or pins a service; "
+    "comments are not kept.\n"
 )
 _AGENTS_HEADER = (
     "# The agent registry: which agents exist and which MCP servers each may call.\n" + _MAINTAINED
@@ -51,7 +52,7 @@ _AGENTS_HEADER = (
 _TOOLS_HEADER = (
     "# The MCP tool registry: which servers and tools exist. An agent can only use a tool\n"
     "# that is listed here, and only if the tool's live input schema still matches its pin.\n"
-    "# After changing a tool's arguments, pin it again: agentlib registry pin <server>\n"
+    "# After changing a tool's arguments, pin it again: agentcraft2 registry pin <server>\n"
     + _MAINTAINED
 )
 _RULES_HEADER = """\
@@ -60,9 +61,9 @@ _RULES_HEADER = """\
 #
 # One document, two engines. In local development the in-process `rules`
 # provider reads this file. A deployed service asks OPA, which loads the
-# `policies` folder as a bundle (this file becomes `data.agentlib.rules`).
+# `policies` folder as a bundle (this file becomes `data.agentcraft2.rules`).
 #
-# This file is yours. agentlib appends the rules a new service needs and never
+# This file is yours. agentcraft2 appends the rules a new service needs and never
 # changes or removes a rule that is here.
 schema: agentlib.rules/v1
 rules: []

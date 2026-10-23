@@ -204,7 +204,7 @@ def starter_settings(target: Target) -> str:
         EnvSetting(options_key(section), value, comment=comment)
         for section, value, comment in examples
     ]
-    command = f"agentlib deploy {target.name}"
+    command = f"agentcraft2 deploy {target.name}"
     where, whose = "in AWS", "task's"
     if target.platform == AGENTCORE:
         command += " --target agentcore"
@@ -229,7 +229,7 @@ def write_starter(root: Path, target: Target) -> Report:
 def next_steps(root: Path, target: Target) -> list[str]:
     """What to do after the starting settings were written, one step per line."""
     steps = []
-    command = f"agentlib deploy {target.name}"
+    command = f"agentcraft2 deploy {target.name}"
     if target.platform == AGENTCORE:
         command += " --target agentcore"
     if not depends_on_aws(root, target):

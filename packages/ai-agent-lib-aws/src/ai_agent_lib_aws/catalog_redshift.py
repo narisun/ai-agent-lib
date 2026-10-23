@@ -1,6 +1,6 @@
 """Reading the Redshift catalogue: which tables a schema has, and their columns.
 
-This is for tools that prepare a server, such as ``agentlib new mcp
+This is for tools that prepare a server, such as ``agentcraft2 new mcp
 --from-redshift``. It asks the Data API to list and describe tables. It runs
 no statement and reads no row.
 

@@ -75,7 +75,7 @@ AC2_TLS_CA_BUNDLE=/path/to/enterprise-ca.pem
 ## Permissions each adapter needs
 
 Each adapter declares what it needs, from its own options, in
-`ai_agent_lib_aws.access`; `agentlib deploy SERVICE --plan` lists it for a
+`ai_agent_lib_aws.access`; `agentcraft2 deploy SERVICE --plan` lists it for a
 service's settings, narrowed to the resources they name, and writes it as the
 task's policy. A test checks that every SDK call an adapter makes, startup
 checks included, is declared. In short:
@@ -92,7 +92,7 @@ checks included, is declared. In short:
 | `agentcore_runtime` | nothing to verify a caller; with `exchange`, `bedrock-agentcore:GetResourceOauth2Token`, `GetWorkloadAccessToken`, `GetWorkloadAccessTokenForUserId` on the default workload identity directory and the service's workload identity |
 | `bedrock` guardrails | `bedrock:ApplyGuardrail` |
 | calling an MCP server on an AgentCore runtime (`runtime_arn` in the tool registry, `auth: sigv4`) | `bedrock-agentcore:InvokeAgentRuntime` on the runtime ARN. Granted by hand per registered runtime: the registry is not part of the deploy settings, so the deploy plan cannot derive it. With `auth: bearer` the runtime's JWT authorizer decides, and no IAM action is needed |
-| reading the catalogue (`agentlib new mcp --from-redshift`) | `redshift-data:ListTables`, `redshift-data:DescribeTable`, and the same credentials action as `redshift_data`. A developer needs these, not the deployed service |
+| reading the catalogue (`agentcraft2 new mcp --from-redshift`) | `redshift-data:ListTables`, `redshift-data:DescribeTable`, and the same credentials action as `redshift_data`. A developer needs these, not the deployed service |
 
 ## Notes on single adapters
 
@@ -104,7 +104,7 @@ bound value with an explicit type.
 
 **Reading the Redshift catalogue.** `ai_agent_lib_aws.catalog_redshift` lists
 the tables of a schema and describes their columns through the Data API. It
-runs no statement and reads no row. `agentlib new mcp --from-redshift` uses it
+runs no statement and reads no row. `agentcraft2 new mcp --from-redshift` uses it
 to propose a server's queries. The queries name tables without a schema,
 because the local CSV engine has none: set the search path of the server's
 database user to the schema.

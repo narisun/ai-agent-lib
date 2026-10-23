@@ -49,9 +49,11 @@ def test_trace_configuration_is_opt_in_and_relative_to_the_service_file(
     blank = MappingConfigSource({"AC2_MODEL_TRACE_PATH": "  "})
     assert ConfigResolver(blank).resolve().model_trace_path is None
     dotenv = tmp_path / ".env"
-    dotenv.write_text("AC2_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl\n", encoding="utf-8")
-    assert load_service_config(dotenv).model_trace_path == tmp_path / ".agentlib/model-trace.jsonl"
-    assert not (tmp_path / ".agentlib").exists()
+    dotenv.write_text("AC2_MODEL_TRACE_PATH=.agentcraft2/model-trace.jsonl\n", encoding="utf-8")
+    assert (
+        load_service_config(dotenv).model_trace_path == tmp_path / ".agentcraft2/model-trace.jsonl"
+    )
+    assert not (tmp_path / ".agentcraft2").exists()
 
 
 async def test_trace_is_disabled_by_default_and_audit_keeps_content_out(

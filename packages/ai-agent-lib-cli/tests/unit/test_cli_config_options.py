@@ -1,4 +1,4 @@
-"""'agentlib config options': every adapter, and each one's options, read from the code."""
+"""'agentcraft2 config options': every adapter, and each one's options, read from the code."""
 
 from __future__ import annotations
 
@@ -19,8 +19,8 @@ def test_without_arguments_every_port_lists_its_adapters(
     out = capsys.readouterr().out
     assert "audit\n  firehose         2 options\n  jsonl            local only, 3 options\n" in out
     assert "  env              no options\n" in out
-    assert "agentlib config options PORT NAME" in out
-    assert out.rstrip().endswith("agentlib config options limits")
+    assert "agentcraft2 config options PORT NAME" in out
+    assert out.rstrip().endswith("agentcraft2 config options limits")
 
 
 def test_one_port_lists_only_its_adapters(capsys: pytest.CaptureFixture[str]) -> None:
@@ -39,7 +39,7 @@ def test_one_adapter_shows_each_option_with_its_default_and_meaning(
     lines = capsys.readouterr().out.splitlines()
     assert lines[0] == "audit jsonl (local only): Options for the JSONL audit sink."
     assert lines[1] == "Set them as one JSON object in AC2_AUDIT_OPTIONS."
-    assert '  path  (path; default ".agentlib/audit.jsonl")' in lines
+    assert '  path  (path; default ".agentcraft2/audit.jsonl")' in lines
     assert "      Force each record to disk before write returns." in lines
 
 

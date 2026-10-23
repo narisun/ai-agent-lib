@@ -1,4 +1,4 @@
 {
   "revision": "0.1.0",
-  "roots": ["agentlib/authz", "agentlib/authz_test"]
+  "roots": ["agentcraft2/authz", "agentcraft2/authz_test"]
 }

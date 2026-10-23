@@ -116,7 +116,7 @@ _REFUSED_STATUS = frozenset({401, 403})
 
 # The token of the call in progress. ``HttpMcpConnector.connect`` binds it for the
 # enclosed block; the SDK's transport tasks, started inside that block, inherit it.
-_CALL_TOKEN: ContextVar[SecretStr | None] = ContextVar("agentlib_mcp_call_token", default=None)
+_CALL_TOKEN: ContextVar[SecretStr | None] = ContextVar("agentcraft2_mcp_call_token", default=None)
 
 
 class _TokenOfTheCall(httpx2.Auth):
@@ -441,7 +441,7 @@ async def load_mcp_tools(
                 f"MCP server {server.id!r} could not be reached ({describe(error)})",
                 expected=f"an MCP server answering at {server.url}",
                 fix=(
-                    f"start it (in a workspace: agentlib run {server.id}), or correct its "
+                    f"start it (in a workspace: agentcraft2 run {server.id}), or correct its "
                     "url in the tool registry"
                 ),
             ) from error

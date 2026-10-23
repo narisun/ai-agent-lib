@@ -15,7 +15,7 @@ from ai_agent_lib_core.testing import FakeChatModelProvider
 __all__ = ["HERE", "REGISTRY", "agent_config", "records", "scripted", "server_config"]
 
 HERE = Path(__file__).parents[1]
-AGENT_RULES = HERE.parent / "accounts-agent" / "policies" / "agentlib" / "rules" / "data.yaml"
+AGENT_RULES = HERE.parent / "accounts-agent" / "policies" / "agentcraft2" / "rules" / "data.yaml"
 REGISTRY = {
     "agents_path": str(HERE / "registry" / "agents.yaml"),
     "tools_path": str(HERE / "registry" / "mcp-tools.yaml"),
@@ -36,7 +36,7 @@ def server_config(tmp_path: Path, **overrides: str) -> ServiceConfig:
         ),
         "AC2_IDENTITY_OPTIONS": json.dumps({"audience": APPLICATION, "roles": ["analyst"]}),
         "AC2_POLICY_OPTIONS": json.dumps(
-            {"path": str(HERE / "policies" / "agentlib" / "rules" / "data.yaml")}
+            {"path": str(HERE / "policies" / "agentcraft2" / "rules" / "data.yaml")}
         ),
         "AC2_REGISTRY_OPTIONS": json.dumps(REGISTRY),
         "AC2_AUDIT_OPTIONS": json.dumps({"path": str(tmp_path / "server-audit.jsonl")}),

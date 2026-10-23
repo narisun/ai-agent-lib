@@ -4,7 +4,7 @@ A workspace for Python agents and shared MCP tools built on `ai-agent-lib`.
 Owner: {{ owner }}.
 
 Run the commands below from **this workspace's root folder**, where
-`agentlib.toml` lives. Local development needs Python 3.11 or newer and pip.
+`agentcraft2.toml` lives. Local development needs Python 3.11 or newer and pip.
 Installing packages requires access to your approved package index or a
 folder of Python wheels. The default tests use scripted models and local fixtures.
 
@@ -23,7 +23,7 @@ launcher's root `.env` configures rmprep. For this workspace, put model settings
 in each agent's `.env` and use the service commands below.
 
 {% if library.kind == "path" %}
-This workspace uses the library checkout recorded in `agentlib.toml`. Select
+This workspace uses the library checkout recorded in `agentcraft2.toml`. Select
 your approved Python (use its full path if your team supplies one):
 
 **Windows Command Prompt (cmd.exe):**
@@ -42,7 +42,7 @@ PYTHON=python3
 "$PYTHON" -c "import sys; print(sys.executable)"
 ```
 
-If this checkout moved, update its path in `agentlib.toml` and the variable
+If this checkout moved, update its path in `agentcraft2.toml` and the variable
 above. Install the CLI once using the selected Python:
 
 ```bat
@@ -95,7 +95,7 @@ formatting, type checks, tests, and policy samples. To run only the tests:
 ## Add services
 
 These commands create a server and an agent, then connect them. Choose names
-that are available in `agentlib.toml`. To work on an existing service, start
+that are available in `agentcraft2.toml`. To work on an existing service, start
 with its README under `agents/` or `mcp-servers/`.
 
 ```bat
@@ -139,7 +139,7 @@ Each generated agent includes two runnable examples. Open its README under
 For example, an agent called `hello-agent` uses the module
 `hello_agent.examples.trace_anthropic`. Anthropic calls use API tokens;
 its README links to instructions for the dependency, model ID, and key.
-The examples write diagnostics into that agent's `.agentlib/` folder.
+The examples write diagnostics into that agent's `.agentcraft2/` folder.
 
 ## Run and troubleshoot
 
@@ -179,7 +179,7 @@ To use a release published to your team's approved Python package index:
 
 1. Confirm that the core, CLI, and any required AWS packages are published.
    Choose an available release and use it in place of `0.1.0` in these examples.
-2. Replace the `[library]` section of `agentlib.toml` with the following,
+2. Replace the `[library]` section of `agentcraft2.toml` with the following,
    using your chosen version and removing the old `path` entry:
 
    ```toml
@@ -215,7 +215,7 @@ To use a release published to your team's approved Python package index:
 
 To use a library checkout in CI, ask a platform maintainer to configure the
 runner to check out a fixed revision, install its packages with pip, and set
-the path in the runner's `agentlib.toml` to that checkout. Remove the setup gate
+the path in the runner's `agentcraft2.toml` to that checkout. Remove the setup gate
 after both the package installation and workspace path are configured.
 {% else %}
 The workflow in `.github/workflows/check.yml` installs the CLI and workspace
@@ -235,18 +235,18 @@ library version for repeatable CI runs.
 | `mcp-servers/` | One folder per MCP server, with its own README |
 | `registry/agents.yaml` | Agents and the MCP servers each may call |
 | `registry/mcp-tools.yaml` | Servers, tools, and pins of their input schemas |
-| `policies/agentlib/rules/data.yaml` | Allow rules; unmatched requests are denied |
+| `policies/agentcraft2/rules/data.yaml` | Allow rules; unmatched requests are denied |
 | `tests/` | Workspace tests and tests of agents together with servers |
 | `examples/read_trace.py` | Read a model trace as formatted JSON |
 | `docs/verified-anthropic-run.md` | Annotated real model calls and checkpoint snapshots |
 | `docs/samples/verified-anthropic/` | Selected-field samples from the verified run |
 | `tests/policy-samples.yaml` | Examples the rules must allow or deny |
 | `.github/workflows/check.yml` | CI checks; complete the setup above before relying on them |
-| `agentlib.toml` | Workspace generation inputs and the library installation source |
-| `agentlib.lock` | Generated-file fingerprints used by the update command; commit this file |
+| `agentcraft2.toml` | Workspace generation inputs and the library installation source |
+| `agentcraft2.lock` | Generated-file fingerprints used by the update command; commit this file |
 | `deploy/` | Deployment files, after running the deployment generator |
 
 Every service has a committed `.env.example` used by its tests and an ignored
 `.env` for local settings. Relative paths in those files resolve from the file's
-folder. Audit logs and checkpoints go in each service's `.agentlib/` folder.
+folder. Audit logs and checkpoints go in each service's `.agentcraft2/` folder.
 Services share the workspace's registry and policy files.

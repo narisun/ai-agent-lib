@@ -60,7 +60,7 @@ _FIRST_SERVER_PORT = 8100
     "answers_file",
     type=click.Path(dir_okay=False, exists=True, path_type=Path),
     default=None,
-    help="Generate the workspace an agentlib.toml describes, services included.",
+    help="Generate the workspace an agentcraft2.toml describes, services included.",
 )
 @click.option("--force", is_flag=True, help="Overwrite files that exist and differ.")
 @pass_toolbox
@@ -83,7 +83,7 @@ def init(
             answers = replace(answers, library=library_source(lib_path, lib_version))
     else:
         if name is None:
-            raise click.UsageError("give the workspace a NAME, or --answers <agentlib.toml>")
+            raise click.UsageError("give the workspace a NAME, or --answers <agentcraft2.toml>")
         answers = WorkspaceAnswers(
             name=check_name("workspace", name),
             owner=tools.ask(owner, "Which team owns this workspace?", "platform-team"),
@@ -317,7 +317,7 @@ def registry_pin(tools: Toolbox, server: str, workspace: Path | None) -> None:
 @workspace_option
 @pass_toolbox
 def update(tools: Toolbox, show_diff: bool, plan_only: bool, workspace: Path | None) -> None:
-    """Bring generated files up to what this version of agentlib writes.
+    """Bring generated files up to what this version of agentcraft2 writes.
 
     A file you have not changed since it was generated is replaced. A file you
     changed is left alone and listed. Registries, rules, samples and .env
@@ -344,5 +344,5 @@ def update(tools: Toolbox, show_diff: bool, plan_only: bool, workspace: Path | N
     if not (report.updated or report.created or report.kept):
         click.echo("  nothing to do: every generated file is up to date")
     elif report.kept and not show_diff:
-        command = "agentlib update --plan --diff" if plan_only else "agentlib update --diff"
+        command = "agentcraft2 update --plan --diff" if plan_only else "agentcraft2 update --diff"
         click.echo(f"\nSee what the templates would change in the files you changed: {command}")

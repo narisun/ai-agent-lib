@@ -31,7 +31,7 @@ def test_the_registries_load_and_every_agent_names_servers_that_exist() -> None:
 
 def test_the_rules_are_a_valid_document() -> None:
     rules = RulesPolicyDecisionPoint(
-        RulesPolicyOptions(path=ROOT / "policies" / "agentlib" / "rules" / "data.yaml"),
+        RulesPolicyOptions(path=ROOT / "policies" / "agentcraft2" / "rules" / "data.yaml"),
         SequentialIds(),
     )
     assert rules.revision.startswith("sha256:")

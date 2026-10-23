@@ -23,7 +23,7 @@ _NAME = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
 _MAX_LENGTH = 28  # two names and a few words must fit in a rule ID
 _MCP_SUFFIX = "-mcp"
 # Names that would shadow a module every project has, or that a tool treats specially.
-_RESERVED = frozenset({"test", "tests", "src", "site", "agentlib", "mcp", "langgraph"})
+_RESERVED = frozenset({"test", "tests", "src", "site", "agentcraft2", "mcp", "langgraph"})
 
 
 def python_name(name: str) -> str:

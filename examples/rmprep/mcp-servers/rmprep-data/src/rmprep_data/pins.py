@@ -1,6 +1,6 @@
 """Print the schema pins of this server's tools, for the tool registry.
 
-``agentlib registry pin rmprep-data`` runs this and writes the pins to
+``agentcraft2 registry pin rmprep-data`` runs this and writes the pins to
 ``registry/mcp-tools.yaml``.
 """
 

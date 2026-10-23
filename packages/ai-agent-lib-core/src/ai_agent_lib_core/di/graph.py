@@ -240,7 +240,7 @@ class AdapterGraph:
             raise ConfigurationError(
                 f"startup validation failed for {count} adapter{'s' if count != 1 else ''}",
                 actual=" | ".join(problems),
-                fix="run 'agentlib doctor' for one line per adapter with what to do",
+                fix="run 'agentcraft2 doctor' for one line per adapter with what to do",
             )
 
     async def check(self) -> tuple[CheckResult, ...]:

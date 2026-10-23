@@ -25,7 +25,7 @@ class JsonlAuditOptions(AuditOptions):
         fsync: Force each record to disk before ``write`` returns.
     """
 
-    path: Path = Path(".agentlib/audit.jsonl")
+    path: Path = Path(".agentcraft2/audit.jsonl")
     fsync: bool = True
 
 

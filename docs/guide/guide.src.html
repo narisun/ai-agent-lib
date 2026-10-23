@@ -488,7 +488,7 @@ def main() -&gt; int:
     <tbody>
       <tr><td>Agent and MCP services</td><td>Business workflow, evidence, policy enforcement, and graph checkpoints</td><td><code>.venv/Lib/site-packages</code>; the approved Python runs it</td></tr>
       <tr><td>Agent Lab</td><td>Agent selection, displayed chat history, memo versions, and inspection pages</td><td><code>packages/ai-agent-lib-ui/.venv/Lib/site-packages</code>; the same approved Python</td></tr>
-      <tr><td>Local Phoenix server, when enabled</td><td>Model/tool observations in a local SQLite database</td><td><code>.agentlib/phoenix/.venv/Lib/site-packages</code> with the same Python; included by <code>start-local.bat</code> when enabled</td></tr>
+      <tr><td>Local Phoenix server, when enabled</td><td>Model/tool observations in a local SQLite database</td><td><code>.agentcraft2/phoenix/.venv/Lib/site-packages</code> with the same Python; included by <code>start-local.bat</code> when enabled</td></tr>
     </tbody>
   </table></div>
   <p>A saved UI message, a graph checkpoint, and a model input are different things.
@@ -690,7 +690,7 @@ set "LIBRARY=%CD%"</code></pre>
 cd /d "%LIBRARY%\..\tutorial"
 "%PYTHON%" -m ai_agent_lib_cli new agent helper --description "A practice assistant" --model fake
 "%PYTHON%" -m ai_agent_lib_cli install</code></pre>
-  <p><strong>Check:</strong> the workspace contains <code>agentlib.toml</code> and
+  <p><strong>Check:</strong> the workspace contains <code>agentcraft2.toml</code> and
   <code>agents\helper</code>, and installation finishes successfully.
   <code>init</code> creates shared files; <code>new agent</code> creates the agent's
   source and tests. <code>--lib-path</code> records which library checkout to use.
@@ -795,11 +795,11 @@ with urlopen(request, timeout=30) as response:
     .env.example        Shareable configuration template
     pyproject.toml      This service's Python dependencies
   registry/             Agent and MCP tool registrations
-  policies/agentlib/rules/data.yaml
+  policies/agentcraft2/rules/data.yaml
                         Which actions are allowed
   tests/policy-samples.yaml
                         Examples of allowed and denied requests
-  agentlib.toml         Answers used to generate the workspace
+  agentcraft2.toml         Answers used to generate the workspace
   pyproject.toml        Shared test and development-tool settings</code></pre>
   <p>Read <code>tools.py</code> first: it contains the greeting function. Next open
   <code>graph.py</code> and find <code>build_graph</code>. Its
@@ -882,7 +882,7 @@ def test_farewell_trims_the_name() -&gt; None:
     reason: helper-calls-its-own-tools</code></pre>
 <pre><code class="language-bat">"%PYTHON%" -m ai_agent_lib_cli policy test</code></pre>
   <p>The new sample should fail: no rule permits <code>farewell</code> yet. In
-  <code>policies/agentlib/rules/data.yaml</code>, find the existing rule with
+  <code>policies/agentcraft2/rules/data.yaml</code>, find the existing rule with
   <code>id: helper-calls-its-own-tools</code>. Change its <code>resources</code> list
   from <code>[greet]</code> to <code>[greet, farewell]</code>. The rule should look like:</p>
 <pre><code class="language-yaml">  - id: helper-calls-its-own-tools
@@ -1081,7 +1081,7 @@ AC2_MODEL_PROVIDER=fake</code></pre>
       <tr><td><code>python</code> is not recognized, or opens the Store</td><td>Use your team's prepared terminal or approved <code>python.exe</code> path in quotes. Ask for the approved installation path if you do not have it.</td></tr>
       <tr><td><code>pip</code> is missing</td><td>Ask for the team's approved Python and pip setup. Point <code>PYTHON</code> at that executable.</td></tr>
       <tr><td>Access denied when installing packages</td><td>Check that the folder is writable and that <code>"%PYTHON%" -c "import sys; print(sys.executable)"</code> points to your approved Python. For an application-policy block, provide the blocked tool's name and path to desktop support.</td></tr>
-      <tr><td><code>"%PYTHON%"</code> cannot run, or <code>agentlib.toml</code> cannot be found</td><td>Use <a href="#new-terminal">the new-terminal recipe</a>. Python selection and the current folder are separate: select the environment and run workspace commands from <code>tutorial</code>.</td></tr>
+      <tr><td><code>"%PYTHON%"</code> cannot run, or <code>agentcraft2.toml</code> cannot be found</td><td>Use <a href="#new-terminal">the new-terminal recipe</a>. Python selection and the current folder are separate: select the environment and run workspace commands from <code>tutorial</code>.</td></tr>
       <tr><td>HTTP 401/403 or a proxy error during pip installation</td><td>Repeat the enterprise sign-in or proxy setup for this terminal. Confirm the pip repository endpoint with your team; use the same approved package source for each installation step.</td></tr>
       <tr><td><code>CERTIFICATE_VERIFY_FAILED</code></td><td>Ask for the enterprise CA configuration for this Python/pip environment. Pip supports a team-provided certificate bundle through <code>PIP_CERT</code>. Keep certificate verification enabled; the agent's <code>AC2_TLS_CA_BUNDLE</code> setting does not configure pip.</td></tr>
       <tr><td><code>No matching distribution found</code>, missing <code>hatchling</code>, or a compiler requirement</td><td>Share the package name, Python version, and Windows architecture with the package-maintenance team. They need to make compatible releases, build dependencies, and prebuilt wheels available. Use a team-supported build environment for dependencies that need compilation.</td></tr>
@@ -1135,7 +1135,7 @@ AC2_MODEL_PROVIDER=fake</code></pre>
     masked credentials. Wait for <strong>All selected services are ready</strong>,
     then open <code>http://127.0.0.1:8765</code>. Read the login code in a second
     Command Prompt at the repository root:</p>
-<pre><code class="language-bat">type .agentlib\ui-rmprep\access-code</code></pre>
+<pre><code class="language-bat">type .agentcraft2\ui-rmprep\access-code</code></pre>
     <p>Sign in, select <strong>Choose agent → Start chat with rmprep</strong>, and
     ask <code>Prepare a memo for JONE-0022 as of 2026-08-03.</code> In the same
     chat, ask <code>Explain the covenant breaches and cash conversion cycle change.
@@ -1170,7 +1170,7 @@ AC2_MODEL_PROVIDER=fake</code></pre>
 <pre><code class="language-bat">start-phoenix.bat setup</code></pre>
       <p>This installs the pinned Phoenix 20.21.1 through your existing pip
       configuration. All services use the default Python. Phoenix keeps its
-      dependencies in <code>.agentlib\phoenix\.venv</code>; the launcher runs
+      dependencies in <code>.agentcraft2\phoenix\.venv</code>; the launcher runs
       Python and pip from your approved installation.</p></li>
       <li><strong>Enable tracing.</strong> Add these settings to <code>.env</code>
       beside <code>start-local.bat</code>. Keep your model settings and API key.
@@ -1199,7 +1199,7 @@ PHOENIX_PROJECT_NAME=rmprep-trial</code></pre>
       model inputs/outputs, MCP arguments/results and checkpoint references. The
       follow-ups should remember the search and zero matches without another
       tool call. Their model inputs should include the earlier exchange. Phoenix
-      stores traces in <code>.agentlib\phoenix\data\phoenix.db</code>;
+      stores traces in <code>.agentcraft2\phoenix\data\phoenix.db</code>;
       checkpoint contents stay in the agent's database.</p></li>
       <li><strong>Stop when finished.</strong> In a second Command Prompt at the
       repository root, run:
@@ -1239,11 +1239,11 @@ PHOENIX_PROJECT_NAME=rmprep-trial</code></pre>
 
   <h3 id="model-debugging">How do I see what the model receives and returns?</h3>
   <p>Add this setting to <code>agents/helper/.env</code>, then restart the agent:</p>
-<pre><code>AC2_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl</code></pre>
+<pre><code>AC2_MODEL_TRACE_PATH=.agentcraft2/model-trace.jsonl</code></pre>
   <p>Run a question in Command Prompt. Start any linked MCP servers first.</p>
 <pre><code class="language-bat">"%PYTHON%" -m helper "My name is Ada. Please greet me." --thread debug-ada
 "%PYTHON%" -m helper "What is my name?" --thread debug-ada</code></pre>
-  <p>The file is <code>tutorial/agents/helper/.agentlib/model-trace.jsonl</code>.
+  <p>The file is <code>tutorial/agents/helper/.agentcraft2/model-trace.jsonl</code>.
   Relative paths resolve from the service's <code>.env</code> folder. The setting
   works for command-line calls and HTTP requests, including services generated by
   an earlier version once their core library is updated. The fake model echoes
@@ -1287,7 +1287,7 @@ from pathlib import Path
 with Path(sys.argv[1]).open(encoding="utf-8") as trace:
     for line in trace:
         print(json.dumps(json.loads(line), indent=2, ensure_ascii=True))</code></pre>
-<pre><code class="language-bat">"%PYTHON%" read_trace.py agents/helper/.agentlib/model-trace.jsonl</code></pre>
+<pre><code class="language-bat">"%PYTHON%" read_trace.py agents/helper/.agentcraft2/model-trace.jsonl</code></pre>
   <p>The reader escapes non-ASCII characters so it also works with older Windows
   terminal encodings. New workspaces include this utility at
   <code>examples\read_trace.py</code>, with a <code>--last</code> option for recent events.</p>
@@ -1315,7 +1315,7 @@ configure_logging("helper", level="DEBUG", details=True)</code></pre>
   <p>Each generated agent includes a scripted ReAct example. After creating and
   installing <code>helper</code> in step 1, run it from the workspace root:</p>
 <pre><code class="language-bat">"%PYTHON%" -m helper.examples.trace_react
-"%PYTHON%" examples\read_trace.py agents/helper/.agentlib/react-demo.jsonl --last 6</code></pre>
+"%PYTHON%" examples\read_trace.py agents/helper/.agentcraft2/react-demo.jsonl --last 6</code></pre>
   <p>For another agent name, use the command in its README. On macOS/Linux,
   use <code>"$PYTHON"</code> for the Python commands.</p>
   <p>The script runs the generated graph and its local <code>greet</code> tool with
@@ -1328,7 +1328,7 @@ configure_logging("helper", level="DEBUG", details=True)</code></pre>
 Your name is Ada.
 Messages sent on each model call: [2, 4, 6]
 Checkpoint message types: ['human', 'ai', 'tool', 'ai', 'human', 'ai']
-Trace: .../agents/helper/.agentlib/react-demo.jsonl</code></pre>
+Trace: .../agents/helper/.agentcraft2/react-demo.jsonl</code></pre>
   <div class="table-wrap"><table>
     <thead><tr><th>Model call</th><th>Messages supplied by the graph</th><th>Scripted response</th></tr></thead>
     <tbody>
@@ -1373,7 +1373,7 @@ Trace: .../agents/helper/.agentlib/react-demo.jsonl</code></pre>
 "%PYTHON%" -m helper.examples.trace_anthropic</code></pre>
   <p>The example enables its own model trace, offers the local greeting tool,
   and prints both checkpoints and the model exchanges. It saves each run under
-  <code>agents/helper/.agentlib/anthropic-demo/</code>. Add
+  <code>agents/helper/.agentcraft2/anthropic-demo/</code>. Add
   <code>--thread "your-thread-id"</code> to continue an existing conversation.
   It calls Anthropic using API tokens; the ordinary tests use scripted replies.</p>
 
@@ -1618,7 +1618,7 @@ async def classify(
     <thead><tr><th>Signal</th><th>Use it to answer</th><th>Where to start</th></tr></thead>
     <tbody>
       <tr><td>Log</td><td>What error or event happened in this process?</td><td>The generated HTTP service writes JSON lines to its output.</td></tr>
-      <tr><td>Audit record</td><td>Who attempted which action, and was it allowed?</td><td>Locally, check the service's <code>.agentlib/audit.jsonl</code>.</td></tr>
+      <tr><td>Audit record</td><td>Who attempted which action, and was it allowed?</td><td>Locally, check the service's <code>.agentcraft2/audit.jsonl</code>.</td></tr>
       <tr><td>Trace</td><td>Which calls made up this request, and where was time spent?</td><td>Enable OpenTelemetry and inspect the request's connected spans.</td></tr>
       <tr><td>Metric</td><td>How often does something happen, or how slow is it overall?</td><td>Inspect counts and durations in your telemetry backend.</td></tr>
       <tr><td>Model diagnostic trace</td><td>Which messages and tools reached the model, and what did it return?</td><td>Enable <code>AC2_MODEL_TRACE_PATH</code> with test data; follow the <a href="#model-debugging">debugging recipe</a>.</td></tr>
@@ -1657,8 +1657,8 @@ async def classify(
   <p>This command selects tests marked <code>eval</code>. They require network access
   to the configured model and use your account's quota and billing. The generated
   evaluation skips when the selected model is <code>fake</code>. Each run writes
-  <code>agents/helper/.agentlib/eval-report.json</code>, with the mean for each metric
-  and every case's score. The <code>.agentlib</code> folder is excluded from version
+  <code>agents/helper/.agentcraft2/eval-report.json</code>, with the mean for each metric
+  and every case's score. The <code>.agentcraft2</code> folder is excluded from version
   control, so open the file to inspect individual failures alongside the aggregate score.</p>
 
   <h3 id="eval-baselines">Protect a baseline</h3>
@@ -1691,7 +1691,7 @@ async def classify(
   <code>score_interactions</code> scores it with ordinary scorers into an ordinary
   report; it does not call the agent again. Exporting is a Python entry point, not
   yet a CLI command. Feedback logs and exports hold real conversation content, so
-  keep them in private <code>.agentlib/</code> state and never commit them.</p>
+  keep them in private <code>.agentcraft2/</code> state and never commit them.</p>
   <p>The <a href="evals.md">evals guide</a> covers the dataset and report formats,
   the generated test, judges and calibration, the export and scoring scripts, and
   privacy in full.</p>
@@ -1920,8 +1920,8 @@ async def classify(
     replace service names, endpoints, IDs, and paths with values supplied by your
     team. Set only the variables your service needs. Variables were previously
     spelled <code>EAP_*</code>; the old spellings keep working for one minor
-    release and warn in the service log, in <code>agentlib doctor</code> and in
-    <code>agentlib config explain</code>. The table lists the current names only.</p>
+    release and warn in the service log, in <code>agentcraft2 doctor</code> and in
+    <code>agentcraft2 config explain</code>. The table lists the current names only.</p>
 
     <h3 id="aws-platform-settings">How the settings fit the AWS design</h3>
     <p>Run agents and MCP servers as ECS Fargate services. The generated deployment
@@ -2027,7 +2027,7 @@ async def classify(
   </details>
   <details class="lesson" id="cli">
     <summary>CLI commands and flags</summary>
-    <p>The command names below use <code>agentlib</code> as shorthand. In Command Prompt,
+    <p>The command names below use <code>agentcraft2</code> as shorthand. In Command Prompt,
     run them with <code>"%PYTHON%" -m ai_agent_lib_cli</code>; in bash/zsh use
     <code>"$PYTHON" -m ai_agent_lib_cli</code>. Add <code>--help</code> to any command
     to list its accepted flags.</p>
@@ -2108,7 +2108,7 @@ async def classify(
     to browse earlier pages. Reopening a held thread checks the agent's outcome journal
     without resending its question. A confirmed outcome restores the answer or failure;
     an unknown outcome keeps the thread held. Local rmprep and newly generated local
-    agents save this journal in <code>.agentlib/outcomes.sqlite</code> beside their
+    agents save this journal in <code>.agentcraft2/outcomes.sqlite</code> beside their
     project file. It contains accepted answers, so protect it like checkpoints.
     Restart the agent and UI after updating their code.</p>
     <p>The agent HTTP service accepts one active request per caller and thread.

@@ -14,8 +14,8 @@ package = false
 members = ["agents/*", "mcp-servers/*"]
 {% if library.kind == "path" %}
 
-# Optional uv support for the local checkout. The pip-based agentlib install
-# command uses the library source recorded in agentlib.toml instead.
+# Optional uv support for the local checkout. The pip-based agentcraft2 install
+# command uses the library source recorded in agentcraft2.toml instead.
 [tool.uv.sources]
 ai-agent-lib-core = { path = {{ (library.path ~ "/packages/ai-agent-lib-core") | toml }}, editable = true }
 ai-agent-lib-aws = { path = {{ (library.path ~ "/packages/ai-agent-lib-aws") | toml }}, editable = true }
@@ -24,7 +24,7 @@ ai-agent-lib-cli = { path = {{ (library.path ~ "/packages/ai-agent-lib-cli") | t
 
 [dependency-groups]
 dev = [
-    # The agentlib command, to add agents and MCP servers to this workspace.
+    # The agentcraft2 command, to add agents and MCP servers to this workspace.
     "ai-agent-lib-cli{{ library.version or "" }}",
     "mypy>=1.11",
     "pytest>=8.2",

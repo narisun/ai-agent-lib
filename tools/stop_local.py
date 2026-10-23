@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def stop(root: Path, *, timeout: float = 150) -> int:
     """Request every active launcher first, then wait for their cleanup in parallel."""
-    runs = (root / ".agentlib/local-runs").resolve()
+    runs = (root / ".agentcraft2/local-runs").resolve()
     requested: list[Path] = []
     for control in sorted(runs.glob("*/control.json")):
         directory = control.parent

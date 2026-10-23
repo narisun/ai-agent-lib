@@ -316,7 +316,8 @@ async def test_opa_is_asked_with_the_decision_input_and_its_answer_is_used() -> 
     (request,) = seen
     assert request.method == "POST"
     assert (
-        str(request.url) == "http://localhost:8181/v1/data/agentlib/authz/decision?provenance=true"
+        str(request.url)
+        == "http://localhost:8181/v1/data/agentcraft2/authz/decision?provenance=true"
     )
     assert json.loads(request.content) == {"input": question().to_input()}
     assert request.headers["authorization"] == "Bearer t0ken"
@@ -768,7 +769,7 @@ async def test_a_denial_names_what_was_refused_the_rule_that_would_allow_it_and_
     assert error.actual is not None
     assert error.actual.startswith("no rule matched; the closest were rule 'managers-call")
     assert error.fix is not None
-    assert "agentlib policy test" in error.fix
+    assert "agentcraft2 policy test" in error.fix
     assert "reason: no_matching_rule" in str(error)
 
 

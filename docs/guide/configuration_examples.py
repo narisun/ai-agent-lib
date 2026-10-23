@@ -28,14 +28,14 @@ class EnvironmentExample:
 
 LOCAL_OPTIONS: Mapping[Section, dict[str, object]] = {
     Section.SECRETS: {},
-    Section.AUDIT: {"path": ".agentlib/audit.jsonl"},
+    Section.AUDIT: {"path": ".agentcraft2/audit.jsonl"},
     Section.IDENTITY: {"subject": "dev-user", "tenant": "dev-tenant", "roles": ["analyst"]},
-    Section.CHECKPOINT: {"path": ".agentlib/checkpoints.sqlite"},
+    Section.CHECKPOINT: {"path": ".agentcraft2/checkpoints.sqlite"},
     Section.REGISTRY: {
         "agents_path": "../../registry/agents.yaml",
         "tools_path": "../../registry/mcp-tools.yaml",
     },
-    Section.POLICY: {"path": "../../policies/agentlib/rules/data.yaml"},
+    Section.POLICY: {"path": "../../policies/agentcraft2/rules/data.yaml"},
     Section.GUARDRAILS: {},
 }
 
@@ -61,7 +61,7 @@ AWS_OPTIONS: Mapping[Section, dict[str, object]] = {
     },
     Section.POLICY: {
         "url": "http://localhost:8181",
-        "package": "agentlib/authz",
+        "package": "agentcraft2/authz",
         "rule": "decision",
     },
     Section.GUARDRAILS: {"guardrail_id": "abc123def456", "guardrail_version": "1"},
@@ -185,7 +185,7 @@ def configuration_examples() -> dict[str, EnvironmentExample]:
             "through its collector; S3 archival needs additional infrastructure.",
         ),
         Key.MODEL_TRACE_PATH: EnvironmentExample(
-            "Optional: `.agentlib/model-trace.jsonl`",
+            "Optional: `.agentcraft2/model-trace.jsonl`",
             "Unset normally; diagnostic file: `/tmp/model-trace.jsonl`",
             "Captures LangChain model messages and replies, including content. This is a local "
             "JSONL file even in AWS; `s3://` is not supported. To retain it in S3, configure "

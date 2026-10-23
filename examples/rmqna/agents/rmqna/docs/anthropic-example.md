@@ -27,7 +27,7 @@ Install the workspace after saving any dependency changes:
 "%PYTHON%" -m ai_agent_lib_cli install
 ```
 
-`install` uses this Python's pip and the library source in `agentlib.toml`.
+`install` uses this Python's pip and the library source in `agentcraft2.toml`.
 Repeat the Python selection in each new Command Prompt terminal.
 
 ## 2. Configure your model
@@ -53,7 +53,7 @@ take precedence over `.env` values.
 
 The example enables tracing in its own configuration. You do not need to set
 `AC2_MODEL_TRACE_PATH` for this script. It uses the configured checkpoint store;
-the tutorial's local defaults use SQLite under `agents/rmqna/.agentlib/`.
+the tutorial's local defaults use SQLite under `agents/rmqna/.agentcraft2/`.
 
 ## 3. Run both questions
 
@@ -101,8 +101,8 @@ The script saves two files in a new directory for every run:
 
 | File | Contents |
 | --- | --- |
-| `agents/rmqna/.agentlib/anthropic-demo/<run-id>/model-trace.jsonl` | Model inputs and outputs at the library's provider adapter boundary. |
-| `agents/rmqna/.agentlib/anthropic-demo/<run-id>/checkpoint-history.json` | The checkpoint messages after each of the two turns, with request and thread IDs. |
+| `agents/rmqna/.agentcraft2/anthropic-demo/<run-id>/model-trace.jsonl` | Model inputs and outputs at the library's provider adapter boundary. |
+| `agents/rmqna/.agentcraft2/anthropic-demo/<run-id>/checkpoint-history.json` | The checkpoint messages after each of the two turns, with request and thread IDs. |
 
 Copy the printed paths to open these files in your editor. You can also use the
 included reader; replace `PASTE_TRACE_PATH_HERE` with the printed trace path:
@@ -115,7 +115,7 @@ The checkpoint history file is a readable snapshot. LangGraph continues the
 conversation from its configured checkpoint database, not from this JSON file.
 The trace contains LangChain messages and responses, not the SDK's HTTP traffic
 or private model reasoning. Both files contain conversation content; keep them
-private. Their `.agentlib/` directory is ignored by Git.
+private. Their `.agentcraft2/` directory is ignored by Git.
 
 ## 5. Continue the thread or start fresh
 

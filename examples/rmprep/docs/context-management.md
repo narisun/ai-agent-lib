@@ -263,7 +263,7 @@ graph = build_graph(
 
 ## Inspect the decision
 
-Set `AC2_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl` in the agent's `.env`.
+Set `AC2_MODEL_TRACE_PATH=.agentcraft2/model-trace.jsonl` in the agent's `.env`.
 Each model request contains a `Context selection` manifest in its system
 message. It identifies the selected memo IDs, client, meeting date, retrieval
 date and mode. The model messages show the actual evidence projection.

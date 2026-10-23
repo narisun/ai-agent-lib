@@ -1,8 +1,8 @@
-# One agentlib service on ECS Fargate: the service, an OPA sidecar when it uses
+# One agentcraft2 service on ECS Fargate: the service, an OPA sidecar when it uses
 # OPA, and an OpenTelemetry collector sidecar when it sends telemetry.
 #
 # The task role holds only what the service's adapters declared they need
-# (task_policy_json, written by 'agentlib deploy'), plus what the collector
+# (task_policy_json, written by 'agentcraft2 deploy'), plus what the collector
 # needs when there is one. The execution role can pull images and write this
 # service's logs, nothing else.
 

@@ -37,7 +37,7 @@ pointing the engine at anything real.
 ## 1. Install
 
 Use Python 3.11 or newer in a virtual environment. From this workspace's folder, with the library
-checkout two levels up (see `agentlib.toml`):
+checkout two levels up (see `agentcraft2.toml`):
 
 ```bash
 python -m pip install -e ../../packages/ai-agent-lib-core -e ../../packages/ai-agent-lib-cli
@@ -64,7 +64,7 @@ python -m rmqna "Which clients have a covenant in breach?" --thread demo    # te
 The agent's own README, [`agents/rmqna/README.md`](agents/rmqna/README.md), has the HTTP request
 and the live chat UI. With no model and no servers, `python -m rmqna.examples.trace_react` runs the
 real server and engine in process under a scripted model and writes its trace to
-`agents/rmqna/.agentlib/react-demo/`; read it with `python examples/read_trace.py <file>`.
+`agents/rmqna/.agentcraft2/react-demo/`; read it with `python examples/read_trace.py <file>`.
 
 Good first questions: *Which clients are using more than 80% of their credit lines?*, *What is our
 weighted pipeline for the next 90 days, by product?*, *What deals does Wawona have open?* (a name
@@ -102,9 +102,9 @@ examples, about 27,000 tokens) on every model span, and every tool result, which
 and figures. There is no setting that captures the SQL alone. That is acceptable for this synthetic
 data on a developer's machine; do not turn it on for real data, and turn it off when you finish.
 
-`AC2_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl` is the alternative with no Phoenix at all: it
+`AC2_MODEL_TRACE_PATH=.agentcraft2/model-trace.jsonl` is the alternative with no Phoenix at all: it
 records every model request and response, tool-call arguments (the SQL) included, to a JSONL file
-under the agent's `.agentlib/`, whatever the Phoenix settings say. It holds content too, so keep it
+under the agent's `.agentcraft2/`, whatever the Phoenix settings say. It holds content too, so keep it
 private. `agents/rmqna/docs/tracing.md` has the rest of the Phoenix settings. The server's own log
 never holds SQL by design: one line per call with its duration, row and column counts, truncated
 flag and error kind.
@@ -133,8 +133,8 @@ provider the eval skips itself); the `rmqna-data` tools are connected in process
 library's `InProcessMcpConnector`, over the real engine. A run asks all 33 questions with a model
 call or several each, so it costs tokens.
 
-- A run writes `agents/rmqna/.agentlib/eval-report.json` (scores per case) and
-  `.agentlib/eval-outputs.json` (the answer and every statement the agent sent, per case). Both are
+- A run writes `agents/rmqna/.agentcraft2/eval-report.json` (scores per case) and
+  `.agentcraft2/eval-outputs.json` (the answer and every statement the agent sent, per case). Both are
   private to your machine. For a failed case, compare its statements with the case's `reference_sql`.
 - There is no `evals/baseline.json` yet. A baseline depends on the model, so the first one is minted
   by a maintainer's live `eval rmqna --accept` and committed. After that every run also fails when a
@@ -171,4 +171,4 @@ local development identity has the `analyst` role; change `AC2_IDENTITY_OPTIONS`
 to see the policy deny another.
 
 rmqna is local only: the server loads this workspace's `data/` folder and the agent's schema document
-by their place in the repository, and `agentlib deploy` is not set up for it.
+by their place in the repository, and `agentcraft2 deploy` is not set up for it.

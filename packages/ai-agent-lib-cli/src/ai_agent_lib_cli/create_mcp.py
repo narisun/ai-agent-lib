@@ -1,4 +1,4 @@
-"""Adding an MCP server: what ``agentlib new mcp`` does once its options are read.
+"""Adding an MCP server: what ``agentcraft2 new mcp`` does once its options are read.
 
 The server is generated from its answers and from what a reader proposed, if
 one did; then its tools' input schemas are pinned, unless that was declined.
@@ -55,7 +55,7 @@ class McpCreated:
         if self.not_pinned is not None:
             return (
                 f"  not pinned: {self.not_pinned}\n"
-                f"  Pin later with: agentlib registry pin {self.server.server_id}"
+                f"  Pin later with: agentcraft2 registry pin {self.server.server_id}"
             )
         return None
 

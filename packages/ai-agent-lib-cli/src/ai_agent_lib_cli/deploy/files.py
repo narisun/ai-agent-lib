@@ -33,7 +33,7 @@ __all__ = [
 ]
 
 _HEADER = (
-    "# Written by 'agentlib deploy {name}{target}' from {source}.\n"
+    "# Written by 'agentcraft2 deploy {name}{target}' from {source}.\n"
     "# Do not edit: change that file and run the command again.\n"
 )
 _REGO_TEST_SUFFIX = "_test.rego"
@@ -56,7 +56,7 @@ class DeploymentReport:
 
 
 def maintained_files(target: Target) -> frozenset[PurePosixPath]:
-    """The files ``agentlib deploy`` rewrites every time; the rest are written once."""
+    """The files ``agentcraft2 deploy`` rewrites every time; the rest are written once."""
     folder = target.deployment
     return frozenset({folder / "settings.tf", folder / "permissions.tf"})
 

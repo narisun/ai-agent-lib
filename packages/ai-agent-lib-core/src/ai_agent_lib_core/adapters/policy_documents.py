@@ -261,7 +261,7 @@ def parse_rules_document(raw: object, *, what: str = "policy rules") -> tuple[Ru
             f"{what} do not match the agentlib.rules/v1 schema",
             expected=found.expected,
             actual=found.actual,
-            fix="correct the file, then run 'agentlib policy test'",
+            fix="correct the file, then run 'agentcraft2 policy test'",
         ) from None
     ids = [rule.id for rule in document.rules]
     repeated = sorted({rule_id for rule_id in ids if ids.count(rule_id) > 1})

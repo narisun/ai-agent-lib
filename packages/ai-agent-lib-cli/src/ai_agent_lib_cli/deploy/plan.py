@@ -115,7 +115,7 @@ def _read_settings(
             f"{target.settings} does not exist",
             expected=f"the settings {target.name} runs with in AWS, in {target.settings}",
             actual="no such file",
-            fix=f"run 'agentlib deploy {target.name}' to write a starting one, then fill it in",
+            fix=f"run 'agentcraft2 deploy {target.name}' to write a starting one, then fill it in",
         )
     source = DotenvConfigSource(path, required=True)
     try:
@@ -194,7 +194,7 @@ def _project(root: Path, target: Target) -> dict[str, Any]:
         raise CliError(
             f"{target.folder}/pyproject.toml could not be read ({describe(exc)})",
             expected="the service's pyproject.toml with a [project] table",
-            fix="repair the file, or regenerate the service with 'agentlib new'",
+            fix="repair the file, or regenerate the service with 'agentcraft2 new'",
         ) from exc
     return project if isinstance(project, dict) else {}
 

@@ -8,7 +8,7 @@ event. Data queries also pass through the library's permission and result checks
 
 ## Before you start
 
-Run commands from the **workspace root**, where `agentlib.toml` lives.
+Run commands from the **workspace root**, where `agentcraft2.toml` lives.
 Follow [Select Python](../../README.md#select-python) in the workspace README
 to set `PYTHON` to your approved Python executable. Select it again in
 every new terminal. These commands use Windows Command Prompt; in bash/zsh replace
@@ -119,7 +119,7 @@ output or run `"%PYTHON%" -m ai_agent_lib_cli doctor {{ name }}` to diagnose a f
 
 On this machine a caller without a token is the development identity in
 `{{ var.identity_options }}`. Local state is written under
-`mcp-servers/{{ name }}/.agentlib/`.
+`mcp-servers/{{ name }}/.agentcraft2/`.
 
 ## What to read
 
@@ -170,7 +170,7 @@ These file paths are relative to this service folder:
    in the workspace's `registry/mcp-tools.yaml`.
 4. From the workspace root, run
    `"%PYTHON%" -m ai_agent_lib_cli registry pin {{ server_id }}` to pin its arguments.
-5. Update the workspace's `policies/agentlib/rules/data.yaml` for any new roles
+5. Update the workspace's `policies/agentcraft2/rules/data.yaml` for any new roles
    or columns to mask, and add samples in `tests/policy-samples.yaml`.
 6. Run `"%PYTHON%" -m ai_agent_lib_cli check` from the workspace root.
 

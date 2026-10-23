@@ -63,5 +63,5 @@ def report_error(problem: AgentLibError) -> int:
     type, facts, notes and causes, as ``explain`` does.
     """
     text = str(problem) if isinstance(problem, CliError) else explain(problem)
-    click.echo(f"agentlib: error: {text}", err=True)
+    click.echo(f"agentcraft2: error: {text}", err=True)
     return EXIT_FAILED

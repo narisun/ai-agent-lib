@@ -20,7 +20,7 @@ from ai_agent_lib_cli.workspace import load_answers
 from ai_agent_lib_core.adapters.strict_yaml import load_strict_yaml
 
 RATES = Path(__file__).parent / "data" / "rates.yaml"
-RULES = Path("policies/agentlib/rules/data.yaml")
+RULES = Path("policies/agentcraft2/rules/data.yaml")
 
 RECORD = {"type": "object", "properties": {"id": {"type": "integer"}, "label": {"type": "string"}}}
 

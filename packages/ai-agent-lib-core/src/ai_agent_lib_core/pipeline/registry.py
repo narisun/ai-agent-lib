@@ -90,7 +90,7 @@ def allowed_agent(agent: AgentEntry | None, name: str, server: ServerEntry) -> A
             f"agent {name!r} is not registered",
             reason_code="agent_unregistered",
             fix=(
-                f"add {name!r} to the agent registry (agentlib new agent does this), or "
+                f"add {name!r} to the agent registry (agentcraft2 new agent does this), or "
                 "check that the caller's token names the agent by its registered ID or client ID"
             ),
         )
@@ -107,7 +107,7 @@ def allowed_agent(agent: AgentEntry | None, name: str, server: ServerEntry) -> A
             reason_code="server_not_allowed",
             expected=f"{server.id!r} among the agent's mcp_servers",
             actual=f"its mcp_servers are: {listed}",
-            fix=f"run 'agentlib link {name} {server.id}', or add it to the agent registry",
+            fix=f"run 'agentcraft2 link {name} {server.id}', or add it to the agent registry",
         )
     return agent
 
@@ -163,7 +163,7 @@ class RegistryInterceptor(Generic[ResponseT]):
                 expected=f"one of the server's registered tools: {registered}",
                 fix=(
                     f"add the tool under server {request.server!r} in the tool registry, then "
-                    f"pin it with 'agentlib registry pin {request.server}'"
+                    f"pin it with 'agentcraft2 registry pin {request.server}'"
                 ),
             )
 

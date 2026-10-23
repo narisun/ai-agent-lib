@@ -36,7 +36,7 @@ class RulesPolicyOptions(PolicyCacheOptions):
             the same file serves this provider and OPA.
     """
 
-    path: Path = Path("policies/agentlib/rules/data.yaml")
+    path: Path = Path("policies/agentcraft2/rules/data.yaml")
 
 
 class RulesPolicyDecisionPoint:

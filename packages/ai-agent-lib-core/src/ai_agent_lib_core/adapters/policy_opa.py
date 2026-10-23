@@ -1,6 +1,6 @@
 """A policy decision point that asks an Open Policy Agent server.
 
-The server evaluates one rule, by default ``data.agentlib.authz.decision``,
+The server evaluates one rule, by default ``data.agentcraft2.authz.decision``,
 which must produce an object such as::
 
     {"allow": true, "reason_code": "analysts-read-accounts",
@@ -67,7 +67,7 @@ class OpaPolicyOptions(PolicyCacheOptions):
 
     url: str = "http://localhost:8181"
     package: str = Field(
-        default="agentlib/authz", pattern=r"^[A-Za-z_][A-Za-z0-9_]*(/[A-Za-z_][A-Za-z0-9_]*)*$"
+        default="agentcraft2/authz", pattern=r"^[A-Za-z_][A-Za-z0-9_]*(/[A-Za-z_][A-Za-z0-9_]*)*$"
     )
     rule: str = Field(default="decision", pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")
     timeout_seconds: float = Field(default=2.0, gt=0)

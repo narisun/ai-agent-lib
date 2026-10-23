@@ -1,7 +1,7 @@
 # The OPA sidecar: the platform's Rego bundle with this workspace's rules as data.
 # Build it from the workspace folder:
 #   docker build -f deploy/opa/Dockerfile -t opa .
-# 'agentlib deploy' copies the bundle to deploy/opa/bundle; run it again after an upgrade.
+# 'agentcraft2 deploy' copies the bundle to deploy/opa/bundle; run it again after an upgrade.
 FROM openpolicyagent/opa:1.0.0-static
 
 COPY deploy/opa/bundle /bundle

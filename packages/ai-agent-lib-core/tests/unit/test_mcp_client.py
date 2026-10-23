@@ -226,7 +226,7 @@ async def test_a_server_that_cannot_be_reached_is_a_transient_error(
         door.answer = fault
         with pytest.raises(TransientError, match="could not be reached") as listing:
             await agent.services.mcp_tools("accounts")
-        assert "agentlib run accounts" in (listing.value.fix or "")
+        assert "agentcraft2 run accounts" in (listing.value.fix or "")
 
         door.answer = None
         (tool,) = await agent.services.mcp_tools("accounts")

@@ -570,11 +570,11 @@ def _usage(path: list[str], command: click.Command) -> str:
             elif not param.required:
                 label = f"[{label}]"
             args.append(label)
-    return " ".join(["agentlib", *path, "[OPTIONS]", *args])
+    return " ".join(["agentcraft2", *path, "[OPTIONS]", *args])
 
 
 def cli_reference() -> str:
-    """Every command and flag of the agentlib CLI."""
+    """Every command and flag of the agentcraft2 CLI."""
     parts = []
     for path, command in _commands(cli, []):
         help_text = inspect.cleandoc(command.help or "").split("\n\n", 1)[0].replace("\n", " ")
@@ -588,7 +588,7 @@ def cli_reference() -> str:
             if isinstance(p, click.Option) and not p.hidden
         ]
         parts.append(
-            f'<h4 id="cli-{"-".join(path)}"><code>agentlib {_e(" ".join(path))}</code></h4>\n'
+            f'<h4 id="cli-{"-".join(path)}"><code>agentcraft2 {_e(" ".join(path))}</code></h4>\n'
             f'<p class="small">{_e(help_text)}</p>\n'
             f'<pre class="usage">{_e(_usage(path, command))}</pre>\n'
             + (
@@ -653,7 +653,7 @@ _EXAMPLE_SOURCE = {
 def permissions() -> str:
     """What each AWS adapter needs, asked of its own access rule, for example settings.
 
-    The settings are the starting ``deploy.env`` that ``agentlib deploy`` writes
+    The settings are the starting ``deploy.env`` that ``agentcraft2 deploy`` writes
     for an agent, plus one Redshift data source.
     """
     target = Target("helper", "agent", PurePosixPath("agents", "helper"), 8000)

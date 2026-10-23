@@ -40,13 +40,13 @@ These changes landed afterward; each is documented where it is used and covered 
 
 | Change | Current behavior | Regression evidence |
 | --- | --- | --- |
-| Offline and online evals, with baselines | `ai_agent_lib_core.evaluation` scores a hand-written dataset, or sampled production interactions, and gates the result with `report.require` and `require_no_regression`. `agentlib eval` runs a service's evals; `--accept` runs them itself and, if they pass, saves the report as `evals/baseline.json`. On an intentional regression it skips only the baseline gate. See [Measure an agent with evals](evals.md). | Core `test_evaluation*.py`; CLI `test_cli_check.py`. |
+| Offline and online evals, with baselines | `ai_agent_lib_core.evaluation` scores a hand-written dataset, or sampled production interactions, and gates the result with `report.require` and `require_no_regression`. `agentcraft2 eval` runs a service's evals; `--accept` runs them itself and, if they pass, saves the report as `evals/baseline.json`. On an intentional regression it skips only the baseline gate. See [Measure an agent with evals](evals.md). | Core `test_evaluation*.py`; CLI `test_cli_check.py`. |
 | Feedback capture and interaction export | Agent Lab appends thumbs up/down on accepted answers to `feedback.jsonl`. `export_interactions` turns saved conversations, joined with that feedback, into JSONL for online scoring. It is a Python entry point, not yet a CLI command. | UI `test_feedback.py`, `test_interactions_export.py`. |
 | `AgentService` and `run_agent` composition | One composition root wires configuration, tracing, lifecycle, readiness and serving around an agent's graph. Generated agents, accounts-agent and rmprep start through it. `app_extras` adds app options that need the live container. | Core `test_http_composition.py`. |
 | Agent Lab import contracts | import-linter contracts keep the UI's contracts free of every other module in its package, keep its application layer free of frameworks and adapters, and let only its integrations module import the browser framework. | `lint-imports` over the contracts in the UI package's `pyproject.toml`. |
 | Coverage gate | CI requires 90% branch coverage on core's `contracts`, `config`, `di` and `pipeline` packages. | `.github/workflows/ci.yml`. |
 | POSIX launchers | `setup-local.sh`, `start-local.sh`, `stop-local.sh` and `start-phoenix.sh` run the same tools as their `.bat` twins on macOS and Linux. | `tests/architecture/test_local_launchers.py`. |
-| `agentlib update --plan` | A true dry run: it previews every change an update would make and writes nothing. | CLI `test_cli_diagnostics.py`. |
+| `agentcraft2 update --plan` | A true dry run: it previews every change an update would make and writes nothing. | CLI `test_cli_diagnostics.py`. |
 | Phoenix is the only agent-tracing backend | Langfuse support is removed: its integration, settings, guides and trace-link provider. `agent_tracing` is the single composition name, and `run_agent` wires it. [ADR 0004](adr/0004-tracing-configuration.md) records the decision. | Core `test_phoenix.py` and `test_http_composition.py`; CLI `test_phoenix_agents.py`; `tests/architecture/test_config_containment.py`. |
 | Library variables are spelled `AC2_*` | `AC2_` replaces `EAP_` as the prefix of every library-owned variable, including the secrets family (`AC2_SECRET_<NAME>`), the Phoenix settings and Agent Lab's reads. The generated reference, templates, examples and guides use it. The old spellings keep working for one minor release and warn; see the migration note below. | Core `test_config_legacy_prefix.py`, `test_phoenix.py` and `test_http_composition.py`; CLI `test_cli_deploy.py`; UI `test_agent_environment_prefix.py`; `tests/architecture/test_config_containment.py` and `test_local_dev.py`. |
 
@@ -54,14 +54,13 @@ These changes landed afterward; each is documented where it is used and covered 
 
 - Rename `EAP_` variables to `AC2_` wherever you set them: `.env` files, task
   definitions and `deploy.env`, shell profiles. Only the prefix changes
-  (`EAP_MODEL_PROVIDER` is now `AC2_MODEL_PROVIDER`). The `agentlib` command, the
-  `.agentlib/` state folder, the `agentlib.*/v*` schema identifiers, span
-  attributes and the deploy resource-name defaults (such as `eap-audit`) keep
-  their names.
+  (`EAP_MODEL_PROVIDER` is now `AC2_MODEL_PROVIDER`). The `agentlib.*/v*` schema
+  identifiers, span attributes and the deploy resource-name defaults (such as
+  `eap-audit`) keep their names.
 - The old `EAP_*` spellings keep working for one minor release and warn. A
   service logs one `WARNING` line per name that names its replacement (for
-  example `EAP_MODEL_ID is deprecated; use AC2_MODEL_ID instead`); `agentlib
-  doctor` (as a passing `warning` check) and `agentlib config explain` print the
+  example `EAP_MODEL_ID is deprecated; use AC2_MODEL_ID instead`); `agentcraft2
+  doctor` (as a passing `warning` check) and `agentcraft2 config explain` print the
   same line, Phoenix settings included. This covers every spelling the
   library reads: the bound variables, the `SECRET_<NAME>` family, the Phoenix
   settings, Agent Lab's settings and the local launchers.
@@ -73,11 +72,34 @@ These changes landed afterward; each is documented where it is used and covered 
   stops startup, and so does an `EAP_*` name that is not an old spelling of a
   defined variable (the message suggests the closest `AC2_` name). A typo or a
   variable that was removed is never silently ignored.
-- `agentlib deploy` passes names through as your `deploy.env` writes them, so a
+- `agentcraft2 deploy` passes names through as your `deploy.env` writes them, so a
   legacy spelling reaches the task definition unchanged. The plan lists each one
   under "Deprecated spellings" with its `AC2_` replacement and says that the old
   spelling stops working after one minor release. A new `deploy.env` is generated
   with `AC2_` names.
+
+**Migrating to the `agentcraft2` names.**
+
+- The command is `agentcraft2`, with `ac2` as its short name. Both run the same
+  program. The `agentlib` command no longer exists.
+- Rename these in a workspace that was generated earlier:
+
+  | Was | Is now |
+  |---|---|
+  | `agentlib.toml`, `agentlib.lock` | `agentcraft2.toml`, `agentcraft2.lock` |
+  | `.agentlib/` (state, traces, reports) | `.agentcraft2/` |
+  | `policies/agentlib/rules/data.yaml` | `policies/agentcraft2/rules/data.yaml` |
+  | `deploy/modules/agentlib-service` | `deploy/modules/agentcraft2-service` |
+
+- The policy bundle's Rego package and data paths follow the folder:
+  `agentlib.authz` is `agentcraft2.authz`, and `data.agentlib.rules` is
+  `data.agentcraft2.rules`. A policy server loaded with an older bundle needs the
+  new one, and the rules file must sit under `agentcraft2/`.
+- Not renamed: package and import names (`ai_agent_lib_*`), the `agentlib.*/vN`
+  schema identifiers inside documents, span attribute names, MCP `_meta` keys,
+  cookie and header names, the `AgentLibError` class, the AWS log group
+  `/agentlib/<name>` and the `eap-*` resource-name defaults. Existing files that
+  carry those names keep working.
 
 **Migrating from Langfuse.**
 
@@ -136,9 +158,9 @@ wheelhouse supports offline installation.
 Native extensions still require a wheel compatible with that Python
 and platform; pip cannot replace a missing platform wheel with pure Python.
 
-When upgrading generated projects, run `agentlib update --plan` first. It lists
+When upgrading generated projects, run `agentcraft2 update --plan` first. It lists
 every file the update would replace or create and every file it would leave alone
-because you edited it, and it writes nothing. Then run `agentlib update --diff`,
+because you edited it, and it writes nothing. Then run `agentcraft2 update --diff`,
 which preserves the files you edited. Existing deployment Dockerfiles are user-owned: review
 the new template alongside the generated `Dockerfile.dockerignore`, replace the
 old uv build steps, and create the per-service `requirements.lock` using the
@@ -152,7 +174,7 @@ for teams already using it.
 | Specification area | Release status |
 | --- | --- |
 | §1 authentication non-goal versus §9 verification | The library verifies configured bearer credentials at its boundary and can exchange credentials. It does not host user sign-in, an identity directory or an authorization server. |
-| §3/§15 Copier and workspace format | Scaffolding uses the existing Jinja renderer, `agentlib.toml` answers and JSON `agentlib.lock` hashes. No Copier dependency or second upgrade system is introduced. |
+| §3/§15 Copier and workspace format | Scaffolding uses the existing Jinja renderer, `agentcraft2.toml` answers and JSON `agentcraft2.lock` hashes. No Copier dependency or second upgrade system is introduced. |
 | §3 extras | Package `pyproject.toml` files are authoritative. OPA's HTTP client needs no `opa` extra; running the external OPA binary is optional. Bedrock/PostgreSQL are AWS extras. |
 | §8 shared/distributed budgets | Budgets are process-local and tied to live request contexts. This is not a distributed spending or billing ledger. Token totals use reported usage after calls; they are not token reservations. |
 | §7/§18 approvals, idempotency, long-term memory and deferred concern ports | Future design. This change does not introduce those services or claim their guarantees. |

@@ -1,6 +1,6 @@
-package agentlib.authz_test
+package agentcraft2.authz_test
 
-import data.agentlib.authz
+import data.agentcraft2.authz
 
 rules := {
 	"schema": "agentlib.rules/v1",
@@ -52,7 +52,7 @@ question := {
 
 decide(patch) := decision if {
 	decision := authz.decision with input as object.union(question, patch)
-		with data.agentlib.rules as rules
+		with data.agentcraft2.rules as rules
 }
 
 test_a_granted_request_is_allowed_with_the_rules_obligations if {
@@ -121,7 +121,7 @@ test_no_rules_document_denies_everything if {
 
 test_an_empty_rules_document_denies_everything if {
 	decision := authz.decision with input as question
-		with data.agentlib.rules as {"schema": "agentlib.rules/v1", "rules": []}
+		with data.agentcraft2.rules as {"schema": "agentlib.rules/v1", "rules": []}
 	decision == {"allow": false, "reason_code": "no_matching_rule"}
 }
 
@@ -165,7 +165,7 @@ with_rule(changes) := decision if {
 		changes,
 	)
 	decision := authz.decision with input as question
-		with data.agentlib.rules as {"schema": "agentlib.rules/v1", "rules": [rule]}
+		with data.agentcraft2.rules as {"schema": "agentlib.rules/v1", "rules": [rule]}
 }
 
 invalid := {"allow": false, "reason_code": "invalid_rules"}
@@ -194,12 +194,12 @@ test_a_valid_rule_still_decides if {
 test_two_rules_with_one_id_are_refused if {
 	rule := {"id": "same", "actions": ["data.query"], "roles": ["analyst"]}
 	decision := authz.decision with input as question
-		with data.agentlib.rules as {"schema": "agentlib.rules/v1", "rules": [rule, rule]}
+		with data.agentcraft2.rules as {"schema": "agentlib.rules/v1", "rules": [rule, rule]}
 	decision == invalid
 }
 
 test_a_document_of_another_schema_is_refused if {
 	decision := authz.decision with input as question
-		with data.agentlib.rules as {"schema": "agentlib.rules/v2", "rules": []}
+		with data.agentcraft2.rules as {"schema": "agentlib.rules/v2", "rules": []}
 	decision == invalid
 }

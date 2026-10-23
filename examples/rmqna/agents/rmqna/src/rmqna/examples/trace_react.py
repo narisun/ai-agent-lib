@@ -91,7 +91,7 @@ async def run_demo(output_dir: Path) -> list[dict[str, Any]]:
 
 async def main() -> None:
     """Run the two turns and print what each model call was sent, and where the trace is."""
-    output_dir = ENV_FILE.parent / ".agentlib" / "react-demo"
+    output_dir = ENV_FILE.parent / ".agentcraft2" / "react-demo"
     output_dir.mkdir(parents=True, exist_ok=True)
     history = await run_demo(output_dir)
     for turn in history:

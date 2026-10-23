@@ -72,7 +72,7 @@ def server_environment(folder: Path) -> dict[str, str]:
 
 def service(root: Path) -> Service:
     """Describe the same isolated server for standalone and supervised startup."""
-    folder = root / ".agentlib" / "phoenix"
+    folder = root / ".agentcraft2" / "phoenix"
     if not package_runtime.package_folder(root, "phoenix").is_dir():
         raise ValueError("Run start-phoenix.bat setup first to install Phoenix's packages.")
     (folder / "data").mkdir(parents=True, exist_ok=True)
@@ -134,7 +134,7 @@ def configured_service(
 def start(root: Path) -> None:
     """Register standalone Phoenix with the same cooperative stop command."""
     phoenix = service(root)
-    serve([phoenix], root / ".agentlib/local-runs" / uuid4().hex)
+    serve([phoenix], root / ".agentcraft2/local-runs" / uuid4().hex)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

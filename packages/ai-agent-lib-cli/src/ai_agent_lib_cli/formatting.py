@@ -72,7 +72,7 @@ def format_python(
     python = {path: text for path, text in files.items() if path.suffix == ".py"}
     if not python:
         return dict(files)
-    with tempfile.TemporaryDirectory(prefix="agentlib-") as scratch:
+    with tempfile.TemporaryDirectory(prefix="agentcraft2-") as scratch:
         folder = Path(scratch)
         (folder / "ruff.toml").write_text(_settings(first_party), encoding="utf-8")
         for path, text in python.items():

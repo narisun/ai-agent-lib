@@ -76,7 +76,7 @@ class _Turn:
     tool_calls: int = 0
 
 
-_current: ContextVar[_Turn | None] = ContextVar("agentlib_trace_turn", default=None)
+_current: ContextVar[_Turn | None] = ContextVar("agentcraft2_trace_turn", default=None)
 
 
 def _content(schema: SpanSchema, span: Span, kind: str, value: object) -> None:

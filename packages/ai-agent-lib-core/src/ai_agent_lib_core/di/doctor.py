@@ -2,7 +2,7 @@
 
 ``diagnose`` builds a service from its configuration, checks every adapter it
 selects and reports each one. It changes nothing and writes nothing: it is
-what ``agentlib doctor`` runs, and what a deployment can run before it sends
+what ``agentcraft2 doctor`` runs, and what a deployment can run before it sends
 traffic to a new task.
 """
 

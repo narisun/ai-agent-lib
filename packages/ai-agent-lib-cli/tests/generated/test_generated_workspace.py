@@ -200,7 +200,7 @@ def test_the_generated_code_passes_a_strict_type_check(workspace: Path) -> None:
     assert "no issues found" in done.stdout
 
 
-def agentlib(workspace: Path, *arguments: str) -> int:
+def agentcraft2(workspace: Path, *arguments: str) -> int:
     return main([*arguments, "--workspace", str(workspace)])
 
 
@@ -208,7 +208,7 @@ def test_doctor_finds_nothing_wrong_with_a_new_workspace(
     workspace: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     capsys.readouterr()
-    assert agentlib(workspace, "doctor") == 0
+    assert agentcraft2(workspace, "doctor") == 0
     out = capsys.readouterr().out
     for service in ("hello-agent", "hello-mcp", "customer-onboarding-agent"):
         assert service in out
@@ -219,7 +219,7 @@ def test_the_generated_policy_samples_are_decided_as_expected(
     workspace: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     capsys.readouterr()
-    assert agentlib(workspace, "policy", "test") == 0
+    assert agentcraft2(workspace, "policy", "test") == 0
     out = capsys.readouterr().out
     # 5 servers x 4, 2 agents x 3, 5 links x 1.
     assert "31 samples" in out, out[-500:]
@@ -230,7 +230,7 @@ def test_the_graph_of_a_generated_agent_can_be_drawn(
     workspace: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     capsys.readouterr()
-    assert agentlib(workspace, "graph", "customer-onboarding-agent") == 0
+    assert agentcraft2(workspace, "graph", "customer-onboarding-agent") == 0
     out = capsys.readouterr().out
     assert "graph TD" in out
     assert "tools" in out
@@ -241,7 +241,7 @@ def test_update_leaves_a_workspace_made_by_this_version_alone(
 ) -> None:
     before = {p: p.read_bytes() for p in workspace.rglob("*") if p.is_file()}
     capsys.readouterr()
-    assert agentlib(workspace, "update") == 0
+    assert agentcraft2(workspace, "update") == 0
     assert "nothing to do" in capsys.readouterr().out.lower()
     assert {p: p.read_bytes() for p in workspace.rglob("*") if p.is_file()} == before
 
@@ -252,7 +252,7 @@ def test_the_rules_and_opa_agree_on_every_generated_sample(
     workspace: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     capsys.readouterr()
-    assert agentlib(workspace, "policy", "test", "--opa") == 0
+    assert agentcraft2(workspace, "policy", "test", "--opa") == 0
     out = capsys.readouterr().out
     assert "\nopa\n" in out
     assert "31 samples came out as expected. The rules engine and OPA agree" in out

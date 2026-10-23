@@ -1,6 +1,6 @@
 """Developer tooling for the Enterprise Agentic Platform library.
 
-The ``agentlib`` command creates a local workspace and adds agents and MCP
+The ``agentcraft2`` command creates a local workspace and adds agents and MCP
 servers to it. What it writes is ordinary code with its tests: a starting
 point the developer owns from the first minute.
 """

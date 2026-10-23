@@ -15,7 +15,7 @@ This guide uses the `helper` agent from the [getting-started
 tutorial](getting-started.md) as its running example. Everything below also
 applies to a hand-written service; swap in your own package name and graph.
 Run every CLI command below from the workspace root — `tutorial/` in the
-tutorial — the same place `agentlib new agent` and `agentlib check` run from.
+tutorial — the same place `agentcraft2 new agent` and `agentcraft2 check` run from.
 
 ## 1. What an eval is here
 
@@ -54,7 +54,7 @@ test failure.
 
 ## 2. Offline: the generated loop
 
-`agentlib new agent helper` writes two files beside the agent: a starter
+`agentcraft2 new agent helper` writes two files beside the agent: a starter
 dataset and a test that runs it. The dataset, `agents/helper/evals/cases.jsonl`:
 
 ```jsonl
@@ -85,9 +85,9 @@ from helper import APPLICATION, answer, build_graph
 
 SERVICE = Path(__file__).resolve().parents[1]
 CASES = SERVICE / "evals" / "cases.jsonl"
-REPORT = SERVICE / ".agentlib" / "eval-report.json"
+REPORT = SERVICE / ".agentcraft2" / "eval-report.json"
 BASELINE = SERVICE / "evals" / "baseline.json"
-ACCEPT_MARKER = SERVICE / ".agentlib" / "eval-accept.flag"
+ACCEPT_MARKER = SERVICE / ".agentcraft2" / "eval-accept.flag"
 
 
 def mentions(case: EvalCase, output: str) -> bool:
@@ -130,7 +130,7 @@ async def test_helper_meets_its_bar(tmp_path: Path) -> None:
 ```
 
 This test is marked `@pytest.mark.eval` and excluded from the default
-`pytest`/`agentlib check` run, so it never blocks on a model nor incurs
+`pytest`/`agentcraft2 check` run, so it never blocks on a model nor incurs
 charges by accident. With `AC2_MODEL_PROVIDER=fake` it skips itself.
 `dataset_digest(CASES)` is a sha256 of the file's bytes, recorded in the
 report's metadata. It is a record for people: it tells you whether two reports
@@ -143,7 +143,7 @@ tutorial](getting-started.md#8-optional-use-and-evaluate-a-real-model)):
 python -m ai_agent_lib_cli eval helper
 ```
 
-This writes `agents/helper/.agentlib/eval-report.json` — `report.to_json()`,
+This writes `agents/helper/.agentcraft2/eval-report.json` — `report.to_json()`,
 with the schema `agentlib.eval-report/v1`, its metadata, every case's scores,
 and the mean per metric. That file is transient state, not a record to keep
 by hand.
@@ -156,10 +156,10 @@ python -m ai_agent_lib_cli eval helper --accept
 ```
 
 `--accept` runs the evals itself — it does not reuse the last report. If that
-run passes, it copies the fresh `.agentlib/eval-report.json` to
+run passes, it copies the fresh `.agentcraft2/eval-report.json` to
 `evals/baseline.json` and prints the path. Commit `evals/baseline.json`
 alongside `evals/cases.jsonl` — both hold synthetic cases and aggregate scores,
-not conversation content. From then on, every `agentlib eval helper` run also
+not conversation content. From then on, every `agentcraft2 eval helper` run also
 calls `require_no_regression`, which compares each metric's mean against the
 baseline and fails when it dropped by more than its `tolerance` (0.05 above).
 The failure names the regressed metrics, both means, and the case IDs whose own
@@ -172,7 +172,7 @@ so after you add or edit cases on purpose, accept a new baseline yourself.
 Re-run `--accept` once a regression is intentional (the model changed, the
 rubric changed) to move the bar. On an intentional regression, `--accept`
 skips only the baseline gate. While that run is in flight it leaves a marker
-(`.agentlib/eval-accept.flag`) beside the report, and the generated test skips
+(`.agentcraft2/eval-accept.flag`) beside the report, and the generated test skips
 only the `require_no_regression` gate against the existing baseline while the
 marker is there. The absolute `report.require({...})` bar still applies, so the
 run still has to pass before its report replaces the baseline. The marker is
@@ -237,7 +237,7 @@ never scores anything itself.
 **Feedback.** Agent Lab shows thumbs up/down controls beneath every accepted
 answer (see [sign in and chat](../packages/ai-agent-lib-ui/README.md#4-sign-in-and-chat)).
 Clicking one writes one `agentlib.feedback/v1` line to `feedback.jsonl`, in
-the same `.agentlib\ui\` folder as `conversations.sqlite`
+the same `.agentcraft2\ui\` folder as `conversations.sqlite`
 (see [initialize the UI](../packages/ai-agent-lib-ui/README.md#3-initialize-the-ui)).
 A record is never deleted, only appended — feedback is evidence.
 
@@ -254,7 +254,7 @@ from ai_agent_lib_ui.adapters.sqlite import SqliteThreads
 from ai_agent_lib_ui.config.settings import Settings
 from ai_agent_lib_ui.config.shell import private_secret
 
-STATE = Path(".agentlib/ui")
+STATE = Path(".agentcraft2/ui")
 settings = Settings.read(STATE / "config.json")
 store = SqliteThreads(
     STATE / "conversations.sqlite",
@@ -277,7 +277,7 @@ exchange the principal owns, active and archived conversations alike, as
 `agentlib.interaction/v1` JSONL (`load_interactions` reads it back). Run it
 after the server has handled some real traffic; `export_interactions` reads
 the UI's existing state, it does not call any agent. Writing the export under
-`STATE` (`.agentlib/ui/online/`) keeps it beside the UI's other private
+`STATE` (`.agentcraft2/ui/online/`) keeps it beside the UI's other private
 state, inside the folder the repository already ignores — see
 [privacy](#6-privacy).
 
@@ -300,7 +300,7 @@ from ai_agent_lib_core.evaluation import (
     score_interactions,
 )
 
-STATE = Path(".agentlib/ui")
+STATE = Path(".agentcraft2/ui")
 interactions = load_interactions(STATE / "online" / "production.jsonl")
 weekly = sampled(interactions, rate=0.1, salt="2026-10-18")
 report = await score_interactions(weekly, [politeness])
@@ -334,7 +334,7 @@ exported interaction JSONL, and any report produced by scoring real
 interactions (a judge's `reason` can quote the question or the answer). Treat
 them like a model trace that captures content:
 
-- Keep them under the service's private `.agentlib/` state (or another path
+- Keep them under the service's private `.agentcraft2/` state (or another path
   the repository already ignores) — never commit them. The checked-in
   `evals/cases.jsonl` and `evals/baseline.json` are safe to commit because
   their cases are synthetic test data, written by hand.

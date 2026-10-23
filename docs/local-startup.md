@@ -22,7 +22,7 @@ the commands and prose use Windows separators; use `/` on macOS/Linux.
 | `python …` | `python3 …` |
 | `setup-local.bat --model anthropic` | `./setup-local.sh --model anthropic` |
 | `start-local.bat` | `./start-local.sh` |
-| `type .agentlib\ui-rmprep\access-code` | `cat .agentlib/ui-rmprep/access-code` |
+| `type .agentcraft2\ui-rmprep\access-code` | `cat .agentcraft2/ui-rmprep/access-code` |
 | `stop-local.bat` | `./stop-local.sh` |
 | `start-phoenix.bat setup` | `./start-phoenix.sh setup` |
 
@@ -45,7 +45,7 @@ and the model provider whose dependencies it will install.
 | --- | --- | --- |
 | Library, rmprep and MCP server | `.venv` | The same `python` used for setup |
 | Agent Lab | `packages\ai-agent-lib-ui\.venv` | The same Python, loading only the UI package set |
-| Phoenix, when installed | `.agentlib\phoenix\.venv` | The same Python, loading only the Phoenix package set |
+| Phoenix, when installed | `.agentcraft2\phoenix\.venv` | The same Python, loading only the Phoenix package set |
 
 Each folder holds its packages in `Lib\site-packages` on Windows and in
 `lib/python3.11/site-packages` on macOS/Linux; that folder name follows the
@@ -164,7 +164,7 @@ Wait for **All selected services are ready**, then open
 terminal at the repository root, read the local access code:
 
 ```bat
-type .agentlib\ui-rmprep\access-code
+type .agentcraft2\ui-rmprep\access-code
 ```
 
 Sign in with that code, then select **Choose agent → Start chat with rmprep**.
@@ -246,11 +246,11 @@ answer `Y`.
 
 | Saved data | Default location under the repository root |
 | --- | --- |
-| Conversations, answers and memo versions | `.agentlib\ui-rmprep\conversations.sqlite` |
-| rmprep checkpoints | `examples\rmprep\agents\rmprep\.agentlib\checkpoints.sqlite` |
-| Phoenix traces | `.agentlib\phoenix\data\phoenix.db` |
-| Service console logs | `.agentlib\local-runs\<run-id>\` — startup prints the exact path |
-| Audit and optional model JSONL files | Each service's `.agentlib` folder |
+| Conversations, answers and memo versions | `.agentcraft2\ui-rmprep\conversations.sqlite` |
+| rmprep checkpoints | `examples\rmprep\agents\rmprep\.agentcraft2\checkpoints.sqlite` |
+| Phoenix traces | `.agentcraft2\phoenix\data\phoenix.db` |
+| Service console logs | `.agentcraft2\local-runs\<run-id>\` — startup prints the exact path |
+| Audit and optional model JSONL files | Each service's `.agentcraft2` folder |
 
 `stop-local.bat` covers managed launchers from this checkout, including separate
 UI, services and Phoenix runs. Stop manually launched services with Ctrl+C in
@@ -306,9 +306,9 @@ become ready. An unexpected exit stops the rest of that launcher's stack and
 reports the relevant log.
 
 For another agent, follow [Agent Lab's manual setup](../packages/ai-agent-lib-ui/README.md).
-Then use `start-local.bat ui --config .agentlib\ui\config.json` and start its
+Then use `start-local.bat ui --config .agentcraft2\ui\config.json` and start its
 agent/MCP services separately. Relative `--config` paths use the repository root.
-The default rmprep configuration is `.agentlib\ui-rmprep\config.json`.
+The default rmprep configuration is `.agentcraft2\ui-rmprep\config.json`.
 
 ## Which environment settings are used?
 
@@ -338,7 +338,7 @@ The summary masks credentials, sensitive JSON fields, database connection string
 and unknown custom variables. Ordinary options such as caching, timeouts and
 token budgets remain readable. It also names the MCP and UI settings files.
 For optional file-based model inspection, add
-`AC2_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl` to rmprep's settings and restart.
+`AC2_MODEL_TRACE_PATH=.agentcraft2/model-trace.jsonl` to rmprep's settings and restart.
 Capture starts with new turns; retain the file to inspect them later.
 
 ## Troubleshooting
@@ -346,7 +346,7 @@ Capture starts with new turns; retain the file to inspect them later.
 | Symptom | First step |
 | --- | --- |
 | Missing package or mismatched Python | Run `setup-local.bat`; for Phoenix, run `start-phoenix.bat setup`. Check your approved pip index and wheels. |
-| Login asks for a code | Run `type .agentlib\ui-rmprep\access-code`. Use `127.0.0.1:8765` consistently. |
+| Login asks for a code | Run `type .agentcraft2\ui-rmprep\access-code`. Use `127.0.0.1:8765` consistently. |
 | Startup selects `fake` | Check the printed environment path. Set provider and model ID along with the key. Clear an unwanted shell override with `set AC2_MODEL_PROVIDER=` (`unset AC2_MODEL_PROVIDER` on macOS/Linux), then restart. A shell that still exports the old `EAP_MODEL_PROVIDER` spelling needs it cleared the same way. |
 | A port is in use | Run `stop-local.bat` for managed runs, or Ctrl+C in a manually started service's window. Existing processes are left alone. |
 | No Phoenix trace or missing content | Check enabled/content-capture settings, restart, send a new question and allow time for ingestion. See [Phoenix troubleshooting](phoenix-trial.md#troubleshooting). |
@@ -360,7 +360,7 @@ After reviewing registry or identity changes, stop the stack and refresh its UI
 configuration from the repository root:
 
 ```bat
-python tools\package_runtime.py ui -m ai_agent_lib_ui init --config .agentlib\ui-rmprep\config.json --env-file examples\rmprep\agents\rmprep\.env --agent rmprep --artifacts-agent rmprep --allow-url http://127.0.0.1:8000 --overwrite
+python tools\package_runtime.py ui -m ai_agent_lib_ui init --config .agentcraft2\ui-rmprep\config.json --env-file examples\rmprep\agents\rmprep\.env --agent rmprep --artifacts-agent rmprep --allow-url http://127.0.0.1:8000 --overwrite
 start-local.bat
 ```
 

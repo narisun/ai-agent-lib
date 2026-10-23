@@ -150,7 +150,7 @@ def _validate(model: type[ModelT], raw: object, what: str) -> ModelT:
             f"{what} does not match the registry schema",
             expected=found.expected,
             actual=found.actual,
-            fix="correct the file; 'agentlib doctor' checks the registries",
+            fix="correct the file; 'agentcraft2 doctor' checks the registries",
         ) from None
 
 
@@ -389,7 +389,7 @@ def load_registries(
                 f"{agents.what}: agent {agent.id!r} names MCP servers the tool registry lacks",
                 expected="every server in the agent's mcp_servers registered in the tool registry",
                 actual=f"no tool registry entry for {', '.join(unknown)}",
-                fix="register the server ('agentlib new mcp' or 'agentlib registry pin'), "
+                fix="register the server ('agentcraft2 new mcp' or 'agentcraft2 registry pin'), "
                 "or remove it from the agent's mcp_servers",
             )
     return agent_snapshot, tool_snapshot

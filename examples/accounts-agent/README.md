@@ -14,7 +14,7 @@ cd examples/accounts-agent
 AC2_MODEL_PROVIDER=fake AC2_MODEL_ID=fake-model accounts-agent "What is the balance of account 4411?"
 ```
 
-Local state is written under `.agentlib/`: the audit log as JSON lines and the
+Local state is written under `.agentcraft2/`: the audit log as JSON lines and the
 conversation checkpoints in SQLite.
 
 ## Run it on the Anthropic API

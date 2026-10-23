@@ -24,7 +24,7 @@ __all__ = [
 DEPLOY_ENV = "deploy.env"
 """The file in a service's folder that holds the settings it runs with in AWS."""
 
-MODULE_FOLDER = PurePosixPath("deploy", "modules", "agentlib-service")
+MODULE_FOLDER = PurePosixPath("deploy", "modules", "agentcraft2-service")
 """Where the reference Terraform module is copied in a workspace."""
 
 OPA_FOLDER = PurePosixPath("deploy", "opa")
@@ -40,7 +40,7 @@ AGENTCORE = "agentcore"
 """The platform that runs the service as an Amazon Bedrock AgentCore Runtime."""
 
 PLATFORMS = (FARGATE, AGENTCORE)
-"""The platforms ``agentlib deploy`` writes a deployment for, the default first."""
+"""The platforms ``agentcraft2 deploy`` writes a deployment for, the default first."""
 
 _ALL_INTERFACES = "0.0.0.0"  # noqa: S104 - the container's port is reached through the task's network
 

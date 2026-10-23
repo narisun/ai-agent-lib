@@ -52,7 +52,7 @@ def test_a_name_of_lower_case_words_joined_by_hyphens_is_accepted(name: str) -> 
 @pytest.mark.parametrize(
     "name",
     ["", "Hello", "hello_agent", "-hello", "hello-", "hello--agent", "9lives", "x" * 29,
-     "hello agent", "héllo", "test", "mcp", "class", "agentlib"],
+     "hello agent", "héllo", "test", "mcp", "class", "agentcraft2"],
 )  # fmt: skip
 def test_a_name_that_cannot_be_a_folder_a_package_and_an_id_is_refused(name: str) -> None:
     with pytest.raises(CliError, match="name"):
@@ -310,7 +310,7 @@ def test_an_agents_settings_select_the_shared_files_and_a_model(tmp_path: Path) 
     assert registry.agents_path.resolve() == (tmp_path / "registry" / "agents.yaml").resolve()
     assert (
         rules.path.resolve()
-        == (tmp_path / "policies" / "agentlib" / "rules" / "data.yaml").resolve()
+        == (tmp_path / "policies" / "agentcraft2" / "rules" / "data.yaml").resolve()
     )
     identity = config.section(Section.IDENTITY).parse_options(StaticIdentityOptions)
     assert (identity.roles, identity.audience) == (("analyst",), None)

@@ -41,7 +41,7 @@ async def test_the_rules_allow_the_agent_its_model(tmp_path: Path) -> None:
     assert isinstance(content, list)
     assert isinstance(content[0], dict)
     assert content[0]["text"] == system_prompt()
-    # The step was allowed by a rule in policies/agentlib/rules/data.yaml.
+    # The step was allowed by a rule in policies/agentcraft2/rules/data.yaml.
     decided = [
         (record["event"], record["outcome"], record["attributes"]["policy_reason_code"])
         for record in audit_records(tmp_path)

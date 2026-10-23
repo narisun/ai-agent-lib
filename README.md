@@ -77,10 +77,10 @@ start-local.bat
 Check the printed environment path, model and masked settings. Wait for **All
 selected services are ready**, then open [Agent Lab](http://127.0.0.1:8765).
 Read its login code in a second Command Prompt or Bash terminal at the repository
-root (on macOS/Linux, `cat .agentlib/ui-rmprep/access-code`):
+root (on macOS/Linux, `cat .agentcraft2/ui-rmprep/access-code`):
 
 ```bat
-type .agentlib\ui-rmprep\access-code
+type .agentcraft2\ui-rmprep\access-code
 ```
 
 Select **Choose agent → Start chat with rmprep**. With Anthropic configured, ask:
@@ -186,7 +186,7 @@ Your generated application lives in `tutorial/`. The library lives in
 | Change what a tool does | `tutorial/agents/helper/src/helper/tools.py` |
 | Change the agent's steps or prompt | `tutorial/agents/helper/src/helper/graph.py` |
 | Write a behavior test | `tutorial/agents/helper/tests/` |
-| Allow a specific action | `tutorial/policies/agentlib/rules/data.yaml`, with a sample in `tutorial/tests/policy-samples.yaml` |
+| Allow a specific action | `tutorial/policies/agentcraft2/rules/data.yaml`, with a sample in `tutorial/tests/policy-samples.yaml` |
 | Choose a model or adapter | `tutorial/agents/helper/.env` and the service's `pyproject.toml` dependencies |
 | Share tools through MCP | [Add an MCP server](docs/getting-started.md#5-add-a-shared-tool-server) |
 | Change shared library behavior | The packages in this repository; see [contributing](#working-on-the-library) below |
@@ -230,10 +230,10 @@ updates for debugging. See [live responses and metrics](packages/ai-agent-lib-ui
 To inspect an agent's model calls, add this to its `.env` and restart:
 
 ```dotenv
-AC2_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl
+AC2_MODEL_TRACE_PATH=.agentcraft2/model-trace.jsonl
 ```
 
-The file is written under that service's `.agentlib/` folder. It records the
+The file is written under that service's `.agentcraft2/` folder. It records the
 messages sent to the provider, tool definitions, responses, and retry attempts.
 Capture is opt-in and retains conversation content; use test data and keep the
 file private. Recognizable credentials are masked.
@@ -252,7 +252,7 @@ From your generated workspace, run the scripted example:
 
 ```bat
 "%PYTHON%" -m helper.examples.trace_react
-"%PYTHON%" examples/read_trace.py agents/helper/.agentlib/react-demo.jsonl --last 6
+"%PYTHON%" examples/read_trace.py agents/helper/.agentcraft2/react-demo.jsonl --last 6
 ```
 
 For a live run, follow [Anthropic setup](docs/anthropic-example.md) to add its
@@ -272,7 +272,7 @@ have these examples under their own package names; their READMEs give exact comm
 | --- | --- |
 | [Core package](packages/ai-agent-lib-core/README.md) | Contracts, configuration, service composition, local adapters, model/tool checks, framework integrations, and test helpers |
 | [AWS package](packages/ai-agent-lib-aws/README.md) | AWS adapters and their optional dependencies |
-| [CLI package](packages/ai-agent-lib-cli/README.md) | The `agentlib` command, also available as `python -m ai_agent_lib_cli` |
+| [CLI package](packages/ai-agent-lib-cli/README.md) | The `agentcraft2` command, also available as `python -m ai_agent_lib_cli` |
 | [Reference agent](examples/accounts-agent/README.md) | A working LangGraph agent |
 | [Reference MCP server](examples/accounts-mcp/README.md) | Shared tools, named queries, and sample CSV data |
 | [Relationship manager preparation](examples/rmprep/README.md) | Router, memo and Q&A nodes over 33 supplied CSVs, with governed MCP evidence, source references and checkpoints |
@@ -281,7 +281,7 @@ have these examples under their own package names; their READMEs give exact comm
 | [Architecture tests](tests/architecture) | Checks that enforce package boundaries and keep documentation current |
 | [Configuration reference](docs/variables.md) | Supported environment variables |
 | [Identity guide](docs/identity.md) | User identity and delegated service calls |
-| [Evals guide](docs/evals.md) | Offline evals with baselines (`agentlib eval`) and online scoring of sampled, saved chats |
+| [Evals guide](docs/evals.md) | Offline evals with baselines (`agentcraft2 eval`) and online scoring of sampled, saved chats |
 
 The repository root holds shared development settings. Install the packages
 under `packages/` using pip or the development helper below.

@@ -1,6 +1,6 @@
 """The workspace file: the answers a workspace was generated from.
 
-``agentlib.toml`` sits at the root of a workspace. It marks the folder as a
+``agentcraft2.toml`` sits at the root of a workspace. It marks the folder as a
 workspace, and it records every answer, so the same workspace can be generated
 again from the file alone.
 """
@@ -29,7 +29,7 @@ __all__ = [
     "load_answers",
 ]
 
-WORKSPACE_FILE = "agentlib.toml"
+WORKSPACE_FILE = "agentcraft2.toml"
 AGENTS_FOLDER = "agents"
 """The folder of a workspace that holds one folder per agent."""
 SERVERS_FOLDER = "mcp-servers"
@@ -37,8 +37,9 @@ SERVERS_FOLDER = "mcp-servers"
 MODEL_PROVIDERS = ("fake", "anthropic", "bedrock")
 
 _HEADER = (
-    "# Written by agentlib. It records the answers this workspace was generated from.\n"
-    "# Generate the same workspace elsewhere with: agentlib init --answers agentlib.toml <folder>\n"
+    "# Written by agentcraft2. It records the answers this workspace was generated from.\n"
+    "# Generate the same workspace elsewhere with: "
+    "agentcraft2 init --answers agentcraft2.toml <folder>\n"
 )
 
 
@@ -112,7 +113,7 @@ class McpAnswers:
 
 @dataclass(frozen=True, slots=True)
 class WorkspaceAnswers:
-    """Generation inputs serialized in ``agentlib.toml``.
+    """Generation inputs serialized in ``agentcraft2.toml``.
 
     Copy-returning helpers update service definitions without mutating existing
     answers. This model describes what to generate; it does not open adapters,
@@ -252,7 +253,7 @@ def find_workspace(start: Path) -> Path:
             return folder
     raise CliError(
         f"{start} is not inside a workspace: no {WORKSPACE_FILE} here or above. "
-        "Create one with 'agentlib init <name>'."
+        "Create one with 'agentcraft2 init <name>'."
     )
 
 

@@ -1,4 +1,4 @@
-"""agentlib deploy: derive a service's deployment from the settings it runs with.
+"""agentcraft2 deploy: derive a service's deployment from the settings it runs with.
 
 The settings a service runs with in AWS live in ``deploy.env`` in its folder.
 From them :mod:`.plan` works out which adapters run, what each needs from IAM

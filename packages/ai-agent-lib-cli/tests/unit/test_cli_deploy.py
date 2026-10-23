@@ -1,4 +1,4 @@
-"""'agentlib deploy': a service's deployment, derived from the settings it runs with."""
+"""'agentcraft2 deploy': a service's deployment, derived from the settings it runs with."""
 
 from __future__ import annotations
 
@@ -70,7 +70,7 @@ def test_the_first_run_writes_a_starting_settings_file_and_nothing_else(
     assert run("deploy", "helper", "--plan", "--workspace", workspace) == 1
     err = capsys.readouterr().err
     assert "agents/helper/deploy.env does not exist" in err
-    assert "fix: run 'agentlib deploy helper' to write a starting one" in err
+    assert "fix: run 'agentcraft2 deploy helper' to write a starting one" in err
 
     assert run("deploy", "helper", "--workspace", workspace) == 0
     out = capsys.readouterr().out
@@ -120,9 +120,9 @@ def test_deploy_writes_the_module_and_the_files_derived_from_the_settings(
     assert run("deploy", "helper", "--workspace", ready) == 0
     out = capsys.readouterr().out
     assert "created  deploy/helper/permissions.tf" in out
-    assert "created  deploy/modules/agentlib-service/main.tf" in out
-    assert "created  deploy/opa/bundle/agentlib/authz/authz.rego" in out
-    assert not (ready / "deploy/opa/bundle/agentlib/authz/authz_test.rego").exists()
+    assert "created  deploy/modules/agentcraft2-service/main.tf" in out
+    assert "created  deploy/opa/bundle/agentcraft2/authz/authz.rego" in out
+    assert not (ready / "deploy/opa/bundle/agentcraft2/authz/authz_test.rego").exists()
 
     permissions = (ready / "deploy/helper/permissions.tf").read_text(encoding="utf-8")
     assert "  # audit firehose: write audit records, and check at startup" in permissions
@@ -188,7 +188,7 @@ def test_no_secret_sentinel_reaches_any_image_layer(ready: Path) -> None:
     )
     docker = shutil.which("docker")
     assert docker is not None, "run this opt-in gate on a host with Docker"
-    tag = "agentlib-context-test:" + uuid.uuid4().hex
+    tag = "agentcraft2-context-test:" + uuid.uuid4().hex
 
     def command(*arguments: str) -> None:
         subprocess.run([docker, *arguments], cwd=ready, check=True, capture_output=True)  # noqa: S603
@@ -374,10 +374,10 @@ def test_the_written_terraform_is_formatted_valid_and_its_module_tests_pass(read
         assert done.returncode == 0, f"terraform {' '.join(arguments)}:\n{done.stdout}{done.stderr}"
 
     terraform("fmt", "-check", "-recursive")
-    for folder in (deploy / "helper", deploy / "modules" / "agentlib-service"):
+    for folder in (deploy / "helper", deploy / "modules" / "agentcraft2-service"):
         terraform("init", "-backend=false", "-input=false", folder=folder)
         terraform("validate", folder=folder)
-    terraform("test", folder=deploy / "modules" / "agentlib-service")
+    terraform("test", folder=deploy / "modules" / "agentcraft2-service")
 
 
 def test_r20_an_extra_an_adapter_needs_is_checked_too(
@@ -540,7 +540,7 @@ def test_the_agentcore_starter_selects_ambient_telemetry_a_memory_and_the_deploy
     out = capsys.readouterr().out
     assert "created  agents/helper/deploy.env" in out
     assert 'add "ai-agent-lib-aws[bedrock,agentcore]" to the dependencies' in out
-    assert "run 'agentlib deploy helper --target agentcore --plan'" in out
+    assert "run 'agentcraft2 deploy helper --target agentcore --plan'" in out
     text = _settings(workspace).read_text(encoding="utf-8")
     assert "AC2_TELEMETRY=ambient\n" in text
     assert "AC2_CHECKPOINT_PROVIDER=agentcore_memory\n" in text
@@ -878,7 +878,8 @@ def test_agentcore_writes_a_root_module_alone_and_an_arm64_image_per_kind(
     assert '"bedrock-agentcore.amazonaws.com"' in main_tf
     permissions = (agentcore_ready / "deploy/helper/permissions.tf").read_text(encoding="utf-8")
     assert permissions.startswith(
-        "# Written by 'agentlib deploy helper --target agentcore' from agents/helper/deploy.env.\n"
+        "# Written by 'agentcraft2 deploy helper --target agentcore' "
+        "from agents/helper/deploy.env.\n"
     )
     assert 'sid       = "CheckpointAgentcoreMemory1"' in permissions
 

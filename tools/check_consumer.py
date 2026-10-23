@@ -76,7 +76,7 @@ def main() -> None:
     version = tomllib.loads((root / "packages/ai-agent-lib-core/pyproject.toml").read_text())[
         "project"
     ]["version"]
-    parent = root / ".agentlib" / "consumers"
+    parent = root / ".agentcraft2" / "consumers"
     parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=parent) as temporary:
         work = Path(temporary)

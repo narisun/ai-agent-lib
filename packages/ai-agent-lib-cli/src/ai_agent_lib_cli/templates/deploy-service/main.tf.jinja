@@ -1,5 +1,5 @@
-# {{ name }} on ECS Fargate. agentlib wrote this file once; it is yours to change.
-# settings.tf and permissions.tf are rewritten by every 'agentlib deploy {{ name }}'.
+# {{ name }} on ECS Fargate. agentcraft2 wrote this file once; it is yours to change.
+# settings.tf and permissions.tf are rewritten by every 'agentcraft2 deploy {{ name }}'.
 
 terraform {
   required_version = ">= 1.5"
@@ -17,7 +17,7 @@ provider "aws" {
 }
 
 module "service" {
-  source = "../modules/agentlib-service"
+  source = "../modules/agentcraft2-service"
 
   name             = "{{ name }}"
   region           = var.region

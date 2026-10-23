@@ -546,7 +546,7 @@ def test_init_pins_a_runtime_agent_that_settings_read_and_check_accept(tmp_path:
     )
     token = tmp_path / "token"
     token.write_text("secret-token\n")
-    config = tmp_path / ".agentlib/ui/config.json"
+    config = tmp_path / ".agentcraft2/ui/config.json"
     env = {key: value for key, value in os.environ.items() if key != "LITERAL_API_KEY"}
 
     def command(*args: str) -> subprocess.CompletedProcess[str]:

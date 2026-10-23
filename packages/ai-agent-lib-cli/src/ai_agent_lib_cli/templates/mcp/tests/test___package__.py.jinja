@@ -71,7 +71,7 @@ async def test_the_tools_are_the_ones_the_registry_lists(running: Running) -> No
     assert entry is not None
     # A tool that is offered but not registered, or the other way round, fails
     # here. So does a tool whose arguments changed since it was pinned: run
-    # 'agentlib registry pin {{ server_id }}' after changing a tool on purpose.
+    # 'agentcraft2 registry pin {{ server_id }}' after changing a tool on purpose.
     await verify_registration(server, entry, require_pins=False)
     assert entry.audience == APPLICATION
 

@@ -129,7 +129,7 @@ def _pins(
     results: list[CheckResult] = []
     for server in answers.mcp_servers:
         name = f"pins of {server.server_id}"
-        fix = f"Run: agentlib registry pin {server.server_id}"
+        fix = f"Run: agentcraft2 registry pin {server.server_id}"
         entry = registry.tools.get(server.server_id)
         if entry is None:
             results.append(
@@ -137,7 +137,7 @@ def _pins(
                     name,
                     ok=False,
                     detail=f"{server.server_id} is not in {TOOLS_FILE}",
-                    fix=f"Run: agentlib new mcp {server.name}",
+                    fix=f"Run: agentcraft2 new mcp {server.name}",
                 )
             )
             continue

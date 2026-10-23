@@ -1,4 +1,4 @@
-"""'agentlib check': the same gate on a developer's machine and in CI."""
+"""'agentcraft2 check': the same gate on a developer's machine and in CI."""
 
 from __future__ import annotations
 
@@ -128,7 +128,7 @@ def test_eval_accept_promotes_the_report_to_the_baseline(
     assert (
         main(["new", "agent", "helper", "--workspace", str(workspace)], toolbox=toolbox(tools)) == 0
     )
-    report = workspace / "agents" / "helper" / ".agentlib" / "eval-report.json"
+    report = workspace / "agents" / "helper" / ".agentcraft2" / "eval-report.json"
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(
         '{"schema": "agentlib.eval-report/v1", "means": {"m": 1.0}, "results": [], "metadata": {}}',
@@ -166,7 +166,7 @@ def test_eval_accept_without_a_report_names_the_fix(
 
 
 def _write_eval_report(workspace: Path) -> None:
-    report = workspace / "agents" / "helper" / ".agentlib" / "eval-report.json"
+    report = workspace / "agents" / "helper" / ".agentcraft2" / "eval-report.json"
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(
         '{"schema": "agentlib.eval-report/v1", "means": {"m": 1.0}, "results": [], "metadata": {}}',
@@ -175,7 +175,7 @@ def _write_eval_report(workspace: Path) -> None:
 
 
 def _accept_marker(workspace: Path) -> Path:
-    return workspace / "agents" / "helper" / ".agentlib" / "eval-accept.flag"
+    return workspace / "agents" / "helper" / ".agentcraft2" / "eval-accept.flag"
 
 
 def test_eval_accept_leaves_a_marker_during_the_pytest_run_and_removes_it(

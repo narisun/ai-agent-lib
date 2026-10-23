@@ -3,7 +3,7 @@
 #
 # One document, two engines. In local development the in-process `rules`
 # provider reads this file. A deployed service asks OPA, which loads this
-# folder as a bundle (the file becomes `data.agentlib.rules`) next to the
+# folder as a bundle (the file becomes `data.agentcraft2.rules`) next to the
 # platform's Rego bundle.
 schema: agentlib.rules/v1
 rules:

@@ -49,7 +49,7 @@ class SyncServices:
         self._options = container
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(
-            target=self._loop.run_forever, name="agentlib-services", daemon=True
+            target=self._loop.run_forever, name="agentcraft2-services", daemon=True
         )
         self._container: ServiceContainer | None = None
 

@@ -102,7 +102,7 @@ class _Call:
 
 # Bound by ``AgentCoreMcpConnector.connect`` for the enclosed block; the SDK's
 # transport tasks, started inside that block, inherit it.
-_CALL: ContextVar[_Call | None] = ContextVar("agentlib_agentcore_mcp_call", default=None)
+_CALL: ContextVar[_Call | None] = ContextVar("agentcraft2_agentcore_mcp_call", default=None)
 
 
 class _SessionIds:

@@ -1,4 +1,4 @@
-"""Entry point of the ``agentlib`` command."""
+"""Entry point of the ``agentcraft2`` command."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def main(argv: Sequence[str] | None = None, toolbox: Toolbox | None = None) -> i
     try:
         result = cli.main(
             args=list(argv) if argv is not None else None,
-            prog_name="agentlib",
+            prog_name="agentcraft2",
             standalone_mode=False,
             obj=toolbox if toolbox is not None else Toolbox(),
         )
@@ -42,7 +42,7 @@ def main(argv: Sequence[str] | None = None, toolbox: Toolbox | None = None) -> i
         problem.show()
         return EXIT_FAILED
     except click.Abort:
-        click.echo("agentlib: stopped", err=True)
+        click.echo("agentcraft2: stopped", err=True)
         return EXIT_FAILED
     except AgentLibError as problem:
         # CliError is one of these: one place prints every error the CLI reports.

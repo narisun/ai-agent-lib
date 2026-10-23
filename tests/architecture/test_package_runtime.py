@@ -174,7 +174,7 @@ def test_installation_is_checked_before_replacing_packages_and_preserves_data(
     destination = package_runtime.package_folder(tmp_path, "ui")
     destination.mkdir(parents=True)
     (destination / "old.py").write_text("old")
-    database = tmp_path / ".agentlib/ui-rmprep/conversations.sqlite"
+    database = tmp_path / ".agentcraft2/ui-rmprep/conversations.sqlite"
     database.parent.mkdir(parents=True)
     database.write_bytes(b"saved conversations")
     commands: list[list[str]] = []
