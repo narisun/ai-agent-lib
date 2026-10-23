@@ -104,7 +104,11 @@ jobs:
         with:
           python-version: "3.11"
       - if: matrix.versions == 'minimum'
-        run: python tools/check_consumer.py --profile ${{ matrix.profile }} --constraints tools/framework-minimum.txt
+        # The anthropic extra needs a newer langchain-core than core's own floor.
+        run: >
+          python tools/check_consumer.py --profile ${{ matrix.profile }} --constraints
+          ${{ matrix.profile == 'generated-anthropic' && 'tools/framework-minimum-anthropic.txt'
+          || 'tools/framework-minimum.txt' }}
       - if: matrix.versions == 'latest'
         run: python tools/check_consumer.py --profile ${{ matrix.profile }}
 
