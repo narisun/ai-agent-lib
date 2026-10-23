@@ -219,7 +219,7 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# ai-agent-lib local development state (audit log, SQLite stores)
+# agentcraft2-sdk local development state (audit log, SQLite stores)
 .agentcraft2/
 # The folder this state used before the rename; checkouts that ran older versions still have it.
 .agentlib/

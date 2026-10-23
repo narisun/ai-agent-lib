@@ -371,9 +371,9 @@ def _desktop_variable_rows() -> list[list[str]]:
         (
             "LIBRARY",
             "Command Prompt shortcut for the library checkout.",
-            r"Example: `F:\work\ai-agent-lib`",
+            r"Example: `F:\work\ai-agentcraft2-sdk`",
             "Not used by the service.",
-            "Defined by the setup commands; it is not an ai-agent-lib setting.",
+            "Defined by the setup commands; it is not an agentcraft2-sdk setting.",
         ),
         (
             "PYTHON",

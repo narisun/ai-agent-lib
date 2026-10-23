@@ -50,7 +50,7 @@ _FIRST_SERVER_PORT = 8100
     "--lib-path",
     type=click.Path(file_okay=False, exists=True, path_type=Path),
     default=None,
-    help="A local checkout of ai-agent-lib to install the library from.",
+    help="A local checkout of agentcraft2-sdk to install the library from.",
 )
 @click.option(
     "--lib-version", default=None, help="Install the library from a package index, e.g. '>=0.1'."

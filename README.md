@@ -1,7 +1,7 @@
-# ai-agent-lib
+# agentcraft2-sdk
 
 Build Python agents and shared tools with consistent configuration, permissions,
-audit records, and tests. You write the application logic; ai-agent-lib connects
+audit records, and tests. You write the application logic; agentcraft2-sdk connects
 it to models, data sources, and the services around each request.
 
 An **agent** uses a language model to answer questions and choose tools. A
@@ -117,7 +117,7 @@ Local is the default for every setting, so no cloud infrastructure is needed;
 AWS is a per-variable opt-in described in the
 [configuration reference](docs/variables.md).
 
-Open a terminal in the repository's top-level `ai-agent-lib/` folder. Choose
+Open a terminal in the repository's top-level `ai-agentcraft2-sdk/` folder. Choose
 the commands for your terminal below. They use your existing Python and create
 an application workspace named `tutorial/` beside the library checkout. Use a different workspace name if that folder already exists.
 
@@ -179,7 +179,7 @@ Keep the terminal open: the tutorial reuses the Python variable and workspace.
 ## Where to make a change
 
 Your generated application lives in `tutorial/`. The library lives in
-`ai-agent-lib/`. They have different responsibilities:
+`ai-agentcraft2-sdk/`. They have different responsibilities:
 
 | You want to… | Start here |
 | --- | --- |
@@ -295,13 +295,13 @@ library root. If you followed the quickstart, return there with
 Select your approved Python, then install the contributor dependencies:
 
 ```bat
-rem Windows Command Prompt, from ai-agent-lib/
+rem Windows Command Prompt, from ai-agentcraft2-sdk/
 set "PYTHON=python"
 "%PYTHON%" tools/install_dev.py
 ```
 
 ```bash
-# macOS/Linux, from ai-agent-lib/
+# macOS/Linux, from ai-agentcraft2-sdk/
 PYTHON=python3
 "$PYTHON" tools/install_dev.py
 ```

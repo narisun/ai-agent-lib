@@ -70,7 +70,7 @@ def test_names_derived_from_a_service_name() -> None:
 ANSWERS = WorkspaceAnswers(
     name="demo",
     owner='the "platform" team',
-    library=LibrarySource(kind="path", path="C:/work/ai-agent-lib"),
+    library=LibrarySource(kind="path", path="C:/work/ai-agentcraft2-sdk"),
     agents=(AgentAnswers("hello-agent", "Greets people.", "fake", 8000, ("hello",)),),
     mcp_servers=(McpAnswers("hello-mcp", "hello", "A directory.", 8100),),
 )
@@ -169,7 +169,7 @@ def test_the_templates_in_the_package_are_found() -> None:
     )
     assert PurePosixPath(".gitignore") in files
     assert (
-        'path = "C:/work/ai-agent-lib/packages/agentcraft2-core"'
+        'path = "C:/work/ai-agentcraft2-sdk/packages/agentcraft2-core"'
         in files[PurePosixPath("pyproject.toml")]
     )
 

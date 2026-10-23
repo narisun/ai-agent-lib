@@ -110,7 +110,7 @@ async def test_a_connection_signs_in_with_an_iam_token_over_checked_tls() -> Non
         "port": 5432,
         "dbname": "agents",
         "user": "accounts_agent",
-        "application_name": "ai-agent-lib",
+        "application_name": "agentcraft2-sdk",
         "autocommit": True,
         "prepare_threshold": 0,
         "row_factory": dict_row,

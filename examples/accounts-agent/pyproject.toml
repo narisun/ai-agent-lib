@@ -1,7 +1,7 @@
 [project]
 name = "accounts-agent"
 version = "0.1.0"
-description = "Reference agent for ai-agent-lib: answers account balance questions."
+description = "Reference agent for agentcraft2-sdk: answers account balance questions."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

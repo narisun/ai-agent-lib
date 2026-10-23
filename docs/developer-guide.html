@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ai-agent-lib Developer Guide</title>
+<title>agentcraft2-sdk Developer Guide</title>
 <style>
 /* Fill the viewport, keep navigation beside the guide on wide screens, and
    contain long tables and examples in panels that scroll in both directions. */
@@ -188,8 +188,8 @@ kbd { font-family: var(--font-mono); font-size: .85em; border: 1px solid var(--l
 <a class="skip-link" href="#main">Skip to the guide</a>
 <div class="shell">
 <header class="masthead">
-  <p class="eyebrow">ai-agent-lib Â· Developer guide</p>
-  <h1>Build and test agents with ai-agent-lib</h1>
+  <p class="eyebrow">agentcraft2-sdk Â· Developer guide</p>
+  <h1>Build and test agents with agentcraft2-sdk</h1>
   <p class="lede">Understand the design, build a local agent, and extend it with tested
   tools. Use interfaces and dependency injection to keep application logic separate
   from the services it depends on.</p>
@@ -285,7 +285,7 @@ kbd { font-family: var(--font-mono); font-size: .85em; border: 1px solid var(--l
   It also needs to know who is calling, check permissions, protect data, record
   actions, and handle failures. These supporting responsibilities are called
   <strong>cross-cutting concerns</strong> because many different features need them.</p>
-  <p>ai-agent-lib gives each responsibility a clear home: your application defines
+  <p>agentcraft2-sdk gives each responsibility a clear home: your application defines
   the workflow and business logic, shared pipelines apply checks around calls, and
   adapters connect to models and other services. This structure centralizes common
   rules and lets tests replace external dependencies with controlled implementations.
@@ -402,7 +402,7 @@ def test_expiry_uses_the_supplied_clock() -&gt; None:
 
   <h3 id="langgraph-boundary">LangGraph owns the workflow; the library supplies governed operations</h3>
   <p>Your graph uses LangGraph state, nodes, edges, and tool routing.
-  Your application owns prompts and business rules. ai-agent-lib supplies model,
+  Your application owns prompts and business rules. agentcraft2-sdk supplies model,
   tool, and data operations with shared enforcement around them. A
   <strong>governed operation</strong> means a call that goes through those checks.</p>
   <div class="table-wrap"><table>
@@ -602,7 +602,7 @@ def main() -&gt; int:
     <thead><tr><th>You need</th><th>What to obtain</th></tr></thead>
     <tbody>
       <tr><td>Python and pip</td><td>An approved Python 3.11+ installation with pip and permission to install approved packages into its configured location. Use the Python version your team supports.</td></tr>
-      <tr><td>Library source</td><td>The team's approved checkout or source archive of <code>ai-agent-lib</code>, with <code>packages/</code> and <code>docs/</code> at its top level.</td></tr>
+      <tr><td>Library source</td><td>The team's approved checkout or source archive of <code>ai-agentcraft2-sdk</code>, with <code>packages/</code> and <code>docs/</code> at its top level.</td></tr>
       <tr><td>Package access</td><td>The team's pip configuration for its Python repository, such as JFrog Artifactory, including its sign-in method and any proxy or certificate setup.</td></tr>
       <tr><td>A development folder</td><td>A location where your account can create files and run Python, for example a team-approved folder under your user profile. Both the library folder and its parent must be writable.</td></tr>
     </tbody>
@@ -619,7 +619,7 @@ def main() -&gt; int:
   later in the guide.</p>
 
   <h3>A. Open the library folder and check Python</h3>
-  <p>Open the <code>ai-agent-lib</code> folder in File Explorer, type
+  <p>Open the <code>ai-agentcraft2-sdk</code> folder in File Explorer, type
   <code>cmd</code> in its address bar, and press Enter. Use this ordinary
   <strong>Command Prompt</strong> window for setup. If your company provides a
   prepared command prompt for Python, open that and use <code>cd /d</code> with
@@ -688,7 +688,7 @@ set "LIBRARY=%CD%"</code></pre>
   outside application source and shared logs.</p>
 
   <h3>D. Install the library and its command-line tool</h3>
-  <p>Still in <code>ai-agent-lib</code>, install the two local packages:</p>
+  <p>Still in <code>ai-agentcraft2-sdk</code>, install the two local packages:</p>
 <pre><code class="language-bat" id="desktop-install-library">"%PYTHON%" -m pip install -e "%LIBRARY%\packages\agentcraft2-core" -e "%LIBRARY%\packages\agentcraft2-cli"
 "%PYTHON%" -m agentcraft2_cli --help</code></pre>
   <p><strong>Check:</strong> installation succeeds and the CLI help lists commands
@@ -715,7 +715,7 @@ cd /d "%LIBRARY%\..\tutorial"
   <code>install</code> installs the workspace's services and development tools
   into the selected Python environment using pip.</p>
 <pre><code>your development folder/
-  ai-agent-lib/         Shared library source; LIBRARY points here
+  ai-agentcraft2-sdk/  Shared library source; LIBRARY points here
   tutorial/            Your application; run the remaining commands here
     agents/helper/     The agent you will change and test</code></pre>
   <p>Both folders use the Python selected in step B. Your application code belongs
@@ -742,7 +742,7 @@ cd /d "%LIBRARY%\..\tutorial"
   <h3 id="new-terminal">Resume in a new Command Prompt window</h3>
   <p>The <code>set</code> commands apply only to the current terminal. To resume,
   open Command Prompt in <code>tutorial</code> and select the existing environment:</p>
-<pre><code class="language-bat" id="desktop-resume">set "LIBRARY=%CD%\..\ai-agent-lib"
+<pre><code class="language-bat" id="desktop-resume">set "LIBRARY=%CD%\..\ai-agentcraft2-sdk"
 set "PYTHON=python"
 "%PYTHON%" -c "import sys; print(sys.executable)"
 "%PYTHON%" -m helper "Say hello to Ada."</code></pre>
@@ -795,7 +795,7 @@ with urlopen(request, timeout=30) as response:
 
 <section id="idea">
   <h2>2. Understand the project</h2>
-  <p>You now have two folders with different jobs. <code>ai-agent-lib/</code> is the
+  <p>You now have two folders with different jobs. <code>ai-agentcraft2-sdk/</code> is the
   library's source. <code>tutorial/</code> is your application workspace. Most of your
   work on an agent belongs in the application workspace.</p>
 <pre><code>tutorial/
@@ -1972,7 +1972,7 @@ async def classify(
   Expand the group you need, or use your browser's Find command.</p>
   <details class="lesson" id="variables" open>
     <summary>Configuration variables: local and AWS</summary>
-    <p>This is the complete list of environment variables bound by ai-agent-lib,
+    <p>This is the complete list of environment variables bound by agentcraft2-sdk,
     followed by OpenTelemetry, Python/pip setup and rmprep context settings used in
     this guide. <strong>Local</strong> is the zero-config default on any machine:
     with nothing set, every provider is local (files, SQLite and in-process engines)
@@ -2126,7 +2126,7 @@ async def classify(
 <tr><td><span class="var" id="var-phoenix_collector_endpoint">PHOENIX_COLLECTOR_ENDPOINT</span></td><td>Phoenix HTTP origin, without /v1/traces.</td><td>http://127.0.0.1:6006</td><td>Team-managed authenticated HTTPS origin</td><td>Process settings override the separate tracing file, then the service .env. Nothing is exported until tracing is enabled. A local Phoenix stores traces in SQLite and runs in its own Python environment. A team-hosted Phoenix is supported over HTTPS; your platform team runs it. <a href="phoenix-trial.md">Trace agents with Phoenix</a>, including the <a href="phoenix-trial.md#send-traces-to-a-team-hosted-phoenix">team-hosted setup</a>.</td></tr>
 <tr><td><span class="var" id="var-phoenix_project_name">PHOENIX_PROJECT_NAME</span></td><td>Project for this agent&#x27;s traces.</td><td>agent-lab; rmprep-trial in the walkthrough</td><td>Team project</td><td>Process settings override the separate tracing file, then the service .env. Nothing is exported until tracing is enabled. A local Phoenix stores traces in SQLite and runs in its own Python environment. A team-hosted Phoenix is supported over HTTPS; your platform team runs it. <a href="phoenix-trial.md">Trace agents with Phoenix</a>, including the <a href="phoenix-trial.md#send-traces-to-a-team-hosted-phoenix">team-hosted setup</a>.</td></tr>
 <tr><td><span class="var" id="var-phoenix_api_key">PHOENIX_API_KEY</span></td><td>Optional API key; never included in trace links.</td><td>Unset for the local server</td><td>Process environment (on Fargate, an ECS task-definition secret); not the secrets provider</td><td>Process settings override the separate tracing file, then the service .env. Nothing is exported until tracing is enabled. A local Phoenix stores traces in SQLite and runs in its own Python environment. A team-hosted Phoenix is supported over HTTPS; your platform team runs it. <a href="phoenix-trial.md">Trace agents with Phoenix</a>, including the <a href="phoenix-trial.md#send-traces-to-a-team-hosted-phoenix">team-hosted setup</a>.</td></tr>
-<tr><td><span class="var">LIBRARY</span></td><td>Command Prompt shortcut for the library checkout.</td><td>Example: <code>F:\work\ai-agent-lib</code></td><td>Not used by the service.</td><td>Defined by the setup commands; it is not an ai-agent-lib setting.</td></tr>
+<tr><td><span class="var">LIBRARY</span></td><td>Command Prompt shortcut for the library checkout.</td><td>Example: <code>F:\work\ai-agentcraft2-sdk</code></td><td>Not used by the service.</td><td>Defined by the setup commands; it is not an agentcraft2-sdk setting.</td></tr>
 <tr><td><span class="var">PYTHON</span></td><td>Command Prompt shortcut for the virtual environment&#x27;s Python.</td><td><code>%LIBRARY%\.venv\Scripts\python.exe</code></td><td>Not used by the service.</td><td>Run <code>&quot;%PYTHON%&quot; -m pip</code> to install into this environment. This is a guide shortcut, not Python&#x27;s PYTHONPATH setting.</td></tr>
 <tr><td><span class="var">PIP_CONFIG_FILE</span></td><td>Pip: selects the team&#x27;s approved configuration file.</td><td>Team-provided path, e.g. <code>C:\company\python\pip.ini</code></td><td>Build environment only, when the build team supplies it.</td><td>The enterprise setup may already configure pip; keep it unless the team tells you to select another file. Pip variables belong in the process environment.</td></tr>
 <tr><td><span class="var">PIP_INDEX_URL</span></td><td>Pip: package repository URL.</td><td>Normally supplied by enterprise setup or pip.ini.</td><td>Approved Artifactory endpoint in the image build environment.</td><td>Use the team&#x27;s repository and credential mechanism. Package installation happens during development/build, not service startup. Keep credentials out of images.</td></tr>
@@ -2510,7 +2510,7 @@ async def classify(
 <tbody>
 <tr><td><span class="var">--dir</span></td><td><code>.</code></td><td>Where to create the workspace folder. Default: the current folder.</td></tr>
 <tr><td><span class="var">--owner</span></td><td><span class="muted">none</span></td><td>The team that owns the workspace.</td></tr>
-<tr><td><span class="var">--lib-path</span></td><td><span class="muted">none</span></td><td>A local checkout of ai-agent-lib to install the library from.</td></tr>
+<tr><td><span class="var">--lib-path</span></td><td><span class="muted">none</span></td><td>A local checkout of agentcraft2-sdk to install the library from.</td></tr>
 <tr><td><span class="var">--lib-version</span></td><td><span class="muted">none</span></td><td>Install the library from a package index, e.g. &#x27;&gt;=0.1&#x27;.</td></tr>
 <tr><td><span class="var">--answers</span></td><td><span class="muted">none</span></td><td>Generate the workspace an agentcraft2.toml describes, services included.</td></tr>
 <tr><td><span class="var">--force</span></td><td><code>off</code></td><td>Overwrite files that exist and differ.</td></tr>

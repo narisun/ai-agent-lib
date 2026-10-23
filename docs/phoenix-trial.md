@@ -68,7 +68,7 @@ troubleshooting.
 Use Python 3.11 or newer and the pip index and certificates supplied by your team.
 Your package administrators must make the pinned package and compatible wheels for
 your platform available through the enterprise package repository. Open a terminal
-in the `ai-agent-lib` repository and run:
+in the `ai-agentcraft2-sdk` repository and run:
 
 ```bat
 start-phoenix.bat setup

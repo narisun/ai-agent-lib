@@ -101,6 +101,7 @@ These changes landed afterward; each is documented where it is used and covered 
   | `ai-agent-lib-core`, `-cli`, `-aws`, `-ui` (distributions and folders) | `agentcraft2-core`, `-cli`, `-aws`, `-ui` |
   | `ai_agent_lib_core`, `_cli`, `_aws`, `_ui` (imports, `python -m ...`) | `agentcraft2_core`, `_cli`, `_aws`, `_ui` |
   | Provider entry-point group `ai_agent_lib.providers` | `agentcraft2.providers` |
+  | Project folder and name `ai-agent-lib` | `ai-agentcraft2-sdk` (the folder) and `agentcraft2-sdk` (the name in docs, descriptions and `[tool.agentcraft2-sdk]`) |
 
   A package that registers providers under the old entry-point group is not found.
   Workspaces generated earlier name the old distributions in their `pyproject.toml`
@@ -137,8 +138,7 @@ These changes landed afterward; each is documented where it is used and covered 
   dashboards and alerts that filter on the old span attribute and metric names. The
   generated Terraform names the log group `/agentcraft2/<name>`, so the next apply
   replaces the old group and deletes the logs in it. Export anything you need first.
-- Not renamed: the repository name `ai-agent-lib`, the `eap-*`
-  resource-name defaults, and two hash salts that derive stable identifiers in Agent
+- Not renamed: the `eap-*` resource-name defaults, and two hash salts that derive stable identifiers in Agent
   Lab (`agentlib:answer:` and `agentlib:older:`). Renaming a salt would change the
   identifiers it produces for saved conversations.
 
