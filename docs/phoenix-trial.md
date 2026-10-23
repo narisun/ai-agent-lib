@@ -178,8 +178,11 @@ when upgrading Phoenix.
 Choose **rmprep** and start a new chat. These questions exercise a real MCP call
 without requesting client financial or contact records:
 
-1. `Find clients containing the exact synthetic test name PHOENIX-TRIAL-NO-MATCH-20261015. Use find_clients once and report the number of matches. Do not broaden the search or retrieve other records.`
-2. `Which exact synthetic name did you just search for, and how many matches did it return? Answer from this conversation without running another search.`
+Send each question in the same chat after the previous answer finishes:
+
+1. `Find clients containing the exact synthetic test name DISTINCT-FIX-NO-MATCH-20261016. Use find_clients once and report the number of matches. Do not broaden the search or retrieve other records.`
+2. `Using the result already in this conversation, what exact name did I ask you to search for and how many matches did you find? Answer in one sentence without calling tools.`
+3. `Without searching again, restate the exact search name and match count from our earlier exchange, and explain whether that result identifies a client for a memo. Keep it to two sentences.`
 
 Accepted answers and confirmed agent failures include **Open trace in Agent Lab**
 below usage and response time when execution created a trace. The link opens the
@@ -190,7 +193,7 @@ In Phoenix, inspect:
 
 | Item | What to look for |
 | --- | --- |
-| Root `rmprep.turn` span | One trace per invocation; the two traces share `session.id` and `agentlib.thread_id`. |
+| Root `rmprep.turn` span | One trace per invocation; the three traces share `session.id` and `agentlib.thread_id`. |
 | `model` spans | Select a model span, then view **Input** and **Output** on its **Info** tab. Switch between **Messages** and **Raw**. The next model call includes the preceding tool result. |
 | `rmprep-data.find_clients` span | MCP arguments, result, duration, and `agentlib.mcp_server`. The synthetic search should return zero matches. |
 | Usage | Prompt/completion tokens and cache read/write counts. Prompt totals already include cache tokens. |
@@ -208,9 +211,41 @@ database; Phoenix receives references, not a second copy of the checkpoint store
 These are dated records of real runs through Agent Lab, kept so you can compare
 your own numbers. Model output, caching, and timing vary between runs.
 
+### Verified local run: October 16, 2026
+
+The three questions above ran through Agent Lab using the root `.env`, default
+Python 3.13.0, Anthropic `claude-sonnet-4-5`, Phoenix 20.22.0 and SQLAlchemy 2.1.4.
+Startup masked credentials, and every observed Python process used the default
+installation. No `.venv` Python or pip executable ran.
+
+| Turn | Model calls | MCP calls | Input / output tokens | UI response time | Checkpoint references |
+| --- | --- | --- | --- | --- | --- |
+| Search for the synthetic name | 2 | 1 | 8,572 / 127 | 5.22 s | 4 |
+| Recall the name and count | 1 | 0 | 4,472 / 37 | 2.12 s | 4 |
+| Explain whether the result identifies a client | 1 | 0 | 4,548 / 60 | 2.07 s | 4 |
+
+The search returned zero matches. Both follow-ups recalled the exact name and
+count on the same thread; the last answer correctly said no client had been
+identified for a memo. Model inputs included the earlier question, tool result
+and saved answers. The MCP log showed the query, parameters and zero-row result.
+Agent Lab's token counts matched Phoenix, and all twelve checkpoint references
+resolved to saved checkpoints.
+
+Phoenix trace browsing showed model input/output and usage. The service logs
+contained no SQLAlchemy warning or application error through startup, requests,
+browsing and shutdown. `stop-local.bat` stopped all four services gracefully;
+ports 6006, 8000, 8100 and 8765 closed. The root `.env` and existing saved
+conversations, traces and checkpoints were preserved. These are observed results;
+model wording, token counts and timings can vary.
+
+That run used Phoenix 20.22.0 with a launcher-side SQLAlchemy query fix, which this
+repository no longer carries. The pinned 20.21.1 leaves the warning visible (see
+[Remaining upstream warning](#remaining-upstream-warning)), so the note above that the
+logs held no SQLAlchemy warning describes that run only.
+
 ### Verified Anthropic run
 
-On October 15, 2026, these two questions ran through Agent Lab using the root
+On October 15, 2026, an earlier two-question test ran through Agent Lab using the root
 `.env` and `claude-sonnet-4-5`. The synthetic name returned zero matches. The
 follow-up recalled that name and count without another MCP call.
 

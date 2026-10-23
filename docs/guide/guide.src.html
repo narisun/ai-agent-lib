@@ -1125,8 +1125,8 @@ AC2_MODEL_PROVIDER=fake</code></pre>
     for the complete walkthrough. Open <strong>Command Prompt</strong> in the
     library repository root. Run <code>setup-local.bat</code> once, then configure
     your model in <code>.env</code> beside <code>start-local.bat</code>. For local
-    tracing, run <code>start-phoenix.bat setup</code> and add the Phoenix settings
-    from that guide. Setup uses your enterprise Python/pip configuration and
+    tracing, follow the <a href="#phoenix-local">Phoenix setup recipe below</a>.
+    Setup uses your enterprise Python/pip configuration and
     one Python for all services, with separate package folders for Agent Lab and Phoenix. The default setup installs
     runtime packages. Run <code>setup-local.bat --dev</code> when you also need
     the scaffolding CLI and the rmprep/Agent Lab test and development tools.</p>
@@ -1157,6 +1157,67 @@ AC2_MODEL_PROVIDER=fake</code></pre>
     <code>start-local.bat --smoke-test</code> to check startup/shutdown without a
     model request, or <code>start-local.bat demo</code> for scripted tool and
     checkpoint examples.</p>
+  </details>
+  <details id="phoenix-local">
+    <summary>How do I enable Phoenix and check a conversation?</summary>
+    <p>Phoenix shows what the model received, which MCP tools it called, and how
+    it answered. It runs locally with Python, pip and SQLite. Start with the
+    <a href="#local-startup">Agent Lab setup above</a> and configure Anthropic in
+    the root <code>.env</code>. Then follow these steps from
+    <strong>Command Prompt</strong> in the repository root.</p>
+    <ol>
+      <li><strong>Install the Phoenix packages once.</strong>
+<pre><code class="language-bat">start-phoenix.bat setup</code></pre>
+      <p>This installs the pinned Phoenix 20.21.1 through your existing pip
+      configuration. All services use the default Python. Phoenix keeps its
+      dependencies in <code>.agentlib\phoenix\.venv</code>; the launcher runs
+      Python and pip from your approved installation.</p></li>
+      <li><strong>Enable tracing.</strong> Add these settings to <code>.env</code>
+      beside <code>start-local.bat</code>. Keep your model settings and API key.
+<pre><code>AC2_TELEMETRY=off
+AC2_PHOENIX_ENABLED=true
+AC2_PHOENIX_CAPTURE_CONTENT=true
+PHOENIX_COLLECTOR_ENDPOINT=http://127.0.0.1:6006
+PHOENIX_PROJECT_NAME=rmprep-trial</code></pre>
+      <p>Content capture records messages and tool results, so use approved test
+      data. Phoenix receives model/tool traces and usage; <code>AC2_TELEMETRY=off</code>
+      disables the separate operational telemetry exporter for this local setup.</p></li>
+      <li><strong>Start the stack.</strong>
+<pre><code class="language-bat">start-local.bat</code></pre>
+      <p>Check that startup shows the root <code>.env</code>, Anthropic, Phoenix,
+      and masked credentials. Wait for <strong>All selected services are ready</strong>.
+      Open <a href="http://127.0.0.1:8765">Agent Lab</a>, sign in using the
+      <a href="#local-startup">local access code</a>, and select
+      <strong>Choose agent → Start chat with rmprep</strong>.</p></li>
+      <li><strong>Check the conversation and traces.</strong> Follow the
+      <a href="phoenix-trial.md#4-verify-a-conversation">three test questions</a>:
+      search for a synthetic client name, recall the name and match count, then
+      ask whether that result identifies a client for a memo. Send each follow-up
+      in the same chat after the previous answer finishes.
+      <p>Each answer shows token usage, response time and
+      <strong>Open trace in Agent Lab</strong>. Open that link to inspect Phoenix
+      model inputs/outputs, MCP arguments/results and checkpoint references. The
+      follow-ups should remember the search and zero matches without another
+      tool call. Their model inputs should include the earlier exchange. Phoenix
+      stores traces in <code>.agentlib\phoenix\data\phoenix.db</code>;
+      checkpoint contents stay in the agent's database.</p></li>
+      <li><strong>Stop when finished.</strong> In a second Command Prompt at the
+      repository root, run:
+<pre><code class="language-bat">stop-local.bat</code></pre>
+      <p>Wait for <strong>Stopped gracefully</strong>. Conversations, traces and
+      checkpoints remain available for the next session.</p></li>
+    </ol>
+    <p><strong>Verified October 16, 2026:</strong> the root <code>.env</code>,
+    default Python 3.13 and Anthropic completed three turns on one thread, with
+    four model calls, one MCP call and twelve valid checkpoint references.
+    Agent Lab metrics matched Phoenix, and saved data remained available.
+    See the <a href="phoenix-trial.md#verified-local-run-october-16-2026">recorded results</a>.
+    Model wording, token counts and timing vary between runs.</p>
+    <p><strong>A SQLAlchemy warning:</strong> the pinned Phoenix can print
+    SQLAlchemy's <code>Column-expression-level unary distinct()</code> warning
+    while it starts or you browse traces. It is left visible and does not block
+    tracing; see the
+    <a href="phoenix-trial.md#remaining-upstream-warning">troubleshooting note</a>.</p>
   </details>
   <details id="rmprep-answer-checks">
     <summary>Why does rmprep sometimes revise a draft?</summary>
@@ -1341,7 +1402,7 @@ messages = [static_system_prompt(SYSTEM_INSTRUCTIONS, request_context), *convers
 reply = await services.model().ainvoke(messages)</code></pre>
   <p>In rmprep, prompt resources live under
   <code>src/rmprep/prompts/&lt;agent&gt;/&lt;type&gt;.v&lt;version&gt;.md</code>.
-  The loader pins <code>rmprep/common.v5.md</code>, <code>memoagent/system.v2.md</code>
+  The loader pins <code>rmprep/common.v6.md</code>, <code>memoagent/system.v2.md</code>
   and <code>qnaagent/system.v3.md</code>. Dates, client selection and output budgets
   stay in request context. The router uses Python rules and needs no model prompt.
   Add a new version and update the loader explicitly when changing instructions.</p>

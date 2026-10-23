@@ -42,6 +42,32 @@ pip module, rather than executables inside those folders. The generated
 Setup installs runtime packages. Use `setup-local.bat --dev` to also install
 the scaffolding CLI and the rmprep/Agent Lab development tools.
 
+**Optional: enable Phoenix traces.** Install its packages once with the same
+default Python and pip:
+
+```bat
+start-phoenix.bat setup
+```
+
+Add these settings to the root `.env`, keeping your model settings and API key:
+
+```dotenv
+AC2_TELEMETRY=off
+AC2_PHOENIX_ENABLED=true
+AC2_PHOENIX_CAPTURE_CONTENT=true
+PHOENIX_COLLECTOR_ENDPOINT=http://127.0.0.1:6006
+PHOENIX_PROJECT_NAME=rmprep-trial
+```
+
+Content capture records model messages and tool results; use approved test data.
+`start-local.bat` will start Phoenix at <http://127.0.0.1:6006> and keep traces in
+local SQLite storage. The pinned Phoenix 20.21.1 can print a SQLAlchemy
+`Column-expression-level unary distinct()` warning; it is left visible and does not
+block tracing ([details](docs/phoenix-trial.md#remaining-upstream-warning)). Follow the
+[Phoenix guide recipe](docs/developer-guide.html#phoenix-local) to check a
+conversation. The [verified three-turn run](docs/phoenix-trial.md#verified-local-run-october-16-2026)
+confirmed Anthropic follow-ups, MCP calls, metrics and checkpoints.
+
 **Each testing session:**
 
 ```bat
