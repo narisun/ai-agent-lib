@@ -1310,7 +1310,7 @@ messages = [static_system_prompt(SYSTEM_INSTRUCTIONS, request_context), *convers
 reply = await services.model().ainvoke(messages)</code></pre>
   <p>In rmprep, prompt resources live under
   <code>src/rmprep/prompts/&lt;agent&gt;/&lt;type&gt;.v&lt;version&gt;.md</code>.
-  The loader pins <code>rmprep/common.v6.md</code>, <code>memoagent/system.v2.md</code>
+  The loader pins <code>rmprep/common.v5.md</code>, <code>memoagent/system.v2.md</code>
   and <code>qnaagent/system.v3.md</code>. Dates, client selection and output budgets
   stay in request context. The router uses Python rules and needs no model prompt.
   Add a new version and update the loader explicitly when changing instructions.</p>
@@ -1963,8 +1963,10 @@ async def classify(
 <tr><td><code>secrets</code></td><td><code>secrets_manager</code></td><td></td><td>ai-agent-lib-aws</td><td><a href="#opt-secrets-secrets-manager">SecretsManagerOptions</a></td></tr>
 <tr><td><code>audit</code></td><td><code>firehose</code></td><td></td><td>ai-agent-lib-aws</td><td><a href="#opt-audit-firehose">FirehoseAuditOptions</a></td></tr>
 <tr><td><code>audit</code></td><td><code>jsonl</code></td><td><span class="tag warn">local only</span></td><td>ai-agent-lib-core</td><td><a href="#opt-audit-jsonl">JsonlAuditOptions</a></td></tr>
+<tr><td><code>identity</code></td><td><code>agentcore_runtime</code></td><td></td><td>ai-agent-lib-aws</td><td><a href="#opt-identity-agentcore-runtime">AgentCoreRuntimeIdentityOptions</a></td></tr>
 <tr><td><code>identity</code></td><td><code>jwt</code></td><td></td><td>ai-agent-lib-core</td><td><a href="#opt-identity-jwt">JwtIdentityOptions</a></td></tr>
 <tr><td><code>identity</code></td><td><code>static</code></td><td><span class="tag warn">local only</span></td><td>ai-agent-lib-core</td><td><a href="#opt-identity-static">StaticIdentityOptions</a></td></tr>
+<tr><td><code>checkpoint</code></td><td><code>agentcore_memory</code></td><td></td><td>ai-agent-lib-aws</td><td><a href="#opt-checkpoint-agentcore-memory">AgentCoreMemoryCheckpointOptions</a></td></tr>
 <tr><td><code>checkpoint</code></td><td><code>none</code></td><td></td><td>ai-agent-lib-core</td><td><span class="muted">none</span></td></tr>
 <tr><td><code>checkpoint</code></td><td><code>postgres</code></td><td></td><td>ai-agent-lib-aws</td><td><a href="#opt-checkpoint-postgres">PostgresCheckpointOptions</a></td></tr>
 <tr><td><code>checkpoint</code></td><td><code>sqlite</code></td><td><span class="tag warn">local only</span></td><td>ai-agent-lib-core</td><td><a href="#opt-checkpoint-sqlite">SqliteCheckpointOptions</a></td></tr>
@@ -2022,16 +2024,31 @@ async def classify(
 <tr><td><span class="var">path</span></td><td>path</td><td><code>.agentlib/audit.jsonl</code></td><td>The file to append to. Parent directories are created.</td></tr>
 <tr><td><span class="var">fsync</span></td><td>true | false</td><td><code>true</code></td><td>Force each record to disk before <code>write</code> returns.</td></tr>
 </tbody></table></div>
+<h4 id="opt-identity-agentcore-runtime"><code>identity</code> Â· <code>agentcore_runtime</code></h4>
+<p class="small">Options of the <code>agentcore_runtime</code> identity provider. <span class="muted">(AgentCoreRuntimeIdentityOptions)</span></p>
+<div class="table-wrap"><table class="opts">
+<thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><span class="var">tenant</span></td><td>text</td><td><span class="tag">required</span></td><td>The tenant every caller belongs to. The runtime says who the caller is, not which tenant they are in.</td></tr>
+<tr><td><span class="var">roles</span></td><td>list of text</td><td><code>[]</code></td><td>The roles every caller is granted. The runtime passes none.</td></tr>
+<tr><td><span class="var">user_header</span></td><td>text</td><td><code>x-amzn-bedrock-agentcore-runtime-user-id</code></td><td>The header the runtime sets to the caller&#x27;s identity.</td></tr>
+<tr><td><span class="var">workload_token_headers</span></td><td>list of text</td><td><code>[&quot;x-amz-bedrock-agentcore-identity-wat&quot;, &quot;workloadaccesstoken&quot;]</code></td><td>The headers that may carry the workload access token, in the order they are looked for.</td></tr>
+<tr><td><span class="var">exchange</span></td><td>object</td><td><span class="muted">keys below</span></td><td>How tokens for other services are obtained through AgentCore Identity. Without it the identity only verifies.</td></tr>
+<tr><td><span class="var">exchange.credential_provider</span></td><td>text</td><td><span class="tag">required</span></td><td>The name of the AgentCore Identity credential provider that knows the downstream service&#x27;s identity provider.</td></tr>
+<tr><td><span class="var">exchange.scopes</span></td><td>list of text</td><td><span class="tag">required</span></td><td>The scopes to ask for, where <code>{audience}</code> stands for the audience of the service being called.</td></tr>
+<tr><td><span class="var">exchange.workload_name</span></td><td>text</td><td><span class="muted">not set</span></td><td>This service&#x27;s workload identity in AgentCore, needed to mint a workload token when a request brought none: for the service&#x27;s own token, and for a caller whose token the runtime did not pass on.</td></tr>
+<tr><td><span class="var">exchange.return_url</span></td><td>text</td><td><span class="muted">not set</span></td><td>Where the person&#x27;s browser is sent after they authorise this service, for the user federation flow.</td></tr>
+<tr><td><span class="var">exchange.cache_seconds</span></td><td>number</td><td><code>300.0</code></td><td>How long an obtained token is reused for the same caller and audience.</td></tr>
+</tbody></table></div>
 <h4 id="opt-identity-jwt"><code>identity</code> Â· <code>jwt</code></h4>
 <p class="small">Options of the <code>jwt</code> identity provider. <span class="muted">(JwtIdentityOptions)</span></p>
 <div class="table-wrap"><table class="opts">
 <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
 <tbody>
 <tr><td><span class="var">preset</span></td><td>&quot;entra&quot; | &quot;cognito&quot;</td><td><span class="muted">not set</span></td><td><code>entra</code> fills in the issuer, key location, token endpoint and claim names for Microsoft Entra ID from <code>tenant_id</code>. <code>cognito</code> fills in the issuer, key location and claim names for an Amazon Cognito user pool from <code>user_pool_id</code>; its access tokens name the app client in <code>client_id</code> rather than <code>aud</code>, so that is the audience claim, and <code>tenant</code> must be set because a pool carries no tenant claim. Cognito has no delegation grant, so <code>exchange</code> needs its <code>kind</code> and <code>token_url</code> spelled out.</td></tr>
-<tr><td><code>identity</code></td><td><code>agentcore_runtime</code></td><td></td><td>ai-agent-lib-aws</td><td><a href="#opt-identity-agentcore-runtime">AgentCoreRuntimeIdentityOptions</a></td></tr>
 <tr><td><span class="var">tenant_id</span></td><td>text</td><td><span class="muted">not set</span></td><td>The Entra tenant (directory) ID.</td></tr>
+<tr><td><span class="var">user_pool_id</span></td><td>text</td><td><span class="muted">not set</span></td><td>The Cognito user pool, <code>{region}_{id}</code>.</td></tr>
 <tr><td><span class="var">token_version</span></td><td>1 | 2</td><td><code>2</code></td><td>The version of access token this application is registered to receive from Entra.</td></tr>
-<tr><td><code>checkpoint</code></td><td><code>agentcore_memory</code></td><td></td><td>ai-agent-lib-aws</td><td><a href="#opt-checkpoint-agentcore-memory">AgentCoreMemoryCheckpointOptions</a></td></tr>
 <tr><td><span class="var">authority</span></td><td>text</td><td><code>https://login.microsoftonline.com</code></td><td>The Entra sign-in host, for national clouds.</td></tr>
 <tr><td><span class="var">issuer</span></td><td>text</td><td><span class="muted">not set</span></td><td>The exact <code>iss</code> value to accept. Required without a preset.</td></tr>
 <tr><td><span class="var">jwks_url</span></td><td>text</td><td><span class="muted">not set</span></td><td>Where the issuer publishes its signing keys. Required without a preset.</td></tr>
@@ -2069,6 +2086,15 @@ async def classify(
 <tr><td><span class="var">audience</span></td><td>text</td><td><span class="muted">not set</span></td><td>The name this service accepts development tokens for. Without it a token for any audience is accepted.</td></tr>
 <tr><td><span class="var">token_ttl_seconds</span></td><td>integer</td><td><code>300</code></td><td>How long a development token is valid.</td></tr>
 </tbody></table></div>
+<h4 id="opt-checkpoint-agentcore-memory"><code>checkpoint</code> Â· <code>agentcore_memory</code></h4>
+<p class="small">Options of the <code>agentcore_memory</code> checkpoint store. <span class="muted">(AgentCoreMemoryCheckpointOptions)</span></p>
+<div class="table-wrap"><table class="opts">
+<thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><span class="var">memory_id</span></td><td>text</td><td><span class="tag">required</span></td><td>The ID of the AgentCore Memory resource, as the console shows it: a name and a ten-character suffix, not the ARN.</td></tr>
+<tr><td><span class="var">max_results</span></td><td>integer</td><td><code>100</code></td><td>How many events one page of a read holds.</td></tr>
+<tr><td><span class="var">checkpoint_format</span></td><td>&quot;legacy&quot; | &quot;snapshot&quot;</td><td><code>legacy</code></td><td><code>legacy</code> stores a checkpoint as a series of events; <code>snapshot</code> stores whole checkpoints, which bounds a read. Every service that shares a memory must use the same format.</td></tr>
+</tbody></table></div>
 <h4 id="opt-checkpoint-none"><code>checkpoint</code> Â· <code>none</code></h4>
 <p class="small">No options. Keeps no graph state: for MCP servers and agents that compile no graph.</p>
 <h4 id="opt-checkpoint-postgres"><code>checkpoint</code> Â· <code>postgres</code></h4>
@@ -2090,22 +2116,6 @@ async def classify(
 <div class="table-wrap"><table class="opts">
 <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
 <tbody>
-<h4 id="opt-identity-agentcore-runtime"><code>identity</code> Â· <code>agentcore_runtime</code></h4>
-<p class="small">Options of the <code>agentcore_runtime</code> identity provider. <span class="muted">(AgentCoreRuntimeIdentityOptions)</span></p>
-<div class="table-wrap"><table class="opts">
-<thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
-<tbody>
-<tr><td><span class="var">tenant</span></td><td>text</td><td><span class="tag">required</span></td><td>The tenant every caller belongs to. The runtime says who the caller is, not which tenant they are in.</td></tr>
-<tr><td><span class="var">roles</span></td><td>list of text</td><td><code>[]</code></td><td>The roles every caller is granted. The runtime passes none.</td></tr>
-<tr><td><span class="var">user_header</span></td><td>text</td><td><code>x-amzn-bedrock-agentcore-runtime-user-id</code></td><td>The header the runtime sets to the caller&#x27;s identity.</td></tr>
-<tr><td><span class="var">workload_token_headers</span></td><td>list of text</td><td><code>[&quot;x-amz-bedrock-agentcore-identity-wat&quot;, &quot;workloadaccesstoken&quot;]</code></td><td>The headers that may carry the workload access token, in the order they are looked for.</td></tr>
-<tr><td><span class="var">exchange</span></td><td>object</td><td><span class="muted">keys below</span></td><td>How tokens for other services are obtained through AgentCore Identity. Without it the identity only verifies.</td></tr>
-<tr><td><span class="var">exchange.credential_provider</span></td><td>text</td><td><span class="tag">required</span></td><td>The name of the AgentCore Identity credential provider that knows the downstream service&#x27;s identity provider.</td></tr>
-<tr><td><span class="var">exchange.scopes</span></td><td>list of text</td><td><span class="tag">required</span></td><td>The scopes to ask for, where <code>{audience}</code> stands for the audience of the service being called.</td></tr>
-<tr><td><span class="var">exchange.workload_name</span></td><td>text</td><td><span class="muted">not set</span></td><td>This service&#x27;s workload identity in AgentCore, needed to mint a workload token when a request brought none: for the service&#x27;s own token, and for a caller whose token the runtime did not pass on.</td></tr>
-<tr><td><span class="var">exchange.return_url</span></td><td>text</td><td><span class="muted">not set</span></td><td>Where the person&#x27;s browser is sent after they authorise this service, for the user federation flow.</td></tr>
-<tr><td><span class="var">exchange.cache_seconds</span></td><td>number</td><td><code>300.0</code></td><td>How long an obtained token is reused for the same caller and audience.</td></tr>
-</tbody></table></div>
 <tr><td><span class="var">path</span></td><td>path</td><td><code>.agentlib/checkpoints.sqlite</code></td><td>The database file. Parent directories are created.</td></tr>
 </tbody></table></div>
 <h4 id="opt-registry-file"><code>registry</code> Â· <code>file</code></h4>
@@ -2113,7 +2123,6 @@ async def classify(
 <div class="table-wrap"><table class="opts">
 <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
 <tbody>
-<tr><td><span class="var">user_pool_id</span></td><td>text</td><td><span class="muted">not set</span></td><td>The Cognito user pool, <code>{region}_{id}</code>.</td></tr>
 <tr><td><span class="var">agents_path</span></td><td>path</td><td><code>registry/agents.yaml</code></td><td>The agent registry file.</td></tr>
 <tr><td><span class="var">tools_path</span></td><td>path</td><td><code>registry/mcp-tools.yaml</code></td><td>The MCP tool registry file.</td></tr>
 </tbody></table></div>
@@ -2150,15 +2159,6 @@ async def classify(
 <tr><td><span class="var">cache_ttl_seconds</span></td><td>number</td><td><code>0.0</code></td><td>How long a decision may be reused. <code>0</code> turns the cache off.</td></tr>
 <tr><td><span class="var">cache_max_entries</span></td><td>integer</td><td><code>1024</code></td><td>The most decisions kept at once.</td></tr>
 <tr><td><span class="var">path</span></td><td>path</td><td><code>policies/agentlib/rules/data.yaml</code></td><td>The rules file, as YAML or JSON. The default is where the file sits when the <code>policies</code> folder is laid out as an OPA bundle, so the same file serves this provider and OPA.</td></tr>
-</tbody></table></div>
-<h4 id="opt-checkpoint-agentcore-memory"><code>checkpoint</code> Â· <code>agentcore_memory</code></h4>
-<p class="small">Options of the <code>agentcore_memory</code> checkpoint store. <span class="muted">(AgentCoreMemoryCheckpointOptions)</span></p>
-<div class="table-wrap"><table class="opts">
-<thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Meaning</th></tr></thead>
-<tbody>
-<tr><td><span class="var">memory_id</span></td><td>text</td><td><span class="tag">required</span></td><td>The ID of the AgentCore Memory resource, as the console shows it: a name and a ten-character suffix, not the ARN.</td></tr>
-<tr><td><span class="var">max_results</span></td><td>integer</td><td><code>100</code></td><td>How many events one page of a read holds.</td></tr>
-<tr><td><span class="var">checkpoint_format</span></td><td>&quot;legacy&quot; | &quot;snapshot&quot;</td><td><code>legacy</code></td><td><code>legacy</code> stores a checkpoint as a series of events; <code>snapshot</code> stores whole checkpoints, which bounds a read. Every service that shares a memory must use the same format.</td></tr>
 </tbody></table></div>
 <h4 id="opt-guardrails-bedrock"><code>guardrails</code> Â· <code>bedrock</code></h4>
 <p class="small">Options of the <code>bedrock</code> guardrails provider. <span class="muted">(BedrockGuardrailsOptions)</span></p>
@@ -2514,6 +2514,7 @@ python -m your_agent.service</code></pre>
 <tr><td><code>ai-agent-lib-core[testing]</code></td><td>Needed to use the contract test suites in ai_agent_lib_core.testing.contracts.</td><td><code>pytest&gt;=8.2</code>, <code>pytest-asyncio&gt;=1.4</code></td></tr>
 <tr><td><code>ai-agent-lib-aws[bedrock]</code></td><td>The bedrock model provider.</td><td><code>langchain-aws&gt;=1.0,&lt;2</code></td></tr>
 <tr><td><code>ai-agent-lib-aws[postgres]</code></td><td>The postgres checkpoint store.</td><td><code>langgraph-checkpoint-postgres&gt;=3.1,&lt;4</code>, <code>psycopg[binary,pool]&gt;=3.2</code>, <code>psycopg-pool&gt;=3.3</code></td></tr>
+<tr><td><code>ai-agent-lib-aws[agentcore]</code></td><td>The AgentCore Memory checkpoint store.</td><td><code>langgraph-checkpoint-aws&gt;=1.2,&lt;2</code></td></tr>
 <tr><td><code>ai-agent-lib-cli[aws]</code></td><td>For &#x27;agentlib new mcp --from-redshift&#x27;, which reads the Redshift catalogue.</td><td><code>ai-agent-lib-aws</code></td></tr>
 </tbody></table></div>
   </details>
@@ -2577,7 +2578,6 @@ python -m your_agent.service</code></pre>
     panel.tabIndex = 0;
   });
   // Keep the reading area visible on small screens.
-<tr><td><code>ai-agent-lib-aws[agentcore]</code></td><td>The AgentCore Memory checkpoint store.</td><td><code>langgraph-checkpoint-aws&gt;=1.2,&lt;2</code></td></tr>
   if (window.matchMedia("(max-width: 63.99rem)").matches) {
     document.querySelector("nav.toc details").removeAttribute("open");
   }
