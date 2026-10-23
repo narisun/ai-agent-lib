@@ -458,7 +458,13 @@ def service_config() -> ServiceConfig:
     )
 
 
-async def test_a_service_selects_the_store_by_name() -> None:
+async def test_a_service_selects_the_store_by_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The memory checkpointer builds its own boto3 client from the SDK's default chain. Without
+    # credentials the chain asks the instance-metadata address, which a machine with no AWS
+    # setup (CI) refuses. Fake keys end the search at the environment and send nothing.
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "test")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "test")
+    monkeypatch.setenv("AWS_EC2_METADATA_DISABLED", "true")
     fakes = Fakes()
     providers = register_aws_adapters(fakes.providers(), sessions=offline_sessions())
     spec = providers.lookup(Section.CHECKPOINT, "agentcore_memory")
