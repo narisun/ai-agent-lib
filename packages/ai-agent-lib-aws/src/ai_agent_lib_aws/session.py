@@ -225,6 +225,31 @@ class AwsSessionFactory:
         """The command that renews the sign-in of a named profile."""
         return f"aws sso login --profile {self._profile}" if self._profile else None
 
+    def credentials(self) -> Any:
+        """Return the session's credentials, frozen at this moment, for signing a request.
+
+        The SDK's credential object refreshes itself; asking on every request
+        is what honours a refresh. The result is read-only and never cached here.
+
+        Raises:
+            ConfigurationError: If the SDK finds no credentials.
+        """
+        found = self._session.get_credentials()
+        if found is None:
+            raise ConfigurationError(
+                "the AWS session has no credentials to sign with",
+                expected="credentials from the SDK's default chain or the named profile",
+                actual="none found",
+                fix=self.sign_in or "configure AWS credentials for the service",
+            )
+        try:
+            return found.get_frozen_credentials()
+        except aws.BotoCoreError as exc:
+            mapped = classify_aws_error(exc, what="the AWS session", sign_in=self.sign_in)
+            raise mapped or ConfigurationError(
+                f"the AWS credentials could not be read ({describe(exc)})"
+            ) from exc
+
     def client(self, service: str, *, retried_by_pipeline: bool = False) -> Any:
         """Return the client for an AWS service, building it on first use.
 

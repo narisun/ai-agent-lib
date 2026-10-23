@@ -11,10 +11,12 @@ from __future__ import annotations
 import enum
 import hashlib
 import json
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Protocol, TypeVar
+from typing import Literal, Protocol, TypeVar
+from urllib.parse import quote
 
 from ai_agent_lib_core.contracts._validation import require_identifier
 from ai_agent_lib_core.contracts.identity import Classification
@@ -30,6 +32,7 @@ __all__ = [
     "ToolEntry",
     "ToolRegistry",
     "ToolSnapshot",
+    "runtime_invocation_url",
     "schema_fingerprint",
 ]
 
@@ -37,6 +40,12 @@ REGISTRY_SCHEMA = "agentlib.registry/v1"
 """The schema identifier every registry document must declare."""
 
 _SHA256_HEX_LENGTH = 64
+_RUNTIME_ARN = re.compile(
+    r"^arn:aws(?:-[a-z]+)*:bedrock-agentcore:(?P<region>[a-z0-9-]+):"
+    r"\d{12}:runtime/[A-Za-z0-9_.-]+$"
+)
+_PLAIN_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
+_DEFAULT_QUALIFIER = "DEFAULT"
 
 
 class EntryStatus(enum.StrEnum):
@@ -55,6 +64,35 @@ def schema_fingerprint(schema: Mapping[str, object]) -> str:
     """
     canonical = json.dumps(schema, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def runtime_invocation_url(runtime_arn: str, qualifier: str = _DEFAULT_QUALIFIER) -> str:
+    """Return where an MCP server hosted on an AgentCore runtime is reached.
+
+    The platform serves every runtime of a region at one host; the runtime's
+    ARN, percent-encoded as one path segment, and the qualifier select the
+    runtime and its endpoint.
+
+    Args:
+        runtime_arn: The runtime's ARN, shaped
+            ``arn:aws:bedrock-agentcore:{region}:{account}:runtime/{id}``.
+        qualifier: The runtime endpoint; ``DEFAULT`` unless one was created.
+
+    Raises:
+        ValueError: If the ARN is not a runtime ARN, or the qualifier is not
+            a plain name.
+    """
+    match = _RUNTIME_ARN.match(runtime_arn)
+    if match is None:
+        raise ValueError(
+            "runtime_arn must be shaped arn:aws:bedrock-agentcore:{region}:{account}:runtime/{id}"
+        )
+    if not _PLAIN_NAME.match(qualifier):
+        raise ValueError("qualifier must be a plain name of at most 64 letters, digits, _ . or -")
+    return (
+        f"https://bedrock-agentcore.{match.group('region')}.amazonaws.com/runtimes/"
+        f"{quote(runtime_arn, safe='')}/invocations?qualifier={qualifier}"
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,25 +132,61 @@ class ServerEntry:
     Attributes:
         id: The name agents use for the server.
         owner: The team that owns it.
-        url: Where the server is reached.
+        url: Where the server is reached. For a server hosted on an AgentCore
+            runtime it is derived from ``runtime_arn`` and ``qualifier`` and
+            must not be given as well: one address, not two.
         audience: The audience a token for this server must carry, if any.
         tools: The tools the server is registered to offer.
+        runtime_arn: The ARN of the AgentCore runtime that hosts the server,
+            when it is hosted on one.
+        qualifier: The runtime endpoint; ``DEFAULT`` unless one was created.
+        auth: How the agent authenticates to the runtime: a bearer token from
+            the token exchanger, or a SigV4 signature with the agent's own AWS
+            credentials. SigV4 needs a ``runtime_arn``.
+        tool_prefix: What the server puts before each registered tool's name
+            in its own listing, for example ``target___`` for a tool exposed
+            through an AgentCore gateway. The registry names the tool without it.
     """
 
     id: str
     owner: str
-    url: str
+    url: str = ""
     audience: str | None = None
     tools: tuple[ToolEntry, ...] = ()
+    runtime_arn: str | None = None
+    qualifier: str = _DEFAULT_QUALIFIER
+    auth: Literal["bearer", "sigv4"] = "bearer"
+    tool_prefix: str = ""
 
     def __post_init__(self) -> None:
         require_identifier("server id", self.id)
         require_identifier("owner", self.owner)
-        require_identifier("url", self.url)
+        if self.auth not in {"bearer", "sigv4"}:
+            raise ValueError(f"server {self.id!r}: auth must be bearer or sigv4")
+        if self.runtime_arn is not None:
+            derived = runtime_invocation_url(self.runtime_arn, self.qualifier)
+            if self.url and self.url != derived:
+                raise ValueError(
+                    f"server {self.id!r} has both a url and a runtime_arn: one address, not two"
+                )
+            object.__setattr__(self, "url", derived)
+        else:
+            require_identifier("url", self.url)
+            if self.auth == "sigv4":
+                raise ValueError(f"server {self.id!r}: auth sigv4 needs a runtime_arn")
+        if self.tool_prefix and not _PLAIN_NAME.match(self.tool_prefix):
+            raise ValueError(
+                f"server {self.id!r}: tool_prefix must be a short name without whitespace"
+            )
         object.__setattr__(self, "tools", tuple(self.tools))
         names = [tool.name for tool in self.tools]
         if len(names) != len(set(names)):
             raise ValueError(f"server {self.id!r} lists a tool more than once")
+
+    @property
+    def transport(self) -> Literal["http", "agentcore"]:
+        """How the server is reached: plain Streamable HTTP, or an AgentCore runtime."""
+        return "agentcore" if self.runtime_arn is not None else "http"
 
     def tool(self, name: str) -> ToolEntry | None:
         """Return the registered tool called ``name``, or ``None``."""

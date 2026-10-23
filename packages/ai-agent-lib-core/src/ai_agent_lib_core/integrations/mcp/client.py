@@ -1,11 +1,22 @@
-"""The agent side: registered MCP tools as governed LangChain tools."""
+"""The agent side: registered MCP tools as governed LangChain tools.
+
+A server may list its tools under a prefix the registry does not use, for
+example ``target___tool`` for a tool reached through an AgentCore gateway.
+The prefix is the server entry's ``tool_prefix``: ``load_mcp_tools`` looks a
+registered tool up in the server's listing under the prefixed name, and the
+governed tool calls the server with that name, while the tool's own name, the
+registry check and the policy keep the registered name. Nothing is stripped
+anywhere else. ``verify_registration`` runs on the server itself, where the
+names carry no prefix, and a schema pin fingerprints the input schema, not
+the name, so a prefixed listing pins exactly as an unprefixed one does.
+"""
 
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Callable, Generator, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from contextvars import ContextVar
-from typing import Any, Protocol
+from typing import Any, Protocol, runtime_checkable
 
 import httpx2
 from jsonschema import Draft202012Validator
@@ -45,7 +56,13 @@ from ai_agent_lib_core.integrations.mcp.wire import (
 )
 from ai_agent_lib_core.pipeline import Pipeline, ToolCall, ToolStage
 
-__all__ = ["GovernedMcpTool", "HttpMcpConnector", "McpConnector", "load_mcp_tools"]
+__all__ = [
+    "GovernedMcpTool",
+    "HttpMcpConnector",
+    "McpConnector",
+    "SupportsErrorClassification",
+    "load_mcp_tools",
+]
 
 _MAX_REPORTED = 5
 _MAX_PAGES = 100
@@ -63,6 +80,36 @@ class McpConnector(Protocol):
     def credential_meta(self, token: SecretStr | None) -> Mapping[str, str]:
         """Return request metadata that carries the token, for transports without headers."""
         ...
+
+
+@runtime_checkable
+class SupportsErrorClassification(Protocol):
+    """Optional: a connector that knows what its transport's errors mean.
+
+    A platform in front of a server answers in its own vocabulary, for example
+    JSON-RPC error codes for a refused token or a throttled call. The connector
+    for that platform maps them; the agent side asks it first and falls back
+    to its own mapping for anything it leaves alone.
+    """
+
+    def classify(self, error: BaseException, *, where: str) -> AgentLibError | None:
+        """Return the library error for ``error``, or ``None`` to leave it to the caller.
+
+        Args:
+            error: The error the connection raised, with exception groups opened.
+            where: Names the server and tool for the message. The server's own
+                text never goes into the message; it may go into ``detail``.
+        """
+        ...
+
+
+def _classified(
+    connector: McpConnector, error: BaseException, *, where: str
+) -> AgentLibError | None:
+    """Ask the connector what ``error`` means, when it can say."""
+    if isinstance(connector, SupportsErrorClassification):
+        return connector.classify(error, where=where)
+    return None
 
 
 _REFUSED_STATUS = frozenset({401, 403})
@@ -193,6 +240,7 @@ class GovernedMcpTool(GovernedToolBase):
     """
 
     _server: ServerEntry = PrivateAttr()
+    _registered_name: str = PrivateAttr()
     _mcp_name: str = PrivateAttr()
     _connector: McpConnector = PrivateAttr()
     _exchanger: TokenExchanger | None = PrivateAttr(default=None)
@@ -225,7 +273,9 @@ class GovernedMcpTool(GovernedToolBase):
             read_only=entry.read_only,
         )
         tool._server = server
-        tool._mcp_name = entry.name
+        tool._registered_name = entry.name
+        # The server lists the tool under the prefix; the registry and the policy do not.
+        tool._mcp_name = server.tool_prefix + entry.name
         tool._connector = connector
         tool._exchanger = exchanger
         tool._validator = Draft202012Validator(offered.input_schema)
@@ -241,7 +291,7 @@ class GovernedMcpTool(GovernedToolBase):
     def _make_call(self, arguments: dict[str, Any], config: RunnableConfig) -> ToolCall:
         return ToolCall(
             context=current_request_context(),
-            tool=self._mcp_name,
+            tool=self._registered_name,
             arguments=arguments,
             read_only=self.read_only,
             payload=config,
@@ -256,7 +306,7 @@ class GovernedMcpTool(GovernedToolBase):
         mismatch = schema_mismatch(self._validator, arguments)
         if mismatch is not None:
             raise ValidationFailed(
-                f"the arguments for tool {self._mcp_name!r} do not match its input schema",
+                f"the arguments for tool {self._registered_name!r} do not match its input schema",
                 expected=mismatch.expected,
                 actual=mismatch.actual,
                 detail=mismatch.detail,
@@ -275,12 +325,18 @@ class GovernedMcpTool(GovernedToolBase):
         }
         # W3C trace context, so the server's spans join this request's trace.
         propagate.inject(meta)
-        where = f"MCP server {self._server.id!r}, tool {self._mcp_name!r}"
+        where = f"MCP server {self._server.id!r}, tool {self._registered_name!r}"
         try:
             async with self._connector.connect(self._server, token) as client:
                 result = await client.call_tool(self._mcp_name, arguments, meta=meta)  # type: ignore[arg-type]
         except BaseException as raised:
             error = _unwrap(raised)
+            # The connector knows its platform's vocabulary; it is asked first.
+            classified = _classified(self._connector, error, where=where)
+            if isinstance(classified, PolicyDenied):
+                raise classified from None
+            if classified is not None:
+                raise classified from error
             if isinstance(error, MCPError):
                 # The server's own text can repeat what the caller sent, so it is
                 # kept for a developer's machine only, never in the message or facts.
@@ -364,6 +420,12 @@ async def load_mcp_tools(
             offered = await _list_tools(client)
     except BaseException as raised:
         error = _unwrap(raised)
+        # The connector knows its platform's vocabulary; it is asked first.
+        classified = _classified(connector, error, where=f"MCP server {server.id!r}, listing tools")
+        if isinstance(classified, PolicyDenied):
+            raise classified from None
+        if classified is not None:
+            raise classified from error
         if _refused_at_the_door(error):
             raise PolicyDenied(
                 f"MCP server {server.id!r} did not accept this agent's own token",
@@ -387,11 +449,13 @@ async def load_mcp_tools(
     tools: list[BaseTool] = []
     names: set[str] = set()
     for entry in server.tools:
-        live = offered.get(entry.name)
+        # Under the prefix only: an unprefixed offering of the same name is not the tool.
+        live = offered.get(server.tool_prefix + entry.name)
         if live is None:
+            listed = f" as {server.tool_prefix + entry.name!r}" if server.tool_prefix else ""
             raise IntegrityError(
                 f"tool {entry.name!r} is registered for MCP server {server.id!r}, "
-                "but the server does not offer it"
+                f"but the server does not offer it{listed}"
             )
         if entry.schema_sha256 is None:
             if require_pins:

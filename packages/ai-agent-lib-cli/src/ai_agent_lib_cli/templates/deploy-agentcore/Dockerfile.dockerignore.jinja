@@ -1,0 +1,22 @@
+# Deny everything unless it is a runtime input of this service.
+**
+!{{ folder }}/pyproject.toml
+!{{ folder }}/README.md
+!{{ folder }}/src/**
+!{{ folder }}/queries/**
+!registry/**
+!policies/**
+!deploy/{{ name }}/requirements.lock
+# These exclusions win even inside an admitted source or asset folder.
+**/.env
+**/.env.*
+**/*.env
+**/.agentlib/**
+**/.venv/**
+**/__pycache__/**
+**/*.pyc
+**/*.sqlite*
+**/*.db
+**/*.jsonl
+**/*.pem
+**/*.key

@@ -6,10 +6,13 @@ import re
 from collections.abc import Sequence
 
 from ai_agent_lib_cli.deploy.plan import DeploymentPlan
-from ai_agent_lib_core.contracts import Access
+from ai_agent_lib_cli.errors import CliError
+from ai_agent_lib_core.config import options_key, provider_key, variable_for
+from ai_agent_lib_core.contracts import Access, Section
 from ai_agent_lib_core.contracts.access import ACCOUNT, REGION
 
 __all__ = [
+    "agentcore_settings_tf",
     "aligned",
     "hcl_list",
     "hcl_string",
@@ -18,6 +21,8 @@ __all__ = [
     "settings_tf",
     "sid",
 ]
+
+_MEMORY_CHECKPOINT = "agentcore_memory"
 
 
 def hcl_string(text: str) -> str:
@@ -123,3 +128,78 @@ def settings_tf(plan: DeploymentPlan, header: str) -> str:
         lines.append("  environment = {}")
     lines.append("}")
     return "\n".join(lines) + "\n"
+
+
+def _hcl_optional(text: str | None) -> str:
+    return "null" if text is None else hcl_string(text)
+
+
+def _environment_lines(plan: DeploymentPlan) -> list[str]:
+    if not plan.environment:
+        return ["  environment = {}"]
+    lines = ["  environment = {"]
+    lines += aligned([(n, hcl_string(v)) for n, v in plan.environment], "    ")
+    lines.append("  }")
+    return lines
+
+
+def agentcore_settings_tf(plan: DeploymentPlan, header: str) -> str:
+    """Return ``settings.tf`` of an AgentCore deployment: what the runtime is made of.
+
+    The locals carry the protocol and port the service's kind fixes, the
+    command, the ``AGENTCORE_`` block as Terraform values, and the container's
+    environment. ``memory_option_variable`` names the checkpoint options
+    variable Terraform rewrites with the ID of the memory it creates, or is
+    ``null`` when the checkpoints do not go to a memory Terraform creates.
+
+    Raises:
+        CliError: If the plan is not an AgentCore deployment.
+    """
+    settings = plan.agentcore
+    if settings is None:
+        raise CliError(f"{plan.target.name} is planned for {plan.target.platform}, not agentcore")
+    environment = dict(plan.environment)
+    checkpoint = environment.get(provider_key_variable(Section.CHECKPOINT))
+    memory_option_variable = (
+        options_key_variable(Section.CHECKPOINT)
+        if settings.create_memory and checkpoint == _MEMORY_CHECKPOINT
+        else None
+    )
+    lines = [header.rstrip("\n"), "", "locals {"]
+    lines += aligned(
+        [
+            ("protocol", hcl_string(plan.target.protocol)),
+            ("port", str(plan.target.port)),
+            ("command", hcl_list(plan.target.command)),
+            ("auth", hcl_string(settings.auth)),
+            ("discovery_url", _hcl_optional(settings.discovery_url)),
+            ("allowed_clients", hcl_list(settings.allowed_clients)),
+            ("allowed_audience", hcl_list(settings.allowed_audience)),
+            ("allowed_scopes", hcl_list(settings.allowed_scopes)),
+            ("network_mode", hcl_string(settings.network)),
+            ("subnets", hcl_list(settings.subnets)),
+            ("security_groups", hcl_list(settings.security_groups)),
+            ("idle_timeout_seconds", str(settings.idle_timeout_seconds)),
+            ("max_lifetime_seconds", str(settings.max_lifetime_seconds)),
+            ("artifact", hcl_string(settings.artifact)),
+            ("create_memory", "true" if settings.create_memory else "false"),
+            ("memory_id", _hcl_optional(settings.memory_id)),
+            ("gateway", hcl_string(settings.gateway)),
+            ("memory_option_variable", _hcl_optional(memory_option_variable)),
+        ],
+        "  ",
+    )
+    lines.append("")
+    lines += _environment_lines(plan)
+    lines.append("}")
+    return "\n".join(lines) + "\n"
+
+
+def provider_key_variable(section: Section) -> str:
+    """The variable that selects a section's adapter."""
+    return variable_for(provider_key(section))
+
+
+def options_key_variable(section: Section) -> str:
+    """The variable that holds a section's adapter options."""
+    return variable_for(options_key(section))

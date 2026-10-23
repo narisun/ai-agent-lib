@@ -1,10 +1,12 @@
 """The files a deployment is made of, and writing them without losing the developer's work.
 
-A deployment is a Terraform root module for the service beside a reference
-module that runs it on ECS Fargate, and, when the task needs the OPA sidecar,
-the sidecar's Dockerfile with the platform's Rego bundle. Two files are
-derived from the settings and rewritten on every run; everything else is
-written once and is the developer's from then on.
+A deployment is a Terraform root module for the service. On Fargate it sits
+beside a reference module that runs the service as an ECS service and, when
+the task needs the OPA sidecar, the sidecar's Dockerfile with the platform's
+Rego bundle. On AgentCore Runtime the root module stands alone: the runtime,
+its role, its artifact store and, when asked for, a Memory and a Gateway.
+Two files are derived from the settings and rewritten on every run;
+everything else is written once and is the developer's from then on.
 """
 
 from __future__ import annotations
@@ -14,7 +16,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-from ai_agent_lib_cli.deploy.hcl import permissions_tf, settings_tf
+from ai_agent_lib_cli.deploy.agentcore import AGENTCORE_PYTHON
+from ai_agent_lib_cli.deploy.hcl import agentcore_settings_tf, permissions_tf, settings_tf
 from ai_agent_lib_cli.deploy.plan import DeploymentPlan
 from ai_agent_lib_cli.deploy.target import MODULE_FOLDER, OPA_FOLDER, Target
 from ai_agent_lib_cli.errors import CliError
@@ -30,10 +33,12 @@ __all__ = [
 ]
 
 _HEADER = (
-    "# Written by 'agentlib deploy {name}' from {source}.\n"
+    "# Written by 'agentlib deploy {name}{target}' from {source}.\n"
     "# Do not edit: change that file and run the command again.\n"
 )
 _REGO_TEST_SUFFIX = "_test.rego"
+_IMAGE_FILES = frozenset({"Dockerfile", "Dockerfile.dockerignore"})
+_ZIP_FILES = frozenset({"build_zip.py"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +61,58 @@ def maintained_files(target: Target) -> frozenset[PurePosixPath]:
     return frozenset({folder / "settings.tf", folder / "permissions.tf"})
 
 
+def _context(target: Target) -> dict[str, object]:
+    return {
+        "name": target.name,
+        "kind": target.kind,
+        "folder": target.folder.as_posix(),
+        "package": target.package,
+        "entry_module": target.entry_module,
+        "protocol": target.protocol,
+        "port": target.port,
+        "command_json": json.dumps(list(target.command)),
+        "python": AGENTCORE_PYTHON,
+    }
+
+
+def _fargate_files(
+    plan: DeploymentPlan, bundle: Mapping[PurePosixPath, str], renderer: TemplateRenderer
+) -> dict[PurePosixPath, str]:
+    target = plan.target
+    render = renderer.render
+    files = {MODULE_FOLDER / path: text for path, text in render("deploy-module", {}).items()}
+    folder = target.deployment
+    context = _context(target)
+    files.update({folder / path: text for path, text in render("deploy-service", context).items()})
+    header = _HEADER.format(name=target.name, target="", source=target.settings)
+    files[folder / "settings.tf"] = settings_tf(plan, header)
+    files[folder / "permissions.tf"] = permissions_tf(plan, header)
+    if plan.opa:
+        files.update({OPA_FOLDER / path: text for path, text in render("deploy-opa", {}).items()})
+        files.update({OPA_FOLDER / "bundle" / path: text for path, text in bundle.items()})
+    return files
+
+
+def _agentcore_files(plan: DeploymentPlan, renderer: TemplateRenderer) -> dict[PurePosixPath, str]:
+    target = plan.target
+    settings = plan.agentcore
+    if settings is None:
+        raise CliError(f"{target.name} is planned for {target.platform} without AgentCore settings")
+    context = _context(target) | {"artifact": settings.artifact, "jwt": settings.jwt}
+    # The image and the zip are two ways to ship the same code; only the chosen one is written.
+    unused = _ZIP_FILES if settings.artifact == "container" else _IMAGE_FILES
+    folder = target.deployment
+    files = {
+        folder / path: text
+        for path, text in renderer.render("deploy-agentcore", context).items()
+        if path.name not in unused
+    }
+    header = _HEADER.format(name=target.name, target=" --target agentcore", source=target.settings)
+    files[folder / "settings.tf"] = agentcore_settings_tf(plan, header)
+    files[folder / "permissions.tf"] = permissions_tf(plan, header)
+    return files
+
+
 def deployment_files(
     plan: DeploymentPlan,
     bundle: Mapping[PurePosixPath, str],
@@ -66,27 +123,13 @@ def deployment_files(
     Args:
         plan: The plan, with no problems left.
         bundle: The platform's Rego bundle, by path inside it. Copied only when
-            the task needs the OPA sidecar.
+            a Fargate task needs the OPA sidecar.
         renderer: Renders the templates.
     """
-    render = (renderer or TemplateRenderer()).render
-    target = plan.target
-    context: dict[str, object] = {
-        "name": target.name,
-        "folder": target.folder.as_posix(),
-        "port": target.port,
-        "command_json": json.dumps(list(target.command)),
-    }
-    files = {MODULE_FOLDER / path: text for path, text in render("deploy-module", {}).items()}
-    folder = target.deployment
-    files.update({folder / path: text for path, text in render("deploy-service", context).items()})
-    header = _HEADER.format(name=target.name, source=target.settings)
-    files[folder / "settings.tf"] = settings_tf(plan, header)
-    files[folder / "permissions.tf"] = permissions_tf(plan, header)
-    if plan.opa:
-        files.update({OPA_FOLDER / path: text for path, text in render("deploy-opa", {}).items()})
-        files.update({OPA_FOLDER / "bundle" / path: text for path, text in bundle.items()})
-    return files
+    chosen = renderer or TemplateRenderer()
+    if plan.agentcore is not None:
+        return _agentcore_files(plan, chosen)
+    return _fargate_files(plan, bundle, chosen)
 
 
 def read_bundle(answers: WorkspaceAnswers, given: Path | None) -> dict[PurePosixPath, str]:
@@ -125,13 +168,14 @@ def write_deployment(
 
     The reference module, the OPA sidecar and the two files derived from the
     settings are the tool's: they are rewritten. A file of the service's own
-    root module that already exists is the developer's and is kept.
+    root module that already exists is the developer's and is kept, which is
+    why a service that changes platform starts from an empty folder.
 
     Args:
         root: The workspace.
         plan: The plan, with no problems left.
         bundle: The platform's Rego bundle, by path inside it; needed only when
-            the task has the OPA sidecar.
+            a Fargate task has the OPA sidecar.
         renderer: Renders the templates.
     """
     files = deployment_files(plan, bundle, renderer)

@@ -15,14 +15,20 @@ import json
 import re
 import sys
 import tomllib
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from importlib import metadata
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-from ai_agent_lib_cli.deploy.target import AWS_DISTRIBUTION, Target
+from ai_agent_lib_cli.deploy.agentcore import (
+    AgentCoreSettings,
+    agentcore_preflight,
+    read_agentcore_settings,
+    strip_agentcore,
+)
+from ai_agent_lib_cli.deploy.target import AGENTCORE, AWS_DISTRIBUTION, Target
 from ai_agent_lib_cli.errors import CliError
 from ai_agent_lib_cli.workspace import WorkspaceAnswers
 from ai_agent_lib_core.config import (
@@ -34,10 +40,12 @@ from ai_agent_lib_core.config import (
     variable_for,
 )
 from ai_agent_lib_core.contracts import (
+    ConfigSource,
     ConfigurationError,
     DeploymentEnv,
     Section,
     ServiceConfig,
+    TelemetryMode,
     describe,
 )
 from ai_agent_lib_core.di import AccessPlan, ServiceProviders, access_plan
@@ -64,14 +72,18 @@ class DeploymentPlan:
     """What deploying one service takes.
 
     Attributes:
-        target: The service.
-        environment: The task's environment: each variable of ``deploy.env``
-            and its value, in the file's order.
+        target: The service, and the platform it goes to.
+        environment: The container's environment: each of the service's
+            variables in ``deploy.env`` and its value, in the file's order. An
+            empty value is kept; the deployment's own ``AGENTCORE_`` variables
+            are not the service's and are left out.
         access: What each selected adapter needs from AWS.
-        opa: Whether the task needs the OPA sidecar.
-        collector: Whether the task needs the telemetry collector sidecar.
+        opa: Whether the task needs the OPA sidecar (Fargate only).
+        collector: Whether the task needs the telemetry collector sidecar
+            (Fargate only; AgentCore Runtime instruments the process itself).
         problems: What stops the deployment. Nothing is written while any remain.
         warnings: What a person should know or check.
+        agentcore: The deployment's own settings, when the platform is AgentCore.
     """
 
     target: Target
@@ -81,12 +93,15 @@ class DeploymentPlan:
     collector: bool = False
     problems: tuple[str, ...] = ()
     warnings: tuple[str, ...] = field(default=())
+    agentcore: AgentCoreSettings | None = None
 
 
 # ------------------------------------------------------------------ the settings
 
 
-def _read_settings(root: Path, target: Target) -> tuple[ServiceConfig, list[tuple[str, str]]]:
+def _read_settings(
+    root: Path, target: Target
+) -> tuple[ServiceConfig, tuple[tuple[str, str], ...], ConfigSource]:
     path = root.joinpath(*target.settings.parts)
     if not path.is_file():
         raise CliError(
@@ -122,8 +137,9 @@ def _read_settings(root: Path, target: Target) -> tuple[ServiceConfig, list[tupl
             actual=f"{variable} is local",
             fix=f"set {variable}=dev in {target.settings}",
         )
-    environment = [(name, value) for name in source.names() if (value := source.get(name))]
-    return config, environment
+    # An empty value is a setting too: it is kept, as the file has it.
+    environment = [(n, value) for n in source.names() if (value := source.get(n)) is not None]
+    return config, strip_agentcore(environment), source
 
 
 def _uses_opa_beside_it(config: ServiceConfig) -> bool:
@@ -325,9 +341,14 @@ def plan_deployment(
         ConfigurationError: If a setting is not valid, or selects an adapter
             that is not installed.
     """
-    config, environment = _read_settings(root, target)
+    config, environment, source = _read_settings(root, target)
     registry = providers if providers is not None else ServiceProviders.default()
     access = access_plan(config, registry)
+    agentcore = (
+        read_agentcore_settings(source, str(target.settings))
+        if target.platform == AGENTCORE
+        else None
+    )
     problems = [
         f"{adapter.label} runs only on a developer's machine; select another in {target.settings}"
         for adapter in access.local_only
@@ -338,7 +359,17 @@ def plan_deployment(
         for adapter in access.undeclared
     ]
     problems += missing_dependencies(root, target, access, registry, resolve)
-    collector = telemetry_enabled(config)
+    if agentcore is not None:
+        # The runtime instruments the process itself (ADOT): no sidecar, and the
+        # image, not the service, brings the distribution that owns the providers.
+        found, noted = agentcore_preflight(
+            target, config, agentcore, _project(root, target).get("requires-python")
+        )
+        problems += found
+        warnings += noted
+        collector = False
+    else:
+        collector = telemetry_enabled(config)
     core = installed_extras(root, target).get(_CORE_DISTRIBUTION, set())
     if collector and "otel" not in core:
         problems.append(
@@ -364,22 +395,71 @@ def plan_deployment(
         )
     return DeploymentPlan(
         target=target,
-        environment=tuple(environment),
+        environment=environment,
         access=access,
-        opa=_uses_opa_beside_it(config),
+        opa=agentcore is None and _uses_opa_beside_it(config),
         collector=collector,
         problems=tuple(problems),
         warnings=tuple(warnings),
+        agentcore=agentcore,
     )
 
 
 # --------------------------------------------------------------- what is shown
 
 
+def _agentcore_lines(plan: DeploymentPlan, settings: AgentCoreSettings) -> list[str]:
+    target = plan.target
+    inbound = (
+        f"jwt (tokens from {settings.discovery_url})" if settings.jwt else "iam (signed requests)"
+    )
+    network = settings.network
+    if settings.network == "VPC":
+        network += f" ({', '.join(settings.subnets)}; {', '.join(settings.security_groups)})"
+    memory = {"none": "none", "create": "created by Terraform"}.get(
+        settings.memory, f"existing {settings.memory}"
+    )
+    gateway = {"none": "none", "create": "created by Terraform, one target per MCP server"}.get(
+        settings.gateway, f"existing {settings.gateway}"
+    )
+    telemetry = next(
+        (value for name, value in plan.environment if name == variable_for(Key.TELEMETRY)),
+        TelemetryMode.OFF.value,
+    )
+    session = f"idle {settings.idle_timeout_seconds}s, at most {settings.max_lifetime_seconds}s"
+    return [
+        f"Deploying {target.name} to AgentCore Runtime with the settings in {target.settings}.",
+        "",
+        "Runtime:",
+        *aligned_lines(
+            [
+                ("protocol", f"{target.protocol} on port {target.port}"),
+                ("inbound auth", inbound),
+                ("network", network),
+                ("artifact", settings.artifact),
+                ("session", session),
+                ("memory", memory),
+                ("gateway", gateway),
+                ("telemetry", f"{telemetry} (ADOT, installed by the image, owns the providers)"),
+            ]
+        ),
+        "",
+    ]
+
+
+def aligned_lines(pairs: Sequence[tuple[str, str]]) -> list[str]:
+    """Return ``name: value`` lines with the values in one column."""
+    width = max((len(name) for name, _ in pairs), default=0)
+    return [f"  {name.ljust(width)}  {value}" for name, value in pairs]
+
+
 def plan_lines(plan: DeploymentPlan) -> list[str]:
     """Return the plan as a person reads it."""
     target = plan.target
-    lines = [f"Deploying {target.name} with the settings in {target.settings}.", ""]
+    if plan.agentcore is not None:
+        lines = _agentcore_lines(plan, plan.agentcore)
+    else:
+        lines = [f"Deploying {target.name} with the settings in {target.settings}.", ""]
     lines.append("Adapters and what each needs from AWS:")
     for adapter in plan.access.adapters:
         if not adapter.declared:
@@ -393,7 +473,8 @@ def plan_lines(plan: DeploymentPlan) -> list[str]:
                 lines += [f"      on {resource}" for resource in access.resources]
                 if access.note:
                     lines.append(f"      check: {access.note}")
-    lines += ["", "Containers in the task:", f"  service: {' '.join(target.command)}"]
+    what = "Container:" if plan.agentcore is not None else "Containers in the task:"
+    lines += ["", what, f"  service: {' '.join(target.command)}"]
     if plan.opa:
         lines.append("  opa: decides policy on the task's loopback address (deploy/opa/Dockerfile)")
     if plan.collector:

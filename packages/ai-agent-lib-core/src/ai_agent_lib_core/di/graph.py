@@ -102,6 +102,15 @@ class AdapterGraph:
             )
         return self._loop
 
+    @property
+    def resources(self) -> BuildResources:
+        """The resources the factories share, closed after the adapters that use them.
+
+        The MCP bindings hand them to a connector factory, so a provider pack's
+        connector shares the pack's session factory with the pack's adapters.
+        """
+        return self._resources
+
     def require_started(self) -> None:
         """Refuse use before ``start`` or after ``aclose``.
 

@@ -1,0 +1,14 @@
+# Copy to terraform.tfvars and fill in. The values below are examples.
+region = "eu-west-1"
+# A container deployment: the ARM64 image pushed to the repository, pinned by digest.
+image = "123456789012.dkr.ecr.eu-west-1.amazonaws.com/{{ name }}@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+# A code deployment: the zip build_zip.py wrote, relative to this folder.
+code_zip    = "{{ name }}.zip"
+code_bucket = null
+# A created gateway's targets: each MCP server's name and MCP endpoint.
+mcp_targets = {
+  # people = "https://bedrock-agentcore.eu-west-1.amazonaws.com/runtimes/arn%3Aaws%3Abedrock-agentcore%3Aeu-west-1%3A123456789012%3Aruntime%2Fpeople-abc123/invocations?qualifier=DEFAULT"
+}
+memory_expiry_days = 90
+log_retention_days = 30
+tags               = { service = "{{ name }}" }

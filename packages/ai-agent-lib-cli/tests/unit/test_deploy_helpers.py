@@ -10,14 +10,18 @@ import pytest
 from ai_agent_lib_cli.deploy import (
     MODULE_FOLDER,
     OPA_FOLDER,
+    AgentCoreSettings,
     DeploymentPlan,
     DistributionResolver,
     ModuleOrigin,
     Target,
+    agentcore_preflight,
+    agentcore_settings_tf,
     deployment_files,
     installed_extras,
     maintained_files,
     next_steps,
+    read_agentcore_settings,
     read_bundle,
     starter_settings,
     write_deployment,
@@ -26,7 +30,8 @@ from ai_agent_lib_cli.deploy.hcl import permissions_tf, settings_tf
 from ai_agent_lib_cli.deploy.plan import missing_dependencies
 from ai_agent_lib_cli.errors import CliError
 from ai_agent_lib_cli.workspace import LibrarySource, WorkspaceAnswers
-from ai_agent_lib_core.contracts import Access
+from ai_agent_lib_core.config import ConfigResolver, MappingConfigSource
+from ai_agent_lib_core.contracts import Access, ServiceConfig
 from ai_agent_lib_core.contracts.access import ACCOUNT, REGION
 from ai_agent_lib_core.di import AccessPlan, AdapterAccess, ServiceProviders
 
@@ -369,3 +374,271 @@ def test_next_steps_ask_for_the_aws_adapters_only_when_the_service_lacks_them(
 
     _service(tmp_path, AGENT, '"ai-agent-lib-aws[bedrock]"')
     assert len(next_steps(tmp_path, AGENT)) == 2
+
+
+# --------------------------------------------------------- the AgentCore target
+
+AGENT_ON_AGENTCORE = Target("helper", "agent", PurePosixPath("agents", "helper"), 8000, "agentcore")
+SERVER_ON_AGENTCORE = Target(
+    "people", "mcp", PurePosixPath("mcp-servers", "people"), 8100, "agentcore"
+)
+
+
+def test_target_on_agentcore_fixes_the_port_and_runs_the_entry_module_under_adot() -> None:
+    assert AGENT_ON_AGENTCORE.port == 8080
+    assert AGENT_ON_AGENTCORE.service_port == 8000
+    assert AGENT_ON_AGENTCORE.protocol == "HTTP"
+    assert AGENT_ON_AGENTCORE.entry_module == "helper.service"
+    assert AGENT_ON_AGENTCORE.command == (
+        "opentelemetry-instrument",
+        "python",
+        "-m",
+        "helper.service",
+        "--profile",
+        "agentcore",
+    )
+    assert SERVER_ON_AGENTCORE.port == 8000
+    assert SERVER_ON_AGENTCORE.protocol == "MCP"
+    assert SERVER_ON_AGENTCORE.command == (
+        "opentelemetry-instrument",
+        "python",
+        "-m",
+        "people",
+        "--profile",
+        "agentcore",
+    )
+    # One deployment folder per service, whatever the platform.
+    assert AGENT_ON_AGENTCORE.deployment == AGENT.deployment == PurePosixPath("deploy/helper")
+    assert AGENT.port == 8000
+    assert AGENT.command[:2] == ("helper-serve", "--host")
+    assert AGENT.command[3:] == ("--port", "8000")
+    hyphenated = Target("my-agent", "agent", PurePosixPath("agents", "my-agent"), 8000, "agentcore")
+    assert hyphenated.package == "my_agent"
+    assert hyphenated.entry_module == "my_agent.service"
+
+
+def test_target_refuses_a_platform_it_does_not_know() -> None:
+    with pytest.raises(ValueError, match="platform must be one of fargate, agentcore"):
+        Target("helper", "agent", PurePosixPath("agents", "helper"), 8000, "lambda")
+
+
+def _agentcore_plan(settings: AgentCoreSettings, **fields: Any) -> DeploymentPlan:
+    return _plan(AGENT_ON_AGENTCORE, agentcore=settings, **fields)
+
+
+def test_agentcore_settings_tf_holds_the_runtime_the_block_and_the_environment() -> None:
+    settings = AgentCoreSettings(
+        auth="jwt",
+        discovery_url="https://issuer.example/.well-known/openid-configuration",
+        allowed_clients=("client-a",),
+        allowed_audience=("api://helper",),
+        allowed_scopes=("read", "write"),
+        network="VPC",
+        subnets=("subnet-1", "subnet-2"),
+        security_groups=("sg-1",),
+        idle_timeout_seconds=600,
+        max_lifetime_seconds=3600,
+        artifact="code",
+        gateway="arn:aws:bedrock-agentcore:eu-west-1:123456789012:gateway/gw-1",
+        memory="mem_01234567890",
+    )
+    environment = (("EAP_PROFILE", "aws"), ("EAP_CHECKPOINT_PROVIDER", "agentcore_memory"))
+    assert agentcore_settings_tf(_agentcore_plan(settings, environment=environment), HEADER) == (
+        "# header\n"
+        "\n"
+        "locals {\n"
+        '  protocol               = "HTTP"\n'
+        "  port                   = 8080\n"
+        '  command                = ["opentelemetry-instrument", "python", "-m", "helper.service",'
+        ' "--profile", "agentcore"]\n'
+        '  auth                   = "jwt"\n'
+        '  discovery_url          = "https://issuer.example/.well-known/openid-configuration"\n'
+        '  allowed_clients        = ["client-a"]\n'
+        '  allowed_audience       = ["api://helper"]\n'
+        '  allowed_scopes         = ["read", "write"]\n'
+        '  network_mode           = "VPC"\n'
+        '  subnets                = ["subnet-1", "subnet-2"]\n'
+        '  security_groups        = ["sg-1"]\n'
+        "  idle_timeout_seconds   = 600\n"
+        "  max_lifetime_seconds   = 3600\n"
+        '  artifact               = "code"\n'
+        "  create_memory          = false\n"
+        '  memory_id              = "mem_01234567890"\n'
+        '  gateway                = "arn:aws:bedrock-agentcore:eu-west-1:123456789012:gateway/'
+        'gw-1"\n'
+        "  memory_option_variable = null\n"
+        "\n"
+        "  environment = {\n"
+        '    EAP_PROFILE             = "aws"\n'
+        '    EAP_CHECKPOINT_PROVIDER = "agentcore_memory"\n'
+        "  }\n"
+        "}\n"
+    )
+
+
+def test_agentcore_settings_tf_names_the_variable_a_created_memory_rewrites() -> None:
+    created = AgentCoreSettings(memory="create")
+    with_memory_checkpoint = (("EAP_CHECKPOINT_PROVIDER", "agentcore_memory"),)
+    text = agentcore_settings_tf(
+        _agentcore_plan(created, environment=with_memory_checkpoint), HEADER
+    )
+    assert "  create_memory          = true\n" in text
+    assert "  memory_id              = null\n" in text
+    assert '  memory_option_variable = "EAP_CHECKPOINT_OPTIONS"\n' in text
+    # The checkpoints go elsewhere: the created memory touches no variable.
+    text = agentcore_settings_tf(_agentcore_plan(created, environment=()), HEADER)
+    assert "  memory_option_variable = null\n" in text
+    assert "  environment = {}\n}\n" in text
+
+
+def test_agentcore_settings_tf_is_only_for_an_agentcore_plan() -> None:
+    with pytest.raises(CliError, match="planned for fargate, not agentcore"):
+        agentcore_settings_tf(_plan(AGENT), HEADER)
+
+
+def test_agentcore_deployment_files_are_one_root_module_with_the_artifacts_files() -> None:
+    container = deployment_files(_agentcore_plan(AgentCoreSettings()), {})
+    assert {path.as_posix() for path in container} == {
+        "deploy/helper/Dockerfile",
+        "deploy/helper/Dockerfile.dockerignore",
+        "deploy/helper/README.md",
+        "deploy/helper/main.tf",
+        "deploy/helper/outputs.tf",
+        "deploy/helper/permissions.tf",
+        "deploy/helper/settings.tf",
+        "deploy/helper/terraform.tfvars.example",
+        "deploy/helper/variables.tf",
+    }
+    header = (
+        "# Written by 'agentlib deploy helper --target agentcore' from agents/helper/deploy.env.\n"
+    )
+    assert container[PurePosixPath("deploy/helper/settings.tf")].startswith(header)
+    assert container[PurePosixPath("deploy/helper/permissions.tf")].startswith(header)
+    dockerfile = container[PurePosixPath("deploy/helper/Dockerfile")]
+    assert "FROM --platform=linux/arm64 python:3.13-slim" in dockerfile
+    assert "EXPOSE 8080" in dockerfile
+
+    code = deployment_files(_agentcore_plan(AgentCoreSettings(artifact="code")), {})
+    names = {path.name for path in code}
+    assert "build_zip.py" in names
+    assert "Dockerfile" not in names
+    assert "Dockerfile.dockerignore" not in names
+    builder = code[PurePosixPath("deploy/helper/build_zip.py")]
+    assert '"--entry", "helper.service",' in builder
+    assert '"--service", "agents/helper",' in builder
+    assert 'runtime     = "PYTHON_3_13"' in code[PurePosixPath("deploy/helper/main.tf")]
+
+    server = deployment_files(_plan(SERVER_ON_AGENTCORE, agentcore=AgentCoreSettings()), {})
+    assert "EXPOSE 8000" in server[PurePosixPath("deploy/people/Dockerfile")]
+    assert '"python", "-m", "people"' in server[PurePosixPath("deploy/people/Dockerfile")]
+
+
+def test_agentcore_starter_settings_select_ambient_telemetry_and_a_created_memory() -> None:
+    text = starter_settings(AGENT_ON_AGENTCORE)
+    assert "How helper runs on AgentCore Runtime." in text
+    assert "EAP_TELEMETRY=ambient\n" in text
+    assert "EAP_CHECKPOINT_PROVIDER=agentcore_memory\n" in text
+    assert 'EAP_CHECKPOINT_OPTIONS={"memory_id": "created_by_terraform"}\n' in text
+    assert "AGENTCORE_MEMORY=create\n" in text
+    assert "rds.amazonaws.com" not in text
+    assert "EAP_SECRET_" not in text
+    assert text.index("EAP_GUARDRAILS_OPTIONS") < text.index("AGENTCORE_AUTH=iam")
+
+    server = starter_settings(SERVER_ON_AGENTCORE)
+    assert "EAP_CHECKPOINT_PROVIDER=none\n" in server
+    assert "AGENTCORE_MEMORY=none\n" in server
+    assert "EAP_MODEL_ID" not in server
+    # The Fargate starter is as it was.
+    assert "AGENTCORE_" not in starter_settings(AGENT)
+    assert "EAP_TELEMETRY=opentelemetry\n" in starter_settings(AGENT)
+
+
+def test_agentcore_next_steps_ask_for_the_memory_extra(tmp_path: Path) -> None:
+    _service(tmp_path, AGENT, '"ai-agent-lib-core"')
+    steps = next_steps(tmp_path, AGENT_ON_AGENTCORE)
+    assert steps[0].startswith('add "ai-agent-lib-aws[bedrock,agentcore]" to the dependencies')
+    assert steps[-1] == "run 'agentlib deploy helper --target agentcore --plan'"
+    _service(tmp_path, SERVER, '"ai-agent-lib-core"')
+    assert next_steps(tmp_path, SERVER_ON_AGENTCORE)[0].startswith('add "ai-agent-lib-aws" to')
+
+
+def test_read_agentcore_settings_defaults_when_the_block_is_absent() -> None:
+    settings = read_agentcore_settings(MappingConfigSource({"EAP_PROFILE": "aws"}), "deploy.env")
+    assert settings == AgentCoreSettings()
+    assert not settings.jwt
+    assert not settings.create_memory
+    assert settings.memory_id is None
+    assert settings.gateway_arn is None
+
+
+def test_read_agentcore_settings_splits_lists_and_recognises_existing_resources() -> None:
+    gateway = "arn:aws:bedrock-agentcore:eu-west-1:123456789012:gateway/abc-123"
+    source = MappingConfigSource(
+        {
+            "AGENTCORE_AUTH": "jwt",
+            "AGENTCORE_DISCOVERY_URL": "https://issuer.example/.well-known/openid-configuration",
+            "AGENTCORE_ALLOWED_CLIENTS": " a , b,,",
+            "AGENTCORE_ALLOWED_SCOPES": "read",
+            "AGENTCORE_NETWORK": "VPC",
+            "AGENTCORE_SUBNETS": "subnet-1",
+            "AGENTCORE_SECURITY_GROUPS": "sg-1,sg-2",
+            "AGENTCORE_IDLE_TIMEOUT_SECONDS": "120",
+            "AGENTCORE_GATEWAY": gateway,
+            "AGENTCORE_MEMORY": "helper_mem-0123456789",
+        }
+    )
+    settings = read_agentcore_settings(source, "deploy.env")
+    assert settings.allowed_clients == ("a", "b")
+    assert settings.allowed_audience == ()
+    assert settings.allowed_scopes == ("read",)
+    assert settings.security_groups == ("sg-1", "sg-2")
+    assert settings.idle_timeout_seconds == 120
+    assert settings.max_lifetime_seconds == 28800
+    assert settings.gateway_arn == gateway
+    assert not settings.create_gateway
+    assert settings.memory_id == "helper_mem-0123456789"
+
+
+def _resolved(**overrides: str) -> ServiceConfig:
+    values = dict(
+        line.split("=", 1)
+        for line in starter_settings(AGENT_ON_AGENTCORE).splitlines()
+        if line and not line.startswith("#")
+    )
+    values.update(overrides)
+    return ConfigResolver(MappingConfigSource(values)).resolve()
+
+
+@pytest.mark.parametrize(
+    ("specifier", "excluded"),
+    [
+        (">=3.11", False),
+        (">=3.11,<3.13", True),
+        (">=3.11, <=3.12", True),
+        ("<3.14", False),
+        ("==3.13.*", False),
+        ("==3.12.*", True),
+        ("~=3.11", False),
+        ("~=3.12.1", True),
+        ("!=3.13.*", True),
+        (">=3.14", True),
+        ("something odd", False),
+    ],
+)
+def test_agentcore_preflight_reads_requires_python_without_packaging(
+    specifier: str, excluded: bool
+) -> None:
+    config = _resolved()
+    problems, _ = agentcore_preflight(
+        AGENT_ON_AGENTCORE, config, AgentCoreSettings(memory="create"), specifier
+    )
+    assert any("excludes it" in problem for problem in problems) is excluded
+
+
+def test_agentcore_preflight_passes_the_starting_settings_with_one_warning() -> None:
+    problems, warnings = agentcore_preflight(
+        AGENT_ON_AGENTCORE, _resolved(), AgentCoreSettings(memory="create"), ">=3.11"
+    )
+    assert problems == []
+    assert len(warnings) == 1
+    assert warnings[0].startswith("AGENTCORE_MEMORY=create: Terraform creates the memory")

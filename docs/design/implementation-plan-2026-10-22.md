@@ -40,8 +40,8 @@ that prove it, and its size (S: under a day, M: one to three days, L: a week).
 Public names and signatures stay compatible unless stated.
 
 **Status, 23 October 2026:** A1 and A2 (Phase 0), A3, A4 and A6 (Phase 1), A5
-and A7 (Phase 2) and B2, B3 and B5 (Phase 3) are implemented. Deviations from
-the text below, with the reason:
+and A7 (Phase 2), B2, B3 and B5 (Phase 3) and B4 and B6 (Phase 4) are
+implemented. Deviations from the text below, with the reason:
 
 - Diagnostics warnings carry the error type and request id but no traceback,
   because the logging policy forbids exception text in logs.
@@ -125,6 +125,33 @@ the text below, with the reason:
   with an authorization URL; the URL is never logged or returned.
 - `registered_mcp_tools`, `run_service`, `run_command` and `--profile
   agentcore` are in the templates; the examples are untouched.
+- A registry entry with `runtime_arn` derives its URL (`url` and the ARN
+  together are refused); `tool_prefix` is applied only where the agent matches
+  and calls a tool, because `verify_registration` runs on the server where
+  names carry no prefix and schema fingerprints hash the schema, not the name.
+- Connectors are chosen per entry through a small factory registry on
+  `ServiceProviders` (`register_mcp_connector`) rather than a port, so access
+  plans and adapter names are untouched; the AWS pack registers `agentcore`.
+  Calling a runtime needs `bedrock-agentcore:InvokeAgentRuntime` on its ARN,
+  which the deploy plan cannot derive from `deploy.env` because the registry is
+  not in it; the README says to grant it by hand.
+- JSON-RPC error codes are mapped by the connector through an optional
+  `classify` hook that core consults before its generic mapping, so the
+  AgentCore codes stay in the AWS pack. A `sigv4` server needs no token
+  exchanger: the signature is the credential.
+- The deploy target reads `AGENTCORE_*` from `deploy.env` and keeps those
+  variables out of the container's environment. The image always installs
+  `aws-opentelemetry-distro` and starts under `opentelemetry-instrument`,
+  whatever the telemetry mode, because the target does not know the mode at
+  render time and the library sends nothing when telemetry is off. The code
+  artifact is built with `pip install --target` for `manylinux2014_aarch64`,
+  because `pip download` yields wheels, not an importable tree. The starter
+  selects a remote OPA with the in-process `rules` adapter as a hint, since
+  `rules` is still `local_only`. The gateway's runtime target and the OpenAPI
+  envelope schema are not expressible in the Terraform provider and are
+  documented as a CLI step; `logs:PutResourcePolicy` is left to the account
+  operator. `requires-python` is read by a small in-house specifier reader,
+  since `packaging` is not a CLI dependency.
 
 ### A1. Green gates and CI coverage (S)
 

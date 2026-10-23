@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import Annotated, Any, Literal, TypeVar
 
 import httpx
-from pydantic import AfterValidator, Field, StringConstraints, ValidationError
+from pydantic import AfterValidator, Field, StringConstraints, ValidationError, model_validator
 
 from ai_agent_lib_core.adapters.strict_yaml import StrictYamlError, load_strict_yaml
 from ai_agent_lib_core.contracts import (
@@ -29,6 +29,7 @@ from ai_agent_lib_core.contracts import (
     ToolEntry,
     ToolSnapshot,
     options_error,
+    runtime_invocation_url,
 )
 
 __all__ = [
@@ -77,12 +78,38 @@ class _ToolModel(OptionsModel):
     description: str = Field(default="", max_length=500)
 
 
+def _runtime_arn(value: str) -> str:
+    """Accept an AgentCore runtime ARN: the one the invocation URL can be derived from."""
+    runtime_invocation_url(value)
+    return value
+
+
+_RuntimeArn = Annotated[str, AfterValidator(_runtime_arn)]
+_PlainName = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_.-]{1,64}$")]
+_ToolPrefix = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_.-]{0,64}$")]
+
+
 class _ServerModel(OptionsModel):
     id: _Id
     owner: _Text
-    url: _Url
+    url: _Url | None = None
     audience: _Text | None = None
     tools: list[_ToolModel] = Field(default_factory=list)
+    runtime_arn: _RuntimeArn | None = None
+    qualifier: _PlainName = "DEFAULT"
+    auth: Literal["bearer", "sigv4"] = "bearer"
+    tool_prefix: _ToolPrefix = ""
+
+    @model_validator(mode="after")
+    def _one_address(self) -> _ServerModel:
+        if self.runtime_arn is None:
+            if self.url is None:
+                raise ValueError("a server needs a url, or a runtime_arn to derive one from")
+            if self.auth == "sigv4":
+                raise ValueError("auth sigv4 needs a runtime_arn: the signature names the runtime")
+        elif self.url is not None:
+            raise ValueError("a server has a url or a runtime_arn: one address, not two")
+        return self
 
 
 class _ToolsDocument(OptionsModel):
@@ -179,9 +206,13 @@ def parse_tools_document(raw: object, *, what: str = "tool registry") -> tuple[S
             ServerEntry(
                 id=server.id,
                 owner=server.owner,
-                url=server.url,
+                url=server.url or "",
                 audience=server.audience,
                 tools=tuple(_tool(tool) for tool in server.tools),
+                runtime_arn=server.runtime_arn,
+                qualifier=server.qualifier,
+                auth=server.auth,
+                tool_prefix=server.tool_prefix,
             )
         )
     return tuple(servers)
@@ -223,15 +254,31 @@ def _agent(agent: _AgentModel) -> AgentEntry:
     return AgentEntry(**values)
 
 
+def _address(server: ServerEntry) -> dict[str, object]:
+    """Return the server's one address: its URL, or the runtime it is derived from."""
+    if server.runtime_arn is None:
+        return {"url": server.url}
+    return {
+        "runtime_arn": server.runtime_arn,
+        **({"qualifier": server.qualifier} if server.qualifier != "DEFAULT" else {}),
+    }
+
+
 def tools_document(servers: Iterable[ServerEntry]) -> dict[str, object]:
-    """Return the MCP tool registry document that holds ``servers``."""
+    """Return the MCP tool registry document that holds ``servers``.
+
+    A field that has its default value is left out, so a document written
+    before the field existed reads back as it was.
+    """
     return {
         "schema": REGISTRY_SCHEMA,
         "servers": [
             {
                 "id": server.id,
                 "owner": server.owner,
-                "url": server.url,
+                **_address(server),
+                **({"auth": server.auth} if server.auth != "bearer" else {}),
+                **({"tool_prefix": server.tool_prefix} if server.tool_prefix else {}),
                 **({"audience": server.audience} if server.audience is not None else {}),
                 "tools": [
                     {

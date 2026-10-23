@@ -37,7 +37,9 @@ __all__ = [
     "MODEL_PORT",
     "BuildContext",
     "BuildResources",
+    "ConnectorContext",
     "Factory",
+    "McpConnectorFactory",
     "ProviderSpec",
     "ServicePort",
     "ServiceProviders",
@@ -213,6 +215,42 @@ clean up its own partially constructed adapter.
 
 
 @dataclass(frozen=True, slots=True)
+class ConnectorContext:
+    """What a factory is given to build the connector that reaches MCP servers of one kind.
+
+    It carries the shared settings a :class:`BuildContext` carries, and the
+    container's resources, so a provider pack's connector shares the pack's
+    session factory with its adapters through ``resources.shared(...)``.
+
+    Attributes:
+        deployment_env: Where the process is running.
+        tls_ca_bundle: The enterprise CA file, if one is configured.
+        external: Values read from third-party variables.
+        clock: The clock port.
+        timeout_seconds: How long one exchange with a server may take; the
+            configured tool call limit, or ``None`` for no limit.
+        resources: Resources shared and owned within this container.
+    """
+
+    deployment_env: DeploymentEnv
+    tls_ca_bundle: Path | None
+    external: ExternalSettings
+    clock: Clock
+    timeout_seconds: float | None
+    resources: BuildResources = field(default_factory=BuildResources, repr=False)
+
+
+McpConnectorFactory = Callable[[ConnectorContext], object]
+"""Build the MCP connector for one transport kind, such as ``"agentcore"``.
+
+The result implements the agent side's ``McpConnector`` protocol: ``connect``
+and ``credential_meta``, and ``classify`` when the platform has errors of its
+own. The MCP bindings own it: one per kind for the life of the container,
+closed with the bindings when it supports ``aclose``.
+"""
+
+
+@dataclass(frozen=True, slots=True)
 class ProviderSpec:
     """The definition of an adapter, not a live instance.
 
@@ -262,6 +300,7 @@ class ServiceProviders:
 
     def __init__(self) -> None:
         self._specs: dict[tuple[str, str], ProviderSpec] = {}
+        self._connectors: dict[str, McpConnectorFactory] = {}
         self._frozen = False
 
     @classmethod
@@ -377,6 +416,37 @@ class ServiceProviders:
             contract=contract,
         )
         return self
+
+    def register_mcp_connector(
+        self, kind: str, factory: McpConnectorFactory, *, replace: bool = False
+    ) -> ServiceProviders:
+        """Add the connector that reaches MCP servers of one transport kind.
+
+        A server entry's ``transport`` names the kind: ``"http"`` is built in,
+        and a provider pack registers the kinds its platform adds, such as
+        ``"agentcore"``. Returns the registry, so calls can be chained.
+
+        Args:
+            kind: The transport kind, as ``ServerEntry.transport`` spells it.
+            factory: Builds the connector from a :class:`ConnectorContext`.
+            replace: Allow overwriting an existing registration.
+
+        Raises:
+            RuntimeError: If the registry is frozen.
+            ValueError: If the kind is taken and ``replace`` is false.
+        """
+        if self._frozen:
+            raise RuntimeError(
+                "the provider registry is frozen; register before the container starts"
+            )
+        if kind in self._connectors and not replace:
+            raise ValueError(f"an MCP connector is already registered for {kind!r}")
+        self._connectors[kind] = factory
+        return self
+
+    def mcp_connector_factory(self, kind: str) -> McpConnectorFactory | None:
+        """Return the connector factory registered for ``kind``, or ``None``."""
+        return self._connectors.get(kind)
 
     def lookup(self, port: str, name: str) -> ProviderSpec:
         """Return an adapter definition without constructing an instance.

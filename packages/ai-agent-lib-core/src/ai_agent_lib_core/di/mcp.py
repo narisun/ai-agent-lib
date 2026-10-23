@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from ai_agent_lib_core.adapters.http_support import checked_base_url
 from ai_agent_lib_core.config import options_key, variable_for
@@ -22,10 +22,12 @@ from ai_agent_lib_core.contracts import (
     RequestVerifier,
     Section,
     ServerEntry,
+    SupportsAsyncClose,
     Telemetry,
     TokenAuthenticator,
     TokenExchanger,
 )
+from ai_agent_lib_core.di.providers import ConnectorContext, McpConnectorFactory
 from ai_agent_lib_core.pipeline import (
     AgentCheck,
     Operations,
@@ -40,28 +42,42 @@ if TYPE_CHECKING:
 
     from ai_agent_lib_core.integrations.langgraph import LangGraphBindings
     from ai_agent_lib_core.integrations.mcp import GovernedToolsMiddleware
-    from ai_agent_lib_core.integrations.mcp.client import HttpMcpConnector, McpConnector
+    from ai_agent_lib_core.integrations.mcp.client import McpConnector
+
+_HTTP = "http"
 
 
-class _OwnedConnector:
-    """The one connector these bindings create themselves, once it is needed.
+def _no_factory(kind: str) -> McpConnectorFactory | None:  # noqa: ARG001 - the default knows none
+    return None
 
-    Kept in its own object so that the frozen bindings can create it on first
-    use, and so that only a connector created here is closed here: an injected
-    connector belongs to whoever injected it.
+
+class _OwnedConnectors:
+    """The connectors these bindings create themselves, by transport kind, once needed.
+
+    Kept in their own object so that the frozen bindings can create them on
+    first use, and so that only a connector created here is closed here: an
+    injected connector belongs to whoever injected it.
     """
 
     def __init__(self) -> None:
-        self.connector: HttpMcpConnector | None = None
+        self.by_kind: dict[str, McpConnector] = {}
 
 
 @dataclass(frozen=True, slots=True)
 class McpBindings:
     """Compose governed MCP clients and servers without owning service lifecycle.
 
-    The one resource these bindings do own is the HTTP connector they create
-    when none is injected; ``aclose`` releases it. Its timeout is the configured
-    tool call limit, ``limits.tool.timeout_seconds``.
+    The resources these bindings do own are the connectors they create when
+    none is injected: one HTTP connector, and one connector per other transport
+    kind a provider pack registered a factory for; ``aclose`` releases them.
+    Their timeout is the configured tool call limit, ``limits.tool.timeout_seconds``.
+
+    Attributes:
+        connector: An injected connector, which then serves every server entry.
+        connector_factory: Finds the registered factory for a transport kind
+            other than ``http``; by default none is known.
+        connector_context: Builds what such a factory is given; ``None`` when
+            the bindings stand alone, in which case only ``http`` is served.
     """
 
     audit: AuditSink
@@ -77,30 +93,62 @@ class McpBindings:
     operations: Operations
     connector: McpConnector | None
     bindings: Callable[[], LangGraphBindings]
-    _owned: _OwnedConnector = field(default_factory=_OwnedConnector, init=False, repr=False)
+    connector_factory: Callable[[str], McpConnectorFactory | None] = _no_factory
+    connector_context: Callable[[], ConnectorContext] | None = None
+    _owned: _OwnedConnectors = field(default_factory=_OwnedConnectors, init=False, repr=False)
 
-    def mcp_connector(self) -> McpConnector:
-        """Return the connector that reaches MCP servers: the injected one, or one HTTP connector.
+    def mcp_connector(self, entry: ServerEntry | None = None) -> McpConnector:
+        """Return the connector that reaches ``entry``: the injected one, or one per transport.
 
-        The HTTP connector is created on first use, so that a container which
-        serves MCP tools but calls none never loads the agent side, and it is
-        shared by every server and every call for as long as these bindings live.
+        Without an entry the HTTP connector is returned. Connectors are
+        created on first use, so that a container which serves MCP tools but
+        calls none never loads the agent side, and each is shared by every
+        server of its kind and every call for as long as these bindings live.
+
+        Raises:
+            ConfigurationError: If the entry's transport is one no installed
+                provider pack registered a connector for.
         """
         if self.connector is not None:
             return self.connector
-        if self._owned.connector is None:
-            # Imported here so that an agent which uses no MCP server does not load the SDK.
-            from ai_agent_lib_core.integrations.mcp.client import HttpMcpConnector
+        kind = entry.transport if entry is not None else _HTTP
+        owned = self._owned.by_kind.get(kind)
+        if owned is None:
+            owned = self._http_connector() if kind == _HTTP else self._registered_connector(kind)
+            self._owned.by_kind[kind] = owned
+        return owned
 
-            self._owned.connector = HttpMcpConnector(
-                timeout_seconds=self.operations.limits.tool.timeout_seconds
+    def _http_connector(self) -> McpConnector:
+        # Imported here so that an agent which uses no MCP server does not load the SDK.
+        from ai_agent_lib_core.integrations.mcp.client import HttpMcpConnector
+
+        return HttpMcpConnector(timeout_seconds=self.operations.limits.tool.timeout_seconds)
+
+    def _registered_connector(self, kind: str) -> McpConnector:
+        factory = self.connector_factory(kind)
+        if factory is None or self.connector_context is None:
+            raise ConfigurationError(
+                f"no MCP connector reaches servers of transport {kind!r}",
+                expected=f"a provider pack that registers an MCP connector for {kind!r}",
+                actual="none registered",
+                fix="install ai-agent-lib-aws" if kind == "agentcore" else "install the pack",
             )
-        return self._owned.connector
+        connector = factory(self.connector_context())
+        if not callable(getattr(connector, "connect", None)) or not callable(
+            getattr(connector, "credential_meta", None)
+        ):
+            raise ConfigurationError(
+                f"the MCP connector registered for {kind!r} is not a connector",
+                expected="an object with connect and credential_meta",
+                actual=type(connector).__name__,
+            )
+        return cast("McpConnector", connector)
 
     async def aclose(self) -> None:
-        """Close the connector these bindings created; an injected one is left to its owner."""
-        if self._owned.connector is not None:
-            await self._owned.connector.aclose()
+        """Close the connectors these bindings created; an injected one is left to its owner."""
+        for connector in self._owned.by_kind.values():
+            if isinstance(connector, SupportsAsyncClose):
+                await connector.aclose()
 
     async def mcp_tools(self, server: str) -> list[BaseTool]:
         """Check discovery requirements and delegate governed tool construction.
@@ -112,15 +160,17 @@ class McpBindings:
         entry = self._registered_server(server)
         local = self.environment is DeploymentEnv.LOCAL
         # Send only service or audience-bound exchanged tokens. HTTP is allowed
-        # on loopback, and on other hosts only during local development.
+        # on loopback, and on other hosts only during local development. An
+        # AgentCore runtime's URL is derived from its ARN and carries the
+        # qualifier as a query; the address before it is what is checked.
         checked_base_url(
             f"MCP server {server!r} in the tool registry",
-            entry.url,
+            entry.url.split("?", 1)[0] if entry.transport == "agentcore" else entry.url,
             allow_http=local,
             hint="outside local development a caller's token is sent only over TLS",
         )
         exchanger = self.identity if isinstance(self.identity, TokenExchanger) else None
-        if exchanger is None and not local:
+        if exchanger is None and not local and entry.auth != "sigv4":
             raise ConfigurationError(
                 f"MCP server {server!r} cannot be called: the identity provider "
                 f"{self.identity_provider!r} is not set up to obtain "
@@ -128,7 +178,7 @@ class McpBindings:
             )
         return await self.bindings().mcp_tools(
             entry,
-            connector=self.mcp_connector(),
+            connector=self.mcp_connector(entry),
             exchanger=exchanger,
             require_pins=not local,
         )

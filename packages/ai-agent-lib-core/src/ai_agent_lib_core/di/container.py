@@ -57,7 +57,13 @@ from ai_agent_lib_core.contracts import (
     shown_value,
 )
 from ai_agent_lib_core.di.graph import AdapterGraph
-from ai_agent_lib_core.di.providers import DATA_PORT, MODEL_PORT, ServicePort, ServiceProviders
+from ai_agent_lib_core.di.providers import (
+    DATA_PORT,
+    MODEL_PORT,
+    ConnectorContext,
+    ServicePort,
+    ServiceProviders,
+)
 from ai_agent_lib_core.observability.diagnostics import Diagnostics
 from ai_agent_lib_core.observability.model_trace import JsonlModelTraceSink
 from ai_agent_lib_core.pipeline import (
@@ -608,8 +614,22 @@ class ServiceContainer:
                 operations=self._operations,
                 connector=self._mcp_connector,
                 bindings=self._bindings,
+                connector_factory=self._providers.mcp_connector_factory,
+                connector_context=self._connector_context,
             )
         return self._mcp
+
+    def _connector_context(self) -> ConnectorContext:
+        """What a provider pack's connector factory is given: the adapters' shared settings."""
+        return ConnectorContext(
+            deployment_env=self.config.deployment_env,
+            tls_ca_bundle=self.config.tls_ca_bundle,
+            external=self.config.external,
+            clock=self._clock,
+            timeout_seconds=self._operations.limits.tool.timeout_seconds,
+            # The same resources the adapters share, so the connector shares their sessions.
+            resources=self._graph.resources,
+        )
 
     def _bindings(self) -> LangGraphBindings:
         self._graph.require_started()

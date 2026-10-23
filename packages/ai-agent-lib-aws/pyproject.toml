@@ -22,8 +22,9 @@ postgres = [
     "psycopg[binary,pool]>=3.2",
     "psycopg-pool>=3.3",
 ]
-# The AgentCore Memory checkpoint store.
+# The AgentCore Memory checkpoint store, and the connector that calls MCP servers on AgentCore runtimes.
 agentcore = [
+    "ai-agent-lib-core[mcp]",
     "langgraph-checkpoint-aws>=1.2,<2",
 ]
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from ai_agent_lib_aws.access import (
@@ -52,14 +53,28 @@ from ai_agent_lib_core.kit import (
     REGISTRY,
     SECRETS,
     BuildContext,
+    ConnectorContext,
     ServiceProviders,
 )
 
 if TYPE_CHECKING:
     from ai_agent_lib_aws.checkpoint_agentcore_memory import AgentCoreMemoryCheckpointBackend
     from ai_agent_lib_aws.checkpoint_postgres import PostgresCheckpointBackend
+    from ai_agent_lib_aws.mcp_agentcore import AgentCoreMcpConnector
 
 __all__ = ["register_aws_adapters"]
+
+
+def _agentcore_mcp_connector() -> type[AgentCoreMcpConnector]:
+    # Imported here so that a service which calls no AgentCore runtime needs no MCP SDK.
+    try:
+        from ai_agent_lib_aws.mcp_agentcore import AgentCoreMcpConnector
+    except ImportError as exc:
+        raise ConfigurationError(
+            "calling an MCP server on an AgentCore runtime needs the MCP SDK; install it with "
+            "'pip install \"ai-agent-lib-aws[agentcore]\"'"
+        ) from exc
+    return AgentCoreMcpConnector
 
 
 def _postgres_backend() -> type[PostgresCheckpointBackend]:
@@ -109,7 +124,7 @@ class _Sessions:
     def __init__(self, sessions: AwsSessionFactory | None) -> None:
         self._sessions = sessions
 
-    def get(self, context: BuildContext) -> AwsSessionFactory:
+    def get(self, context: BuildContext | ConnectorContext) -> AwsSessionFactory:
         if self._sessions is not None:
             return self._sessions  # explicitly injected: the caller owns it
         return context.resources.shared(
@@ -118,6 +133,19 @@ class _Sessions:
                 context.external, tls_ca_bundle=context.tls_ca_bundle
             ),
         )
+
+
+def _agentcore_connector_factory(
+    shared: _Sessions,
+) -> Callable[[ConnectorContext], AgentCoreMcpConnector]:
+    """Return the factory for the connector that calls MCP servers on AgentCore runtimes."""
+
+    def build(context: ConnectorContext) -> AgentCoreMcpConnector:
+        return _agentcore_mcp_connector()(
+            shared.get(context), timeout_seconds=context.timeout_seconds
+        )
+
+    return build
 
 
 def register_aws_adapters(
@@ -276,5 +304,9 @@ def register_aws_adapters(
         access=secrets_manager_access,
         replace=replace,
         dependencies=(),
+    )
+
+    providers.register_mcp_connector(
+        "agentcore", _agentcore_connector_factory(shared), replace=replace
     )
     return providers

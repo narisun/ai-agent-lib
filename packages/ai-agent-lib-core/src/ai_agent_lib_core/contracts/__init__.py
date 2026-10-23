@@ -147,6 +147,7 @@ from ai_agent_lib_core.contracts.registry import (
     ToolEntry,
     ToolRegistry,
     ToolSnapshot,
+    runtime_invocation_url,
     schema_fingerprint,
 )
 from ai_agent_lib_core.contracts.scope import Scope
@@ -279,6 +280,7 @@ __all__ = [
     "options_summary",
     "query_parameters",
     "redact",
+    "runtime_invocation_url",
     "schema_fingerprint",
     "schema_mismatch",
     "shorten",

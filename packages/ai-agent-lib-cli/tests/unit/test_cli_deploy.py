@@ -470,3 +470,480 @@ def test_a_corrupt_service_pyproject_is_named_instead_of_misread(
     assert "agents/helper/pyproject.toml could not be read" in err
     assert "TOMLDecodeError" in err
     assert "does not install" not in err
+
+
+# ------------------------------------------------ the AgentCore Runtime target
+
+
+def _edit_settings(
+    root: Path,
+    replacements: Mapping[str, str] | None = None,
+    append: str = "",
+    folder: str = "agents/helper",
+) -> None:
+    """Change lines of a deploy.env: each replacement must find its text."""
+    settings = _settings(root, folder)
+    text = settings.read_text(encoding="utf-8")
+    for old, new in (replacements or {}).items():
+        assert old in text, old
+        text = text.replace(old, new)
+    settings.write_text(text + append, encoding="utf-8")
+
+
+@pytest.fixture
+def agentcore_ready(workspace: Path, capsys: pytest.CaptureFixture[str]) -> Path:
+    """A workspace whose agent has the AgentCore starting deploy.env and the adapters it selects."""
+    assert run("deploy", "helper", "--target", "agentcore", "--workspace", workspace) == 0
+    _depend_on_aws(workspace, "agents/helper", "ai-agent-lib-aws[bedrock,agentcore]")
+    capsys.readouterr()
+    return workspace
+
+
+def _agentcore(root: Path, *arguments: str, service: str = "helper") -> int:
+    return run("deploy", service, "--target", "agentcore", *arguments, "--workspace", root)
+
+
+def test_the_agentcore_starter_selects_ambient_telemetry_a_memory_and_the_deployment_block(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert _agentcore(workspace) == 0
+    out = capsys.readouterr().out
+    assert "created  agents/helper/deploy.env" in out
+    assert 'add "ai-agent-lib-aws[bedrock,agentcore]" to the dependencies' in out
+    assert "run 'agentlib deploy helper --target agentcore --plan'" in out
+    text = _settings(workspace).read_text(encoding="utf-8")
+    assert "EAP_TELEMETRY=ambient\n" in text
+    assert "EAP_CHECKPOINT_PROVIDER=agentcore_memory\n" in text
+    assert 'EAP_CHECKPOINT_OPTIONS={"memory_id": "created_by_terraform"}\n' in text
+    assert "AGENTCORE_AUTH=iam\n" in text
+    assert "# AGENTCORE_DISCOVERY_URL=" in text
+    assert "AGENTCORE_NETWORK=PUBLIC\n" in text
+    assert "AGENTCORE_ARTIFACT=container\n" in text
+    assert "AGENTCORE_MEMORY=create\n" in text
+    assert "AGENTCORE_GATEWAY=none\n" in text
+    assert "never reach the container" in text
+    assert "Postgres" not in text
+
+
+def test_the_agentcore_plan_shows_the_runtime_before_the_adapters_and_no_sidecar(
+    agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert _agentcore(agentcore_ready, "--plan") == 0
+    out = capsys.readouterr().out
+    assert out.startswith(
+        "Deploying helper to AgentCore Runtime with the settings in agents/helper/deploy.env.\n"
+        "\nRuntime:\n"
+    )
+    assert "  protocol      HTTP on port 8080\n" in out
+    assert "  inbound auth  iam (signed requests)\n" in out
+    assert "  network       PUBLIC\n" in out
+    assert "  artifact      container\n" in out
+    assert "  memory        created by Terraform\n" in out
+    assert "  gateway       none\n" in out
+    assert "  telemetry     ambient (ADOT" in out
+    assert out.index("Runtime:") < out.index("Adapters and what each needs from AWS:")
+    assert (
+        "\nContainer:\n"
+        "  service: opentelemetry-instrument python -m helper.service --profile agentcore\n" in out
+    )
+    assert "collector:" not in out
+    assert "  opa:" not in out
+    assert "AGENTCORE_MEMORY=create: Terraform creates the memory" in out
+    assert "  AGENTCORE_" not in out  # the block is the deployment's, not the environment's
+    assert not (agentcore_ready / "deploy").exists()
+
+
+def test_agentcore_refuses_the_services_own_telemetry_providers(
+    agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _edit_settings(agentcore_ready, {"EAP_TELEMETRY=ambient": "EAP_TELEMETRY=opentelemetry"})
+    assert _agentcore(agentcore_ready, "--plan") == 1
+    out = capsys.readouterr().out
+    assert "collide with the ones ADOT installs" in out
+    assert "set EAP_TELEMETRY=ambient (or off) in agents/helper/deploy.env" in out
+
+
+def test_agentcore_refuses_the_older_audit_tracing_switch_with_telemetry_off(
+    agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _edit_settings(
+        agentcore_ready,
+        {
+            "EAP_TELEMETRY=ambient": "EAP_TELEMETRY=off",
+            'EAP_AUDIT_OPTIONS={"stream": "eap-audit"}': (
+                'EAP_AUDIT_OPTIONS={"stream": "eap-audit", "tracing": true}'
+            ),
+        },
+    )
+    assert _agentcore(agentcore_ready, "--plan") == 1
+    assert "the audit option tracing turns telemetry on" in capsys.readouterr().out
+
+
+def test_agentcore_refuses_opa_on_the_loopback_address(
+    agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _edit_settings(
+        agentcore_ready,
+        {'{"url": "https://opa.internal:8181"}': '{"url": "http://localhost:8181"}'},
+    )
+    assert _agentcore(agentcore_ready, "--plan") == 1
+    out = capsys.readouterr().out
+    assert "nothing runs beside a container on AgentCore Runtime" in out
+    assert "EAP_POLICY_PROVIDER=rules" in out
+    assert "Point url in EAP_POLICY_OPTIONS" in out
+
+
+def test_agentcore_refuses_a_checkpoint_store_on_the_sessions_disk(
+    agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _edit_settings(
+        agentcore_ready,
+        {
+            "EAP_CHECKPOINT_PROVIDER=agentcore_memory": "EAP_CHECKPOINT_PROVIDER=sqlite",
+            'EAP_CHECKPOINT_OPTIONS={"memory_id": "created_by_terraform"}': (
+                "EAP_CHECKPOINT_OPTIONS={}"
+            ),
+        },
+    )
+    assert _agentcore(agentcore_ready, "--plan") == 1
+    out = capsys.readouterr().out
+    assert "checkpoint sqlite runs only on a developer's machine" in out
+    assert "checkpoint sqlite has nowhere durable to write" in out
+    assert "set EAP_CHECKPOINT_PROVIDER to one of postgres, agentcore_memory, none" in out
+    assert "AGENTCORE_MEMORY=create while checkpoint sqlite does not use AgentCore Memory" in out
+
+
+def test_agentcore_refuses_a_python_the_runtime_does_not_offer(
+    agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    pyproject = agentcore_ready / "agents/helper/pyproject.toml"
+    text = pyproject.read_text(encoding="utf-8")
+    pyproject.write_text(
+        text.replace('requires-python = ">=3.11"', 'requires-python = ">=3.11,<3.13"'), "utf-8"
+    )
+    assert _agentcore(agentcore_ready, "--plan") == 1
+    out = capsys.readouterr().out
+    assert 'requires-python = ">=3.11,<3.13" in agents/helper/pyproject.toml excludes it' in out
+    assert "the runtime offers Python 3.13" in out
+
+
+def test_agentcore_memory_named_in_the_block_must_be_the_checkpoints_memory(
+    agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _edit_settings(
+        agentcore_ready, {"AGENTCORE_MEMORY=create": "AGENTCORE_MEMORY=helper_mem-0123456789"}
+    )
+    assert _agentcore(agentcore_ready, "--plan") == 1
+    out = capsys.readouterr().out
+    assert "AGENTCORE_MEMORY names the memory helper_mem-0123456789" in out
+    assert "memory_id is 'created_by_terraform'" in out
+    assert "make them agree" in out
+
+    _edit_settings(
+        agentcore_ready,
+        {'"memory_id": "created_by_terraform"': '"memory_id": "helper_mem-0123456789"'},
+    )
+    assert _agentcore(agentcore_ready, "--plan") == 0
+    out = capsys.readouterr().out
+    assert "  memory        existing helper_mem-0123456789\n" in out
+    assert "placeholder" not in out
+
+
+def test_agentcore_memory_without_the_memory_checkpoint_is_a_warning(
+    agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _edit_settings(
+        agentcore_ready,
+        {
+            "EAP_CHECKPOINT_PROVIDER=agentcore_memory": "EAP_CHECKPOINT_PROVIDER=none",
+            'EAP_CHECKPOINT_OPTIONS={"memory_id": "created_by_terraform"}': "",
+        },
+    )
+    assert _agentcore(agentcore_ready, "--plan") == 0
+    out = capsys.readouterr().out
+    assert "Warnings:" in out
+    assert "AGENTCORE_MEMORY=create while checkpoint none does not use AgentCore Memory" in out
+    assert "set EAP_CHECKPOINT_PROVIDER=agentcore_memory" in out
+
+
+def test_agentcore_code_artifact_warns_about_wheels_and_writes_the_zip_builder(
+    agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _edit_settings(agentcore_ready, {"AGENTCORE_ARTIFACT=container": "AGENTCORE_ARTIFACT=code"})
+    assert _agentcore(agentcore_ready) == 0
+    out = capsys.readouterr().out
+    assert "  artifact      code\n" in out
+    assert "AGENTCORE_ARTIFACT=code: every dependency needs a wheel for Python 3.13" in out
+    assert "build_zip.py enforces that" in out
+    assert "created  deploy/helper/build_zip.py" in out
+    assert "Next: read deploy/helper/README.md, build the zip" in out
+    folder = agentcore_ready / "deploy/helper"
+    assert not (folder / "Dockerfile").exists()
+    builder = (folder / "build_zip.py").read_text(encoding="utf-8")
+    assert '"--entry", "helper.service",' in builder
+    assert '"--lock", "deploy/helper/requirements.lock",' in builder
+    assert "from ai_agent_lib_cli.deploy.zipbuild import main" in builder
+    settings = (folder / "settings.tf").read_text(encoding="utf-8")
+    assert '  artifact               = "code"\n' in settings
+
+
+@pytest.mark.parametrize(
+    ("replacements", "append", "named", "expected"),
+    [
+        ({"AGENTCORE_AUTH=iam": "AGENTCORE_AUTH=jwt"}, "", "AGENTCORE_DISCOVERY_URL", "not set"),
+        (
+            {"AGENTCORE_AUTH=iam": "AGENTCORE_AUTH=jwt"},
+            "AGENTCORE_DISCOVERY_URL=https://issuer.example/openid\n",
+            "AGENTCORE_DISCOVERY_URL",
+            ".well-known/openid-configuration",
+        ),
+        (
+            {"AGENTCORE_AUTH=iam": "AGENTCORE_AUTH=jwt"},
+            "AGENTCORE_DISCOVERY_URL=https://issuer.example/.well-known/openid-configuration\n",
+            "AGENTCORE_ALLOWED_CLIENTS",
+            "neither is set",
+        ),
+        (
+            {},
+            "AGENTCORE_ALLOWED_AUDIENCE=api://helper\n",
+            "AGENTCORE_AUTH",
+            "AGENTCORE_AUTH=jwt when",
+        ),
+        ({"AGENTCORE_AUTH=iam": "AGENTCORE_AUTH=sigv4"}, "", "AGENTCORE_AUTH", "iam or jwt"),
+        ({"AGENTCORE_NETWORK=PUBLIC": "AGENTCORE_NETWORK=VPC"}, "", "AGENTCORE_SUBNETS", "not set"),
+        ({}, "AGENTCORE_SUBNETS=subnet-1\n", "AGENTCORE_NETWORK", "AGENTCORE_NETWORK=VPC when"),
+        (
+            {"AGENTCORE_IDLE_TIMEOUT_SECONDS=900": "AGENTCORE_IDLE_TIMEOUT_SECONDS=soon"},
+            "",
+            "AGENTCORE_IDLE_TIMEOUT_SECONDS",
+            "a whole number of seconds from 60 to 28800",
+        ),
+        (
+            {"AGENTCORE_MAX_LIFETIME_SECONDS=28800": "AGENTCORE_MAX_LIFETIME_SECONDS=600"},
+            "",
+            "AGENTCORE_IDLE_TIMEOUT_SECONDS",
+            "no more than AGENTCORE_MAX_LIFETIME_SECONDS (600)",
+        ),
+        (
+            {"AGENTCORE_ARTIFACT=container": "AGENTCORE_ARTIFACT=zip"},
+            "",
+            "AGENTCORE_ARTIFACT",
+            "container or code",
+        ),
+        (
+            {"AGENTCORE_GATEWAY=none": "AGENTCORE_GATEWAY=my-gateway"},
+            "",
+            "AGENTCORE_GATEWAY",
+            "the ARN of a gateway",
+        ),
+        (
+            {"AGENTCORE_MEMORY=create": "AGENTCORE_MEMORY=1-not-an-id"},
+            "",
+            "AGENTCORE_MEMORY",
+            "the ID of a memory",
+        ),
+    ],
+)
+def test_a_bad_agentcore_value_names_the_variable_to_change(
+    agentcore_ready: Path,
+    capsys: pytest.CaptureFixture[str],
+    replacements: dict[str, str],
+    append: str,
+    named: str,
+    expected: str,
+) -> None:
+    _edit_settings(agentcore_ready, replacements, append)
+    assert _agentcore(agentcore_ready, "--plan") == 1
+    err = capsys.readouterr().err
+    assert f"{named} in agents/helper/deploy.env is not valid" in err
+    assert expected in err
+    assert f"fix: change {named} in agents/helper/deploy.env" in err
+
+
+def test_agentcore_jwt_and_vpc_settings_reach_settings_tf(
+    agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _edit_settings(
+        agentcore_ready,
+        {
+            "AGENTCORE_AUTH=iam": "AGENTCORE_AUTH=jwt",
+            "# AGENTCORE_DISCOVERY_URL=https://login.microsoftonline.com/<tenant>/v2.0/": (
+                "AGENTCORE_DISCOVERY_URL=https://login.microsoftonline.com/t/v2.0/"
+            ),
+            "# AGENTCORE_ALLOWED_AUDIENCE=api://helper": "AGENTCORE_ALLOWED_AUDIENCE=api://helper, api://two",
+            "AGENTCORE_NETWORK=PUBLIC": "AGENTCORE_NETWORK=VPC",
+            "# AGENTCORE_SUBNETS=": "AGENTCORE_SUBNETS=",
+            "# AGENTCORE_SECURITY_GROUPS=": "AGENTCORE_SECURITY_GROUPS=",
+            "AGENTCORE_GATEWAY=none": "AGENTCORE_GATEWAY=create",
+        },
+    )
+    assert _agentcore(agentcore_ready) == 0
+    out = capsys.readouterr().out
+    assert "inbound auth  jwt (tokens from https://login.microsoftonline.com/t/v2.0/" in out
+    assert (
+        "  network       VPC (subnet-0123456789abcdef0, subnet-0fedcba9876543210; "
+        "sg-0123456789abcdef0)\n" in out
+    )
+    assert "  gateway       created by Terraform, one target per MCP server\n" in out
+    settings = (agentcore_ready / "deploy/helper/settings.tf").read_text(encoding="utf-8")
+    assert '  auth                   = "jwt"\n' in settings
+    assert (
+        '  discovery_url          = "https://login.microsoftonline.com/t/v2.0/.well-known/openid-configuration"\n'
+    ) in settings
+    assert "  allowed_clients        = []\n" in settings
+    assert '  allowed_audience       = ["api://helper", "api://two"]\n' in settings
+    assert '  network_mode           = "VPC"\n' in settings
+    assert (
+        '  subnets                = ["subnet-0123456789abcdef0", "subnet-0fedcba9876543210"]\n'
+        in settings
+    )
+    assert '  security_groups        = ["sg-0123456789abcdef0"]\n' in settings
+    assert '  gateway                = "create"\n' in settings
+
+
+def test_agentcore_environment_leaves_the_block_out_and_keeps_an_empty_value(
+    agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _edit_settings(agentcore_ready, append="EAP_TLS_CA_BUNDLE=\n")
+    assert _agentcore(agentcore_ready) == 0
+    capsys.readouterr()
+    settings = (agentcore_ready / "deploy/helper/settings.tf").read_text(encoding="utf-8")
+    environment = settings[settings.index("environment = {") :]
+    assert "AGENTCORE_" not in environment
+    assert '    EAP_TLS_CA_BUNDLE       = ""\n' in environment
+    assert '  memory_option_variable = "EAP_CHECKPOINT_OPTIONS"\n' in settings
+    assert (
+        '    EAP_CHECKPOINT_OPTIONS  = "{\\"memory_id\\": \\"created_by_terraform\\"}"\n'
+        in settings
+    )
+
+
+def test_agentcore_writes_a_root_module_alone_and_an_arm64_image_per_kind(
+    agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert _agentcore(agentcore_ready) == 0
+    out = capsys.readouterr().out
+    assert "created  deploy/helper/main.tf" in out
+    assert "created  deploy/helper/permissions.tf" in out
+    assert "Next: read deploy/helper/README.md, build and push the ARM64 image" in out
+    assert not (agentcore_ready / "deploy/modules").exists()
+    assert not (agentcore_ready / "deploy/opa").exists()
+    assert not (agentcore_ready / "deploy/helper/build_zip.py").exists()
+    dockerfile = (agentcore_ready / "deploy/helper/Dockerfile").read_text(encoding="utf-8")
+    assert "FROM --platform=linux/arm64 python:3.13-slim\n" in dockerfile
+    assert "EXPOSE 8080\n" in dockerfile
+    assert (
+        'CMD ["opentelemetry-instrument", "python", "-m", "helper.service", '
+        '"--profile", "agentcore"]' in dockerfile
+    )
+    assert '"aws-opentelemetry-distro>=0.18.0"' in dockerfile
+    assert "--require-hashes" in dockerfile
+    assert "USER 10001" in dockerfile
+    rules = (agentcore_ready / "deploy/helper/Dockerfile.dockerignore").read_text(encoding="utf-8")
+    assert rules.splitlines()[1] == "**"
+    assert "!agents/helper/src/**" in rules
+    main_tf = (agentcore_ready / "deploy/helper/main.tf").read_text(encoding="utf-8")
+    assert 'version = ">= 6.20"' in main_tf
+    assert 'resource "aws_bedrockagentcore_agent_runtime" "this"' in main_tf
+    assert '"bedrock-agentcore.amazonaws.com"' in main_tf
+    permissions = (agentcore_ready / "deploy/helper/permissions.tf").read_text(encoding="utf-8")
+    assert permissions.startswith(
+        "# Written by 'agentlib deploy helper --target agentcore' from agents/helper/deploy.env.\n"
+    )
+    assert 'sid       = "CheckpointAgentcoreMemory1"' in permissions
+
+    # An MCP server listens on the runtime's MCP port, served by its own package.
+    assert _agentcore(agentcore_ready, service="people") == 0
+    _depend_on_aws(agentcore_ready, "mcp-servers/people")
+    _edit_settings(agentcore_ready, folder="mcp-servers/people", append="EAP_DATA_SOURCES={}\n")
+    capsys.readouterr()
+    assert _agentcore(agentcore_ready, service="people") == 0
+    out = capsys.readouterr().out
+    assert "  protocol      MCP on port 8000\n" in out
+    assert "  memory        none\n" in out
+    dockerfile = (agentcore_ready / "deploy/people/Dockerfile").read_text(encoding="utf-8")
+    assert "EXPOSE 8000\n" in dockerfile
+    assert (
+        'CMD ["opentelemetry-instrument", "python", "-m", "people", "--profile", "agentcore"]'
+        in dockerfile
+    )
+
+
+def test_agentcore_running_again_rewrites_what_is_derived_and_keeps_what_is_yours(
+    agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert _agentcore(agentcore_ready) == 0
+    main_tf = agentcore_ready / "deploy/helper/main.tf"
+    main_tf.write_text(main_tf.read_text(encoding="utf-8") + "# mine\n", encoding="utf-8")
+    _edit_settings(
+        agentcore_ready,
+        {"AGENTCORE_IDLE_TIMEOUT_SECONDS=900": "AGENTCORE_IDLE_TIMEOUT_SECONDS=600"},
+    )
+    capsys.readouterr()
+
+    assert _agentcore(agentcore_ready) == 0
+    out = capsys.readouterr().out
+    assert "kept     deploy/helper/main.tf (yours)" in out
+    assert "updated  deploy/helper/settings.tf" in out
+    assert main_tf.read_text(encoding="utf-8").endswith("# mine\n")
+    assert (
+        "  idle_timeout_seconds   = 600\n"
+        in (agentcore_ready / "deploy/helper/settings.tf").read_text()
+    )
+
+
+def test_the_fargate_target_is_the_default_and_ignores_the_agentcore_block(
+    agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The same deploy.env, deployed to Fargate: the block is not the service's environment."""
+    _edit_settings(agentcore_ready, {"EAP_TELEMETRY=ambient": "EAP_TELEMETRY=off"})
+    assert run("deploy", "helper", "--plan", "--workspace", agentcore_ready) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("Deploying helper with the settings in agents/helper/deploy.env.\n")
+    assert "Containers in the task:" in out
+    assert "  service: helper-serve --host 0.0.0.0 --port 8000" in out
+    assert "  AGENTCORE_" not in out
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(shutil.which("terraform") is None, reason="needs terraform on PATH")
+@pytest.mark.parametrize(
+    "replacements",
+    [
+        {},
+        {
+            "AGENTCORE_ARTIFACT=container": "AGENTCORE_ARTIFACT=code",
+            "AGENTCORE_AUTH=iam": "AGENTCORE_AUTH=jwt",
+            "# AGENTCORE_DISCOVERY_URL=https://login.microsoftonline.com/<tenant>/v2.0/": (
+                "AGENTCORE_DISCOVERY_URL=https://login.microsoftonline.com/t/v2.0/"
+            ),
+            "# AGENTCORE_ALLOWED_AUDIENCE=api://helper": "AGENTCORE_ALLOWED_AUDIENCE=api://helper",
+            "AGENTCORE_GATEWAY=none": "AGENTCORE_GATEWAY=create",
+            "AGENTCORE_MEMORY=create": "AGENTCORE_MEMORY=none",
+            'EAP_CHECKPOINT_OPTIONS={"memory_id": "created_by_terraform"}': (
+                'EAP_CHECKPOINT_OPTIONS={"memory_id": "helper_mem-0123456789"}'
+            ),
+        },
+    ],
+    ids=["container-iam-memory", "code-jwt-gateway"],
+)
+def test_the_written_agentcore_terraform_is_formatted_and_valid(
+    agentcore_ready: Path, replacements: dict[str, str]
+) -> None:
+    _edit_settings(agentcore_ready, replacements)
+    assert _agentcore(agentcore_ready) == 0
+    folder = agentcore_ready / "deploy" / "helper"
+
+    def terraform(*arguments: str) -> None:
+        done = subprocess.run(  # noqa: S603 - a fixed command line, no shell
+            ["terraform", *arguments],  # noqa: S607 - terraform from PATH, as a developer runs it
+            cwd=folder,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert done.returncode == 0, f"terraform {' '.join(arguments)}:\n{done.stdout}{done.stderr}"
+
+    terraform("fmt", "-check", "-recursive")
+    terraform("init", "-backend=false", "-input=false")
+    terraform("validate")

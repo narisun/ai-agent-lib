@@ -90,6 +90,7 @@ checks included, is declared. In short:
 | `agentcore_memory` | `bedrock-agentcore:CreateEvent`, `ListEvents`, `GetEvent`, `DeleteEvent` on the memory; `ListSessions` too when `checkpoint_format` is `snapshot` |
 | `agentcore_runtime` | nothing to verify a caller; with `exchange`, `bedrock-agentcore:GetResourceOauth2Token`, `GetWorkloadAccessToken`, `GetWorkloadAccessTokenForUserId` on the default workload identity directory and the service's workload identity |
 | `bedrock` guardrails | `bedrock:ApplyGuardrail` |
+| calling an MCP server on an AgentCore runtime (`runtime_arn` in the tool registry, `auth: sigv4`) | `bedrock-agentcore:InvokeAgentRuntime` on the runtime ARN. Granted by hand per registered runtime: the registry is not part of the deploy settings, so the deploy plan cannot derive it. With `auth: bearer` the runtime's JWT authorizer decides, and no IAM action is needed |
 | reading the catalogue (`agentlib new mcp --from-redshift`) | `redshift-data:ListTables`, `redshift-data:DescribeTable`, and the same credentials action as `redshift_data`. A developer needs these, not the deployed service |
 
 ## Notes on single adapters
@@ -155,6 +156,21 @@ Identity: the workload access token the runtime passes on is exchanged with
 `USER_FEDERATION` for a person, `M2M` for the service itself, and a person who
 has not yet authorised the service is refused with `user_consent_required`.
 See [identity](../../docs/identity.md#on-aws-bedrock-agentcore).
+
+**Calling MCP servers on AgentCore runtimes.** A tool registry entry with a
+`runtime_arn` instead of a `url` is reached through the platform's invocation
+endpoint, which the library derives from the ARN; `qualifier` selects the
+runtime endpoint (`DEFAULT` unless one was created). `auth: bearer` presents
+the token the identity provider's exchange obtains, for a runtime with a JWT
+authorizer; `auth: sigv4` signs each request with the service's own AWS
+credentials, for a runtime in IAM mode. The connector keeps the
+`Mcp-Session-Id` the platform returns and sends it back on later calls to the
+same server, so a stateful runtime keeps serving the same microVM. The
+platform's JSON-RPC error codes become the library's errors: a refused token
+or a denied call is a `PolicyDenied`, throttling and a retryable session
+conflict are `TransientError`, an unknown runtime a `ConfigurationError`.
+Tools a gateway lists under a prefix are registered without it, with
+`tool_prefix` on the server entry. Needs the `agentcore` extra.
 
 **`bedrock` guardrails.** Text a model will read, which is model input and
 tool results, is checked as input, where Bedrock looks for attacks on the
