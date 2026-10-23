@@ -1623,6 +1623,39 @@ async def classify(
   and the external resources the adapters use. Load balancers should check
   <code>/readyz</code>: the listener opens before startup completes, and readiness waits
   for validation and graph/MCP preparation. Use <code>/healthz</code> to check listener liveness.</p>
+  <h3 id="deploy-agentcore">Deploy to AgentCore Runtime</h3>
+  <p>Amazon Bedrock AgentCore Runtime is AWS's managed runtime for agents and MCP
+  servers: each session runs in its own isolated microVM, with no sidecars and no disk
+  that outlives it. The same workspace deploys there. <code>--target agentcore</code>
+  reads an <code>AGENTCORE_</code> block from <code>deploy.env</code> that describes the
+  deployment itself and never reaches the container, refuses what the runtime cannot
+  host (a loopback OPA, the service's own OpenTelemetry providers, a checkpoint store
+  with nowhere durable to write), and renders an ARM64 image or a code zip together
+  with Terraform for the runtime. The generated services start with
+  <code>--profile agentcore</code>, which selects the platform's address, port and routes.</p>
+<pre><code class="language-bat">"%PYTHON%" -m ai_agent_lib_cli deploy helper --target agentcore
+"%PYTHON%" -m ai_agent_lib_cli deploy helper --target agentcore --plan</code></pre>
+  <p>The block's variables, as the target reads them:</p>
+<div class="table-wrap"><table class="compact">
+<thead><tr><th>Variable</th><th>Values</th><th>Default</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><span class="var" id="var-agentcore_auth">AGENTCORE_AUTH</span></td><td><code>iam</code> or <code>jwt</code></td><td><code>iam</code></td><td>Who may invoke the runtime. <code>iam</code>: callers sign their requests and need <code>bedrock-agentcore:InvokeAgentRuntime</code> on the runtime; the service sees a perimeter-trusted principal. <code>jwt</code>: callers present bearer tokens from the issuer below, which the service verifies itself.</td></tr>
+<tr><td><span class="var" id="var-agentcore_discovery_url">AGENTCORE_DISCOVERY_URL</span></td><td>an https URL ending in <code>.well-known/openid-configuration</code></td><td><span class="muted">not set</span></td><td>The issuer&#x27;s OpenID discovery document. Required with <code>AGENTCORE_AUTH=jwt</code>, refused otherwise.</td></tr>
+<tr><td><span class="var" id="var-agentcore_allowed_clients">AGENTCORE_ALLOWED_CLIENTS</span></td><td>comma-separated client IDs</td><td><span class="muted">not set</span></td><td>Client IDs a token may carry. With <code>AGENTCORE_AUTH=jwt</code>, this or the audience must be set.</td></tr>
+<tr><td><span class="var" id="var-agentcore_allowed_audience">AGENTCORE_ALLOWED_AUDIENCE</span></td><td>comma-separated audiences</td><td><span class="muted">not set</span></td><td>Audiences a token may carry. With <code>AGENTCORE_AUTH=jwt</code>, this or the client IDs must be set.</td></tr>
+<tr><td><span class="var" id="var-agentcore_allowed_scopes">AGENTCORE_ALLOWED_SCOPES</span></td><td>comma-separated scopes</td><td><span class="muted">not set</span></td><td>Scopes a token must carry. Read only with <code>AGENTCORE_AUTH=jwt</code>.</td></tr>
+<tr><td><span class="var" id="var-agentcore_network">AGENTCORE_NETWORK</span></td><td><code>PUBLIC</code> or <code>VPC</code></td><td><code>PUBLIC</code></td><td>Where the sessions run. <code>VPC</code> needs <code>AGENTCORE_SUBNETS</code> and <code>AGENTCORE_SECURITY_GROUPS</code>; <code>PUBLIC</code> refuses them.</td></tr>
+<tr><td><span class="var" id="var-agentcore_subnets">AGENTCORE_SUBNETS</span></td><td>comma-separated subnet IDs</td><td><span class="muted">not set</span></td><td>The subnets of a <code>AGENTCORE_NETWORK=VPC</code> deployment.</td></tr>
+<tr><td><span class="var" id="var-agentcore_security_groups">AGENTCORE_SECURITY_GROUPS</span></td><td>comma-separated security group IDs</td><td><span class="muted">not set</span></td><td>The security groups of a <code>AGENTCORE_NETWORK=VPC</code> deployment.</td></tr>
+<tr><td><span class="var" id="var-agentcore_idle_timeout_seconds">AGENTCORE_IDLE_TIMEOUT_SECONDS</span></td><td>60 to 28800 (seconds)</td><td><code>900</code></td><td>A session ends after this long idle. No more than <code>AGENTCORE_MAX_LIFETIME_SECONDS</code>.</td></tr>
+<tr><td><span class="var" id="var-agentcore_max_lifetime_seconds">AGENTCORE_MAX_LIFETIME_SECONDS</span></td><td>60 to 28800 (seconds)</td><td><code>28800</code></td><td>A session ends after this long in any case.</td></tr>
+<tr><td><span class="var" id="var-agentcore_artifact">AGENTCORE_ARTIFACT</span></td><td><code>container</code> or <code>code</code></td><td><code>container</code></td><td><code>container</code>: an ARM64 image pushed to the ECR repository Terraform creates. <code>code</code>: a zip of the service and its wheels for Python 3.13 on aarch64, built by <code>build_zip.py</code> and uploaded to S3.</td></tr>
+<tr><td><span class="var" id="var-agentcore_gateway">AGENTCORE_GATEWAY</span></td><td><code>none</code>, <code>create</code> or the ARN of a gateway</td><td><code>none</code></td><td>Whether a gateway fronts the runtime. <code>create</code>: Terraform creates one with the workspace&#x27;s MCP servers as targets; the runtime target itself is a CLI step the generated README gives. An ARN names a gateway that exists.</td></tr>
+<tr><td><span class="var" id="var-agentcore_memory">AGENTCORE_MEMORY</span></td><td><code>none</code>, <code>create</code> or the ID of a memory</td><td><code>none</code></td><td>The AgentCore Memory the <code>agentcore_memory</code> checkpoints go to. <code>create</code>: Terraform creates it and puts its ID into the checkpoint option <code>memory_id</code>; an ID must equal that option. The starter settings of an agent set <code>create</code>.</td></tr>
+</tbody></table></div>
+<p>The protocol is not a variable (there is no <code>AGENTCORE_PROTOCOL</code>): it follows the service's kind, HTTP for an agent and MCP for an MCP server, as does the port. Every <code>AGENTCORE_</code> variable stays out of the container's environment.</p>
+  <p>The <a href="agentcore-trial.md">AgentCore trial</a> records the pilot of the rmprep
+  agent and its MCP server on the runtime.</p>
   <details class="lesson">
     <summary>Example permissions derived from adapter settings</summary>
     <p>IAM is AWS's permission system. Adapters declare the actions and resources they
