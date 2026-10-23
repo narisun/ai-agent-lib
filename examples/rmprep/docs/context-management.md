@@ -306,7 +306,7 @@ Prompt files are installed with the agent package:
 
 | Resource under `src/rmprep/prompts` | Purpose |
 | --- | --- |
-| `rmprep/common.v5.md` | Shared evidence, citation, client-group and context rules, including content-word counting and unknown reporting years in meeting questions. |
+| `rmprep/common.v6.md` | Shared evidence, citation, client-group and context rules, including content-word counting, unknown reporting years and waiver execution limits in both directions. |
 | `memoagent/system.v2.md` | Memo structure and evidence retrieval instructions. |
 | `qnaagent/system.v3.md` | Reuse supplied evidence for follow-ups; retrieve missing or refreshed client records. |
 
@@ -355,6 +355,15 @@ Citation checks distinguish changes across time from comparisons between clients
 For example, comparing two clients' FY2025 revenues requires their FY2025 sources.
 Explaining one client's revenue growth from FY2024 to FY2025 requires both years.
 The presence of older records in the conversation does not change those requirements.
+
+Waiver exceptions record requirements and workflow status. They do not establish
+whether a waiver was signed, whether it remains unsigned, or whether another overdue
+item blocked execution. Both specialists keep these unknowns explicit. Known
+unsupported waiver claims trigger a revision, including "Open status suggests it
+was not executed" and "overdue statements may be blocking execution". The check
+also works with older saved evidence. Rejected drafts remain in model traces;
+only an accepted revision enters conversation history or becomes a memo version.
+These targeted checks complement business review; they do not prove every claim.
 
 If the answer still fails the checks, the UI saves a failed outcome with reported
 token usage and elapsed time. You can send another question in the same thread.

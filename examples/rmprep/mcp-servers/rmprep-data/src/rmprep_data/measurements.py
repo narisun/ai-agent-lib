@@ -17,6 +17,8 @@ from ai_agent_lib_core.contracts import MASK
 EVIDENCE_LIMITS: dict[str, dict[str, str]] = {
     "credit_exceptions": {
         "waiver_execution": "not_established_by_this_source",
+        "waiver_non_execution": "not_established_by_status_requirement_or_missing_receipt",
+        "waiver_execution_blockers": "not_supplied_no_causal_link_to_other_exceptions",
         "waiver_expiry": "recorded_date_only_not_proof_of_execution",
         "syndicate_approval_conditions": "not_supplied",
         "statement_fiscal_year": "not_supplied_by_exception_record",

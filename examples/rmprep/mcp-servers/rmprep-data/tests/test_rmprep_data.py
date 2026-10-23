@@ -185,6 +185,12 @@ async def test_jones_memo_and_detail_pages_include_verified_measurements(running
         "CE-JONE-002": 34,
     }
     assert exceptions["evidence_limits"]["waiver_execution"] == "not_established_by_this_source"
+    assert exceptions["evidence_limits"]["waiver_non_execution"] == (
+        "not_established_by_status_requirement_or_missing_receipt"
+    )
+    assert exceptions["evidence_limits"]["waiver_execution_blockers"] == (
+        "not_supplied_no_causal_link_to_other_exceptions"
+    )
     assert sections["commitments"]["records"][0]["days_overdue"] == 10
     assert sections["commitments"]["evidence_limits"]["received_date_field"] == (
         "not_present_in_this_schema"
