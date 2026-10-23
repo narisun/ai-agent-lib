@@ -39,9 +39,12 @@ Each workstream lists what changes, which review findings it closes, the tests
 that prove it, and its size (S: under a day, M: one to three days, L: a week).
 Public names and signatures stay compatible unless stated.
 
-**Status, 23 October 2026:** A1 and A2 (Phase 0), A3, A4 and A6 (Phase 1), A5
-and A7 (Phase 2), B2, B3 and B5 (Phase 3) and B4 and B6 (Phase 4) are
-implemented. Deviations from the text below, with the reason:
+**Status, 23 October 2026:** every workstream is implemented: A1 and A2
+(Phase 0), A3, A4 and A6 (Phase 1), A5 and A7 (Phase 2), B2, B3 and B5 (Phase
+3), B4 and B6 (Phase 4), B8 and B7 (Phase 5). The pilot is a recorded dry run
+(`docs/agentcore-trial.md`): no account was available, so `terraform apply`
+and the live chat are the operator's steps. Deviations from the text below,
+with the reason:
 
 - Diagnostics warnings carry the error type and request id but no traceback,
   because the logging policy forbids exception text in logs.
@@ -152,6 +155,23 @@ implemented. Deviations from the text below, with the reason:
   documented as a CLI step; `logs:PutResourcePolicy` is left to the account
   operator. `requires-python` is read by a small in-house specifier reader,
   since `packaging` is not a CLI dependency.
+- The pilot's MCP runtime takes IAM inbound auth with
+  `identity=agentcore_runtime` rather than JWT, because the agent calls it with
+  SigV4 (`auth: sigv4` in the registry); the bearer path to the server is
+  untried. The server's data source is Redshift in the plan, since DuckDB over
+  CSV is local-only and the data folder is not in the image. ADR 0004 records
+  the six decisions as built; the `rules` policy adapter is still local-only,
+  so the pilot uses a remote OPA.
+- Agent Lab's `agentcore` binding derives the invocation URL from the ARN
+  (no registry URL needed), signs with the desktop's AWS credentials or reads a
+  bearer from a token file, sends the conversation as the runtime session (a
+  thread id under 33 characters is extended deterministically), retries
+  `RetryableConflictException` three times, turns `RuntimeClientError` into a
+  failed run, and cannot reconcile unknown outcomes because only
+  `/invocations` is proxied. The CloudWatch trace link opens the GenAI
+  Observability view, not one session: AWS publishes no per-session route.
+  A local misconfiguration (no credentials, unreadable token file) fails the
+  run instead of raising, so the thread is not held forever.
 
 ### A1. Green gates and CI coverage (S)
 

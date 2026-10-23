@@ -6,6 +6,10 @@ import json
 import sys
 import traceback
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ai_agent_lib_ui.contracts.catalog import AgentCoreRuntime
 
 
 def arguments() -> argparse.Namespace:
@@ -31,8 +35,27 @@ def arguments() -> argparse.Namespace:
             command.add_argument(
                 "--allow-url",
                 action="append",
-                required=True,
+                default=None,
                 help="exact loopback registry URL; repeat for more endpoints",
+            )
+            command.add_argument(
+                "--agentcore-runtime",
+                action="append",
+                default=None,
+                metavar="AGENT=ARN",
+                help="reach a selected agent through AgentCore Runtime at this ARN; repeatable",
+            )
+            command.add_argument(
+                "--agentcore-auth",
+                choices=("iam", "bearer"),
+                default="iam",
+                help="how every runtime request is authenticated: SigV4 or a bearer token file",
+            )
+            command.add_argument(
+                "--agentcore-token-file",
+                type=Path,
+                default=None,
+                help="file whose first line is the bearer token; needed for bearer auth",
             )
             command.add_argument("--port", type=int, default=8765)
             command.add_argument(
@@ -72,7 +95,13 @@ def main() -> int:
                 )
             agents_path, tools_path, identity = agent_environment(args.env_file.resolve())
             agents, _ = read_registries(agents_path, tools_path)
-            allowed = frozenset(args.allow_url)
+            runtimes = _runtimes(args)
+            # Pinning an ARN is the explicit approval of its derived service URL.
+            allowed = frozenset(args.allow_url or ()) | {
+                runtime.invocation_url for runtime in runtimes.values()
+            }
+            if not allowed:
+                raise ValueError("give --allow-url for each agent URL or --agentcore-runtime")
             artifact_agents = args.artifacts_agent or []
             if not set(artifact_agents) <= set(args.agent):
                 raise ValueError("--artifacts-agent must also be selected with --agent")
@@ -85,6 +114,7 @@ def main() -> int:
                     tuple(args.agent),
                     allowed,
                     artifact_agent_ids=frozenset(artifact_agents),
+                    runtimes=runtimes,
                 ),
                 allowed_urls=allowed,
                 port=args.port,
@@ -141,6 +171,28 @@ def main() -> int:
             # Opt-in only: a traceback can repeat configuration values.
             traceback.print_exc()
     return 2
+
+
+def _runtimes(args: argparse.Namespace) -> "dict[str, AgentCoreRuntime]":
+    """Map each ``--agentcore-runtime AGENT=ARN`` to a validated runtime description."""
+    from ai_agent_lib_ui.contracts.catalog import AgentCoreRuntime
+
+    result: dict[str, AgentCoreRuntime] = {}
+    for item in args.agentcore_runtime or ():
+        agent_id, separator, arn = item.partition("=")
+        if not separator or not agent_id or agent_id not in args.agent:
+            raise ValueError("--agentcore-runtime takes AGENT=ARN for an agent given with --agent")
+        if agent_id in result:
+            raise ValueError(f"--agentcore-runtime names agent {agent_id!r} twice")
+        token_file = args.agentcore_token_file
+        if (args.agentcore_auth == "bearer") != (token_file is not None):
+            raise ValueError("--agentcore-token-file goes with --agentcore-auth bearer only")
+        result[agent_id] = AgentCoreRuntime(
+            arn=arn,
+            auth=args.agentcore_auth,
+            token_file=token_file.resolve() if token_file is not None else None,
+        )
+    return result
 
 
 def _safe_message(error: Exception) -> str:

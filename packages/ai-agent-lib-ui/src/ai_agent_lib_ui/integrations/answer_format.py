@@ -161,6 +161,12 @@ def _outcome(run: RunRecord) -> str:
                 "The agent could not accept this request or produce a response that passed "
                 "its checks. You can send a new question in this thread."
             )
+        if run.failure_code == "runtime_client_error":
+            return (
+                "The agent's container returned an error through AgentCore Runtime. "
+                "Check its CloudWatch logs for the cause. You can send a new question in "
+                "this thread."
+            )
         return (
             "This request failed. Check the agent logs for the cause. "
             "You can send a new question in this thread."

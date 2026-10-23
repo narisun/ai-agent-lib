@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ai_agent_lib_core.contracts import Principal
-from ai_agent_lib_ui.application.catalog import validate_destination
+from ai_agent_lib_ui.application.catalog import validate_destination, validate_runtime_destination
 from ai_agent_lib_ui.contracts.catalog import AgentBinding
 
 
@@ -57,6 +57,13 @@ class Settings(BaseModel):
         if not ids or len(ids) != len(set(ids)):
             raise ValueError("configure at least one agent, with unique IDs")
         for binding in self.bindings:
+            if binding.runtime is not None:
+                # An AgentCore runtime is the one non-loopback destination: HTTPS to
+                # the derived service URL, still pinned through the explicit allowlist.
+                validate_runtime_destination(
+                    binding.base_url, binding.runtime, allowed_urls=self.allowed_urls
+                )
+                continue
             validate_destination(binding.base_url, allowed_urls=self.allowed_urls, local=True)
             if urlsplit(binding.base_url).hostname not in {"127.0.0.1", "::1"}:
                 raise ValueError("static local identity requires loopback agent URLs")

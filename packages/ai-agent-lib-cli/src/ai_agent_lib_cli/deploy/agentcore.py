@@ -30,7 +30,9 @@ from ai_agent_lib_core.contracts import ConfigSource, Section, ServiceConfig, Te
 __all__ = [
     "AGENTCORE_PREFIX",
     "AGENTCORE_PYTHON",
+    "AGENTCORE_VARIABLES",
     "AgentCoreSettings",
+    "AgentCoreVariable",
     "agentcore_preflight",
     "is_agentcore_variable",
     "read_agentcore_settings",
@@ -135,6 +137,121 @@ class AgentCoreSettings:
     def gateway_arn(self) -> str | None:
         """The ARN of an existing Gateway, when one is named."""
         return None if self.gateway in (NONE, CREATE) else self.gateway
+
+
+@dataclass(frozen=True, slots=True)
+class AgentCoreVariable:
+    """One variable of the ``AGENTCORE_`` block, as the developer guide lists it.
+
+    Attributes:
+        name: The variable.
+        values: What it accepts.
+        default: What an unset variable means, as text.
+        meaning: What it decides; ``literal`` spans are shown as code.
+    """
+
+    name: str
+    values: str
+    default: str
+    meaning: str
+
+
+_DEFAULTS = AgentCoreSettings()
+_NOT_SET = "not set"
+_LIST = "comma-separated"
+_SECONDS = f"{_SESSION_SECONDS[0]} to {_SESSION_SECONDS[1]} (seconds)"
+
+AGENTCORE_VARIABLES: tuple[AgentCoreVariable, ...] = (
+    AgentCoreVariable(
+        V_AUTH,
+        " or ".join(f"`{mode}`" for mode in AUTH_MODES),
+        _DEFAULTS.auth,
+        "Who may invoke the runtime. `iam`: callers sign their requests and need "
+        "`bedrock-agentcore:InvokeAgentRuntime` on the runtime; the service sees a "
+        "perimeter-trusted principal. `jwt`: callers present bearer tokens from the issuer "
+        "below, which the service verifies itself.",
+    ),
+    AgentCoreVariable(
+        V_DISCOVERY_URL,
+        f"an https URL ending in `{DISCOVERY_SUFFIX}`",
+        _NOT_SET,
+        f"The issuer's OpenID discovery document. Required with `{V_AUTH}=jwt`, refused otherwise.",
+    ),
+    AgentCoreVariable(
+        V_ALLOWED_CLIENTS,
+        f"{_LIST} client IDs",
+        _NOT_SET,
+        f"Client IDs a token may carry. With `{V_AUTH}=jwt`, this or the audience must be set.",
+    ),
+    AgentCoreVariable(
+        V_ALLOWED_AUDIENCE,
+        f"{_LIST} audiences",
+        _NOT_SET,
+        f"Audiences a token may carry. With `{V_AUTH}=jwt`, this or the client IDs must be set.",
+    ),
+    AgentCoreVariable(
+        V_ALLOWED_SCOPES,
+        f"{_LIST} scopes",
+        _NOT_SET,
+        f"Scopes a token must carry. Read only with `{V_AUTH}=jwt`.",
+    ),
+    AgentCoreVariable(
+        V_NETWORK,
+        " or ".join(f"`{mode}`" for mode in NETWORK_MODES),
+        _DEFAULTS.network,
+        f"Where the sessions run. `VPC` needs `{V_SUBNETS}` and `{V_SECURITY_GROUPS}`; "
+        "`PUBLIC` refuses them.",
+    ),
+    AgentCoreVariable(
+        V_SUBNETS,
+        f"{_LIST} subnet IDs",
+        _NOT_SET,
+        f"The subnets of a `{V_NETWORK}=VPC` deployment.",
+    ),
+    AgentCoreVariable(
+        V_SECURITY_GROUPS,
+        f"{_LIST} security group IDs",
+        _NOT_SET,
+        f"The security groups of a `{V_NETWORK}=VPC` deployment.",
+    ),
+    AgentCoreVariable(
+        V_IDLE_TIMEOUT,
+        _SECONDS,
+        str(_DEFAULTS.idle_timeout_seconds),
+        f"A session ends after this long idle. No more than `{V_MAX_LIFETIME}`.",
+    ),
+    AgentCoreVariable(
+        V_MAX_LIFETIME,
+        _SECONDS,
+        str(_DEFAULTS.max_lifetime_seconds),
+        "A session ends after this long in any case.",
+    ),
+    AgentCoreVariable(
+        V_ARTIFACT,
+        " or ".join(f"`{kind}`" for kind in ARTIFACTS),
+        _DEFAULTS.artifact,
+        "`container`: an ARM64 image pushed to the ECR repository Terraform creates. `code`: a "
+        f"zip of the service and its wheels for Python {AGENTCORE_PYTHON} on aarch64, built by "
+        "`build_zip.py` and uploaded to S3.",
+    ),
+    AgentCoreVariable(
+        V_GATEWAY,
+        f"`{NONE}`, `{CREATE}` or the ARN of a gateway",
+        _DEFAULTS.gateway,
+        f"Whether a gateway fronts the runtime. `{CREATE}`: Terraform creates one with the "
+        "workspace's MCP servers as targets; the runtime target itself is a CLI step the "
+        "generated README gives. An ARN names a gateway that exists.",
+    ),
+    AgentCoreVariable(
+        V_MEMORY,
+        f"`{NONE}`, `{CREATE}` or the ID of a memory",
+        _DEFAULTS.memory,
+        f"The AgentCore Memory the `{_MEMORY_CHECKPOINT}` checkpoints go to. `{CREATE}`: "
+        f"Terraform creates it and puts its ID into the checkpoint option `{_OPTION_MEMORY_ID}`; "
+        f"an ID must equal that option. The starter settings of an agent set `{CREATE}`.",
+    ),
+)
+"""Every variable of the ``AGENTCORE_`` block, in the order the starter settings write them."""
 
 
 def is_agentcore_variable(name: str) -> bool:

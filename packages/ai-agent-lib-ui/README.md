@@ -416,3 +416,55 @@ Phoenix server before rmprep and Agent Lab, using `.agentlib\phoenix\.venv\Lib\s
 conversations, traces, and checkpoints. **Ctrl+C** in the launcher window also works.
 Each response links to its Phoenix trace using **Open trace in Agent Lab**.
 The **Logs** page provides local diagnostic inspection.
+
+## Chat with an agent on AgentCore Runtime
+
+An agent deployed with `agentlib deploy --target agentcore` is reached through
+the AgentCore service endpoint instead of a loopback URL. Pin it at `init` with
+its runtime ARN; the registry entry needs no `url` for such an agent. Run the
+first command as one line:
+
+```bat
+python tools\package_runtime.py ui -m ai_agent_lib_ui init --env-file examples\rmprep\agents\rmprep\.env --agent rmprep --artifacts-agent rmprep --agentcore-runtime rmprep=arn:aws:bedrock-agentcore:eu-west-1:123456789012:runtime/rmprep-abc123
+python tools\package_runtime.py ui -m ai_agent_lib_ui check
+```
+
+Repeat `--agentcore-runtime AGENT=ARN` for more hosted agents; each must also be
+selected with `--agent`. The invocation URL is derived from the ARN and recorded
+in `allowed_urls`, so pinning the ARN is the approval of that one HTTPS address.
+Loopback agents and hosted agents can share a configuration.
+
+Two authentication modes apply to every runtime binding of a configuration:
+
+- `--agentcore-auth iam` (default) signs each request with SigV4 using the
+  desktop's AWS credentials, resolved by boto3 at each request (environment,
+  profile or SSO session). Install the `aws` extra:
+  `python tools\package_runtime.py ui --install -e "packages\ai-agent-lib-ui[chat,aws]"`.
+- `--agentcore-auth bearer --agentcore-token-file PATH` sends
+  `Authorization: Bearer` with the first line of that file, for a runtime with a
+  JWT authorizer. The UI reads the file for every request and never copies the
+  token into settings or logs; refresh the file with your identity provider's
+  tooling and the next question uses the new token.
+
+What is different from a loopback agent:
+
+- The conversation's thread id travels as the runtime session id
+  (`X-Amzn-Bedrock-AgentCore-Runtime-Session-Id`), and the agent sees that
+  session id as its thread id. Agent Lab's thread ids are UUIDs, which satisfy
+  the platform's 33-character rule as they are. A shorter id, as some tests
+  use, is extended deterministically with 32 hex digits of its SHA-256.
+- The runtime proxies only `/invocations`, so an **unknown** outcome cannot be
+  reconciled through the agent's outcome journal; the thread stays held. A
+  `RetryableConflictException` is retried three times (0.5 s, 1 s, 2 s) before
+  the outcome is left unknown; throttling and service faults are unknown at once.
+- A `RuntimeClientError` (HTTP 424) means the agent's container returned an
+  error. The run is saved as **failed** and is never replayed; when the agent's
+  own refusal envelope survives the proxy, its code and metrics are kept.
+  `UnauthorizedException` and `AccessDeniedException` are terminal failures too.
+- Each completed or failed run links to **Open trace in CloudWatch**: the GenAI
+  Observability view of the runtime's region. The console publishes no
+  per-session address, so open the agent's sessions there and find the session
+  by its id, which is the conversation's thread id.
+
+The UI still binds to `127.0.0.1` with the same static local identity; the
+runtime's own authorizer decides who the hosted agent serves.

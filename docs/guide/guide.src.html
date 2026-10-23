@@ -1586,6 +1586,22 @@ async def classify(
   and the external resources the adapters use. Load balancers should check
   <code>/readyz</code>: the listener opens before startup completes, and readiness waits
   for validation and graph/MCP preparation. Use <code>/healthz</code> to check listener liveness.</p>
+  <h3 id="deploy-agentcore">Deploy to AgentCore Runtime</h3>
+  <p>Amazon Bedrock AgentCore Runtime is AWS's managed runtime for agents and MCP
+  servers: each session runs in its own isolated microVM, with no sidecars and no disk
+  that outlives it. The same workspace deploys there. <code>--target agentcore</code>
+  reads an <code>AGENTCORE_</code> block from <code>deploy.env</code> that describes the
+  deployment itself and never reaches the container, refuses what the runtime cannot
+  host (a loopback OPA, the service's own OpenTelemetry providers, a checkpoint store
+  with nowhere durable to write), and renders an ARM64 image or a code zip together
+  with Terraform for the runtime. The generated services start with
+  <code>--profile agentcore</code>, which selects the platform's address, port and routes.</p>
+<pre><code class="language-bat">"%PYTHON%" -m ai_agent_lib_cli deploy helper --target agentcore
+"%PYTHON%" -m ai_agent_lib_cli deploy helper --target agentcore --plan</code></pre>
+  <p>The block's variables, as the target reads them:</p>
+<!-- generated: agentcore-settings -->
+  <p>The <a href="agentcore-trial.md">AgentCore trial</a> records the pilot of the rmprep
+  agent and its MCP server on the runtime.</p>
   <details class="lesson">
     <summary>Example permissions derived from adapter settings</summary>
     <p>IAM is AWS's permission system. Adapters declare the actions and resources they

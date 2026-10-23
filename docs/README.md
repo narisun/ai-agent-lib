@@ -13,6 +13,7 @@ Python, and pip with your team's approved package source.
 | Inspect model context and tool use | [Tracing and ReAct walkthrough](developer-guide.html#model-debugging) | Read model input/output and checkpoint history |
 | Export traces to Langfuse | [Shared integration](langfuse.md) | Configure one separately hosted backend for generated or existing agents |
 | Inspect traces on a restricted desktop | [Local Phoenix trial](phoenix-trial.md) | Run Phoenix with the same Python, isolated packages, and SQLite and follow Agent Lab's trace links |
+| Deploy an agent to AWS Bedrock AgentCore | [AgentCore trial](agentcore-trial.md) | Generate the AgentCore deployment with `--target agentcore`, pass preflight, deploy the rmprep agent and its MCP server, and check the recorded run |
 | Understand the business example | [rmprep](../examples/rmprep/README.md) and [context management](../examples/rmprep/docs/context-management.md) | Follow client selection, memo generation, and same-thread questions |
 | Change the library | [Contributor setup](../README.md#working-on-the-library) | Install development dependencies and run the appropriate checks |
 
@@ -91,7 +92,8 @@ test and type-check commands.
 Use setup guides and [release scope](release-scope.md) for supported behavior.
 The [specification](Specification.md), [frontend specification](frontend-specification.md),
 and [frontend implementation plan](frontend-implementation-plan.md) also describe
-future work. The [ADRs](adr/README.md) record decisions; the
+future work. The [ADRs](adr/README.md) record decisions
+([ADR 0004](adr/0004-agentcore-target.md) the AgentCore deployment choices); the
 [Phase 0 report](frontend-phase0-review.md) records the initial Chainlit trial.
 
 The [code structure and reliability review](design/code-structure-review-2026-10-13.md)
@@ -99,10 +101,12 @@ records three resolved issues, reproduction evidence, and proposed simplificatio
 Its proposed commands are recommendations, not commands available in this checkout.
 The [code structure, exception handling, and test review](design/code-review-2026-10-22.md)
 records the follow-up pass over the whole checkout with prioritized findings and a
-suggested fix order; nothing in it has been applied yet. The
+suggested fix order. The
 [implementation plan](design/implementation-plan-2026-10-22.md) sequences those
 fixes and the changes needed to deploy agents and MCP servers to Amazon Bedrock
-AgentCore; it is a proposal, not implemented behavior.
+AgentCore; its status block says which phases are implemented and where the code
+departs from the plan's text. [ADR 0004](adr/0004-agentcore-target.md) records
+the AgentCore decisions, and the [AgentCore trial](agentcore-trial.md) the pilot.
 
 ## Keep documentation in sync
 
