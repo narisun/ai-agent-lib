@@ -60,6 +60,7 @@ __all__ = [
 ]
 
 _INSTALL_HINT = "install it with: pip install 'ai-agent-lib-core[jwt]'"
+_AUDIENCE = "aud"
 _WHAT = "the jwt identity provider"
 _MAX_TOKEN_CHARS = 16_384
 
@@ -190,31 +191,27 @@ class JwtIdentityVerifier:
         key = await self._keys.get(kid)
         if key is None:
             raise _denied("the token is not signed by the issuer", "credential_invalid")
+        # An issuer whose access tokens carry no aud names the audience in another
+        # claim; PyJWT checks aud only, so that claim is checked here instead.
+        standard_audience = settings.audience_claim == _AUDIENCE
         try:
             claims = jwt.decode(
                 credential,
                 key=key,
                 algorithms=list(settings.algorithms),
-                audience=list(settings.audiences),
+                audience=list(settings.audiences) if standard_audience else None,
                 issuer=settings.issuer,
                 # The validity period is checked below against the injected clock.
                 options={
-                    "require": ["exp", "iss", "aud"],
+                    "require": ["exp", "iss", *([_AUDIENCE] if standard_audience else [])],
+                    "verify_aud": standard_audience,
                     "verify_exp": False,
                     "verify_nbf": False,
                     "verify_iat": False,
                 },
             )
         except jwt.InvalidAudienceError:
-            raise _denied(
-                "the token is for another service",
-                "credential_audience",
-                expected="a token whose aud is " + " or ".join(map(repr, settings.audiences)),
-                fix=(
-                    "the caller must ask the identity provider for a token for this service "
-                    "(its scope or resource); or correct audience in the identity options"
-                ),
-            ) from None
+            raise self._wrong_audience() from None
         except jwt.InvalidIssuerError:
             raise _denied(
                 "the token is from another issuer",
@@ -224,8 +221,32 @@ class JwtIdentityVerifier:
             ) from None
         except jwt.PyJWTError:
             raise _denied("the token is not valid", "credential_invalid") from None
+        if not standard_audience:
+            self._check_audience(claims)
         self._check_validity_period(claims)
         return self._principal(claims)
+
+    def _wrong_audience(self) -> PolicyDenied:
+        settings = self._settings
+        return _denied(
+            "the token is for another service",
+            "credential_audience",
+            expected=(
+                f"a token whose {settings.audience_claim} is "
+                + " or ".join(map(repr, settings.audiences))
+            ),
+            fix=(
+                "the caller must ask the identity provider for a token for this service "
+                "(its scope or resource); or correct audience in the identity options"
+            ),
+        )
+
+    def _check_audience(self, claims: Mapping[str, Any]) -> None:
+        """Check the configured audience claim, a string or a list, as PyJWT checks ``aud``."""
+        value = claims.get(self._settings.audience_claim)
+        named = [value] if isinstance(value, str) else value if isinstance(value, list) else []
+        if not any(isinstance(name, str) and name in self._settings.audiences for name in named):
+            raise self._wrong_audience()
 
     def _check_validity_period(self, claims: Mapping[str, Any]) -> None:
         now = self._clock.now().timestamp()

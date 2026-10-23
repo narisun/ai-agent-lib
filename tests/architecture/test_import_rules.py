@@ -103,7 +103,7 @@ def test_the_real_code_keeps_every_import_rule() -> None:
         (
             "ai_agent_lib_aws/planted.py",
             "import langgraph.graph",
-            "in the AWS package only the checkpoint store imports langgraph",
+            "in the AWS package only the checkpoint stores import langgraph",
         ),
         (
             "ai_agent_lib_core/adapters/planted.py",

@@ -39,9 +39,9 @@ Each workstream lists what changes, which review findings it closes, the tests
 that prove it, and its size (S: under a day, M: one to three days, L: a week).
 Public names and signatures stay compatible unless stated.
 
-**Status, 22 October 2026:** A1 and A2 (Phase 0), A3, A4 and A6 (Phase 1) and
-A5 and A7 (Phase 2) are implemented. Deviations from the text below, with the
-reason:
+**Status, 23 October 2026:** A1 and A2 (Phase 0), A3, A4 and A6 (Phase 1), A5
+and A7 (Phase 2) and B2, B3 and B5 (Phase 3) are implemented. Deviations from
+the text below, with the reason:
 
 - Diagnostics warnings carry the error type and request id but no traceback,
   because the logging policy forbids exception text in logs.
@@ -92,6 +92,39 @@ reason:
   variant with no logging or telemetry, since the answer owns stdout) and
   `question_input`. The three templates call them; the examples still carry
   their own copies.
+- Phase 3 reads the perimeter through two new contracts rather than a
+  `CredentialSource` argument: `PresentedCredentials` (the bearer and the
+  request headers) and the optional `RequestVerifier` port
+  (`trusts_perimeter`, `verify_request -> Verified`). `authenticate` accepts a
+  bearer or a `PresentedCredentials`; verifiers that only check tokens are
+  unchanged.
+- The MCP door for SigV4 runtimes is an ASGI wrapper, `PerimeterDoor`, reached
+  through `services.mcp_door(app)`, rather than a mode of `DoorTokenVerifier`:
+  the MCP SDK's own door only ever sees bearer tokens. Outside local a
+  perimeter-trusting identity gets the governed middleware without the SDK
+  door.
+- `/invocations` is the same handler object as `/invoke`, so live
+  server-sent events work on both; `/ping` reports `HealthyBusy` from a
+  `SupportsActivity` count on the thread admission. The session id reaches
+  OpenTelemetry baggage through `SessionBaggageMiddleware`.
+- The `cognito` preset needed `audience_claim`: Cognito access tokens carry the
+  app client in `client_id`, not `aud`.
+- `TelemetryMode.AMBIENT` counts as telemetry on for the container and the
+  entry point; `start_telemetry` fails fast when no global provider is
+  installed.
+- The AgentCore Memory checkpointer requires `actor_id` on every call, so the
+  adapter wraps the saver (`ScopedMemorySaver`) and derives `actor_id`
+  (tenant/subject) and the memory session id (application-thread) from the
+  library's scoped thread key with an injective encoding and a hashed
+  fallback for AgentCore's length limits. The saver builds its own boto3
+  client, so a named AWS profile is not forwarded (region, timeouts, retries,
+  proxy and CA bundle are). Its live contract run is integration-marked and
+  skips without `AGENTCORE_MEMORY_ID`.
+- The AgentCore exchange adapter gained `return_url` (the consent callback)
+  and refuses with `user_consent_required` when AgentCore Identity answers
+  with an authorization URL; the URL is never logged or returned.
+- `registered_mcp_tools`, `run_service`, `run_command` and `--profile
+  agentcore` are in the templates; the examples are untouched.
 
 ### A1. Green gates and CI coverage (S)
 

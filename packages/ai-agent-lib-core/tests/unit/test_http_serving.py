@@ -19,7 +19,12 @@ from typing import Any
 import httpx
 import pytest
 
-from ai_agent_lib_core.contracts import ConfigurationError, Principal, RequestContext
+from ai_agent_lib_core.contracts import (
+    ConfigurationError,
+    PresentedCredentials,
+    Principal,
+    RequestContext,
+)
 from ai_agent_lib_core.integrations.http import (
     ServiceLifecycle,
     ServiceState,
@@ -37,14 +42,15 @@ class Services:
 
     async def authenticate(
         self,
-        credential: str | None,
+        credential: str | PresentedCredentials | None,
         *,
         application: str,
         thread_id: str,
         request_id: str | None = None,
     ) -> RequestContext:
+        bearer = credential.bearer if isinstance(credential, PresentedCredentials) else credential
         return RequestContext(
-            principal=Principal(subject=credential or "dev", tenant="t-1"),
+            principal=Principal(subject=bearer or "dev", tenant="t-1"),
             application=application,
             request_id=request_id or "r-1",
             thread_id=thread_id,

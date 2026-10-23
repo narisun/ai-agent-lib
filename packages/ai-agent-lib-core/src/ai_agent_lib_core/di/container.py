@@ -46,6 +46,7 @@ from ai_agent_lib_core.contracts import (
     ModelRef,
     ModelTraceSink,
     PolicyDecisionPoint,
+    PresentedCredentials,
     RegistrySource,
     RequestContext,
     SecretsProvider,
@@ -434,7 +435,7 @@ class ServiceContainer:
 
     async def authenticate(
         self,
-        credential: str | None,
+        credential: str | PresentedCredentials | None,
         *,
         application: str,
         thread_id: str,
@@ -445,14 +446,17 @@ class ServiceContainer:
         """Verify a caller's credential and return the context for their request.
 
         This is what the entry point of an agent calls once per request, with
-        the bearer token it was sent. The credential is kept in the context
-        only so that it can later be exchanged for a token bound to an MCP
-        server; it is never forwarded.
+        what it was sent. The credential is kept in the context only so that
+        it can later be exchanged for a token bound to an MCP server; it is
+        never forwarded.
 
         Args:
-            credential: The token the caller presented, without the ``Bearer``
-                prefix. ``None`` is accepted only by a verifier that supports
-                tokenless access, such as the local development identity.
+            credential: What the caller presented: the bearer token without
+                the ``Bearer`` prefix, or :class:`PresentedCredentials` with
+                the token and the request's headers, which a verifier that
+                trusts the hosting platform's perimeter reads. ``None`` is
+                accepted only by a verifier that supports tokenless access,
+                such as the local development identity.
             application: This agent's name.
             thread_id: The conversation or workflow the request belongs to.
             request_id: Correlates logs. Defaults to a new identifier.
@@ -572,6 +576,18 @@ class ServiceContainer:
         return self._mcp_bindings().mcp_server_kwargs(
             server, application=application, classification_ceiling=classification_ceiling
         )
+
+    def mcp_door(self, app: Any) -> Any:
+        """Return the MCP server's ASGI app behind the door its identity provider needs.
+
+        When the identity provider trusts the hosting platform's perimeter
+        instead of checking a token at the door, a request that carries
+        neither a bearer token nor the headers the perimeter sets is refused
+        with HTTP 401 before it reaches the server; health routes stay open.
+        With any other identity provider the app is returned unchanged, so an
+        entry point can always wrap its app.
+        """
+        return self._mcp_bindings().perimeter_door(app)
 
     def _mcp_bindings(self) -> McpBindings:
         from ai_agent_lib_core.di.mcp import McpBindings

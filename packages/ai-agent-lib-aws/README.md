@@ -19,8 +19,9 @@ and your model ID in the root `.env` before starting. All services use the same
 Python; the launcher isolates UI/Phoenix packages. See [local setup](../../docs/local-startup.md).
 
 For a manual Bedrock installation, use `-e "packages/ai-agent-lib-aws[bedrock]"` instead; for PostgreSQL
-use `-e "packages/ai-agent-lib-aws[postgres]"`. Combine both as `[bedrock,postgres]`
-when needed. Pip uses your team's configured package index. The selected AWS
+use `-e "packages/ai-agent-lib-aws[postgres]"`; for checkpoints in AgentCore Memory
+use `-e "packages/ai-agent-lib-aws[agentcore]"`. Combine them as `[bedrock,postgres]`
+or `[bedrock,agentcore]` when needed. Pip uses your team's configured package index. The selected AWS
 services also need provisioned resources, network access, and credentials.
 See the [configuration table](../../docs/developer-guide.html#variables).
 
@@ -38,6 +39,8 @@ in the section's options variable. The variables are listed in
 | data source | `redshift_data` | Amazon Redshift, through the Data API | `queries_dir`, `database`, and `workgroup` or `cluster_id` (with `db_user` or `secret_arn`), `timeout_seconds` |
 | registry | `s3_file` | Two objects in an S3 bucket | `bucket`, `agents_key`, `tools_key`, `expected_bucket_owner` |
 | checkpoint | `postgres` | PostgreSQL on Amazon RDS or Aurora, signed in with IAM | `host`, `port`, `database`, `user`, `ca_bundle`, `pool_min_size`, `pool_max_size`, `connect_timeout_seconds` |
+| checkpoint | `agentcore_memory` | Amazon Bedrock AgentCore Memory, through `langgraph-checkpoint-aws` | `memory_id`, `max_results`, `checkpoint_format` |
+| identity | `agentcore_runtime` | The caller as an AgentCore runtime in IAM mode reports them in its headers; AgentCore Identity for outbound tokens | `tenant`, `roles`, `user_header`, `workload_token_headers`, `exchange` (`credential_provider`, `scopes`, `workload_name`, `return_url`, `cache_seconds`) |
 | guardrails | `bedrock` | One version of a Bedrock guardrail | `guardrail_id`, `guardrail_version`, `points`, the four size limits, `frame_tool_results` |
 
 Local and AWS adapters mix freely. A developer who wants a Bedrock model and
@@ -84,6 +87,8 @@ checks included, is declared. In short:
 | `redshift_data` | `redshift-data:ExecuteStatement`, `DescribeStatement`, `GetStatementResult`, `CancelStatement`; and `redshift-serverless:GetCredentials` for a workgroup, `redshift:GetClusterCredentials` for a cluster with `db_user`, `redshift:GetClusterCredentialsWithIAM` for a cluster with neither, or `secretsmanager:GetSecretValue` on `secret_arn` |
 | `s3_file` | `s3:GetObject` on the two objects |
 | `postgres` | `rds-db:connect` for the database user |
+| `agentcore_memory` | `bedrock-agentcore:CreateEvent`, `ListEvents`, `GetEvent`, `DeleteEvent` on the memory; `ListSessions` too when `checkpoint_format` is `snapshot` |
+| `agentcore_runtime` | nothing to verify a caller; with `exchange`, `bedrock-agentcore:GetResourceOauth2Token`, `GetWorkloadAccessToken`, `GetWorkloadAccessTokenForUserId` on the default workload identity directory and the service's workload identity |
 | `bedrock` guardrails | `bedrock:ApplyGuardrail` |
 | reading the catalogue (`agentlib new mcp --from-redshift`) | `redshift-data:ListTables`, `redshift-data:DescribeTable`, and the same credentials action as `redshift_data`. A developer needs these, not the deployed service |
 
@@ -123,6 +128,34 @@ The service's role needs `SELECT` on `checkpoint_migrations` and `SELECT`,
 `checkpoint_writes`. A service whose tables are missing or older than the
 library needs does not start.
 
+**`agentcore_memory`.** The native store for a service hosted on Bedrock
+AgentCore; PostgreSQL works from there too. AgentCore Memory keys events by an
+actor and a session. The library's scoped thread key becomes both: the tenant
+and subject become the actor, the application and the thread's name become
+the session, each encoded so that two scopes can never meet at one memory key
+and cut to the memory's length limits with a digest when they must be. A
+thread ID that is not a scoped key is refused. Every service that shares a
+memory must use the same `checkpoint_format`. The memory client is the one
+`langgraph-checkpoint-aws` ships and builds its own boto3 client: the
+service's region, CA file, proxy and timeouts reach it, a named AWS profile
+does not, so on a developer's machine it uses the SDK's default credentials.
+`validate` reads one empty probe session and writes nothing.
+
+**`agentcore_runtime`.** For an agent or MCP server on an AgentCore runtime
+with IAM (SigV4) authentication, where no bearer token reaches the container.
+The runtime authenticates the caller and passes them on as an opaque user ID
+header; the adapter trusts that perimeter, builds the principal in the
+configured `tenant` with the configured `roles`, and marks it
+`authenticated_by: agentcore-runtime`, so a policy can tell it from a
+verified token. A request without the header, or a bare bearer token, is
+refused with `perimeter_identity_missing`. The adapter cannot be selected in
+local development, where there is no runtime to trust. With `exchange` set,
+the agent obtains tokens for the MCP servers it calls through AgentCore
+Identity: the workload access token the runtime passes on is exchanged with
+`USER_FEDERATION` for a person, `M2M` for the service itself, and a person who
+has not yet authorised the service is refused with `user_consent_required`.
+See [identity](../../docs/identity.md#on-aws-bedrock-agentcore).
+
 **`bedrock` guardrails.** Text a model will read, which is model input and
 tool results, is checked as input, where Bedrock looks for attacks on the
 prompt. Text a model wrote is checked as output. Any intervention stops the
@@ -135,9 +168,10 @@ needs. Production needs a published guardrail version, not `DRAFT`.
 `ai_agent_lib_aws.testing` has stand-ins for the AWS clients, so every adapter
 passes its port's contract suite offline. Request and reply shapes are checked
 against the SDK's own service models with `botocore.stub.Stubber`. The
-PostgreSQL store also runs against a real PostgreSQL server:
+PostgreSQL store also runs against a real PostgreSQL server, and the AgentCore
+Memory store against a real memory when `AGENTCORE_MEMORY_ID` names one:
 
 ```bash
 python -m pytest packages/ai-agent-lib-aws                  # offline
-python -m pytest -m integration packages/ai-agent-lib-aws   # real PostgreSQL; Bedrock if configured
+python -m pytest -m integration packages/ai-agent-lib-aws   # real PostgreSQL; Bedrock and AgentCore Memory if configured
 ```

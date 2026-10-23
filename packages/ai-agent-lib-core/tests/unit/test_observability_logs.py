@@ -24,6 +24,7 @@ from ai_agent_lib_core.adapters import (
 from ai_agent_lib_core.contracts import (
     Classification,
     PolicyDenied,
+    PresentedCredentials,
     ServerEntry,
     ToolEntry,
     ValidationFailed,
@@ -190,10 +191,11 @@ class Services:
     ids = SequentialIds()
 
     async def authenticate(
-        self, credential: str | None, *, application: str, thread_id: str,
+        self, credential: str | PresentedCredentials | None, *, application: str, thread_id: str,
         request_id: str | None = None,
     ) -> RequestContext:  # fmt: skip
-        if credential != "good":
+        bearer = credential.bearer if isinstance(credential, PresentedCredentials) else credential
+        if bearer != "good":
             raise PolicyDenied("the caller is not known", reason_code="invalid_token")
         return RequestContext(
             principal=Principal(subject="ann", tenant="t-1"),

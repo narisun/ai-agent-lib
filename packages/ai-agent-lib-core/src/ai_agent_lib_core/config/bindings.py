@@ -217,14 +217,17 @@ def _default_bindings() -> tuple[Binding, ...]:
         Binding(
             name=f"{PREFIX}TELEMETRY",
             key=Key.TELEMETRY,
-            description="Operational traces and metrics: off or opentelemetry.",
+            description="Operational traces and metrics: off, opentelemetry or ambient.",
             example="off",
             details=(
                 "With `opentelemetry` every governed call is a span named after the GenAI "
                 "conventions, and the `agentlib.events` and `agentlib.duration` metrics are "
                 "recorded, through the OpenTelemetry API. The service sends them by calling "
                 "`configure_telemetry()`; where to is set with the standard `OTEL_` variables. "
-                "The audit option `tracing: true` also turns it on."
+                "With `ambient` the same signals go to the providers the host installed, as "
+                "`opentelemetry-instrument` does, and the service installs none; it refuses to "
+                "start when no provider is found. The audit option `tracing: true` also turns "
+                "it on."
             ),
         ),
         Binding(

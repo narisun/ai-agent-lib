@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from ai_agent_lib_aws.access import (
+    agentcore_identity_access,
+    agentcore_memory_access,
     bedrock_guardrails_access,
     bedrock_model_access,
     firehose_audit_access,
@@ -12,17 +16,26 @@ from ai_agent_lib_aws.access import (
     secrets_manager_access,
 )
 from ai_agent_lib_aws.audit_firehose import FirehoseAuditOptions, FirehoseAuditSink
-from ai_agent_lib_aws.checkpoint_options import PostgresCheckpointOptions
+from ai_agent_lib_aws.checkpoint_options import (
+    AgentCoreMemoryCheckpointOptions,
+    PostgresCheckpointOptions,
+)
 from ai_agent_lib_aws.data_redshift import RedshiftDataOptions, RedshiftDataSource
 from ai_agent_lib_aws.guardrails_bedrock import (
     DRAFT_VERSION,
     BedrockGuardrails,
     BedrockGuardrailsOptions,
 )
+from ai_agent_lib_aws.identity_agentcore import (
+    AgentCoreRuntimeIdentity,
+    AgentCoreRuntimeIdentityOptions,
+    ExchangingAgentCoreRuntimeIdentity,
+)
 from ai_agent_lib_aws.model_bedrock import BedrockChatModelProvider
 from ai_agent_lib_aws.registry_s3 import S3RegistryOptions, S3RegistrySource
 from ai_agent_lib_aws.secrets_manager import SecretsManagerOptions, SecretsManagerProvider
 from ai_agent_lib_aws.session import AwsSessionFactory
+from ai_agent_lib_aws.token_exchange_agentcore import AgentCoreTokenExchanger
 from ai_agent_lib_core.contracts import (
     CheckpointBackend,
     ConfigurationError,
@@ -34,6 +47,7 @@ from ai_agent_lib_core.kit import (
     CHECKPOINT,
     DATA,
     GUARDRAILS,
+    IDENTITY,
     MODEL,
     REGISTRY,
     SECRETS,
@@ -41,7 +55,48 @@ from ai_agent_lib_core.kit import (
     ServiceProviders,
 )
 
+if TYPE_CHECKING:
+    from ai_agent_lib_aws.checkpoint_agentcore_memory import AgentCoreMemoryCheckpointBackend
+    from ai_agent_lib_aws.checkpoint_postgres import PostgresCheckpointBackend
+
 __all__ = ["register_aws_adapters"]
+
+
+def _postgres_backend() -> type[PostgresCheckpointBackend]:
+    # Imported here so that a service without this store needs no database driver.
+    try:
+        from ai_agent_lib_aws.checkpoint_postgres import PostgresCheckpointBackend
+    except ImportError as exc:
+        raise ConfigurationError(
+            "the postgres checkpoint store needs a database driver; install it with "
+            "'pip install \"ai-agent-lib-aws[postgres]\"'"
+        ) from exc
+    return PostgresCheckpointBackend
+
+
+def _agentcore_memory_backend() -> type[AgentCoreMemoryCheckpointBackend]:
+    # Imported here so that a service without this store needs no AgentCore checkpointer.
+    try:
+        from ai_agent_lib_aws.checkpoint_agentcore_memory import AgentCoreMemoryCheckpointBackend
+    except ImportError as exc:
+        raise ConfigurationError(
+            "the agentcore_memory checkpoint store needs the AgentCore checkpointer; install "
+            "it with 'pip install \"ai-agent-lib-aws[agentcore]\"'"
+        ) from exc
+    return AgentCoreMemoryCheckpointBackend
+
+
+def _require_deployed(context: BuildContext) -> None:
+    """Refuse the runtime identity in local development: the inverse of ``local_only``."""
+    if context.deployment_env is DeploymentEnv.LOCAL:
+        raise ConfigurationError(
+            "the agentcore_runtime identity trusts the AgentCore runtime to have authenticated "
+            "the caller, and there is no runtime in local development",
+            expected="a deployed environment: dev or prod",
+            actual="the local deployment environment",
+            fix="name the deployment environment as dev or prod in the service's configuration; "
+            "on a developer's machine select identity=static",
+        )
 
 
 class _Sessions:
@@ -119,19 +174,44 @@ def register_aws_adapters(
         return BedrockGuardrails(options, shared.get(context))
 
     async def postgres_checkpoint(context: BuildContext) -> CheckpointBackend:
-        try:
-            # Imported here so that a service without this store needs no database driver.
-            from ai_agent_lib_aws.checkpoint_postgres import PostgresCheckpointBackend
-        except ImportError as exc:
-            raise ConfigurationError(
-                "the postgres checkpoint store needs a database driver; install it with "
-                "'pip install \"ai-agent-lib-aws[postgres]\"'"
-            ) from exc
         options = context.selection.parse_options(PostgresCheckpointOptions)
-        backend = PostgresCheckpointBackend(options, shared.get(context))
+        backend = _postgres_backend()(options, shared.get(context))
         await backend.start()
         return backend
 
+    async def agentcore_memory_checkpoint(context: BuildContext) -> CheckpointBackend:
+        options = context.selection.parse_options(AgentCoreMemoryCheckpointOptions)
+        backend = _agentcore_memory_backend()(options, shared.get(context))
+        await backend.start()
+        return backend
+
+    def agentcore_runtime_identity(context: BuildContext) -> AgentCoreRuntimeIdentity:
+        _require_deployed(context)
+        options = context.selection.parse_options(AgentCoreRuntimeIdentityOptions)
+        if options.exchange is None:
+            return AgentCoreRuntimeIdentity(options)
+        exchanger = AgentCoreTokenExchanger(options.exchange, shared.get(context), context.clock)
+        return ExchangingAgentCoreRuntimeIdentity(options, exchanger)
+
+    providers.register(
+        IDENTITY,
+        "agentcore_runtime",
+        agentcore_runtime_identity,
+        options=AgentCoreRuntimeIdentityOptions,
+        access=agentcore_identity_access,
+        replace=replace,
+        dependencies=(),
+    )
+    providers.register(
+        CHECKPOINT,
+        "agentcore_memory",
+        agentcore_memory_checkpoint,
+        options=AgentCoreMemoryCheckpointOptions,
+        access=agentcore_memory_access,
+        extra="agentcore",
+        replace=replace,
+        dependencies=(),
+    )
     providers.register(
         MODEL,
         "bedrock",

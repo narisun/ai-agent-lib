@@ -245,6 +245,26 @@ class AwsSessionFactory:
                 self._clients[key] = self._build(service, attempts)
             return self._clients[key]
 
+    def client_arguments(self, service: str) -> dict[str, Any]:
+        """Return the keyword arguments for a library that builds its own client for ``service``.
+
+        Some libraries, such as the AgentCore Memory checkpointer, create their
+        own boto3 client and accept only its keyword arguments. The arguments
+        carry this factory's region, CA file, proxy decision and timeouts, so
+        that client reaches AWS the way every other client of the service does.
+        Credentials are the SDK's default chain: a named profile is not passed
+        on, because ``boto3.client`` takes none.
+
+        Raises:
+            ConfigurationError: If a client for the service cannot be built.
+        """
+        client = self.client(service)
+        return {
+            "region_name": self.region,
+            "config": client.meta.config,
+            "verify": self._verify(service),
+        }
+
     def _verify(self, service: str) -> str | None:
         chosen = self._bedrock_ca_bundle if service in _BEDROCK_SERVICES else None
         chosen = chosen if chosen is not None else self._ca_bundle

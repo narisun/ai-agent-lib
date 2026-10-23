@@ -12,11 +12,40 @@ from ai_agent_lib_core.contracts import (
     IdentityVerifier,
     IdGenerator,
     PolicyDenied,
+    PresentedCredentials,
     RegistrySource,
     RequestContext,
+    RequestVerifier,
     Telemetry,
+    Verified,
 )
 from ai_agent_lib_core.pipeline import record_refused_sign_in
+
+__all__ = ["RequestAuthenticator", "verify_presented"]
+
+
+async def verify_presented(
+    identity: IdentityVerifier, credential: str | PresentedCredentials | None
+) -> Verified:
+    """Verify what was presented, through the verifier's widest interface.
+
+    A verifier that reads headers (:class:`RequestVerifier`) sees everything
+    that was presented; any other sees the bearer token alone, and the token
+    is what is kept for exchange. Every entry point, HTTP or MCP, signs
+    callers in through this one function.
+
+    Raises:
+        PolicyDenied: If the verifier rejects the credentials.
+    """
+    presented = (
+        credential
+        if isinstance(credential, PresentedCredentials)
+        else PresentedCredentials(bearer=credential)
+    )
+    if isinstance(identity, RequestVerifier):
+        return await identity.verify_request(presented)
+    principal = await identity.verify(presented.bearer)
+    return Verified(principal, SecretStr(presented.bearer) if presented.bearer else None)
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,9 +64,21 @@ class RequestAuthenticator:
     clock: Clock
     ids: IdGenerator
 
+    async def verify(self, credential: str | PresentedCredentials | None) -> Verified:
+        """Verify what was presented, through the verifier's widest interface.
+
+        A verifier that reads headers (:class:`RequestVerifier`) sees everything
+        that was presented; any other sees the bearer token alone, and the
+        token is what is kept for exchange.
+
+        Raises:
+            PolicyDenied: If the verifier rejects the credentials.
+        """
+        return await verify_presented(self.identity, credential)
+
     async def authenticate(
         self,
-        credential: str | None,
+        credential: str | PresentedCredentials | None,
         *,
         application: str,
         thread_id: str,
@@ -54,7 +95,7 @@ class RequestAuthenticator:
         """
         request_id = request_id if request_id is not None else self.ids.new_id()
         try:
-            principal = await self.identity.verify(credential)
+            verified = await self.verify(credential)
         except PolicyDenied as refusal:
             await record_refused_sign_in(
                 self.audit,
@@ -73,13 +114,13 @@ class RequestAuthenticator:
                 entry.classification_ceiling if entry is not None else Classification.INTERNAL
             )
         return RequestContext(
-            principal=principal,
+            principal=verified.principal,
             application=application,
             request_id=request_id,
             thread_id=thread_id,
             classification_ceiling=classification_ceiling,
             deadline=deadline,
-            credential=SecretStr(credential) if credential else None,
+            credential=verified.credential,
             # Each request gets its own budget, whatever request ID it was sent.
             invocation_id=self.ids.new_id(),
         )

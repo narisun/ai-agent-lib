@@ -13,6 +13,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, ValidationError
 
 from ai_agent_lib_core.contracts import (
+    PresentedCredentials,
     Principal,
     RequestContext,
     ServiceConfig,
@@ -329,7 +330,7 @@ async def test_http_legacy_envelope_is_unchanged_with_terminal_capture() -> None
 
         async def authenticate(
             self,
-            credential: str | None,
+            credential: str | PresentedCredentials | None,
             *,
             application: str,
             thread_id: str,

@@ -88,6 +88,11 @@ max-complexity = 12
 module = ["boto3.*", "botocore.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# The AgentCore checkpointer ships no type information.
+module = ["langgraph_checkpoint_aws", "langgraph_checkpoint_aws.*"]
+ignore_missing_imports = true
+
 [tool.mypy]
 python_version = "3.11"
 strict = true
@@ -297,11 +302,14 @@ forbidden_modules = [
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
-name = "in the AWS package only the checkpoint store imports langgraph"
+name = "in the AWS package only the checkpoint stores import langgraph"
 type = "forbidden"
 source_modules = ["ai_agent_lib_aws"]
 forbidden_modules = ["langgraph"]
-ignore_imports = ["ai_agent_lib_aws.checkpoint_postgres -> langgraph"]
+ignore_imports = [
+    "ai_agent_lib_aws.checkpoint_postgres -> langgraph",
+    "ai_agent_lib_aws.checkpoint_agentcore_memory -> langgraph",
+]
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]

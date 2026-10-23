@@ -8,6 +8,7 @@ credentials: application code must use an identity verifier at the boundary.
 from __future__ import annotations
 
 import enum
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -16,7 +17,14 @@ from pydantic import SecretStr
 from ai_agent_lib_core.contracts._validation import require_identifier
 from ai_agent_lib_core.contracts.scope import Scope
 
-__all__ = ["Classification", "Principal", "PrincipalKind", "RequestContext"]
+__all__ = [
+    "Classification",
+    "PresentedCredentials",
+    "Principal",
+    "PrincipalKind",
+    "RequestContext",
+    "Verified",
+]
 
 
 class Classification(enum.IntEnum):
@@ -85,6 +93,52 @@ class Principal:
     def has_role(self, role: str) -> bool:
         """Return whether the principal holds ``role``."""
         return role in self.roles
+
+
+@dataclass(frozen=True, slots=True)
+class PresentedCredentials:
+    """What a caller presented at an entry point, before anyone has verified it.
+
+    A verifier that checks tokens reads ``bearer``. A verifier that trusts a
+    perimeter, such as a hosting platform that authenticated the caller before
+    the request reached the service, reads the headers that perimeter set. The
+    headers are the request's, with lower-case names; nothing here is trusted
+    until a verifier says so.
+
+    Attributes:
+        bearer: The bearer token, without the ``Bearer`` prefix, if one was sent.
+        headers: The request headers, by lower-case name.
+    """
+
+    bearer: str | None = None
+    headers: Mapping[str, str] = field(default_factory=dict, repr=False)
+
+    def header(self, name: str) -> str | None:
+        """Return the header called ``name`` (any case), or ``None``."""
+        value = self.headers.get(name.lower())
+        return value if isinstance(value, str) and value else None
+
+
+@dataclass(frozen=True, slots=True)
+class Verified:
+    """The outcome of verifying a request's credentials.
+
+    Attributes:
+        principal: Who the caller is.
+        credential: The credential to keep for exchanging into tokens for
+            other services, or ``None`` when there is nothing to exchange. For
+            a bearer token this is the token; a perimeter-trusting verifier
+            may keep a workload token the perimeter supplied instead.
+    """
+
+    principal: Principal
+    credential: SecretStr | None = field(default=None, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.principal, Principal):
+            raise TypeError("principal must be a Principal")
+        if self.credential is not None and not isinstance(self.credential, SecretStr):
+            raise TypeError("credential must be a SecretStr")
 
 
 @dataclass(frozen=True, slots=True, weakref_slot=True)

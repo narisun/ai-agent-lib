@@ -15,15 +15,23 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from ai_agent_lib_aws.audit_firehose import FirehoseAuditOptions
-from ai_agent_lib_aws.checkpoint_options import PostgresCheckpointOptions
+from ai_agent_lib_aws.checkpoint_options import (
+    AgentCoreMemoryCheckpointOptions,
+    PostgresCheckpointOptions,
+)
 from ai_agent_lib_aws.data_redshift import RedshiftDataOptions
 from ai_agent_lib_aws.guardrails_bedrock import BedrockGuardrailsOptions
+from ai_agent_lib_aws.identity_agentcore import AgentCoreRuntimeIdentityOptions
 from ai_agent_lib_aws.registry_s3 import S3RegistryOptions
 from ai_agent_lib_aws.secrets_manager import SecretsManagerOptions
+from ai_agent_lib_aws.token_exchange_agentcore import AgentCoreExchangeOptions
 from ai_agent_lib_core.contracts import Access, AccessQuery
 from ai_agent_lib_core.contracts.access import ACCOUNT, REGION
 
 __all__ = [
+    "agentcore_exchange_access",
+    "agentcore_identity_access",
+    "agentcore_memory_access",
     "bedrock_guardrails_access",
     "bedrock_model_access",
     "firehose_audit_access",
@@ -32,6 +40,16 @@ __all__ = [
     "s3_registry_access",
     "secrets_manager_access",
 ]
+
+_AGENTCORE = f"arn:aws:bedrock-agentcore:{REGION}:{ACCOUNT}"
+_MEMORY_ACTIONS = (
+    "bedrock-agentcore:CreateEvent",
+    "bedrock-agentcore:ListEvents",
+    "bedrock-agentcore:GetEvent",
+    "bedrock-agentcore:DeleteEvent",
+)
+# Deleting a thread stored as snapshots first lists the actor's sessions.
+_SNAPSHOT_ACTIONS = (*_MEMORY_ACTIONS, "bedrock-agentcore:ListSessions")
 
 # A cross-region inference profile is a geography and a model, such as "us.anthropic...".
 _PROFILE = re.compile(r"^(?P<geo>us|us-gov|eu|apac|jp|au|ca|global)\.(?P<model>.+)$")
@@ -280,3 +298,49 @@ def postgres_checkpoint_access(query: AccessQuery) -> Sequence[Access]:
             "(it starts with cluster- or db-)",
         ),
     )
+
+
+def agentcore_memory_access(query: AccessQuery) -> Sequence[Access]:
+    """AgentCore Memory checkpoints: read, write and delete events in the one memory."""
+    options = query.selection.parse_options(AgentCoreMemoryCheckpointOptions)
+    snapshot = options.checkpoint_format == "snapshot"
+    return (
+        Access(
+            actions=_SNAPSHOT_ACTIONS if snapshot else _MEMORY_ACTIONS,
+            resources=(f"{_AGENTCORE}:memory/{options.memory_id}",),
+            why="store graph thread state in the configured memory, and check at startup "
+            "that the memory can be read",
+        ),
+    )
+
+
+def agentcore_exchange_access(exchange: AgentCoreExchangeOptions) -> Sequence[Access]:
+    """AgentCore Identity: exchange the workload token, and mint one for the workload."""
+    directory = f"{_AGENTCORE}:workload-identity-directory/default"
+    name = exchange.workload_name or "*"
+    note = (
+        ""
+        if exchange.workload_name
+        else "no workload_name is configured, so every workload identity in the directory is "
+        "allowed; set workload_name to the service's own to narrow this"
+    )
+    return (
+        Access(
+            actions=(
+                "bedrock-agentcore:GetResourceOauth2Token",
+                "bedrock-agentcore:GetWorkloadAccessToken",
+                "bedrock-agentcore:GetWorkloadAccessTokenForUserId",
+            ),
+            resources=(directory, f"{directory}/workload-identity/{name}"),
+            why="obtain tokens for the services this one calls through AgentCore Identity",
+            note=note,
+        ),
+    )
+
+
+def agentcore_identity_access(query: AccessQuery) -> Sequence[Access]:
+    """The runtime identity: nothing to verify a caller; AgentCore Identity when it exchanges."""
+    options = query.selection.parse_options(AgentCoreRuntimeIdentityOptions)
+    if options.exchange is None:
+        return ()
+    return agentcore_exchange_access(options.exchange)

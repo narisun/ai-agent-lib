@@ -27,6 +27,7 @@ from ai_agent_lib_core.contracts import (
     ExecutionPaused,
     IdGenerator,
     PolicyDenied,
+    PresentedCredentials,
     RequestContext,
     TransientError,
     ValidationFailed,
@@ -71,13 +72,18 @@ class AgentServices(Protocol):
 
     async def authenticate(
         self,
-        credential: str | None,
+        credential: str | PresentedCredentials | None,
         *,
         application: str,
         thread_id: str,
         request_id: str | None = None,
     ) -> RequestContext:
-        """Verify a caller's credential and return the context for their request."""
+        """Verify what a caller presented and return the context for their request.
+
+        The entry point presents everything it was sent, as
+        :class:`PresentedCredentials`; a bare token is accepted for callers
+        that have only that.
+        """
         ...
 
 
@@ -201,6 +207,18 @@ class RequestPrelude:
     Nothing here runs the agent. Every reply it returns is a refusal: the body
     could not be read, an identifier is not usable, the credential is malformed
     or the identity provider said no.
+
+    Args:
+        services: The container, or anything that signs callers in like it.
+        application: The agent's name.
+        lifecycle: Requests are refused once the service stops accepting them.
+        max_body_bytes: The largest request body accepted.
+        session_header: A header the hosting platform sets to name the
+            session, lower-case. When the body names no ``thread_id`` the
+            session is the thread; a body that names a different thread is
+            refused. ``None`` when no platform does this.
+        request_id_headers: The headers that may carry the caller's request
+            id, lower-case, in order of preference.
     """
 
     def __init__(
@@ -210,11 +228,15 @@ class RequestPrelude:
         application: str,
         lifecycle: ServiceLifecycle,
         max_body_bytes: int,
+        session_header: str | None = None,
+        request_id_headers: tuple[str, ...] = (REQUEST_ID_HEADER,),
     ) -> None:
         self._services = services
         self._application = application
         self._lifecycle = lifecycle
         self._max_body_bytes = max_body_bytes
+        self._session_header = session_header
+        self._request_id_headers = request_id_headers
 
     async def admit(self, request: Request) -> Admitted | Response:
         """Return what may run, or the reply to a request refused before anything runs."""
@@ -256,22 +278,63 @@ class RequestPrelude:
             return error_response(
                 400, "invalid", detail="the body must be a JSON object with 'input'"
             )
-        thread_id = payload["thread_id"] if "thread_id" in payload else self._services.ids.new_id()
+        session = self._session(request)
+        if isinstance(session, Response):
+            return session
+        if "thread_id" in payload:
+            thread_id = payload["thread_id"]
+        elif session is not None:
+            thread_id = session
+        else:
+            thread_id = self._services.ids.new_id()
         if not isinstance(thread_id, str) or not _SAFE_ID.fullmatch(thread_id):
             return error_response(400, "invalid", detail="'thread_id' is not a usable identifier")
+        if session is not None and thread_id != session:
+            return error_response(
+                400, "invalid", detail="'thread_id' disagrees with the runtime session"
+            )
         return Asked(payload["input"], thread_id)
 
+    def _session(self, request: Request) -> str | Response | None:
+        """The platform's session id, if the header is set; the refusal if it is not usable."""
+        if self._session_header is None:
+            return None
+        session = request.headers.get(self._session_header)
+        if session is None:
+            return None
+        if not _SAFE_ID.fullmatch(session):
+            return error_response(
+                400, "invalid", detail="the session header is not a usable identifier"
+            )
+        return session
+
+    def _request_id(self, request: Request) -> str | None:
+        """The caller's request id, from the first accepted header that carries a usable one."""
+        for name in self._request_id_headers:
+            sent = request.headers.get(name, "")
+            if _SAFE_ID.fullmatch(sent):
+                return sent
+        return None
+
     async def caller(self, request: Request, thread_id: str) -> RequestContext | Response:
-        """Return the request context of the caller, or the reply to one who is refused."""
+        """Return the request context of the caller, or the reply to one who is refused.
+
+        Everything the request presented reaches the container: the bearer
+        token, if any, and the headers, so that a verifier which trusts the
+        hosting platform's perimeter can read what the platform set.
+        """
         header = request.headers.get("authorization")
         bearer = _BEARER.match(header) if header is not None else None
         if header is not None and bearer is None:
             return _unauthorized("malformed_authorization")
-        sent = request.headers.get(REQUEST_ID_HEADER, "")
-        request_id = sent if _SAFE_ID.fullmatch(sent) else None
+        request_id = self._request_id(request)
+        presented = PresentedCredentials(
+            bearer=bearer["token"] if bearer is not None else None,
+            headers=dict(request.headers),
+        )
         try:
             return await self._services.authenticate(
-                bearer["token"] if bearer is not None else None,
+                presented,
                 application=self._application,
                 thread_id=thread_id,
                 request_id=request_id,

@@ -20,7 +20,13 @@ from ai_agent_lib_core.adapters import (
     StaticIdentityOptions,
     StaticIdentityVerifier,
 )
-from ai_agent_lib_core.contracts import Classification, ConfigurationError, ServerEntry, ToolEntry
+from ai_agent_lib_core.contracts import (
+    Classification,
+    ConfigurationError,
+    PresentedCredentials,
+    ServerEntry,
+    ToolEntry,
+)
 from ai_agent_lib_core.integrations.http import ServiceLifecycle, agent_app
 from ai_agent_lib_core.integrations.mcp import META_REQUEST_ID
 from ai_agent_lib_core.observability import build_providers, configure_telemetry
@@ -86,7 +92,7 @@ class Services:
     ids = SequentialIds()
 
     async def authenticate(
-        self, credential: str | None, *, application: str, thread_id: str,
+        self, credential: str | PresentedCredentials | None, *, application: str, thread_id: str,
         request_id: str | None = None,
     ) -> RequestContext:  # fmt: skip
         return RequestContext(

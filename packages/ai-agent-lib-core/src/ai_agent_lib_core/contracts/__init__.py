@@ -67,9 +67,11 @@ from ai_agent_lib_core.contracts.guardrails import (
 )
 from ai_agent_lib_core.contracts.identity import (
     Classification,
+    PresentedCredentials,
     Principal,
     PrincipalKind,
     RequestContext,
+    Verified,
 )
 from ai_agent_lib_core.contracts.inspection import (
     InspectionSection,
@@ -119,6 +121,7 @@ from ai_agent_lib_core.contracts.ports import (
     IdGenerator,
     ModelCapabilities,
     ModelTraceSink,
+    RequestVerifier,
     SecretsProvider,
     SpanNotes,
     SupportsAsyncClose,
@@ -223,6 +226,7 @@ __all__ = [
     "PolicyDenied",
     "PolicyRequest",
     "PolicyResource",
+    "PresentedCredentials",
     "Principal",
     "PrincipalKind",
     "Profile",
@@ -235,6 +239,7 @@ __all__ = [
     "RequestOutcome",
     "RequestOutcomeJournal",
     "RequestRecord",
+    "RequestVerifier",
     "RowFilter",
     "Scalar",
     "SchemaMismatch",
@@ -263,6 +268,7 @@ __all__ = [
     "UpstreamError",
     "UsageField",
     "ValidationFailed",
+    "Verified",
     "causes",
     "describe",
     "generic_fix",

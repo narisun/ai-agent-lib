@@ -34,10 +34,11 @@ class _AuditTracing(AuditOptions):
 
 
 def telemetry_enabled(config: ServiceConfig) -> bool:
-    """Whether telemetry is on: ``EAP_TELEMETRY=opentelemetry``, or the older audit option.
+    """Whether telemetry is on: ``EAP_TELEMETRY`` other than ``off``, or the older audit option.
 
-    The audit option ``tracing: true`` predates the telemetry setting and still
-    turns telemetry on.
+    ``opentelemetry`` and ``ambient`` both turn it on; they differ only in who
+    installs the providers. The audit option ``tracing: true`` predates the
+    telemetry setting and still turns telemetry on.
 
     Raises:
         ConfigurationError: If the audit option ``tracing`` is not true or false.
@@ -56,4 +57,4 @@ def telemetry_enabled(config: ServiceConfig) -> bool:
                 f"{variable_for(Key.TELEMETRY)}=opentelemetry instead"
             ),
         ) from error
-    return tracing or config.telemetry is TelemetryMode.OPENTELEMETRY
+    return tracing or config.telemetry is not TelemetryMode.OFF

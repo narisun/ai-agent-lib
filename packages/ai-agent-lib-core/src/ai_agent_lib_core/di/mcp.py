@@ -19,6 +19,7 @@ from ai_agent_lib_core.contracts import (
     IdGenerator,
     PolicyDecisionPoint,
     RegistrySource,
+    RequestVerifier,
     Section,
     ServerEntry,
     Telemetry,
@@ -199,8 +200,13 @@ class McpBindings:
         """Combine tool middleware with HTTP token-verification settings.
 
         Outside local development, the identity port must implement
-        ``TokenAuthenticator``. Import the MCP integration only when needed.
-        See ``ServiceContainer.mcp_server_kwargs`` for arguments and usage.
+        ``TokenAuthenticator``, or be a :class:`RequestVerifier` that trusts
+        the hosting platform's perimeter: the platform then authenticated the
+        caller before the request arrived, there is no token to check at the
+        door, and the server gets the middleware alone; :meth:`perimeter_door`
+        refuses requests the perimeter did not forward. Import the MCP
+        integration only when needed. See ``ServiceContainer.mcp_server_kwargs``
+        for arguments and usage.
         """
         from ai_agent_lib_core.integrations.mcp import DoorTokenVerifier, resource_server_settings
 
@@ -216,11 +222,11 @@ class McpBindings:
         identity = self.identity
         local = self.environment is DeploymentEnv.LOCAL
         if not isinstance(identity, TokenAuthenticator):
-            if not local:
+            if not local and not self._trusts_perimeter():
                 raise ConfigurationError(
                     f"MCP server {server!r} cannot check tokens at its door: the identity "
                     f"provider {self.identity_provider!r} does not "
-                    "verify tokens from an issuer"
+                    "verify tokens from an issuer, and does not trust a perimeter"
                 )
             return kwargs
         kwargs["auth"] = resource_server_settings(identity.issuer, entry)
@@ -236,6 +242,27 @@ class McpBindings:
             ids=self.ids,
         )
         return kwargs
+
+    def perimeter_door(self, app: Any) -> Any:
+        """Wrap an MCP server's ASGI app in the perimeter door its identity needs, if any.
+
+        When the identity is a :class:`RequestVerifier` that trusts the
+        perimeter, a request to any path but the health routes that carries
+        neither an ``Authorization`` header nor every header the identity
+        requires (its ``required_headers``, when it has them) is refused with
+        HTTP 401. Otherwise the app is returned unchanged. The public contract
+        is documented on ``ServiceContainer.mcp_door``.
+        """
+        if not self._trusts_perimeter():
+            return app
+        from ai_agent_lib_core.integrations.mcp import PerimeterDoor
+
+        required: tuple[str, ...] = tuple(getattr(self.identity, "required_headers", ()))
+        return PerimeterDoor(app, required_headers=required)
+
+    def _trusts_perimeter(self) -> bool:
+        identity = self.identity
+        return isinstance(identity, RequestVerifier) and bool(identity.trusts_perimeter)
 
     def _registered_server(self, server: str) -> ServerEntry:
         entry = self.registry.tools.get(server)

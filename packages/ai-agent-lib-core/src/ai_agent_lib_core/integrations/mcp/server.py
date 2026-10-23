@@ -15,7 +15,6 @@ from mcp.server.context import CallNext, HandlerResult, ServerRequestContext
 from mcp.server.mcpserver import MCPServer
 from mcp_types import CallToolResult, TextContent
 from opentelemetry import propagate, trace
-from pydantic import SecretStr
 
 from ai_agent_lib_core.contracts import (
     AgentLibError,
@@ -28,6 +27,7 @@ from ai_agent_lib_core.contracts import (
     IdGenerator,
     IntegrityError,
     PolicyDenied,
+    PresentedCredentials,
     RequestContext,
     ServerEntry,
     Telemetry,
@@ -35,6 +35,7 @@ from ai_agent_lib_core.contracts import (
     ValidationFailed,
     schema_fingerprint,
 )
+from ai_agent_lib_core.di.authentication import verify_presented
 from ai_agent_lib_core.integrations.mcp.wire import (
     META_AUTHORIZATION,
     META_CLASSIFICATION_CEILING,
@@ -118,6 +119,17 @@ def _credential(request: ServerRequestContext[Any, Any]) -> str | None:
         return None
     value = (request.meta or {}).get(META_AUTHORIZATION)
     return value if isinstance(value, str) and value else None
+
+
+def _presented(request: ServerRequestContext[Any, Any]) -> PresentedCredentials:
+    """Everything the request presented: the bearer, and over HTTP the headers, lower-cased."""
+    headers = getattr(request.request, "headers", None)
+    return PresentedCredentials(
+        bearer=_credential(request),
+        headers={str(name).lower(): str(value) for name, value in headers.items()}
+        if headers is not None
+        else {},
+    )
 
 
 class DoorTokenVerifier:
@@ -372,9 +384,10 @@ class GovernedToolsMiddleware:
     async def _request_context(
         self, request: ServerRequestContext[Any, Any], evidence: Evidence
     ) -> RequestContext | None:
-        credential = _credential(request)
         try:
-            principal = await self._identity.verify(credential)
+            # The same path as the HTTP entry point: a verifier that trusts the
+            # hosting platform's perimeter sees the headers, any other the token.
+            verified = await verify_presented(self._identity, _presented(request))
         except PolicyDenied as denied:
             # Without a context the pipeline refuses the call and records the refusal.
             evidence.add(identity_reason_code=denied.reason_code)
@@ -386,12 +399,12 @@ class GovernedToolsMiddleware:
         if isinstance(asked, str) and asked.upper() in Classification.__members__:
             ceiling = min(ceiling, Classification[asked.upper()])
         return RequestContext(
-            principal=principal,
+            principal=verified.principal,
             application=self._application,
             request_id=request_id,
             thread_id=_identifier(meta.get(META_THREAD_ID)) or request_id,
             classification_ceiling=ceiling,
-            credential=SecretStr(credential) if credential else None,
+            credential=verified.credential,
         )
 
     @staticmethod

@@ -2,8 +2,8 @@
 
 They live apart from the verifier, which needs PyJWT, so that the provider
 registry can declare and check them without loading it. ``resolve_jwt_options``
-applies the preset (Microsoft Entra ID today) and refuses options that are
-incomplete or unsafe before any token is looked at.
+applies the preset (Microsoft Entra ID, or Amazon Cognito) and refuses options
+that are incomplete or unsafe before any token is looked at.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from typing import Literal
 from pydantic import Field
 
 from ai_agent_lib_core.adapters.http_support import checked_base_url
-from ai_agent_lib_core.contracts import ConfigurationError, OptionsModel
+from ai_agent_lib_core.contracts import ConfigurationError, OptionsModel, shown_value
 
 __all__ = [
     "Algorithm",
@@ -25,6 +25,7 @@ __all__ = [
     "ExchangeKind",
     "JwtIdentityOptions",
     "JwtSettings",
+    "Preset",
     "ServiceTokenRule",
     "TokenExchangeOptions",
     "resolve_jwt_options",
@@ -44,10 +45,15 @@ application (``actor``) and the subject are the same, true of some issuers only.
 """
 ExchangeKind = Literal["on_behalf_of", "token_exchange"]
 
+Preset = Literal["entra", "cognito"]
+"""An identity provider whose issuer, keys and claim names the options can fill in."""
+
 _WHAT = "the jwt identity provider"
 _GUID = re.compile(r"^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$")
+_USER_POOL = re.compile(r"^(?P<region>[a-z]{2}-[a-z]+-\d)_[A-Za-z0-9]+$")
 _APP_TOKEN = "app"  # noqa: S105 - the value of a claim, not a credential
 _ENTRA_V2 = 2
+_AUDIENCE = "aud"
 
 _GENERIC_CLAIMS: Mapping[ClaimRole, str | None] = {
     "subject": "sub",
@@ -66,6 +72,16 @@ _ENTRA_CLAIMS: Mapping[ClaimRole, str | None] = {
     "actor": "azp",
     "scopes": "scp",
     "kind": "idtyp",
+}
+_COGNITO_CLAIMS: Mapping[ClaimRole, str | None] = {
+    "subject": "sub",
+    # A user pool is one tenant; the options name it.
+    "tenant": None,
+    "roles": "cognito:groups",
+    # The app client the token was issued to; a client-credentials token has sub == client_id.
+    "actor": "client_id",
+    "scopes": "scope",
+    "kind": None,
 }
 
 
@@ -97,14 +113,23 @@ class JwtIdentityOptions(OptionsModel):
 
     Attributes:
         preset: ``entra`` fills in the issuer, key location, token endpoint and
-            claim names for Microsoft Entra ID from ``tenant_id``.
+            claim names for Microsoft Entra ID from ``tenant_id``. ``cognito``
+            fills in the issuer, key location and claim names for an Amazon
+            Cognito user pool from ``user_pool_id``; its access tokens name the
+            app client in ``client_id`` rather than ``aud``, so that is the
+            audience claim, and ``tenant`` must be set because a pool carries
+            no tenant claim. Cognito has no delegation grant, so ``exchange``
+            needs its ``kind`` and ``token_url`` spelled out.
         tenant_id: The Entra tenant (directory) ID.
+        user_pool_id: The Cognito user pool, ``{region}_{id}``.
         token_version: The version of access token this application is
             registered to receive from Entra.
         authority: The Entra sign-in host, for national clouds.
         issuer: The exact ``iss`` value to accept. Required without a preset.
         jwks_url: Where the issuer publishes its signing keys. Required without a preset.
-        audience: The ``aud`` value or values that identify this service.
+        audience: The audience value or values that identify this service.
+        audience_claim: The claim that carries the audience. ``aud`` by the
+            standard; an issuer whose access tokens have none names it elsewhere.
         algorithms: The signature algorithms to accept. Only asymmetric ones exist here.
         claims: Claim names that differ from the preset, by what they supply:
             ``subject``, ``tenant``, ``roles``, ``actor``, ``scopes``, ``kind``.
@@ -127,13 +152,15 @@ class JwtIdentityOptions(OptionsModel):
             server that calls nothing else leaves it out.
     """
 
-    preset: Literal["entra"] | None = None
+    preset: Preset | None = None
     tenant_id: str | None = None
+    user_pool_id: str | None = Field(default=None, pattern=r"^[a-z]{2}-[a-z]+-\d_[A-Za-z0-9]+$")
     token_version: Literal[1, 2] = 2
     authority: str = "https://login.microsoftonline.com"
     issuer: str | None = None
     jwks_url: str | None = None
     audience: str | tuple[str, ...]
+    audience_claim: str = Field(default=_AUDIENCE, min_length=1, max_length=200)
     algorithms: tuple[Algorithm, ...] = Field(default=("RS256",), min_length=1)
     claims: dict[ClaimRole, str | None] = Field(default_factory=dict)
     tenant: str | None = None
@@ -172,6 +199,7 @@ class JwtSettings:
     exchange_kind: ExchangeKind | None
     token_url: str | None
     exchange_scope: str | None
+    audience_claim: str = _AUDIENCE
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,9 +210,11 @@ class _Defaults:
     jwks_url: str
     claims: Mapping[ClaimRole, str | None]
     token_url: str | None
-    exchange_kind: ExchangeKind
+    exchange_kind: ExchangeKind | None
     exchange_scope: str | None
     expected_tenant: str | None
+    audience_claim: str = _AUDIENCE
+    service_tokens_are: ServiceTokenRule | None = None
 
 
 def _entra_defaults(options: JwtIdentityOptions) -> _Defaults:
@@ -215,6 +245,32 @@ def _entra_defaults(options: JwtIdentityOptions) -> _Defaults:
     )
 
 
+def _cognito_defaults(options: JwtIdentityOptions) -> _Defaults:
+    pool = _USER_POOL.match(options.user_pool_id or "")
+    if pool is None:
+        raise ConfigurationError(
+            f"{_WHAT}: the cognito preset needs user_pool_id",
+            expected="the user pool's ID, {region}_{id}, such as eu-west-1_AbCdEfGhI",
+            actual=shown_value(options.user_pool_id),
+            fix="copy the pool ID from the Cognito console or `aws cognito-idp list-user-pools`",
+        )
+    issuer = f"https://cognito-idp.{pool['region']}.amazonaws.com/{options.user_pool_id}"
+    issuer = options.issuer or issuer
+    return _Defaults(
+        issuer=issuer,
+        jwks_url=options.jwks_url or f"{issuer}/.well-known/jwks.json",
+        claims=_COGNITO_CLAIMS,
+        # Cognito has no delegation grant; exchange, if any, is spelled out in the options.
+        token_url=None,
+        exchange_kind=None,
+        exchange_scope=None,
+        expected_tenant=None,
+        # Access tokens carry no aud; the app client they were issued to is in client_id.
+        audience_claim="client_id",
+        service_tokens_are="actor_is_subject",
+    )
+
+
 def _generic_defaults(options: JwtIdentityOptions) -> _Defaults:
     if not options.issuer or not options.jwks_url:
         raise ConfigurationError(f"{_WHAT}: set issuer and jwks_url, or choose a preset")
@@ -230,7 +286,11 @@ def _generic_defaults(options: JwtIdentityOptions) -> _Defaults:
 
 
 def _service_token_rule(
-    options: JwtIdentityOptions, claims: Mapping[ClaimRole, str | None], *, entra: bool
+    options: JwtIdentityOptions,
+    claims: Mapping[ClaimRole, str | None],
+    *,
+    entra: bool,
+    defaults: _Defaults,
 ) -> ServiceTokenRule | Literal["entra"]:
     """The rule that tells an application's own token from a user's, which must be explicit."""
     rule = options.service_tokens_are
@@ -238,6 +298,8 @@ def _service_token_rule(
         # Entra marks app-only tokens with idtyp when the optional claim is
         # configured, and they never carry the delegated scp claim.
         return "entra"
+    if rule is None:
+        rule = defaults.service_tokens_are
     if rule is None:
         raise ConfigurationError(
             f"{_WHAT}: it cannot tell an application's own token from a user's",
@@ -293,7 +355,14 @@ def _exchange_settings(
         raise ConfigurationError(f"{_WHAT}: exchange needs token_url")
     checked_base_url(f"{_WHAT} (token_url)", token_url, allow_http=options.allow_http)
     scope = exchange.scope if exchange.scope is not None else defaults.exchange_scope
-    return exchange.kind or defaults.exchange_kind, token_url, scope
+    kind = exchange.kind or defaults.exchange_kind
+    if kind is None:
+        raise ConfigurationError(
+            f"{_WHAT}: exchange needs kind",
+            expected='"kind": "on_behalf_of" or "token_exchange" under exchange',
+            actual="no kind, and a preset whose issuer has no delegation grant of its own",
+        )
+    return kind, token_url, scope
 
 
 def resolve_jwt_options(options: JwtIdentityOptions) -> JwtSettings:
@@ -306,10 +375,20 @@ def resolve_jwt_options(options: JwtIdentityOptions) -> JwtSettings:
     if not audiences or not all(audiences):
         raise ConfigurationError(f"{_WHAT}: audience must name this service")
     entra = options.preset == "entra"
-    defaults = _entra_defaults(options) if entra else _generic_defaults(options)
+    if entra:
+        defaults = _entra_defaults(options)
+    elif options.preset == "cognito":
+        defaults = _cognito_defaults(options)
+    else:
+        defaults = _generic_defaults(options)
     claims = _claim_names(options, defaults)
     checked_base_url(f"{_WHAT} (jwks_url)", defaults.jwks_url, allow_http=options.allow_http)
     exchange_kind, token_url, exchange_scope = _exchange_settings(options, defaults)
+    audience_claim = (
+        options.audience_claim
+        if "audience_claim" in options.model_fields_set
+        else defaults.audience_claim
+    )
     return JwtSettings(
         issuer=defaults.issuer,
         jwks_url=defaults.jwks_url,
@@ -320,7 +399,7 @@ def resolve_jwt_options(options: JwtIdentityOptions) -> JwtSettings:
         expected_tenant=defaults.expected_tenant,
         required_scopes=frozenset(options.required_scopes),
         accept_service_tokens=options.accept_service_tokens,
-        service_tokens_are=_service_token_rule(options, claims, entra=entra),
+        service_tokens_are=_service_token_rule(options, claims, entra=entra, defaults=defaults),
         service_kinds=frozenset(options.service_kinds),
         leeway_seconds=options.leeway_seconds,
         jwks_cache_seconds=options.jwks_cache_seconds,
@@ -329,4 +408,5 @@ def resolve_jwt_options(options: JwtIdentityOptions) -> JwtSettings:
         exchange_kind=exchange_kind,
         token_url=token_url,
         exchange_scope=exchange_scope,
+        audience_claim=audience_claim,
     )

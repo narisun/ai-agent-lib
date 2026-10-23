@@ -16,6 +16,7 @@ from ai_agent_lib_core.contracts import (
     ExecutionPaused,
     IntegrityError,
     PolicyDenied,
+    PresentedCredentials,
     Principal,
     RequestContext,
     TransientError,
@@ -30,6 +31,11 @@ APPLICATION = "accounts-agent"
 TOKENS = {"ann-token": "ann", "bo-token": "bo"}
 
 
+def bearer_of(credential: str | PresentedCredentials | None) -> str | None:
+    """The token a fake sees: the entry point presents everything, a test may pass the token."""
+    return credential.bearer if isinstance(credential, PresentedCredentials) else credential
+
+
 class Services:
     """Stands in for the container: a table of tokens and what was asked of it."""
 
@@ -40,14 +46,21 @@ class Services:
 
     async def authenticate(
         self,
-        credential: str | None,
+        credential: str | PresentedCredentials | None,
         *,
         application: str,
         thread_id: str,
         request_id: str | None = None,
     ) -> RequestContext:
+        presented = credential if isinstance(credential, PresentedCredentials) else None
+        credential = presented.bearer if presented is not None else credential
         self.asked.append(
-            {"credential": credential, "application": application, "request_id": request_id}
+            {
+                "credential": credential,
+                "application": application,
+                "request_id": request_id,
+                "headers": dict(presented.headers) if presented is not None else None,
+            }
         )
         if self.fail_with is not None:
             raise self.fail_with
@@ -380,10 +393,10 @@ class _StreamServices:
     ids = SequentialIds()
 
     async def authenticate(
-        self, credential: str | None, *, application: str, thread_id: str,
+        self, credential: str | PresentedCredentials | None, *, application: str, thread_id: str,
         request_id: str | None = None,
     ) -> RequestContext:  # fmt: skip
-        if credential != "good":
+        if bearer_of(credential) != "good":
             raise PolicyDenied("unknown caller", reason_code="invalid_token")
         return RequestContext(
             principal=Principal(subject="ann", tenant="t-1"),

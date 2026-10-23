@@ -12,6 +12,7 @@ from ai_agent_lib_core.integrations.http import (
     ServiceLifecycle,
     SqliteOutcomeJournal,
     agent_app,
+    agentcore_app,
     question_input,
     run_service,
     serve,
@@ -21,12 +22,19 @@ from ai_agent_lib_core.integrations.langgraph.langfuse import LangfuseTracing, l
 from {{ package }}.graph import APPLICATION, answer, build_graph, steps
 from {{ package }}.settings import ENV_FILE
 
-__all__ = ["build_app", "main"]
+__all__ = ["PROFILES", "build_app", "main"]
+
+# How the service listens: the library's own contract, or a hosting platform's.
+# AgentCore Runtime invokes POST /invocations and asks GET /ping on 0.0.0.0:8080.
+PROFILES: dict[str, tuple[str, int]] = {
+    "standard": ("127.0.0.1", {{ port }}),
+    "agentcore": ("0.0.0.0", 8080),  # the platform reaches the container at any address
+}
 
 
 async def build_app(
     services: ServiceContainer, lifecycle: ServiceLifecycle, *, outcomes: OutcomeJournal | None = None,
-    tracing: LangfuseTracing | None = None,
+    tracing: LangfuseTracing | None = None, agentcore: bool = False,
 ) -> Any:
     """Build the agent's HTTP application.
 
@@ -38,7 +46,10 @@ async def build_app(
         services: The container used by request handlers. The lifecycle startup
             callback must start and validate it before graph preparation runs.
         lifecycle: Receives deferred preparation before serving starts.
+        outcomes: Optional durable journal of accepted answers.
         tracing: Optional library tracing, owned by the service entry point.
+        agentcore: Also serve AgentCore Runtime's contract: POST /invocations and
+            GET /ping beside the library's own routes.
     """
     graph: Any = None
 
@@ -64,13 +75,14 @@ async def build_app(
         async for step in steps(graph, services, context, question_input(given)):
             yield step
 
-    return agent_app(
+    build = agentcore_app if agentcore else agent_app
+    return build(
         services, run, application=APPLICATION, lifecycle=lifecycle, stream=stream,
         live_updates=True, outcomes=outcomes,
     )
 
 
-async def _serve(config: ServiceConfig, host: str, port: int) -> None:
+async def _serve(config: ServiceConfig, host: str, port: int, *, agentcore: bool) -> None:
     async with langfuse_tracing(APPLICATION, config, dotenv_path=ENV_FILE) as tracing:
         services = ServiceContainer(config, model_trace=tracing)
 
@@ -82,7 +94,7 @@ async def _serve(config: ServiceConfig, host: str, port: int) -> None:
         try:
             # The listener is available during adapter startup and graph preparation.
             await serve(await build_app(
-                services, lifecycle, tracing=tracing,
+                services, lifecycle, tracing=tracing, agentcore=agentcore,
                 outcomes=SqliteOutcomeJournal(ENV_FILE.parent / ".agentlib" / "outcomes.sqlite")
                 if config.deployment_env == "local" else None,
             ), lifecycle, host=host, port=port)
@@ -93,14 +105,21 @@ async def _serve(config: ServiceConfig, host: str, port: int) -> None:
 def main(argv: Sequence[str] | None = None) -> int:
     """Serve until stopped. SIGTERM lets requests in flight finish first."""
     parser = argparse.ArgumentParser(prog="{{ name }}-serve", description=__doc__)
-    parser.add_argument("--host", default="127.0.0.1", help="address to listen on")
-    parser.add_argument("--port", type=int, default={{ port }}, help="port to listen on")
+    parser.add_argument(
+        "--profile", choices=sorted(PROFILES), default="standard",
+        help="how to listen: standard, or agentcore (0.0.0.0:8080, /invocations and /ping)",
+    )
+    parser.add_argument("--host", help="address to listen on (the profile's by default)")
+    parser.add_argument("--port", type=int, help="port to listen on (the profile's by default)")
     arguments = parser.parse_args(argv)
+    host, port = PROFILES[arguments.profile]
+    host = arguments.host if arguments.host is not None else host
+    port = arguments.port if arguments.port is not None else port
     # Configuration, logging, telemetry and the explanation of a failure are
     # the library's entry-point wiring; this module only says what to serve.
     return run_service(
         APPLICATION,
-        lambda config: _serve(config, arguments.host, arguments.port),
+        lambda config: _serve(config, host, port, agentcore=arguments.profile == "agentcore"),
         env_file=ENV_FILE,
         program="{{ name }}-serve",
     )

@@ -64,7 +64,19 @@ class TelemetryMode(enum.StrEnum):
     """Whether a service sends operational traces and metrics."""
 
     OFF = "off"
+    """Nothing is sent; the library's spans and metrics go to no-op providers."""
+
     OPENTELEMETRY = "opentelemetry"
+    """The service installs OpenTelemetry providers that export to a collector."""
+
+    AMBIENT = "ambient"
+    """Use the providers the host installed; install nothing.
+
+    For a process started under ``opentelemetry-instrument`` (the ADOT
+    distribution on AgentCore Runtime, for one), which installs the global
+    tracer and meter providers before the service's own code runs. The
+    service refuses to start if no such provider is found.
+    """
 
 
 class Section(enum.StrEnum):

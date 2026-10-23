@@ -22,6 +22,10 @@ postgres = [
     "psycopg[binary,pool]>=3.2",
     "psycopg-pool>=3.3",
 ]
+# The AgentCore Memory checkpoint store.
+agentcore = [
+    "langgraph-checkpoint-aws>=1.2,<2",
+]
 
 [project.entry-points."ai_agent_lib.providers"]
 aws = "ai_agent_lib_aws:register"

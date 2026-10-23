@@ -1,7 +1,13 @@
-"""The HTTP application of an agent: its routes composed into one Starlette app."""
+"""The HTTP application of an agent: its routes composed into one Starlette app.
+
+``agent_app`` is the library's own contract. ``agentcore_app`` in
+:mod:`.agentcore` adds a hosting platform's aliases to the same routes; both
+are built by :func:`compose_agent`, so the two never drift apart.
+"""
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from starlette.applications import Starlette
@@ -15,11 +21,94 @@ from ai_agent_lib_core.integrations.http.health import health_routes
 from ai_agent_lib_core.integrations.http.invoke import INVOKE_PATH, InvokeRoute, Run
 from ai_agent_lib_core.integrations.http.lifecycle import ServiceLifecycle
 from ai_agent_lib_core.integrations.http.outcomes import OutcomeJournal
-from ai_agent_lib_core.integrations.http.prelude import AgentServices, RequestPrelude
+from ai_agent_lib_core.integrations.http.prelude import (
+    REQUEST_ID_HEADER,
+    AgentServices,
+    RequestPrelude,
+)
 from ai_agent_lib_core.integrations.http.stream import STREAM_PATH, Stream, StreamRoute
 from ai_agent_lib_core.observability.diagnostics import Diagnostics
 
-__all__ = ["agent_app"]
+__all__ = ["AgentComposition", "agent_app", "compose_agent"]
+
+
+@dataclass(frozen=True, slots=True)
+class AgentComposition:
+    """The parts of an agent's HTTP application before they become one app.
+
+    Attributes:
+        routes: The agent's own routes: invoke, and what the options added.
+        health: The liveness and readiness routes.
+        prelude: What every route does before it runs anything.
+        invoke: The JSON route, whose handler an alias may serve again.
+        admission: The thread guard the routes share.
+    """
+
+    routes: list[Route]
+    health: list[Route]
+    prelude: RequestPrelude
+    invoke: InvokeRoute
+    admission: ThreadAdmission
+
+    def app(self, *more: Route, middleware: list[Any] | None = None) -> Starlette:
+        """Return the Starlette application: the routes, ``more`` aliases, then health."""
+        return Starlette(routes=[*self.routes, *more, *self.health], middleware=middleware)
+
+
+def compose_agent(
+    services: AgentServices,
+    run: Run,
+    *,
+    application: str,
+    lifecycle: ServiceLifecycle,
+    max_body_bytes: int = 1_000_000,
+    stream: Stream | None = None,
+    diagnostics: Diagnostics | None = None,
+    live_updates: bool = False,
+    outcomes: OutcomeJournal | None = None,
+    inspector: TurnInspector | None = None,
+    admission: ThreadAdmission | None = None,
+    session_header: str | None = None,
+    request_id_headers: tuple[str, ...] = (REQUEST_ID_HEADER,),
+) -> AgentComposition:
+    """Build the routes of an agent without yet making them an application.
+
+    The arguments are those of :func:`agent_app`, plus the two a hosting
+    platform's contract adds to the prelude: ``session_header``, the header
+    that names the session the platform routes to this process, and
+    ``request_id_headers``, where the caller's request id may be sent.
+    """
+    if diagnostics is not None:
+        run = _observed_run(run, diagnostics)
+    admission = admission if admission is not None else InMemoryThreadAdmission()
+    prelude = RequestPrelude(
+        services,
+        application=application,
+        lifecycle=lifecycle,
+        max_body_bytes=max_body_bytes,
+        session_header=session_header,
+        request_id_headers=request_id_headers,
+    )
+    invoke = InvokeRoute(
+        prelude,
+        run,
+        application=application,
+        admission=admission,
+        live_updates=live_updates,
+        outcomes=outcomes,
+        inspector=inspector,
+    )
+    routes = [Route(INVOKE_PATH, invoke.handle, methods=["POST"])]
+    if outcomes is not None:
+        routes.append(Route("/requests/{request_id}", invoke.status, methods=["GET"]))
+    if inspector is not None:
+        routes.append(Route("/requests/{request_id}/inspection", invoke.inspect, methods=["GET"]))
+    if stream is not None:
+        streaming = StreamRoute(
+            prelude, stream, application=application, admission=admission, outcomes=outcomes
+        )
+        routes.append(Route(STREAM_PATH, streaming.handle, methods=["POST"]))
+    return AgentComposition(routes, health_routes(lifecycle), prelude, invoke, admission)
 
 
 def agent_app(
@@ -73,32 +162,19 @@ def agent_app(
             lasts through graph cancellation and cleanup. A journal also deduplicates
             legacy stream request IDs, but that route has no recoverable final answer.
     """
-    if diagnostics is not None:
-        run = _observed_run(run, diagnostics)
-    admission = admission if admission is not None else InMemoryThreadAdmission()
-    prelude = RequestPrelude(
-        services, application=application, lifecycle=lifecycle, max_body_bytes=max_body_bytes
-    )
-    invoke = InvokeRoute(
-        prelude,
+    return compose_agent(
+        services,
         run,
         application=application,
-        admission=admission,
+        lifecycle=lifecycle,
+        max_body_bytes=max_body_bytes,
+        stream=stream,
+        diagnostics=diagnostics,
         live_updates=live_updates,
         outcomes=outcomes,
         inspector=inspector,
-    )
-    routes = [Route(INVOKE_PATH, invoke.handle, methods=["POST"])]
-    if outcomes is not None:
-        routes.append(Route("/requests/{request_id}", invoke.status, methods=["GET"]))
-    if inspector is not None:
-        routes.append(Route("/requests/{request_id}/inspection", invoke.inspect, methods=["GET"]))
-    if stream is not None:
-        streaming = StreamRoute(
-            prelude, stream, application=application, admission=admission, outcomes=outcomes
-        )
-        routes.append(Route(STREAM_PATH, streaming.handle, methods=["POST"]))
-    return Starlette(routes=[*routes, *health_routes(lifecycle)])
+        admission=admission,
+    ).app()
 
 
 def _observed_run(run: Run, diagnostics: Diagnostics) -> Run:
