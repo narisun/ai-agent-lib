@@ -1,6 +1,7 @@
 """Project decoded graph snapshots into bounded, request-linked diagnostic text."""
 
 from collections.abc import Callable, Mapping
+from contextlib import aclosing
 from typing import Any
 
 from langchain_core.messages import BaseMessage
@@ -40,26 +41,29 @@ class GraphCheckpointPreview:
         """Return up to 50 parent graph snapshots for exactly this request."""
         records: list[object] = []
         with bind_request_context(context):
-            async for snapshot in request_history(
-                self.graph(), self.invocation(context)["config"], request_id, limit=51
-            ):
-                if len(records) == 50:
-                    return preview(records, truncated=True)
-                records.append(
-                    {
-                        "checkpoint_id": snapshot.config.get("configurable", {}).get(
-                            "checkpoint_id"
-                        ),
-                        "parent_id": (snapshot.parent_config or {})
-                        .get("configurable", {})
-                        .get("checkpoint_id"),
-                        "created_at": snapshot.created_at,
-                        "next": snapshot.next,
-                        "metadata": _decoded(snapshot.metadata),
-                        "values": _decoded(snapshot.values),
-                    }
+            async with aclosing(
+                request_history(
+                    self.graph(), self.invocation(context)["config"], request_id, limit=51
                 )
-                # Stop reading large histories once the preview budget is consumed.
-                if preview(records).truncated:
-                    return preview(records, truncated=True)
+            ) as history:
+                async for snapshot in history:
+                    if len(records) == 50:
+                        return preview(records, truncated=True)
+                    records.append(
+                        {
+                            "checkpoint_id": snapshot.config.get("configurable", {}).get(
+                                "checkpoint_id"
+                            ),
+                            "parent_id": (snapshot.parent_config or {})
+                            .get("configurable", {})
+                            .get("checkpoint_id"),
+                            "created_at": snapshot.created_at,
+                            "next": snapshot.next,
+                            "metadata": _decoded(snapshot.metadata),
+                            "values": _decoded(snapshot.values),
+                        }
+                    )
+                    # Stop reading large histories once the preview budget is consumed.
+                    if preview(records).truncated:
+                        return preview(records, truncated=True)
         return preview(records)

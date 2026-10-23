@@ -183,3 +183,26 @@ async def test_request_history_prefers_the_current_key_and_stops_there() -> None
 
 async def test_request_history_is_empty_when_neither_key_recorded_anything() -> None:
     assert await _history(_Graph({})) == []
+
+
+async def test_abandoning_request_history_closes_the_graphs_own_iterator() -> None:
+    closed: list[str] = []
+
+    class _Endless:
+        async def aget_state_history(
+            self,
+            config: dict[str, Any],
+            *,
+            filter: dict[str, str],  # noqa: A002 - the graph API's own keyword
+            limit: int,
+        ) -> AsyncIterator[str]:
+            try:
+                for index in range(1000):
+                    yield f"snapshot-{index}"
+            finally:
+                closed.append("closed")
+
+    history = request_history(_Endless(), {}, "request-1", limit=5)
+    assert await anext(history) == "snapshot-0"
+    await history.aclose()
+    assert closed == ["closed"]

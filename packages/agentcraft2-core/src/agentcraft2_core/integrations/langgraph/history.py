@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
+from contextlib import aclosing
 from typing import Any
 
 __all__ = ["LEGACY_REQUEST_KEY", "REQUEST_KEY", "request_history"]
@@ -15,11 +16,13 @@ LEGACY_REQUEST_KEY = "agentlib_request_id"
 
 async def request_history(
     graph: Any, config: dict[str, Any], request_id: str, *, limit: int
-) -> AsyncIterator[Any]:
+) -> AsyncGenerator[Any, None]:
     """Yield the graph snapshots recorded for one request, newest first.
 
     Checkpoints written before the rename carry the old key. It is asked for only
-    when nothing was recorded under the current one.
+    when nothing was recorded under the current one. Closing this iterator, or
+    abandoning it part way, closes the graph's own iterator at once: it holds a
+    database cursor, and Python 3.13 releases an abandoned one later than 3.11 did.
 
     Args:
         graph: A compiled graph with ``aget_state_history``.
@@ -29,10 +32,11 @@ async def request_history(
     """
     for key in (REQUEST_KEY, LEGACY_REQUEST_KEY):
         found = False
-        async for snapshot in graph.aget_state_history(
-            config, filter={key: request_id}, limit=limit
-        ):
-            found = True
-            yield snapshot
+        async with aclosing(
+            graph.aget_state_history(config, filter={key: request_id}, limit=limit)
+        ) as snapshots:
+            async for snapshot in snapshots:
+                found = True
+                yield snapshot
         if found:
             return
