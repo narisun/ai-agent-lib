@@ -16,14 +16,14 @@ members = ["agents/*", "mcp-servers/*"]
 # Optional uv support for the local checkout. The pip-based agentcraft2 install
 # command uses the library source recorded in agentcraft2.toml instead.
 [tool.uv.sources]
-ai-agent-lib-core = { path = "../../packages/ai-agent-lib-core", editable = true }
-ai-agent-lib-aws = { path = "../../packages/ai-agent-lib-aws", editable = true }
-ai-agent-lib-cli = { path = "../../packages/ai-agent-lib-cli", editable = true }
+agentcraft2-core = { path = "../../packages/agentcraft2-core", editable = true }
+agentcraft2-aws = { path = "../../packages/agentcraft2-aws", editable = true }
+agentcraft2-cli = { path = "../../packages/agentcraft2-cli", editable = true }
 
 [dependency-groups]
 dev = [
     # The agentcraft2 command, to add agents and MCP servers to this workspace.
-    "ai-agent-lib-cli",
+    "agentcraft2-cli",
     "mypy>=1.11",
     "pytest>=8.2",
     "pytest-asyncio>=1.4",

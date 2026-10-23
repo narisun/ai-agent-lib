@@ -7,12 +7,12 @@ import asyncio
 import logging
 from collections.abc import Sequence
 
-from ai_agent_lib_core import ServiceConfig, ServiceContainer
-from ai_agent_lib_core.config import log_resolution_warnings, service_resolver
-from ai_agent_lib_core.contracts import DeploymentEnv
-from ai_agent_lib_core.integrations.http import ServiceLifecycle, add_health_routes, serve
-from ai_agent_lib_core.integrations.mcp import verify_registration
-from ai_agent_lib_core.observability import (
+from agentcraft2_core import ServiceConfig, ServiceContainer
+from agentcraft2_core.config import log_resolution_warnings, service_resolver
+from agentcraft2_core.contracts import DeploymentEnv
+from agentcraft2_core.integrations.http import ServiceLifecycle, add_health_routes, serve
+from agentcraft2_core.integrations.mcp import verify_registration
+from agentcraft2_core.observability import (
     configure_logging,
     report_error,
     shows_details,

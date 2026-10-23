@@ -11,7 +11,7 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
 
-from ai_agent_lib_core.contracts import MASK
+from agentcraft2_core.contracts import MASK
 
 # These are limits of the supplied schemas, even when a row happens to be Closed.
 EVIDENCE_LIMITS: dict[str, dict[str, str]] = {

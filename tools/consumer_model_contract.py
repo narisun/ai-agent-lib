@@ -2,8 +2,8 @@
 
 import os
 
-from ai_agent_lib_core.contracts import ChatModelProvider
-from ai_agent_lib_core.testing.langgraph_model_contracts import LangGraphModelProviderContract
+from agentcraft2_core.contracts import ChatModelProvider
+from agentcraft2_core.testing.langgraph_model_contracts import LangGraphModelProviderContract
 
 
 class TestInstalledModel(LangGraphModelProviderContract):
@@ -15,18 +15,18 @@ class TestInstalledModel(LangGraphModelProviderContract):
         """Build the selected provider using local test credentials."""
         provider = os.environ["AGENTCRAFT2_CONSUMER_MODEL"]
         if provider == "fake":
-            from ai_agent_lib_core.adapters import FakeChatModelProvider
+            from agentcraft2_core.adapters import FakeChatModelProvider
 
             return FakeChatModelProvider()
         if provider == "anthropic":
             from pydantic import SecretStr
 
-            from ai_agent_lib_core.adapters import AnthropicChatModelProvider
+            from agentcraft2_core.adapters import AnthropicChatModelProvider
 
             return AnthropicChatModelProvider(SecretStr("test"))
         if provider == "bedrock":
-            from ai_agent_lib_aws.model_bedrock import BedrockChatModelProvider
-            from ai_agent_lib_aws.testing import offline_sessions
+            from agentcraft2_aws.model_bedrock import BedrockChatModelProvider
+            from agentcraft2_aws.testing import offline_sessions
 
             return BedrockChatModelProvider(offline_sessions())
         raise AssertionError(f"unknown consumer model {provider}")

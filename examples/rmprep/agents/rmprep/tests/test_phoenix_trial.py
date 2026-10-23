@@ -8,14 +8,14 @@ from typing import Any
 from unittest.mock import Mock
 
 import pytest
-from ai_agent_lib_core import ServiceContainer
-from ai_agent_lib_core.config.phoenix import PhoenixSettings
-from ai_agent_lib_core.integrations.http import composition
-from ai_agent_lib_core.integrations.langgraph import phoenix
-from ai_agent_lib_core.integrations.langgraph.phoenix import PhoenixTracing
-from ai_agent_lib_core.observability.model_trace import JsonlModelTraceSink
-from ai_agent_lib_core.testing import calls_tool, load_test_config, scripted_providers
-from ai_agent_lib_core.testing.mcp import InProcessMcpConnector
+from agentcraft2_core import ServiceContainer
+from agentcraft2_core.config.phoenix import PhoenixSettings
+from agentcraft2_core.integrations.http import composition
+from agentcraft2_core.integrations.langgraph import phoenix
+from agentcraft2_core.integrations.langgraph.phoenix import PhoenixTracing
+from agentcraft2_core.observability.model_trace import JsonlModelTraceSink
+from agentcraft2_core.testing import calls_tool, load_test_config, scripted_providers
+from agentcraft2_core.testing.mcp import InProcessMcpConnector
 from langchain_core.messages import AIMessage
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 

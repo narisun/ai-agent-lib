@@ -5,7 +5,7 @@ description = "Reference agent for ai-agent-lib: answers account balance questio
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "ai-agent-lib-core[jwt,mcp,otel,serve]",
+    "agentcraft2-core[jwt,mcp,otel,serve]",
 ]
 
 [project.scripts]
@@ -13,7 +13,7 @@ accounts-agent = "accounts_agent.__main__:main"
 accounts-agent-serve = "accounts_agent.service:main"
 
 [tool.uv.sources]
-ai-agent-lib-core = { workspace = true }
+agentcraft2-core = { workspace = true }
 
 [build-system]
 requires = ["hatchling>=1.25"]

@@ -21,7 +21,7 @@ with `"$PYTHON"` after setting `PYTHON` as that README describes.
 Install the workspace once, and again after changing dependencies:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli install
+"%PYTHON%" -m agentcraft2_cli install
 ```
 
 ## Test it
@@ -59,11 +59,11 @@ Select Python in each terminal first. Leave these terminals running and wait
 for each server's `ready` log event before proceeding.
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli run rmqna-data
+"%PYTHON%" -m agentcraft2_cli run rmqna-data
 ```
 
 If a server fails to start, open its README under `mcp-servers/` and run
-`"%PYTHON%" -m ai_agent_lib_cli doctor` followed by that server's name.
+`"%PYTHON%" -m agentcraft2_cli doctor` followed by that server's name.
 
 ### 3. Start the agent's HTTP server
 
@@ -171,7 +171,7 @@ result, answer with its basis) is written in the prompt, not in code.
    checked against the server by `tests/test_prompt_contract.py`. Run the workspace checks:
 
    ```bat
-   "%PYTHON%" -m ai_agent_lib_cli check
+   "%PYTHON%" -m agentcraft2_cli check
    ```
 
 ## Inspect model input and output
@@ -246,7 +246,7 @@ and when to summarize long conversations.
 
 ### Why is the trace empty?
 
-Run `"%PYTHON%" -m ai_agent_lib_cli config explain rmqna` to confirm the path.
+Run `"%PYTHON%" -m agentcraft2_cli config explain rmqna` to confirm the path.
 Calls must use `services.model()` and pass the pipeline's input checks before
 they reach the provider. Check audit records for denials. A
 `model_trace.disabled` warning means the destination or serialization failed;
@@ -256,14 +256,14 @@ separate controls.
 ## Diagnose failures and evaluate answers
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli doctor rmqna
+"%PYTHON%" -m agentcraft2_cli doctor rmqna
 ```
 
 The diagnostic explains what failed and suggests a fix. A real-model
 evaluation is a separate, explicit command:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli eval rmqna
+"%PYTHON%" -m agentcraft2_cli eval rmqna
 ```
 
 It asks the 33 questions of `evals/cases.jsonl` with the real model and the `rmqna-data` tools in
@@ -274,7 +274,7 @@ to read the report and mint the baseline.
 ## Prepare a deployment
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli deploy rmqna
+"%PYTHON%" -m agentcraft2_cli deploy rmqna
 ```
 
 The first run creates `agents/rmqna/deploy.env`. Fill in its deployment
@@ -282,9 +282,9 @@ settings and add the provider dependencies reported by the CLI to the service's
 `pyproject.toml`. Install them, review the plan, then generate the deployment files:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli install
-"%PYTHON%" -m ai_agent_lib_cli deploy rmqna --plan
-"%PYTHON%" -m ai_agent_lib_cli deploy rmqna
+"%PYTHON%" -m agentcraft2_cli install
+"%PYTHON%" -m agentcraft2_cli deploy rmqna --plan
+"%PYTHON%" -m agentcraft2_cli deploy rmqna
 ```
 
 **Expected result:** `deploy/rmqna/` contains Terraform and image-build

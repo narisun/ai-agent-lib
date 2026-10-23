@@ -15,11 +15,11 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from ai_agent_lib_core.adapters import (
+from agentcraft2_core.adapters import (
     FileRegistryOptions,
     FileRegistrySource,
 )
-from ai_agent_lib_core.contracts.structured import model_safe_name
+from agentcraft2_core.contracts.structured import model_safe_name
 
 from rmqna.prompts import SYSTEM_VERSION, load_prompt, schema_document
 from rmqna_data import engine as engine_module

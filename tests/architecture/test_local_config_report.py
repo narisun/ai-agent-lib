@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from tools.local_config_report import report_environment
 
-from ai_agent_lib_core.config import ConfigResolver, LayeredConfigSource, MappingConfigSource
+from agentcraft2_core.config import ConfigResolver, LayeredConfigSource, MappingConfigSource
 
 
 @pytest.mark.parametrize("from_launcher", [False, True])
@@ -18,7 +18,7 @@ def test_startup_uses_separate_tracing_file_and_child_working_directory(
 ) -> None:
     from tools.local_environment import agent_environment
 
-    from ai_agent_lib_core.config.phoenix import resolve_phoenix_settings
+    from agentcraft2_core.config.phoenix import resolve_phoenix_settings
 
     monkeypatch.setattr("os.environ", {})
     folder = tmp_path / "agent"
@@ -271,7 +271,7 @@ def test_legacy_tracing_names_resolve_and_report_under_the_canonical_name(
 ) -> None:
     from tools.local_environment import agent_environment
 
-    from ai_agent_lib_core.config.phoenix import resolve_phoenix_settings
+    from agentcraft2_core.config.phoenix import resolve_phoenix_settings
 
     monkeypatch.setattr("os.environ", {})
     folder = tmp_path / "agent"

@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-from ai_agent_lib_core import ServiceContainer
-from ai_agent_lib_core.testing import audit_records, load_test_config, scripted_providers
+from agentcraft2_core import ServiceContainer
+from agentcraft2_core.testing import audit_records, load_test_config, scripted_providers
 
 from rmprep import APPLICATION, answer, build_graph
 

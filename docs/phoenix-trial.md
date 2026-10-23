@@ -322,9 +322,9 @@ to run this scenario with your own saved memo reference.
 
 ## Settings
 
-From your agent workspace, run `python -m ai_agent_lib_cli config explain rmprep`
+From your agent workspace, run `python -m agentcraft2_cli config explain rmprep`
 to see effective Phoenix settings and their source files, with API keys masked.
-Run `python -m ai_agent_lib_cli doctor rmprep` to validate them before startup.
+Run `python -m agentcraft2_cli doctor rmprep` to validate them before startup.
 These tracing checks do not contact Phoenix. Startup, `doctor`, `config explain`,
 and the launcher's summary all resolve the settings through the same function,
 `resolve_phoenix_settings`, so a check shows what startup will use, including a
@@ -428,7 +428,7 @@ feedback logs, exported interactions, and scored reports.
 A service built from the generated template, or started with `run_agent`, needs
 none of this. Do it yourself only when a service composes its own entry point.
 
-Use `agent_tracing` from `ai_agent_lib_core.integrations.langgraph.tracing`. Its
+Use `agent_tracing` from `agentcraft2_core.integrations.langgraph.tracing`. Its
 signature is `agent_tracing(application, config, *, dotenv_path=Path(".env"),
 settings=None)`. It resolves the Phoenix settings from the process environment
 and `dotenv_path` (pass `None` to read only the process environment, or pass
@@ -438,7 +438,7 @@ before the exporter flushes, and pass the one adapter to both the container and
 the response handler:
 
 ```python
-from ai_agent_lib_core.integrations.langgraph.tracing import agent_tracing
+from agentcraft2_core.integrations.langgraph.tracing import agent_tracing
 
 async with agent_tracing(APPLICATION, config, dotenv_path=ENV_FILE) as tracing:
     services = ServiceContainer(config, model_trace=tracing)
@@ -464,11 +464,11 @@ because that graph carries the tracing callbacks. The adapter copies that
 dictionary and adds `trace` metadata, so treat that key as reserved while tracing
 is enabled. For isolated tests, construct
 `PhoenixTracing(settings, application=..., exporter=...)` from
-`ai_agent_lib_core.integrations.langgraph.phoenix` with an in-memory exporter
+`agentcraft2_core.integrations.langgraph.phoenix` with an in-memory exporter
 (OpenTelemetry's `InMemorySpanExporter`) instead of running a server. The rmprep service shows the full composition through `run_agent`.
 
 The agent needs the library's `otel` extra, installed with
-`python -m pip install "ai-agent-lib-core[otel]"`; generated agents already
+`python -m pip install "agentcraft2-core[otel]"`; generated agents already
 declare it. Enabling tracing without it fails at startup with that command. The
 agent does not import the Phoenix server package.
 
@@ -500,7 +500,7 @@ agents keep their own model dependencies and can still send traces to Phoenix.
 | Phoenix environment is missing | Run `start-phoenix.bat setup` once, then retry `start-local.bat`. |
 | Port 6006 is in use | Stop a standalone Phoenix window before starting the combined stack. The launcher fails before starting services and leaves the existing process alone. |
 | Repeated connection errors on port 4318 | Set `AC2_TELEMETRY=off` for this local setup, or configure your separate operational collector. Restart the stack. |
-| Startup says tracing needs `ai-agent-lib-core[otel]` | Install the extra with pip, as shown in [Compose tracing by hand](#compose-tracing-by-hand), then restart. |
+| Startup says tracing needs `agentcraft2-core[otel]` | Install the extra with pip, as shown in [Compose tracing by hand](#compose-tracing-by-hand), then restart. |
 | Startup rejects `PHOENIX_COLLECTOR_ENDPOINT` | Use an HTTPS origin, or HTTP for loopback only, with no path, query, or credentials. |
 | Startup fails with `unknown configuration variable` naming a Langfuse setting | Langfuse support was removed. Delete those lines from the `.env`, or unset the variables in the process environment; see [Since the October review](release-scope.md#since-the-october-review). |
 | No trace link | Check `AC2_PHOENIX_ENABLED` in the agent startup output and restart after changing settings. |

@@ -376,7 +376,7 @@ From `examples\rmprep`, in its Python environment:
 
 ```bat
 python -m pytest agents\rmprep\tests -q
-python -m ai_agent_lib_cli check
+python -m agentcraft2_cli check
 ```
 
 The tests use scripted model decisions. They verify selection, MCP arguments,

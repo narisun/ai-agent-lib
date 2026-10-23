@@ -44,7 +44,7 @@ and the model provider whose dependencies it will install.
 | Component | Virtual-environment folder | How it runs |
 | --- | --- | --- |
 | Library, rmprep and MCP server | `.venv` | The same `python` used for setup |
-| Agent Lab | `packages\ai-agent-lib-ui\.venv` | The same Python, loading only the UI package set |
+| Agent Lab | `packages\agentcraft2-ui\.venv` | The same Python, loading only the UI package set |
 | Phoenix, when installed | `.agentcraft2\phoenix\.venv` | The same Python, loading only the Phoenix package set |
 
 Each folder holds its packages in `Lib\site-packages` on Windows and in
@@ -68,7 +68,7 @@ conversations, traces and checkpoints are stored separately and are preserved.
 | Command | Packages installed |
 | --- | --- |
 | `setup-local.bat` | Core library, rmprep, rmprep-data, Agent Lab, and the model dependency selected by the shell, root `.env`, or service `.env` (in that order). Defaults to `fake`. |
-| `setup-local.bat --model bedrock` | The above with `ai-agent-lib-aws[bedrock]`, including `langchain-aws` and boto3. |
+| `setup-local.bat --model bedrock` | The above with `agentcraft2-aws[bedrock]`, including `langchain-aws` and boto3. |
 | `setup-local.bat --model anthropic` | The above with the core library's Anthropic extra. |
 | `setup-local.bat --dev` | Also installs the scaffolding CLI and the rmprep/Agent Lab test, lint, and type-check tools. |
 | `start-phoenix.bat setup` | The pinned Phoenix server and its required dependencies. |
@@ -123,7 +123,7 @@ Use the AWS credentials or profile provided by your enterprise setup. If your
 team supplies a named profile, set `AWS_PROFILE` to that profile. Run
 `setup-local.bat --model bedrock`, then restart. This installs `langchain-aws`;
 model access and authentication still come from your AWS account. See the
-[AWS package guide](../packages/ai-agent-lib-aws/README.md) for provider options.
+[AWS package guide](../packages/agentcraft2-aws/README.md) for provider options.
 
 To see model input/output and MCP calls in local Phoenix, add:
 
@@ -281,7 +281,7 @@ setup-local.bat --dev
 cd examples\rmprep
 python ..\..\tools\package_runtime.py agent -m pytest -q
 cd ..\..
-cd packages\ai-agent-lib-ui
+cd packages\agentcraft2-ui
 python ..\..\tools\package_runtime.py ui -m pytest -q
 cd ..\..
 ```
@@ -289,7 +289,7 @@ cd ..\..
 Run UI tests from the UI package folder so pytest uses that package's configuration.
 These tests use local fixtures and scripted models. Full contributor checks are
 in the [library README](../README.md#working-on-the-library) and
-[Agent Lab README](../packages/ai-agent-lib-ui/README.md#run-the-checks-and-build-a-wheel).
+[Agent Lab README](../packages/agentcraft2-ui/README.md#run-the-checks-and-build-a-wheel).
 
 ## Other startup scenarios
 
@@ -305,7 +305,7 @@ The MCP URL is `http://127.0.0.1:8100/mcp`. Each service gets up to 90 seconds t
 become ready. An unexpected exit stops the rest of that launcher's stack and
 reports the relevant log.
 
-For another agent, follow [Agent Lab's manual setup](../packages/ai-agent-lib-ui/README.md).
+For another agent, follow [Agent Lab's manual setup](../packages/agentcraft2-ui/README.md).
 Then use `start-local.bat ui --config .agentcraft2\ui\config.json` and start its
 agent/MCP services separately. Relative `--config` paths use the repository root.
 The default rmprep configuration is `.agentcraft2\ui-rmprep\config.json`.
@@ -360,7 +360,7 @@ After reviewing registry or identity changes, stop the stack and refresh its UI
 configuration from the repository root:
 
 ```bat
-python tools\package_runtime.py ui -m ai_agent_lib_ui init --config .agentcraft2\ui-rmprep\config.json --env-file examples\rmprep\agents\rmprep\.env --agent rmprep --artifacts-agent rmprep --allow-url http://127.0.0.1:8000 --overwrite
+python tools\package_runtime.py ui -m agentcraft2_ui init --config .agentcraft2\ui-rmprep\config.json --env-file examples\rmprep\agents\rmprep\.env --agent rmprep --artifacts-agent rmprep --allow-url http://127.0.0.1:8000 --overwrite
 start-local.bat
 ```
 

@@ -48,8 +48,8 @@ Open **Command Prompt** in the library repository. Use Python 3.11 or newer and
 your team's existing pip configuration, including its enterprise package index.
 
 ```bat
-python -m pip install -e packages\ai-agent-lib-core -e packages\ai-agent-lib-aws -e packages\ai-agent-lib-cli
-python -m ai_agent_lib_cli install --workspace examples\rmprep
+python -m pip install -e packages\agentcraft2-core -e packages\agentcraft2-aws -e packages\agentcraft2-cli
+python -m agentcraft2_cli install --workspace examples\rmprep
 cd examples\rmprep
 ```
 
@@ -132,11 +132,11 @@ It listens at `http://127.0.0.1:8100/mcp`. Keep the window open.
 
 For model-written answers, configure a tool-capable model in
 `agents\rmprep\.env`. The default `fake` provider echoes input.
-For Anthropic, add `anthropic` to the existing `ai-agent-lib-core[...]` extras
+For Anthropic, add `anthropic` to the existing `agentcraft2-core[...]` extras
 in `agents\rmprep\pyproject.toml`, then run:
 
 ```bat
-python -m ai_agent_lib_cli install
+python -m agentcraft2_cli install
 notepad agents\rmprep\.env
 ```
 
@@ -294,7 +294,7 @@ the custom composite tools and graph. Copy this example to retain those changes.
 ## 6. Run the checks
 
 ```bat
-python -m ai_agent_lib_cli check
+python -m agentcraft2_cli check
 ```
 
 This runs linting, formatting, type checks, tests and policy samples. Tests cover

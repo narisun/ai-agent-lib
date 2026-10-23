@@ -7,9 +7,9 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from ai_agent_lib_core import ValidationFailed
-from ai_agent_lib_core.integrations.langgraph.prompts import static_system_prompt
-from ai_agent_lib_core.pipeline.guardrails import frame_untrusted
+from agentcraft2_core import ValidationFailed
+from agentcraft2_core.integrations.langgraph.prompts import static_system_prompt
+from agentcraft2_core.pipeline.guardrails import frame_untrusted
 from langchain_core.messages import AIMessage, AnyMessage, ToolMessage
 
 from rmprep.clients import resolved_clients

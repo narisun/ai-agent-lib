@@ -105,7 +105,7 @@ or settings. Ctrl+C in the launcher window also stops its stack.
 
 The [local testing guide](docs/local-startup.md) includes expected answers, client
 switching, older memos, startup checks and troubleshooting. To connect your own
-agent, use the [Agent Lab package guide](packages/ai-agent-lib-ui/README.md).
+agent, use the [Agent Lab package guide](packages/agentcraft2-ui/README.md).
 
 ## Run your first agent
 
@@ -134,11 +134,11 @@ it. Keep the quotes so paths containing spaces work.
 ```bat
 set "LIBRARY=%CD%"
 set "PYTHON=python"
-"%PYTHON%" -m pip install -e ./packages/ai-agent-lib-core -e ./packages/ai-agent-lib-cli
-"%PYTHON%" -m ai_agent_lib_cli init tutorial --dir .. --lib-path "%LIBRARY%" --owner learning
+"%PYTHON%" -m pip install -e ./packages/agentcraft2-core -e ./packages/agentcraft2-cli
+"%PYTHON%" -m agentcraft2_cli init tutorial --dir .. --lib-path "%LIBRARY%" --owner learning
 cd /d ..\tutorial
-"%PYTHON%" -m ai_agent_lib_cli new agent helper --description "A practice assistant" --model fake
-"%PYTHON%" -m ai_agent_lib_cli install
+"%PYTHON%" -m agentcraft2_cli new agent helper --description "A practice assistant" --model fake
+"%PYTHON%" -m agentcraft2_cli install
 "%PYTHON%" -m pytest
 "%PYTHON%" -m helper "Say hello to Ada."
 ```
@@ -151,11 +151,11 @@ Use `python -m pip`, so pip runs under that approved Python.
 ```bash
 LIBRARY="$PWD"
 PYTHON=python3
-"$PYTHON" -m pip install -e ./packages/ai-agent-lib-core -e ./packages/ai-agent-lib-cli
-"$PYTHON" -m ai_agent_lib_cli init tutorial --dir .. --lib-path "$LIBRARY" --owner learning
+"$PYTHON" -m pip install -e ./packages/agentcraft2-core -e ./packages/agentcraft2-cli
+"$PYTHON" -m agentcraft2_cli init tutorial --dir .. --lib-path "$LIBRARY" --owner learning
 cd ../tutorial
-"$PYTHON" -m ai_agent_lib_cli new agent helper --description "A practice assistant" --model fake
-"$PYTHON" -m ai_agent_lib_cli install
+"$PYTHON" -m agentcraft2_cli new agent helper --description "A practice assistant" --model fake
+"$PYTHON" -m agentcraft2_cli install
 "$PYTHON" -m pytest
 "$PYTHON" -m helper "Say hello to Ada."
 ```
@@ -201,9 +201,9 @@ interfaces, so tests can supply fakes and deployments can select other providers
 From `tutorial/`, in the same Command Prompt window:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli doctor helper
-"%PYTHON%" -m ai_agent_lib_cli check
-"%PYTHON%" -m ai_agent_lib_cli run helper
+"%PYTHON%" -m agentcraft2_cli doctor helper
+"%PYTHON%" -m agentcraft2_cli check
+"%PYTHON%" -m agentcraft2_cli run helper
 ```
 
 On macOS/Linux, replace `"%PYTHON%"` with `"$PYTHON"`. In a new terminal,
@@ -223,7 +223,7 @@ uses Python's standard library to send a request. The service exposes
 service validation and graph/MCP preparation. Generated agents support live
 model drafts through `POST /invoke` with `Accept: text/event-stream`, followed
 by one accepted result. The separate `/invoke/stream` route sends graph-step
-updates for debugging. See [live responses and metrics](packages/ai-agent-lib-ui/README.md#live-responses-and-metrics).
+updates for debugging. See [live responses and metrics](packages/agentcraft2-ui/README.md#live-responses-and-metrics).
 
 ## Inspect model input, output, and conversation history
 
@@ -270,13 +270,13 @@ have these examples under their own package names; their READMEs give exact comm
 
 | Path | What it contains |
 | --- | --- |
-| [Core package](packages/ai-agent-lib-core/README.md) | Contracts, configuration, service composition, local adapters, model/tool checks, framework integrations, and test helpers |
-| [AWS package](packages/ai-agent-lib-aws/README.md) | AWS adapters and their optional dependencies |
-| [CLI package](packages/ai-agent-lib-cli/README.md) | The `agentcraft2` command, also available as `python -m ai_agent_lib_cli` |
+| [Core package](packages/agentcraft2-core/README.md) | Contracts, configuration, service composition, local adapters, model/tool checks, framework integrations, and test helpers |
+| [AWS package](packages/agentcraft2-aws/README.md) | AWS adapters and their optional dependencies |
+| [CLI package](packages/agentcraft2-cli/README.md) | The `agentcraft2` command, also available as `python -m agentcraft2_cli` |
 | [Reference agent](examples/accounts-agent/README.md) | A working LangGraph agent |
 | [Reference MCP server](examples/accounts-mcp/README.md) | Shared tools, named queries, and sample CSV data |
 | [Relationship manager preparation](examples/rmprep/README.md) | Router, memo and Q&A nodes over 33 supplied CSVs, with governed MCP evidence, source references and checkpoints |
-| [Agent Lab package](packages/ai-agent-lib-ui/README.md) | `packages/ai-agent-lib-ui`: the browser simulator with chat, memo versions, trace links, answer feedback, and online-eval export of saved chats |
+| [Agent Lab package](packages/agentcraft2-ui/README.md) | `packages/agentcraft2-ui`: the browser simulator with chat, memo versions, trace links, answer feedback, and online-eval export of saved chats |
 | [Policies](policies/README.md) | Rules and the OPA policy bundle |
 | [Architecture tests](tests/architecture) | Checks that enforce package boundaries and keep documentation current |
 | [Configuration reference](docs/variables.md) | Supported environment variables |
@@ -347,7 +347,7 @@ Keep the generated HTML and companion Markdown/sample files with the source chan
 The walkthroughs and trace reader come from the CLI templates, so the library
 docs and newly generated tutorials stay in sync. Configuration reference
 tables come from the binding definitions in
-`packages/ai-agent-lib-core/src/ai_agent_lib_core/config/bindings.py`.
+`packages/agentcraft2-core/src/agentcraft2_core/config/bindings.py`.
 
 ## Deployment and release scope
 
@@ -362,6 +362,6 @@ operational limits. The [architecture decisions](docs/adr/README.md) explain
 the design choices.
 
 For Agent Lab's current setup and features, use its
-[package guide](packages/ai-agent-lib-ui/README.md). The
+[package guide](packages/agentcraft2-ui/README.md). The
 [documentation index](docs/README.md#current-behavior-and-design-material) links
 the frontend design, implementation plan, and original Chainlit trial separately.

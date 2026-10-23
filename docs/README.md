@@ -11,7 +11,7 @@ source.
 | Test the included business agent | [Local startup and testing](local-startup.md) | Set the root `.env`, start the stack, test memos and same-thread follow-ups, inspect traces, and stop safely |
 | Build a new agent | [Getting started](getting-started.md) | Create the `tutorial` workspace, add a tool, and test permissions and behavior |
 | Learn the architecture | [Developer guide](developer-guide.html#principles) | Understand interfaces, dependency injection, providers, and the LangGraph boundary |
-| Connect an existing agent to the simulator | [Agent Lab setup](../packages/ai-agent-lib-ui/README.md#1-prepare-the-ui-packages) | Register an HTTP agent, start the UI, and resume saved chats |
+| Connect an existing agent to the simulator | [Agent Lab setup](../packages/agentcraft2-ui/README.md#1-prepare-the-ui-packages) | Register an HTTP agent, start the UI, and resume saved chats |
 | Find a configuration variable | [Searchable configuration table](developer-guide.html#variables) | See its purpose, local/AWS values, and provider options |
 | Inspect model context and tool use | [Tracing and ReAct walkthrough](developer-guide.html#model-debugging) | Read model input/output and checkpoint history |
 | Trace agent runs with Phoenix | [Trace agents with Phoenix](phoenix-trial.md) | Turn tracing on with one setting, run Phoenix locally or send traces to a team-hosted server, and follow Agent Lab's trace links |
@@ -21,7 +21,7 @@ source.
 | Keep turns on one thread in order | [Thread admission](http-thread-admission.md) | Learn when an overlapping request gets HTTP 409 `thread_busy` and which coordination fits your deployment |
 | Deploy an agent to AWS Bedrock AgentCore | [AgentCore trial](agentcore-trial.md) | Generate the AgentCore deployment with `--target agentcore`, pass preflight, deploy the rmprep agent and its MCP server, and check the recorded run |
 | Understand the business example | [rmprep](../examples/rmprep/README.md) and [context management](../examples/rmprep/docs/context-management.md) | Follow client selection, memo generation, and same-thread questions |
-| Upgrade a generated workspace | [Keep generated files up to date](getting-started.md#9-keep-generated-files-up-to-date) and [updating generated code](../packages/ai-agent-lib-cli/README.md#updating-generated-code) | Preview with `agentcraft2 update --plan`, which writes nothing, then run `agentcraft2 update` |
+| Upgrade a generated workspace | [Keep generated files up to date](getting-started.md#9-keep-generated-files-up-to-date) and [updating generated code](../packages/agentcraft2-cli/README.md#updating-generated-code) | Preview with `agentcraft2 update --plan`, which writes nothing, then run `agentcraft2 update` |
 | Change the library | [Contributor setup](../README.md#working-on-the-library) | Install development dependencies and run the appropriate checks |
 
 Add `--diff` to `agentcraft2 update --plan` to see the proposed changes to files you
@@ -40,15 +40,15 @@ injects them into the components that use them.
 
 | Location | Responsibility | Change it when… |
 | --- | --- | --- |
-| `packages/ai-agent-lib-core/src/ai_agent_lib_core/contracts/` | Framework-independent values and interfaces | Defining a shared capability or boundary |
+| `packages/agentcraft2-core/src/agentcraft2_core/contracts/` | Framework-independent values and interfaces | Defining a shared capability or boundary |
 | `…/config/`, `…/di/` in core | Resolve settings; construct and close providers | Adding a provider or changing configuration/lifecycle behavior |
 | `…/pipeline/`, `…/adapters/` in core | Apply policy, limits, audit, and local provider behavior | Changing a cross-cutting concern |
 | `…/integrations/` in core | Connect the library to LangGraph, MCP, and HTTP | Changing framework or transport behavior |
 | `…/integrations/http/` in core | `AgentService` and `run_agent` (`composition.py`) wire configuration, tracing, lifecycle, and serving around an agent's graph | Changing how every agent service starts, answers, or stops |
 | `…/evaluation/` in core | Eval cases, scorers, offline runs, baselines, and sampled online scoring | Changing how an agent is measured; see the [evals guide](evals.md) |
-| `packages/ai-agent-lib-aws/` | AWS implementations of library interfaces | Adding cloud-specific behavior |
-| `packages/ai-agent-lib-cli/` | Workspace commands and generated templates | Changing what developers generate, install, check, or deploy |
-| `packages/ai-agent-lib-ui/src/ai_agent_lib_ui/application/` | Chat admission, dispatch coordination, and response projection | Changing the simulator's workflow |
+| `packages/agentcraft2-aws/` | AWS implementations of library interfaces | Adding cloud-specific behavior |
+| `packages/agentcraft2-cli/` | Workspace commands and generated templates | Changing what developers generate, install, check, or deploy |
+| `packages/agentcraft2-ui/src/agentcraft2_ui/application/` | Chat admission, dispatch coordination, and response projection | Changing the simulator's workflow |
 | `…/contracts/` in UI | Values and ports for catalog, conversations, artifacts, feedback, and diagnostics; imports nothing else in the package | Changing what the application layer may ask of its adapters |
 | `…/adapters/` in UI | HTTP, registry, SQLite, documents, diagnostic readers, and the online-eval export | Changing how the UI talks to services or stores state |
 | `…/integrations/`, `…/assets/` in UI | FastAPI/Chainlit hooks, pages, and styling | Changing browser behavior or presentation |
@@ -92,7 +92,7 @@ rmprep and UI checks; the full library and guide checks require the additional
 | --- | --- | --- |
 | Library and CLI (contributor setup) | `python` | `python -m pytest tests/architecture` |
 | rmprep (local setup) | `python` with agent packages | First `cd examples/rmprep`, then `python ../../tools/package_runtime.py agent -m pytest`; return with `cd ../..`. |
-| Agent Lab | `python` with the UI package folder | First `cd packages/ai-agent-lib-ui`, then `python ../../tools/package_runtime.py ui -m pytest`; return with `cd ../..`. |
+| Agent Lab | `python` with the UI package folder | First `cd packages/agentcraft2-ui`, then `python ../../tools/package_runtime.py ui -m pytest`; return with `cd ../..`. |
 | Developer guide (contributor setup) | `python` | `python docs/guide/build_guide.py --check` |
 | Local stack readiness | Launcher | With services stopped, run `start-local.bat --smoke-test`; it checks startup and shuts down without sending model requests. |
 
@@ -135,7 +135,7 @@ For Agent Lab's package boundaries, presentation manifest, and registry rules, r
   `python docs/guide/build_guide.py`. The builder regenerates
   the HTML guide and its template-derived companion files.
 - Edit generated workspace/service instructions in
-  `packages/ai-agent-lib-cli/src/ai_agent_lib_cli/templates/`. Test generation
+  `packages/agentcraft2-cli/src/agentcraft2_cli/templates/`. Test generation
   before treating an existing generated project's README as authoritative.
 - Edit package READMEs and this index directly. Link to the detailed guide for
   advanced setup instead of copying it into every README.

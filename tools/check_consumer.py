@@ -48,7 +48,7 @@ UI_PROTOCOL_SUPPORT = (
 def distribution_paths(wheels: Path, packages: list[str], version: str, *, chat: bool) -> list[str]:
     """Select this checkout's wheels and request the optional chat extra explicitly."""
     return [
-        str(next(wheels.glob(f"ai_agent_lib_{package}-{version}-*.whl")))
+        str(next(wheels.glob(f"agentcraft2_{package}-{version}-*.whl")))
         + ("[chat]" if package == "ui" and chat else "")
         for package in packages
     ]
@@ -73,7 +73,7 @@ def main() -> None:
     parser.add_argument("--constraints", type=Path)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
-    version = tomllib.loads((root / "packages/ai-agent-lib-core/pyproject.toml").read_text())[
+    version = tomllib.loads((root / "packages/agentcraft2-core/pyproject.toml").read_text())[
         "project"
     ]["version"]
     parent = root / ".agentcraft2" / "consumers"
@@ -125,33 +125,33 @@ def main() -> None:
             wheels, packages, version, chat=args.profile == "ui-chat"
         )
         run("-m", "pip", "install", *distributions)
-        run("-c", "import ai_agent_lib_core as c; assert 'site-packages' in c.__file__")
+        run("-c", "import agentcraft2_core as c; assert 'site-packages' in c.__file__")
         if args.profile == "core":
             run(
                 "-c",
-                "from ai_agent_lib_core.di import ServiceProviders; "
+                "from agentcraft2_core.di import ServiceProviders; "
                 "assert ServiceProviders.default().lookup('checkpoint', 'sqlite').options; "
                 "import importlib.util; "
-                "assert importlib.util.find_spec('ai_agent_lib_aws') is None",
+                "assert importlib.util.find_spec('agentcraft2_aws') is None",
             )
         elif args.profile == "ui":
             run(
                 "-c",
                 "import sys, importlib.util; "
-                "import ai_agent_lib_ui as ui; "
-                "from ai_agent_lib_ui.application.question_answer import QuestionAnswerAdapter; "
-                "from ai_agent_lib_ui.contracts.ports import ConversationStore; "
-                "from ai_agent_lib_core.contracts.diagnostics import ModelAttempt; "
+                "import agentcraft2_ui as ui; "
+                "from agentcraft2_ui.application.question_answer import QuestionAnswerAdapter; "
+                "from agentcraft2_ui.contracts.ports import ConversationStore; "
+                "from agentcraft2_core.contracts.diagnostics import ModelAttempt; "
                 "assert 'site-packages' in ui.__file__; "
                 "assert not any(n.split('.')[0] in {'langgraph','langchain_core','mcp','chainlit'} "
                 "for n in sys.modules); "
                 "assert all(importlib.util.find_spec(n) is None "
-                "for n in ('ai_agent_lib_cli','ai_agent_lib_aws','chainlit','mcp'))",
+                "for n in ('agentcraft2_cli','agentcraft2_aws','chainlit','mcp'))",
             )
         elif args.profile == "ui-chat":
             run(
                 "-c",
-                "import ai_agent_lib_ui as ui; from importlib.resources import files; "
+                "import agentcraft2_ui as ui; from importlib.resources import files; "
                 "assert 'site-packages' in ui.__file__; "
                 "assert files(ui).joinpath('assets/chainlit.toml').is_file(); "
                 "assert files(ui).joinpath('migrations/001_local.sql').is_file()",
@@ -159,7 +159,7 @@ def main() -> None:
             run("-m", "pip", "install", "pytest>=8.2", "pytest-asyncio>=0.24", "aiohttp>=3.10")
             # The browser protocol tests, with the fixtures and helpers they share, run
             # against the installed wheel from a folder that has no source tree.
-            tests = root / "packages/ai-agent-lib-ui/tests"
+            tests = root / "packages/agentcraft2-ui/tests"
             suites = [work / name for name in UI_PROTOCOL_TESTS]
             for name in (*UI_PROTOCOL_TESTS, *UI_PROTOCOL_SUPPORT):
                 shutil.copyfile(tests / name, work / name)
@@ -174,14 +174,14 @@ def main() -> None:
         elif args.profile == "aws":
             run(
                 "-c",
-                "from ai_agent_lib_core.di import ServiceProviders; "
+                "from agentcraft2_core.di import ServiceProviders; "
                 "assert ServiceProviders.default().lookup('checkpoint', 'postgres').options; "
                 "import importlib.util; assert importlib.util.find_spec('psycopg') is None",
             )
         else:
             run(
                 "-m",
-                "ai_agent_lib_cli",
+                "agentcraft2_cli",
                 "init",
                 "demo",
                 "--owner",
@@ -196,7 +196,7 @@ def main() -> None:
                 provider = args.profile.removeprefix("generated-")
                 run(
                     "-m",
-                    "ai_agent_lib_cli",
+                    "agentcraft2_cli",
                     "new",
                     "agent",
                     "helper",
@@ -209,7 +209,7 @@ def main() -> None:
                 )
                 run(
                     "-m",
-                    "ai_agent_lib_cli",
+                    "agentcraft2_cli",
                     "new",
                     "mcp",
                     "people",
@@ -219,25 +219,25 @@ def main() -> None:
                     "--workspace",
                     str(workspace),
                 )
-                run("-m", "ai_agent_lib_cli", "install", "--workspace", str(workspace))
+                run("-m", "agentcraft2_cli", "install", "--workspace", str(workspace))
                 run(
                     "-c",
                     "import helper.graph, helper.service, people.server; "
-                    "from ai_agent_lib_core.di import ServiceProviders; "
+                    "from agentcraft2_core.di import ServiceProviders; "
                     f"assert ServiceProviders.default().lookup('model', {provider!r})",
                 )
                 if provider == "anthropic":
                     run(
                         "-c",
-                        "from ai_agent_lib_core.adapters import AnthropicChatModelProvider; "
+                        "from agentcraft2_core.adapters import AnthropicChatModelProvider; "
                         "from pydantic import SecretStr; "
                         "AnthropicChatModelProvider(SecretStr('test')).create('test-model')",
                     )
                 elif provider == "bedrock":
                     run(
                         "-c",
-                        "from ai_agent_lib_aws.model_bedrock import BedrockChatModelProvider; "
-                        "from ai_agent_lib_aws.testing import offline_sessions; "
+                        "from agentcraft2_aws.model_bedrock import BedrockChatModelProvider; "
+                        "from agentcraft2_aws.testing import offline_sessions; "
                         "BedrockChatModelProvider(offline_sessions()).create('anthropic.claude-v2')",
                     )
                 run("-m", "pytest", "-q", cwd=workspace)

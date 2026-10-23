@@ -342,8 +342,8 @@ kbd { font-family: var(--font-mono); font-size: .85em; border: 1px solid var(--l
     <code>tests/test_expiry.py</code> in the tutorial workspace and run it with pytest.</p>
 <pre><code class="language-python" id="di-example">from datetime import UTC, datetime, timedelta
 
-from ai_agent_lib_core.contracts import Clock
-from ai_agent_lib_core.testing import FrozenClock
+from agentcraft2_core.contracts import Clock
+from agentcraft2_core.testing import FrozenClock
 
 
 class Expiry:
@@ -364,7 +364,7 @@ def test_expiry_uses_the_supplied_clock() -&gt; None:
     clock.advance(30)
     assert expiry.after(60) == datetime(2026, 1, 1, 0, 1, 30, tzinfo=UTC)</code></pre>
     <p>Running code can supply <code>SystemClock</code> from
-    <code>ai_agent_lib_core.adapters</code> to the same constructor. The calculation
+    <code>agentcraft2_core.adapters</code> to the same constructor. The calculation
     stays the same; the test controls its input time through the clock interface.</p>
   </details>
   <p><strong>Dependency inversion</strong> is the rule about depending on a contract.
@@ -439,8 +439,8 @@ def test_expiry_uses_the_supplied_clock() -&gt; None:
   <code>main(argv)</code> and the <code>__main__</code> guard:</p>
 <pre><code class="language-python" id="service-example">from typing import Any
 
-from ai_agent_lib_core import RequestContext, ServiceContainer
-from ai_agent_lib_core.integrations.http import AgentService, run_agent
+from agentcraft2_core import RequestContext, ServiceContainer
+from agentcraft2_core.integrations.http import AgentService, run_agent
 
 from helper.graph import APPLICATION, answer, build_graph, registered_mcp_tools
 from helper.settings import ENV_FILE
@@ -466,7 +466,7 @@ SERVICE = AgentService(
 
 def main() -&gt; int:
     return run_agent(SERVICE)</code></pre>
-  <p><code>python -m ai_agent_lib_cli run helper</code> starts the module that calls
+  <p><code>python -m agentcraft2_cli run helper</code> starts the module that calls
   <code>main()</code>, which serves the agent until the platform stops it. The two
   sides of that call have separate jobs:</p>
   <div class="table-wrap"><table>
@@ -494,7 +494,7 @@ def main() -&gt; int:
     <thead><tr><th>Component</th><th>Owns</th><th>Local package location</th></tr></thead>
     <tbody>
       <tr><td>Agent and MCP services</td><td>Business workflow, evidence, policy enforcement, and graph checkpoints</td><td><code>.venv/Lib/site-packages</code>; the approved Python runs it</td></tr>
-      <tr><td>Agent Lab</td><td>Agent selection, displayed chat history, memo versions, and inspection pages</td><td><code>packages/ai-agent-lib-ui/.venv/Lib/site-packages</code>; the same approved Python</td></tr>
+      <tr><td>Agent Lab</td><td>Agent selection, displayed chat history, memo versions, and inspection pages</td><td><code>packages/agentcraft2-ui/.venv/Lib/site-packages</code>; the same approved Python</td></tr>
       <tr><td>Local Phoenix server, when enabled</td><td>Model/tool observations in a local SQLite database</td><td><code>.agentcraft2/phoenix/.venv/Lib/site-packages</code> with the same Python; included by <code>start-local.bat</code> when enabled</td></tr>
     </tbody>
   </table></div>
@@ -571,10 +571,10 @@ def main() -&gt; int:
   <details class="lesson">
   <summary>Read the library implementation after completing the tutorial</summary>
   <p>To read the implementation in order, start with
-  <a href="../packages/ai-agent-lib-core/src/ai_agent_lib_core/contracts/ports.py">contracts/ports.py</a>,
-  then <a href="../packages/ai-agent-lib-core/src/ai_agent_lib_core/di/defaults.py">di/defaults.py</a>
-  and <a href="../packages/ai-agent-lib-core/src/ai_agent_lib_core/di/container.py">di/container.py</a>.
-  Follow <a href="../packages/ai-agent-lib-core/src/ai_agent_lib_core/pipeline/assembly.py">pipeline/assembly.py</a>
+  <a href="../packages/agentcraft2-core/src/agentcraft2_core/contracts/ports.py">contracts/ports.py</a>,
+  then <a href="../packages/agentcraft2-core/src/agentcraft2_core/di/defaults.py">di/defaults.py</a>
+  and <a href="../packages/agentcraft2-core/src/agentcraft2_core/di/container.py">di/container.py</a>.
+  Follow <a href="../packages/agentcraft2-core/src/agentcraft2_core/pipeline/assembly.py">pipeline/assembly.py</a>
   into its stages, then see the connection to a real graph in
   <a href="../examples/accounts-agent/src/accounts_agent/graph.py">accounts_agent/graph.py</a>.
   </p>
@@ -669,7 +669,7 @@ set "LIBRARY=%CD%"</code></pre>
   Use the pip endpoint and authentication procedure supplied by your team.
   An Artifactory browser page is not necessarily its pip endpoint.</p>
   <p>Keep your existing approved pip configuration. The commands below use it,
-  and <code>ai_agent_lib_cli install</code> runs pip with the same Python and
+  and <code>agentcraft2_cli install</code> runs pip with the same Python and
   inherited environment. Pip settings belong to pip; the agent's <code>.env</code>
   file configures the running application.</p>
   <details class="lesson">
@@ -689,8 +689,8 @@ set "LIBRARY=%CD%"</code></pre>
 
   <h3>D. Install the library and its command-line tool</h3>
   <p>Still in <code>ai-agent-lib</code>, install the two local packages:</p>
-<pre><code class="language-bat" id="desktop-install-library">"%PYTHON%" -m pip install -e "%LIBRARY%\packages\ai-agent-lib-core" -e "%LIBRARY%\packages\ai-agent-lib-cli"
-"%PYTHON%" -m ai_agent_lib_cli --help</code></pre>
+<pre><code class="language-bat" id="desktop-install-library">"%PYTHON%" -m pip install -e "%LIBRARY%\packages\agentcraft2-core" -e "%LIBRARY%\packages\agentcraft2-cli"
+"%PYTHON%" -m agentcraft2_cli --help</code></pre>
   <p><strong>Check:</strong> installation succeeds and the CLI help lists commands
   including <code>init</code>, <code>new</code>, and <code>install</code>.
   <strong>CLI</strong> means command-line interface. The <code>-e</code> option
@@ -704,10 +704,10 @@ set "LIBRARY=%CD%"</code></pre>
   beside the library checkout, then switch into it. If that folder already exists,
   choose an unused name and use it in both the <code>init</code> and <code>cd</code>
   commands.</p>
-<pre><code class="language-bat" id="desktop-create-workspace">"%PYTHON%" -m ai_agent_lib_cli init tutorial --dir .. --lib-path "%LIBRARY%" --owner learning
+<pre><code class="language-bat" id="desktop-create-workspace">"%PYTHON%" -m agentcraft2_cli init tutorial --dir .. --lib-path "%LIBRARY%" --owner learning
 cd /d "%LIBRARY%\..\tutorial"
-"%PYTHON%" -m ai_agent_lib_cli new agent helper --description "A practice assistant" --model fake
-"%PYTHON%" -m ai_agent_lib_cli install</code></pre>
+"%PYTHON%" -m agentcraft2_cli new agent helper --description "A practice assistant" --model fake
+"%PYTHON%" -m agentcraft2_cli install</code></pre>
   <p><strong>Check:</strong> the workspace contains <code>agentcraft2.toml</code> and
   <code>agents\helper</code>, and installation finishes successfully.
   <code>init</code> creates shared files; <code>new agent</code> creates the agent's
@@ -724,7 +724,7 @@ cd /d "%LIBRARY%\..\tutorial"
 
   <h3>F. Check the workspace and ask a question</h3>
 <pre><code class="language-bat" id="desktop-first-run">"%PYTHON%" -m pip check
-"%PYTHON%" -m ai_agent_lib_cli check
+"%PYTHON%" -m agentcraft2_cli check
 "%PYTHON%" -m helper "Say hello to Ada."</code></pre>
   <p><strong>Check:</strong> pip reports compatible dependencies, the workspace
   reports <code>Every check passed.</code>, and the answer is
@@ -766,7 +766,7 @@ set "PYTHON=python"
   <details class="lesson">
     <summary>Optional: call the agent over HTTP</summary>
   <p>HTTP lets another program call your agent. Start the service in your setup terminal:</p>
-<pre><code class="language-bat">"%PYTHON%" -m ai_agent_lib_cli run helper</code></pre>
+<pre><code class="language-bat">"%PYTHON%" -m agentcraft2_cli run helper</code></pre>
   <p>Wait for the <code>ready</code> log event and leave the server running.
   Save this as <code>try_http.py</code> in <code>tutorial/</code>.
   It uses Python's standard library and works on Windows, macOS, and Linux.</p>
@@ -898,7 +898,7 @@ def test_farewell_trims_the_name() -&gt; None:
     resource: farewell
     expect: allow
     reason: helper-calls-its-own-tools</code></pre>
-<pre><code class="language-bat">"%PYTHON%" -m ai_agent_lib_cli policy test</code></pre>
+<pre><code class="language-bat">"%PYTHON%" -m agentcraft2_cli policy test</code></pre>
   <p>The new sample should fail: no rule permits <code>farewell</code> yet. In
   <code>policies/agentcraft2/rules/data.yaml</code>, find the existing rule with
   <code>id: helper-calls-its-own-tools</code>. Change its <code>resources</code> list
@@ -907,13 +907,13 @@ def test_farewell_trims_the_name() -&gt; None:
     actions: [tool.call]
     applications: [helper]
     resources: [greet, farewell]</code></pre>
-  <p>Rerun <code>"%PYTHON%" -m ai_agent_lib_cli policy test</code>.
+  <p>Rerun <code>"%PYTHON%" -m agentcraft2_cli policy test</code>.
   The sample should pass with the added permission.</p>
   <h3>Step D: test the graph's tool call</h3>
   <p>Create <code>agents/helper/tests/test_farewell_graph.py</code>:</p>
-<pre><code class="language-python" data-example="farewell-graph">from ai_agent_lib_core import Principal, RequestContext
-from ai_agent_lib_core.pipeline import frame_untrusted
-from ai_agent_lib_core.testing import FakeChatModelProvider, Fakes, calls_tool
+<pre><code class="language-python" data-example="farewell-graph">from agentcraft2_core import Principal, RequestContext
+from agentcraft2_core.pipeline import frame_untrusted
+from agentcraft2_core.testing import FakeChatModelProvider, Fakes, calls_tool
 
 from helper import APPLICATION, ask
 
@@ -947,8 +947,8 @@ async def test_agent_uses_farewell() -&gt; None:
   <p><strong>This test uses fake permissions.</strong> It checks the graph's behavior;
   the policy sample in Step C checks your actual rule. Both are necessary.</p>
 <pre><code class="language-bat">"%PYTHON%" -m pytest agents/helper
-"%PYTHON%" -m ai_agent_lib_cli policy test
-"%PYTHON%" -m ai_agent_lib_cli check</code></pre>
+"%PYTHON%" -m agentcraft2_cli policy test
+"%PYTHON%" -m agentcraft2_cli check</code></pre>
   <div class="note">
     <strong>Expected result: the function, graph, and permission tests pass.</strong>
     <p><code>check</code> also runs formatting, lint, and type checks. If formatting
@@ -983,9 +983,9 @@ AC2_MODEL_PROVIDER=fake</code></pre>
   <p>Use the <a href="#variables">configuration variable table</a> to compare local
   and AWS settings for every concern. It includes the team's Fargate, Redshift,
   PostgreSQL, S3, and Entra deployment choices.</p>
-<pre><code class="language-bat">"%PYTHON%" -m ai_agent_lib_cli config explain helper
-"%PYTHON%" -m ai_agent_lib_cli config options model fake
-"%PYTHON%" -m ai_agent_lib_cli doctor helper</code></pre>
+<pre><code class="language-bat">"%PYTHON%" -m agentcraft2_cli config explain helper
+"%PYTHON%" -m agentcraft2_cli config options model fake
+"%PYTHON%" -m agentcraft2_cli doctor helper</code></pre>
   <p><code>explain</code> shows resolved settings and where they came from, masking
   secrets. <code>options</code> lists accepted keys and defaults. <code>doctor</code>
   tries to build and validate the configured services; with cloud adapters, this can
@@ -1000,15 +1000,15 @@ AC2_MODEL_PROVIDER=fake</code></pre>
   when your team has approved a model endpoint and supplied account access:</p>
   <ol>
     <li>Choose a provider your team supports. Look up its options with
-    <code>"%PYTHON%" -m ai_agent_lib_cli config options model anthropic</code>
+    <code>"%PYTHON%" -m agentcraft2_cli config options model anthropic</code>
     (or replace <code>anthropic</code> with <code>bedrock</code>).</li>
     <li>Add the dependency to <code>agents/helper/pyproject.toml</code>:
-    the core <code>anthropic</code> extra, or <code>ai-agent-lib-aws[bedrock]</code>.
+    the core <code>anthropic</code> extra, or <code>agentcraft2-aws[bedrock]</code>.
     Preserve the version constraints already used by your project.</li>
-    <li>Run <code>"%PYTHON%" -m ai_agent_lib_cli install</code> again.</li>
+    <li>Run <code>"%PYTHON%" -m agentcraft2_cli install</code> again.</li>
     <li>Set the provider, the model ID enabled for your account, and its options in
     the service's <code>.env</code>. Supply credentials using your team's approved method.</li>
-    <li>Run <code>"%PYTHON%" -m ai_agent_lib_cli doctor helper</code>, then ask a
+    <li>Run <code>"%PYTHON%" -m agentcraft2_cli doctor helper</code>, then ask a
     question. Hosted model calls use your account's quota and billing.</li>
   </ol>
   <p>An <strong>extra</strong>, written in brackets after a package name, installs
@@ -1021,11 +1021,11 @@ AC2_MODEL_PROVIDER=fake</code></pre>
   <p>A function inside <code>helper</code> is enough for a tool only that agent uses.
   An MCP server is useful when several agents need the same tools or a separate team
   owns access to the data. This example adds a server named <code>directory</code>.</p>
-<pre><code class="language-bat">"%PYTHON%" -m ai_agent_lib_cli new mcp directory --description "The people directory"
-"%PYTHON%" -m ai_agent_lib_cli install
-"%PYTHON%" -m ai_agent_lib_cli link helper directory
+<pre><code class="language-bat">"%PYTHON%" -m agentcraft2_cli new mcp directory --description "The people directory"
+"%PYTHON%" -m agentcraft2_cli install
+"%PYTHON%" -m agentcraft2_cli link helper directory
 "%PYTHON%" -m pytest
-"%PYTHON%" -m ai_agent_lib_cli policy test</code></pre>
+"%PYTHON%" -m agentcraft2_cli policy test</code></pre>
   <p>The server includes sample CSV data, named queries, tools, and tests under
   <code>mcp-servers/directory/</code>. <code>link</code> adds the agent's registration,
   permissions, and a test connecting the two. Inspect the changed files as you would
@@ -1034,7 +1034,7 @@ AC2_MODEL_PROVIDER=fake</code></pre>
   parameters. The model supplies arguments to that predefined query. Data
   classification and policy can restrict rows and mask columns.</p>
   <p>To run the linked services, start the MCP server first. In one terminal:</p>
-<pre><code class="language-bat">"%PYTHON%" -m ai_agent_lib_cli run directory</code></pre>
+<pre><code class="language-bat">"%PYTHON%" -m agentcraft2_cli run directory</code></pre>
   <p>Wait for the <code>ready</code> log event. Leave the server running and open
   another terminal with the same Python variable and workspace directory:</p>
 <pre><code class="language-bat">"%PYTHON%" -m helper "Who is in the payments team?"</code></pre>
@@ -1045,9 +1045,9 @@ AC2_MODEL_PROVIDER=fake</code></pre>
   <p>The registry records a <strong>schema pin</strong>: a hash of the tool's input
   definition. A mismatch means the caller's expected interface differs from the server's.
   Review the intended change, regenerate the pins, and rerun the affected tests:</p>
-<pre><code class="language-bat">"%PYTHON%" -m ai_agent_lib_cli registry pin directory
+<pre><code class="language-bat">"%PYTHON%" -m agentcraft2_cli registry pin directory
 "%PYTHON%" -m pytest
-"%PYTHON%" -m ai_agent_lib_cli check</code></pre>
+"%PYTHON%" -m agentcraft2_cli check</code></pre>
   <p>For CSV, REST, and Redshift examples, continue with the
   <a href="getting-started.md#7-optional-generate-tools-over-your-own-data">data tutorial</a> and the
   <a href="#cli">CLI reference</a>.</p>
@@ -1075,7 +1075,7 @@ AC2_MODEL_PROVIDER=fake</code></pre>
   external service. Use fakes to control external dependencies in unit tests.</p>
 <pre><code class="language-bat">"%PYTHON%" -m pytest agents/helper/tests/test_farewell.py
 "%PYTHON%" -m pytest
-"%PYTHON%" -m ai_agent_lib_cli check</code></pre>
+"%PYTHON%" -m agentcraft2_cli check</code></pre>
   <p><code>check</code> is the pre-commit routine: lint, format checking, type checking,
   tests, and policy samples. <strong>Lint</strong> catches suspicious code patterns;
   <strong>type checking</strong> catches inconsistent inputs and return types without
@@ -1103,7 +1103,7 @@ AC2_MODEL_PROVIDER=fake</code></pre>
       <tr><td>HTTP 401/403 or a proxy error during pip installation</td><td>Repeat the enterprise sign-in or proxy setup for this terminal. Confirm the pip repository endpoint with your team; use the same approved package source for each installation step.</td></tr>
       <tr><td><code>CERTIFICATE_VERIFY_FAILED</code></td><td>Ask for the enterprise CA configuration for this Python/pip environment. Pip supports a team-provided certificate bundle through <code>PIP_CERT</code>. Keep certificate verification enabled; the agent's <code>AC2_TLS_CA_BUNDLE</code> setting does not configure pip.</td></tr>
       <tr><td><code>No matching distribution found</code>, missing <code>hatchling</code>, or a compiler requirement</td><td>Share the package name, Python version, and Windows architecture with the package-maintenance team. They need to make compatible releases, build dependencies, and prebuilt wheels available. Use a team-supported build environment for dependencies that need compilation.</td></tr>
-      <tr><td><code>langchain_aws</code> is missing for Bedrock</td><td>For the local stack, run <code>setup-local.bat --model bedrock</code>. For generated agents, select Bedrock in the CLI and rerun <code>"%PYTHON%" -m ai_agent_lib_cli install</code>. This installs the AWS package's <code>bedrock</code> extra.</td></tr>
+      <tr><td><code>langchain_aws</code> is missing for Bedrock</td><td>For the local stack, run <code>setup-local.bat --model bedrock</code>. For generated agents, select Bedrock in the CLI and rerun <code>"%PYTHON%" -m agentcraft2_cli install</code>. This installs the AWS package's <code>bedrock</code> extra.</td></tr>
       <tr><td>Ruff or a local test process is blocked by desktop policy</td><td>Have the approved tool package or local execution permission enabled by your support team. Use your team's approved development runner for checks your desktop cannot run, and record which checks still need to pass.</td></tr>
     </tbody>
   </table></div>
@@ -1118,9 +1118,9 @@ AC2_MODEL_PROVIDER=fake</code></pre>
   <div class="table-wrap"><table>
     <thead><tr><th>What you see</th><th>What to check next</th></tr></thead>
     <tbody>
-      <tr><td><code>No module named helper</code> or a missing package</td><td>Use the Python executable from setup and run <code>"%PYTHON%" -m ai_agent_lib_cli install</code>.</td></tr>
-      <tr><td>A setting appears to be ignored</td><td>Run <code>"%PYTHON%" -m ai_agent_lib_cli config explain helper</code>. Check for a process variable overriding <code>.env</code>, then restart after editing configuration.</td></tr>
-      <tr><td><code>ConfigurationError</code></td><td>Check spelling, accepted options, and JSON syntax. Run <code>"%PYTHON%" -m ai_agent_lib_cli doctor helper</code> for diagnostics.</td></tr>
+      <tr><td><code>No module named helper</code> or a missing package</td><td>Use the Python executable from setup and run <code>"%PYTHON%" -m agentcraft2_cli install</code>.</td></tr>
+      <tr><td>A setting appears to be ignored</td><td>Run <code>"%PYTHON%" -m agentcraft2_cli config explain helper</code>. Check for a process variable overriding <code>.env</code>, then restart after editing configuration.</td></tr>
+      <tr><td><code>ConfigurationError</code></td><td>Check spelling, accepted options, and JSON syntax. Run <code>"%PYTHON%" -m agentcraft2_cli doctor helper</code> for diagnostics.</td></tr>
       <tr><td><code>PolicyDenied</code></td><td>Read the reason code. Compare the caller, application, action, and resource with the intended rule. Add a policy sample before changing permissions.</td></tr>
       <tr><td>The answer starts with <code>fake:</code></td><td>This is expected for the default model. Use a scripted test for tool behavior, or configure a real model.</td></tr>
       <tr><td>Connection refused after linking MCP</td><td>Start the registered MCP server and check its configured address and port.</td></tr>
@@ -1314,7 +1314,7 @@ with Path(sys.argv[1]).open(encoding="utf-8") as trace:
   <p>The log level controls operational messages. Model content capture has its own
   explicit setting, <code>AC2_MODEL_TRACE_PATH</code>. For additional operational
   detail in a custom entry point, configure Python logging before starting services:</p>
-<pre><code class="language-python">from ai_agent_lib_core.observability import configure_logging
+<pre><code class="language-python">from agentcraft2_core.observability import configure_logging
 
 configure_logging("helper", level="DEBUG", details=True)</code></pre>
   <p>In the generated HTTP entry point, update its existing
@@ -1406,7 +1406,7 @@ Trace: .../agents/helper/.agentcraft2/react-demo.jsonl</code></pre>
   was created with a fake model, add <code>anthropic</code> to the core dependency's
   extras in <code>agents/helper/pyproject.toml</code> and run the pip-based installer.
   Set the model ID and key in the agent's ignored <code>.env</code>, then run:</p>
-<pre><code class="language-bat">"%PYTHON%" -m ai_agent_lib_cli install
+<pre><code class="language-bat">"%PYTHON%" -m agentcraft2_cli install
 "%PYTHON%" -m helper.examples.trace_anthropic</code></pre>
   <p>The example enables its own model trace, offers the local greeting tool,
   and prints both checkpoints and the model exchanges. It saves each run under
@@ -1433,7 +1433,7 @@ Trace: .../agents/helper/.agentcraft2/react-demo.jsonl</code></pre>
   builds two text blocks. When caching is enabled, the Anthropic adapter marks
   the static block with a cache breakpoint and enables automatic caching for the
   growing conversation. Existing model-provider interfaces continue to work.</p>
-<pre><code class="language-python">from ai_agent_lib_core.integrations.langgraph import static_system_prompt
+<pre><code class="language-python">from agentcraft2_core.integrations.langgraph import static_system_prompt
 
 messages = [static_system_prompt(SYSTEM_INSTRUCTIONS, request_context), *conversation]
 reply = await services.model().ainvoke(messages)</code></pre>
@@ -1515,7 +1515,7 @@ reply = await services.model().ainvoke(messages)</code></pre>
   Checkpoint diagnostics show the selected budget, retained recent tokens and omitted turns.</p>
 
   <h3>Why is the trace empty or incomplete?</h3>
-  <p>Run <code>"%PYTHON%" -m ai_agent_lib_cli config explain helper</code> to verify
+  <p>Run <code>"%PYTHON%" -m agentcraft2_cli config explain helper</code> to verify
   the path and its source. Restart after changing settings. Calls must use
   <code>services.model()</code> to be captured. A policy or input-check denial can
   stop a request before it reaches the provider, so look at the audit record too.</p>
@@ -1528,7 +1528,7 @@ reply = await services.model().ainvoke(messages)</code></pre>
 
   <h3>Can I send diagnostics to another destination?</h3>
   <p>Implement the asynchronous <code>ModelTraceSink.write(record)</code> interface
-  from <code>ai_agent_lib_core.contracts</code> and pass the instance as
+  from <code>agentcraft2_core.contracts</code> and pass the instance as
   <code>ServiceContainer(config, model_trace=your_sink)</code>. An injected sink
   overrides the file destination and remains caller-owned. Support concurrent
   writes and close any resources you create. Tests can inject a sink that keeps
@@ -1548,13 +1548,13 @@ reply = await services.model().ainvoke(messages)</code></pre>
   these are the packages involved:</p>
   <div class="layers">
     <div class="layer"><b>Your application</b><span>Tools, graph steps, query definitions, and application rules.</span></div>
-    <div class="layer core"><b>ai-agent-lib-core</b><span>Contracts, configuration, service composition, call checks, local adapters, and optional framework integrations.</span></div>
-    <div class="layer"><b>ai-agent-lib-aws</b><span>AWS adapters and their optional dependencies.</span></div>
-    <div class="layer"><b>ai-agent-lib-cli</b><span>Project generation, diagnostics, installation, checks, and deployment generation.</span></div>
+    <div class="layer core"><b>agentcraft2-core</b><span>Contracts, configuration, service composition, call checks, local adapters, and optional framework integrations.</span></div>
+    <div class="layer"><b>agentcraft2-aws</b><span>AWS adapters and their optional dependencies.</span></div>
+    <div class="layer"><b>agentcraft2-cli</b><span>Project generation, diagnostics, installation, checks, and deployment generation.</span></div>
   </div>
   <h3>Implement and register the adapter</h3>
   <ol>
-    <li>Choose the contract from <code>ai_agent_lib_core.contracts</code> and implement its methods.</li>
+    <li>Choose the contract from <code>agentcraft2_core.contracts</code> and implement its methods.</li>
     <li>Create a factory that accepts a <code>BuildContext</code>. Declare required
     singleton dependencies in <code>ServiceProviders.register(..., dependencies=...)</code>.</li>
     <li>Use a typed descriptor, such as <code>AUDIT</code> or <code>SECRETS</code>, when
@@ -1622,8 +1622,8 @@ reply = await services.model().ainvoke(messages)</code></pre>
   an open container, a request context, and the text to classify:</p>
 <pre><code class="language-python" data-example="structured-function">from typing import Literal
 
-from ai_agent_lib_core import RequestContext, ServiceContainer
-from ai_agent_lib_core.pipeline import bind_request_context
+from agentcraft2_core import RequestContext, ServiceContainer
+from agentcraft2_core.pipeline import bind_request_context
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel
 
@@ -1645,7 +1645,7 @@ async def classify(
   <p>The adapter must support structured output; unsupported operations are rejected.
   Invalid output raises <code>ValidationFailed</code>. In a fake-model test, script
   the result with <code>structured_reply(Triage(category="billing", urgent=False))</code>
-  from <code>ai_agent_lib_core.testing</code>. Test invalid replies too, so the application
+  from <code>agentcraft2_core.testing</code>. Test invalid replies too, so the application
   handles them deliberately.</p>
 </section>
 
@@ -1690,7 +1690,7 @@ async def classify(
     <li>Start required MCP services, if the evaluation uses them.</li>
     <li>Run the evaluation explicitly:</li>
   </ol>
-<pre><code class="language-bat">"%PYTHON%" -m ai_agent_lib_cli eval helper</code></pre>
+<pre><code class="language-bat">"%PYTHON%" -m agentcraft2_cli eval helper</code></pre>
   <p>This command selects tests marked <code>eval</code>. They require network access
   to the configured model and use your account's quota and billing. The generated
   evaluation skips when the selected model is <code>fake</code>. Each run writes
@@ -1700,7 +1700,7 @@ async def classify(
 
   <h3 id="eval-baselines">Protect a baseline</h3>
   <p>When the scores are ones you want to protect, accept them:</p>
-<pre><code class="language-bat">"%PYTHON%" -m ai_agent_lib_cli eval helper --accept</code></pre>
+<pre><code class="language-bat">"%PYTHON%" -m agentcraft2_cli eval helper --accept</code></pre>
   <p><code>--accept</code> runs the evaluation itself and, if it passes, saves the
   report as <code>agents/helper/evals/baseline.json</code>. Commit that file with
   <code>cases.jsonl</code>: both hold synthetic cases and aggregate scores, not
@@ -1758,7 +1758,7 @@ async def classify(
     checks reject development-only adapters.</li>
   </ul>
   <p>If your deployment uses OPA (Open Policy Agent, an external policy engine), run
-  <code>"%PYTHON%" -m ai_agent_lib_cli policy test --opa</code> on a machine with
+  <code>"%PYTHON%" -m agentcraft2_cli policy test --opa</code> on a machine with
   OPA installed to verify its decisions against the policy samples.</p>
 </section>
 
@@ -1770,13 +1770,13 @@ async def classify(
   Terraform, and the required AWS credentials and permissions.</p>
   <h3>1. Configure the target environment</h3>
   <p>From the tutorial workspace, create <code>agents/helper/deploy.env</code>:</p>
-<pre><code class="language-bat">"%PYTHON%" -m ai_agent_lib_cli deploy helper</code></pre>
+<pre><code class="language-bat">"%PYTHON%" -m agentcraft2_cli deploy helper</code></pre>
   <p>Edit that file with your platform's deployment settings and secret references.
   Add the selected adapters' extras to the service's dependencies, then run
-  <code>"%PYTHON%" -m ai_agent_lib_cli install</code>.</p>
+  <code>"%PYTHON%" -m agentcraft2_cli install</code>.</p>
   <h3>2. Review and generate deployment files</h3>
-<pre><code class="language-bat">"%PYTHON%" -m ai_agent_lib_cli deploy helper --plan
-"%PYTHON%" -m ai_agent_lib_cli deploy helper</code></pre>
+<pre><code class="language-bat">"%PYTHON%" -m agentcraft2_cli deploy helper --plan
+"%PYTHON%" -m agentcraft2_cli deploy helper</code></pre>
   <p>The plan explains adapter dependencies, AWS permissions, sidecars (supporting
   containers), and warnings. Review <code>deploy/helper/README.md</code> for the generated
   build and Terraform steps, including the hash-checked <code>requirements.lock</code>.</p>
@@ -1798,8 +1798,8 @@ async def classify(
   with nowhere durable to write), and renders an ARM64 image or a code zip together
   with Terraform for the runtime. The generated services start with
   <code>--profile agentcore</code>, which selects the platform's address, port and routes.</p>
-<pre><code class="language-bat">"%PYTHON%" -m ai_agent_lib_cli deploy helper --target agentcore
-"%PYTHON%" -m ai_agent_lib_cli deploy helper --target agentcore --plan</code></pre>
+<pre><code class="language-bat">"%PYTHON%" -m agentcraft2_cli deploy helper --target agentcore
+"%PYTHON%" -m agentcraft2_cli deploy helper --target agentcore --plan</code></pre>
   <p>The block's variables, as the target reads them:</p>
 <div class="table-wrap"><table class="compact">
 <thead><tr><th>Variable</th><th>Values</th><th>Default</th><th>Meaning</th></tr></thead>
@@ -1870,7 +1870,7 @@ async def classify(
   <code>"$PYTHON"</code> for the Python commands. The installation helper uses pip.
   Import-linter checks that code respects the package dependency boundaries.</p>
   <p>For changes to Agent Lab, use its isolated package launcher and
-  <a href="../packages/ai-agent-lib-ui/README.md#run-the-checks-and-build-a-wheel">UI checks</a>.
+  <a href="../packages/agentcraft2-ui/README.md#run-the-checks-and-build-a-wheel">UI checks</a>.
   The library's default test command does not replace that suite. The
   <a href="README.md#find-the-code">code map</a> shows which package owns each responsibility.</p>
   <p>Keep a change in the layer that owns it. Put shared interfaces in contracts,
@@ -1892,11 +1892,11 @@ async def classify(
         dependencies, and own adapter startup and cleanup.</td></tr>
       <tr><td><code>core/pipeline/</code></td><td>Governed-call rules expressed
         through framework-neutral protocols.</td></tr>
-      <tr><td><code>core/adapters/</code> and <code>ai_agent_lib_aws/</code></td>
+      <tr><td><code>core/adapters/</code> and <code>agentcraft2_aws/</code></td>
         <td>Implement protocols using files, APIs, databases, or provider SDKs.</td></tr>
       <tr><td><code>core/integrations/</code></td><td>Translate between library
         contracts and HTTP, MCP, or LangGraph types and lifecycle behavior.</td></tr>
-      <tr><td><code>ai_agent_lib_cli/</code></td><td>Read generation inputs,
+      <tr><td><code>agentcraft2_cli/</code></td><td>Read generation inputs,
         render templates, and write projects. Keep CLI parsing separate from
         generation logic.</td></tr>
       <tr><td><code>core/testing/</code></td><td>Reusable fakes and contract suites.
@@ -1904,7 +1904,7 @@ async def classify(
     </tbody>
   </table>
   <p>In this table, <code>core/</code> means
-  <code>packages/ai-agent-lib-core/src/ai_agent_lib_core/</code>. The AWS and CLI
+  <code>packages/agentcraft2-core/src/agentcraft2_core/</code>. The AWS and CLI
   packages have their own matching <code>packages/&lt;distribution&gt;/src/</code>
   directories.</p>
   <h4>Name things by their role</h4>
@@ -2160,29 +2160,29 @@ async def classify(
 <div class="table-wrap"><table class="compact">
 <thead><tr><th>Port</th><th>Adapter</th><th>Guard</th><th>Package</th><th>Options</th></tr></thead>
 <tbody>
-<tr><td><code>model</code></td><td><code>anthropic</code></td><td></td><td>ai-agent-lib-core</td><td><a href="#opt-model-anthropic">AnthropicModelOptions</a></td></tr>
-<tr><td><code>model</code></td><td><code>bedrock</code></td><td></td><td>ai-agent-lib-aws</td><td><span class="muted">none</span></td></tr>
-<tr><td><code>model</code></td><td><code>fake</code></td><td><span class="tag warn">local only</span></td><td>ai-agent-lib-core</td><td><span class="muted">none</span></td></tr>
-<tr><td><code>secrets</code></td><td><code>env</code></td><td></td><td>ai-agent-lib-core</td><td><span class="muted">none</span></td></tr>
-<tr><td><code>secrets</code></td><td><code>secrets_manager</code></td><td></td><td>ai-agent-lib-aws</td><td><a href="#opt-secrets-secrets-manager">SecretsManagerOptions</a></td></tr>
-<tr><td><code>audit</code></td><td><code>firehose</code></td><td></td><td>ai-agent-lib-aws</td><td><a href="#opt-audit-firehose">FirehoseAuditOptions</a></td></tr>
-<tr><td><code>audit</code></td><td><code>jsonl</code></td><td><span class="tag warn">local only</span></td><td>ai-agent-lib-core</td><td><a href="#opt-audit-jsonl">JsonlAuditOptions</a></td></tr>
-<tr><td><code>identity</code></td><td><code>agentcore_runtime</code></td><td></td><td>ai-agent-lib-aws</td><td><a href="#opt-identity-agentcore-runtime">AgentCoreRuntimeIdentityOptions</a></td></tr>
-<tr><td><code>identity</code></td><td><code>jwt</code></td><td></td><td>ai-agent-lib-core</td><td><a href="#opt-identity-jwt">JwtIdentityOptions</a></td></tr>
-<tr><td><code>identity</code></td><td><code>static</code></td><td><span class="tag warn">local only</span></td><td>ai-agent-lib-core</td><td><a href="#opt-identity-static">StaticIdentityOptions</a></td></tr>
-<tr><td><code>checkpoint</code></td><td><code>agentcore_memory</code></td><td></td><td>ai-agent-lib-aws</td><td><a href="#opt-checkpoint-agentcore-memory">AgentCoreMemoryCheckpointOptions</a></td></tr>
-<tr><td><code>checkpoint</code></td><td><code>none</code></td><td></td><td>ai-agent-lib-core</td><td><span class="muted">none</span></td></tr>
-<tr><td><code>checkpoint</code></td><td><code>postgres</code></td><td></td><td>ai-agent-lib-aws</td><td><a href="#opt-checkpoint-postgres">PostgresCheckpointOptions</a></td></tr>
-<tr><td><code>checkpoint</code></td><td><code>sqlite</code></td><td><span class="tag warn">local only</span></td><td>ai-agent-lib-core</td><td><a href="#opt-checkpoint-sqlite">SqliteCheckpointOptions</a></td></tr>
-<tr><td><code>registry</code></td><td><code>file</code></td><td></td><td>ai-agent-lib-core</td><td><a href="#opt-registry-file">FileRegistryOptions</a></td></tr>
-<tr><td><code>registry</code></td><td><code>s3_file</code></td><td></td><td>ai-agent-lib-aws</td><td><a href="#opt-registry-s3-file">S3RegistryOptions</a></td></tr>
-<tr><td><code>policy</code></td><td><code>opa</code></td><td></td><td>ai-agent-lib-core</td><td><a href="#opt-policy-opa">OpaPolicyOptions</a></td></tr>
-<tr><td><code>policy</code></td><td><code>rules</code></td><td><span class="tag warn">local only</span></td><td>ai-agent-lib-core</td><td><a href="#opt-policy-rules">RulesPolicyOptions</a></td></tr>
-<tr><td><code>guardrails</code></td><td><code>bedrock</code></td><td></td><td>ai-agent-lib-aws</td><td><a href="#opt-guardrails-bedrock">BedrockGuardrailsOptions</a></td></tr>
-<tr><td><code>guardrails</code></td><td><code>patterns</code></td><td></td><td>ai-agent-lib-core</td><td><a href="#opt-guardrails-patterns">PatternGuardrailsOptions</a></td></tr>
-<tr><td><code>data</code></td><td><code>duckdb_csv</code></td><td><span class="tag warn">local only</span></td><td>ai-agent-lib-core</td><td><a href="#opt-data-duckdb-csv">DuckDbCsvOptions</a></td></tr>
-<tr><td><code>data</code></td><td><code>redshift_data</code></td><td></td><td>ai-agent-lib-aws</td><td><a href="#opt-data-redshift-data">RedshiftDataOptions</a></td></tr>
-<tr><td><code>data</code></td><td><code>rest</code></td><td></td><td>ai-agent-lib-core</td><td><a href="#opt-data-rest">RestOptions</a></td></tr>
+<tr><td><code>model</code></td><td><code>anthropic</code></td><td></td><td>agentcraft2-core</td><td><a href="#opt-model-anthropic">AnthropicModelOptions</a></td></tr>
+<tr><td><code>model</code></td><td><code>bedrock</code></td><td></td><td>agentcraft2-aws</td><td><span class="muted">none</span></td></tr>
+<tr><td><code>model</code></td><td><code>fake</code></td><td><span class="tag warn">local only</span></td><td>agentcraft2-core</td><td><span class="muted">none</span></td></tr>
+<tr><td><code>secrets</code></td><td><code>env</code></td><td></td><td>agentcraft2-core</td><td><span class="muted">none</span></td></tr>
+<tr><td><code>secrets</code></td><td><code>secrets_manager</code></td><td></td><td>agentcraft2-aws</td><td><a href="#opt-secrets-secrets-manager">SecretsManagerOptions</a></td></tr>
+<tr><td><code>audit</code></td><td><code>firehose</code></td><td></td><td>agentcraft2-aws</td><td><a href="#opt-audit-firehose">FirehoseAuditOptions</a></td></tr>
+<tr><td><code>audit</code></td><td><code>jsonl</code></td><td><span class="tag warn">local only</span></td><td>agentcraft2-core</td><td><a href="#opt-audit-jsonl">JsonlAuditOptions</a></td></tr>
+<tr><td><code>identity</code></td><td><code>agentcore_runtime</code></td><td></td><td>agentcraft2-aws</td><td><a href="#opt-identity-agentcore-runtime">AgentCoreRuntimeIdentityOptions</a></td></tr>
+<tr><td><code>identity</code></td><td><code>jwt</code></td><td></td><td>agentcraft2-core</td><td><a href="#opt-identity-jwt">JwtIdentityOptions</a></td></tr>
+<tr><td><code>identity</code></td><td><code>static</code></td><td><span class="tag warn">local only</span></td><td>agentcraft2-core</td><td><a href="#opt-identity-static">StaticIdentityOptions</a></td></tr>
+<tr><td><code>checkpoint</code></td><td><code>agentcore_memory</code></td><td></td><td>agentcraft2-aws</td><td><a href="#opt-checkpoint-agentcore-memory">AgentCoreMemoryCheckpointOptions</a></td></tr>
+<tr><td><code>checkpoint</code></td><td><code>none</code></td><td></td><td>agentcraft2-core</td><td><span class="muted">none</span></td></tr>
+<tr><td><code>checkpoint</code></td><td><code>postgres</code></td><td></td><td>agentcraft2-aws</td><td><a href="#opt-checkpoint-postgres">PostgresCheckpointOptions</a></td></tr>
+<tr><td><code>checkpoint</code></td><td><code>sqlite</code></td><td><span class="tag warn">local only</span></td><td>agentcraft2-core</td><td><a href="#opt-checkpoint-sqlite">SqliteCheckpointOptions</a></td></tr>
+<tr><td><code>registry</code></td><td><code>file</code></td><td></td><td>agentcraft2-core</td><td><a href="#opt-registry-file">FileRegistryOptions</a></td></tr>
+<tr><td><code>registry</code></td><td><code>s3_file</code></td><td></td><td>agentcraft2-aws</td><td><a href="#opt-registry-s3-file">S3RegistryOptions</a></td></tr>
+<tr><td><code>policy</code></td><td><code>opa</code></td><td></td><td>agentcraft2-core</td><td><a href="#opt-policy-opa">OpaPolicyOptions</a></td></tr>
+<tr><td><code>policy</code></td><td><code>rules</code></td><td><span class="tag warn">local only</span></td><td>agentcraft2-core</td><td><a href="#opt-policy-rules">RulesPolicyOptions</a></td></tr>
+<tr><td><code>guardrails</code></td><td><code>bedrock</code></td><td></td><td>agentcraft2-aws</td><td><a href="#opt-guardrails-bedrock">BedrockGuardrailsOptions</a></td></tr>
+<tr><td><code>guardrails</code></td><td><code>patterns</code></td><td></td><td>agentcraft2-core</td><td><a href="#opt-guardrails-patterns">PatternGuardrailsOptions</a></td></tr>
+<tr><td><code>data</code></td><td><code>duckdb_csv</code></td><td><span class="tag warn">local only</span></td><td>agentcraft2-core</td><td><a href="#opt-data-duckdb-csv">DuckDbCsvOptions</a></td></tr>
+<tr><td><code>data</code></td><td><code>redshift_data</code></td><td></td><td>agentcraft2-aws</td><td><a href="#opt-data-redshift-data">RedshiftDataOptions</a></td></tr>
+<tr><td><code>data</code></td><td><code>rest</code></td><td></td><td>agentcraft2-core</td><td><a href="#opt-data-rest">RestOptions</a></td></tr>
 </tbody></table></div>
   </details>
   <details class="lesson" id="options">
@@ -2436,8 +2436,8 @@ async def classify(
   <details class="lesson" id="cli">
     <summary>CLI commands and flags</summary>
     <p>The command names below use <code>agentcraft2</code> as shorthand. In Command Prompt,
-    run them with <code>"%PYTHON%" -m ai_agent_lib_cli</code>; in bash/zsh use
-    <code>"$PYTHON" -m ai_agent_lib_cli</code>. Add <code>--help</code> to any command
+    run them with <code>"%PYTHON%" -m agentcraft2_cli</code>; in bash/zsh use
+    <code>"$PYTHON" -m agentcraft2_cli</code>. Add <code>--help</code> to any command
     to list its accepted flags.</p>
 <h4 id="cli-check"><code>agentcraft2 check</code></h4>
 <p class="small">Run what CI runs: lint, format, types, tests and the policy samples.</p>
@@ -2617,8 +2617,8 @@ async def classify(
       <thead><tr><th>Command or endpoint</th><th>Purpose</th></tr></thead>
       <tbody>
         <tr><td><code>"%PYTHON%" -m helper "Say hello" --thread demo</code></td><td>Ask one question. The default thread is <code>default</code>.</td></tr>
-        <tr><td><code>"%PYTHON%" -m ai_agent_lib_cli run helper</code></td><td>Serve the agent over HTTP. Defaults to <code>127.0.0.1</code> and the generated port, initially 8000. Accepts <code>--host</code> and <code>--port</code>.</td></tr>
-        <tr><td><code>"%PYTHON%" -m ai_agent_lib_cli run directory</code></td><td>Serve MCP over Streamable HTTP at <code>/mcp</code>. The first generated server uses port 8100.</td></tr>
+        <tr><td><code>"%PYTHON%" -m agentcraft2_cli run helper</code></td><td>Serve the agent over HTTP. Defaults to <code>127.0.0.1</code> and the generated port, initially 8000. Accepts <code>--host</code> and <code>--port</code>.</td></tr>
+        <tr><td><code>"%PYTHON%" -m agentcraft2_cli run directory</code></td><td>Serve MCP over Streamable HTTP at <code>/mcp</code>. The first generated server uses port 8100.</td></tr>
         <tr><td><code>GET /healthz</code></td><td>Liveness: is the HTTP listener responding?</td></tr>
         <tr><td><code>GET /readyz</code></td><td>Readiness: are services and graph preparation complete?</td></tr>
         <tr><td><code>POST /invoke</code></td><td>Accepts <code>{"input":{"question":"..."},"thread_id":"..."}</code> for the generated agent. Returns <code>output</code>, <code>thread_id</code>, and <code>request_id</code>.</td></tr>
@@ -2629,7 +2629,7 @@ async def classify(
     <p>For authenticated requests, send <code>Authorization: Bearer &lt;token&gt;</code>.
     An optional <code>x-request-id</code> correlates requests. The local static identity
     supplies the tutorial's configured development caller.</p>
-    <p><a href="../packages/ai-agent-lib-ui/README.md">Agent Lab</a> shows
+    <p><a href="../packages/agentcraft2-ui/README.md">Agent Lab</a> shows
     a live draft while the model responds. It removes the temporary draft panel
     once the final outcome is saved, then shows input/output tokens, elapsed time and cache-hit
     ratio when reported. Usage includes model calls made for tool selection and
@@ -2702,17 +2702,17 @@ async def classify(
 <div class="table-wrap"><table class="compact">
 <thead><tr><th>Install</th><th>What it adds</th><th>Requirements</th></tr></thead>
 <tbody>
-<tr><td><code>ai-agent-lib-core[duckdb]</code></td><td>The DuckDB data source, for CSV files in local development.</td><td><code>duckdb&gt;=1.1</code></td></tr>
-<tr><td><code>ai-agent-lib-core[jwt]</code></td><td>The jwt identity provider: OAuth 2.0 access tokens, for example from Microsoft Entra ID.</td><td><code>pyjwt[crypto]&gt;=2.10.1</code></td></tr>
-<tr><td><code>ai-agent-lib-core[mcp]</code></td><td>The MCP bindings.</td><td><code>httpx2&gt;=2.0</code>, <code>mcp&gt;=2.3,&lt;3</code></td></tr>
-<tr><td><code>ai-agent-lib-core[serve]</code></td><td>The HTTP entry point, health routes and server loop in ai_agent_lib_core.integrations.http.</td><td><code>starlette&gt;=0.45</code>, <code>uvicorn&gt;=0.32</code></td></tr>
-<tr><td><code>ai-agent-lib-core[otel]</code></td><td>Exporting traces and metrics to an OpenTelemetry collector.</td><td><code>opentelemetry-exporter-otlp-proto-http&gt;=1.28</code>, <code>opentelemetry-sdk&gt;=1.28</code></td></tr>
-<tr><td><code>ai-agent-lib-core[anthropic]</code></td><td>The anthropic model provider.</td><td><code>langchain-anthropic&gt;=1.7.5,&lt;2</code></td></tr>
-<tr><td><code>ai-agent-lib-core[testing]</code></td><td>Needed to use the contract test suites in ai_agent_lib_core.testing.contracts.</td><td><code>pytest&gt;=8.2</code>, <code>pytest-asyncio&gt;=1.4</code></td></tr>
-<tr><td><code>ai-agent-lib-aws[bedrock]</code></td><td>The bedrock model provider.</td><td><code>langchain-aws&gt;=1.0,&lt;2</code></td></tr>
-<tr><td><code>ai-agent-lib-aws[postgres]</code></td><td>The postgres checkpoint store.</td><td><code>langgraph-checkpoint-postgres&gt;=3.1,&lt;4</code>, <code>psycopg[binary,pool]&gt;=3.2</code>, <code>psycopg-pool&gt;=3.3</code></td></tr>
-<tr><td><code>ai-agent-lib-aws[agentcore]</code></td><td>The AgentCore Memory checkpoint store, and the connector that calls MCP servers on AgentCore runtimes.</td><td><code>ai-agent-lib-core[mcp]</code>, <code>langgraph-checkpoint-aws&gt;=1.2,&lt;2</code></td></tr>
-<tr><td><code>ai-agent-lib-cli[aws]</code></td><td>For &#x27;agentcraft2 new mcp --from-redshift&#x27;, which reads the Redshift catalogue.</td><td><code>ai-agent-lib-aws</code></td></tr>
+<tr><td><code>agentcraft2-core[duckdb]</code></td><td>The DuckDB data source, for CSV files in local development.</td><td><code>duckdb&gt;=1.1</code></td></tr>
+<tr><td><code>agentcraft2-core[jwt]</code></td><td>The jwt identity provider: OAuth 2.0 access tokens, for example from Microsoft Entra ID.</td><td><code>pyjwt[crypto]&gt;=2.10.1</code></td></tr>
+<tr><td><code>agentcraft2-core[mcp]</code></td><td>The MCP bindings.</td><td><code>httpx2&gt;=2.0</code>, <code>mcp&gt;=2.3,&lt;3</code></td></tr>
+<tr><td><code>agentcraft2-core[serve]</code></td><td>The HTTP entry point, health routes and server loop in agentcraft2_core.integrations.http.</td><td><code>starlette&gt;=0.45</code>, <code>uvicorn&gt;=0.32</code></td></tr>
+<tr><td><code>agentcraft2-core[otel]</code></td><td>Exporting traces and metrics to an OpenTelemetry collector.</td><td><code>opentelemetry-exporter-otlp-proto-http&gt;=1.28</code>, <code>opentelemetry-sdk&gt;=1.28</code></td></tr>
+<tr><td><code>agentcraft2-core[anthropic]</code></td><td>The anthropic model provider.</td><td><code>langchain-anthropic&gt;=1.7.5,&lt;2</code></td></tr>
+<tr><td><code>agentcraft2-core[testing]</code></td><td>Needed to use the contract test suites in agentcraft2_core.testing.contracts.</td><td><code>pytest&gt;=8.2</code>, <code>pytest-asyncio&gt;=1.4</code></td></tr>
+<tr><td><code>agentcraft2-aws[bedrock]</code></td><td>The bedrock model provider.</td><td><code>langchain-aws&gt;=1.0,&lt;2</code></td></tr>
+<tr><td><code>agentcraft2-aws[postgres]</code></td><td>The postgres checkpoint store.</td><td><code>langgraph-checkpoint-postgres&gt;=3.1,&lt;4</code>, <code>psycopg[binary,pool]&gt;=3.2</code>, <code>psycopg-pool&gt;=3.3</code></td></tr>
+<tr><td><code>agentcraft2-aws[agentcore]</code></td><td>The AgentCore Memory checkpoint store, and the connector that calls MCP servers on AgentCore runtimes.</td><td><code>agentcraft2-core[mcp]</code>, <code>langgraph-checkpoint-aws&gt;=1.2,&lt;2</code></td></tr>
+<tr><td><code>agentcraft2-cli[aws]</code></td><td>For &#x27;agentcraft2 new mcp --from-redshift&#x27;, which reads the Redshift catalogue.</td><td><code>agentcraft2-aws</code></td></tr>
 </tbody></table></div>
   </details>
   <details class="lesson" id="api">
@@ -2722,20 +2722,20 @@ async def classify(
 <div class="table-wrap"><table class="compact">
 <thead><tr><th>Module</th><th>What it is for</th><th>Names</th></tr></thead>
 <tbody>
-<tr><td><code>ai_agent_lib_core</code></td><td>Core package of the Enterprise Agentic Platform library.</td><td><code>AgentCraft2Error</code>, <code>bind_request_context</code>, <code>BudgetExceeded</code>, <code>Classification</code>, <code>ConfigurationError</code>, <code>CredentialsExpiredError</code>, <code>ExecutionPaused</code>, <code>IntegrityError</code>, <code>PolicyDenied</code>, <code>Principal</code>, <code>RequestContext</code>, <code>Scope</code>, <code>ServiceConfig</code>, <code>ServiceContainer</code>, <code>ServiceProviders</code>, <code>StructuredOutput</code>, <code>SyncServices</code>, <code>TransientError</code>, <code>ValidationFailed</code></td></tr>
-<tr><td><code>ai_agent_lib_core.contracts</code></td><td>Ports, value types, options models and errors.</td><td><code>Access</code>, <code>AccessQuery</code>, <code>AccessRule</code>, <code>ACCOUNT</code>, <code>AgentCraft2Error</code>, <code>AgentEntry</code>, <code>AgentRegistry</code>, <code>AgentSnapshot</code>, <code>AttemptRef</code>, <code>AUDIT_SCHEMA</code>, <code>AuditOptions</code>, <code>AuditOutcome</code>, <code>AuditRecord</code>, <code>AuditSink</code>, <code>AuditValue</code>, <code>BudgetExceeded</code>, <code>BudgetLimits</code>, <code>CallLimits</code>, <code>causes</code>, <code>ChatModelProvider</code>, <code>CheckpointBackend</code>, <code>CheckResult</code>, <code>Classification</code>, <code>Clock</code>, <code>ConfigSource</code>, <code>ConfigurationError</code>, <code>CredentialsExpiredError</code>, <code>current_schema</code>, <code>DataSource</code>, <code>Decision</code>, <code>DECISION_SCHEMA</code>, <code>DEFAULT_MODEL_ALIAS</code>, <code>DeploymentEnv</code>, <code>describe</code>, <code>DiagnosticLinks</code>, <code>DiagnosticSink</code>, <code>DiagnosticValue</code>, <code>EntryStatus</code>, <code>ExecutionPaused</code>, <code>ExternalSettings</code>, <code>generic_fix</code>, <code>GuardrailCheck</code>, <code>GuardrailFinding</code>, <code>GuardrailPoint</code>, <code>GuardrailVerdict</code>, <code>IdentityVerifier</code>, <code>IdGenerator</code>, <code>InspectionSection</code>, <code>IntegrityError</code>, <code>is_schema</code>, <code>kind_of</code>, <code>Limits</code>, <code>MASK</code>, <code>ModelAttempt</code>, <code>ModelCapabilities</code>, <code>ModelRef</code>, <code>ModelSection</code>, <code>ModelTraceSink</code>, <code>NO_ACCESS</code>, <code>no_access</code>, <code>NoOptions</code>, <code>NotStartedError</code>, <code>Obligations</code>, <code>OperationDecision</code>, <code>OperationSummary</code>, <code>OptionHelp</code>, <code>options_error</code>, <code>options_help</code>, <code>options_summary</code>, <code>OptionsModel</code>, <code>ParameterType</code>, <code>PolicyAction</code>, <code>PolicyDecisionPoint</code>, <code>PolicyDenied</code>, <code>PolicyRequest</code>, <code>PolicyResource</code>, <code>PresentedCredentials</code>, <code>Principal</code>, <code>PrincipalKind</code>, <code>Profile</code>, <code>ProviderSelection</code>, <code>query_parameters</code>, <code>QueryDescription</code>, <code>QueryParameter</code>, <code>QueryResult</code>, <code>redact</code>, <code>REDACTED</code>, <code>REGION</code>, <code>REGISTRY_SCHEMA</code>, <code>RegistrySource</code>, <code>RequestContext</code>, <code>RequestOutcome</code>, <code>RequestOutcomeJournal</code>, <code>RequestRecord</code>, <code>RequestVerifier</code>, <code>RowFilter</code>, <code>runtime_invocation_url</code>, <code>Scalar</code>, <code>schema_fingerprint</code>, <code>schema_mismatch</code>, <code>SchemaMismatch</code>, <code>Scope</code>, <code>SecretsProvider</code>, <code>Section</code>, <code>ServerEntry</code>, <code>ServiceConfig</code>, <code>shorten</code>, <code>shown_value</code>, <code>SourceMetadata</code>, <code>SpanNotes</code>, <code>StreamingGuardrailCheck</code>, <code>StructuredOutput</code>, <code>SupportsAsyncClose</code>, <code>SupportsValidation</code>, <code>Telemetry</code>, <code>TelemetryMode</code>, <code>TokenAuthenticator</code>, <code>TokenExchanger</code>, <code>TokenUsage</code>, <code>ToolEntry</code>, <code>ToolRegistry</code>, <code>ToolSnapshot</code>, <code>TransientError</code>, <code>TurnInspection</code>, <code>TurnInspector</code>, <code>type_words</code>, <code>UpstreamError</code>, <code>UsageField</code>, <code>ValidationFailed</code>, <code>Verified</code></td></tr>
-<tr><td><code>ai_agent_lib_core.config</code></td><td>Configuration: the only package that knows a variable name.</td><td><code>Binding</code>, <code>ConfigResolver</code>, <code>DEFAULT_BINDINGS</code>, <code>DotenvConfigSource</code>, <code>EnvironConfigSource</code>, <code>EnvSetting</code>, <code>Key</code>, <code>LayeredConfigSource</code>, <code>LEGACY_PREFIX</code>, <code>load_service_config</code>, <code>log_deprecation</code>, <code>log_resolution_warnings</code>, <code>MappingConfigSource</code>, <code>MASKED</code>, <code>options_key</code>, <code>PREFIX</code>, <code>PROFILE_DEFAULTS</code>, <code>ProfileDefaults</code>, <code>provider_key</code>, <code>render_env_example</code>, <code>render_env_file</code>, <code>render_reference</code>, <code>Resolution</code>, <code>secret_key</code>, <code>service_resolver</code>, <code>telemetry_enabled</code>, <code>ValueKind</code>, <code>variable_for</code></td></tr>
-<tr><td><code>ai_agent_lib_core.di</code></td><td>Select implementations at the composition boundary and manage their resources.</td><td><code>access_plan</code>, <code>AccessPlan</code>, <code>AdapterAccess</code>, <code>AUDIT</code>, <code>BuildContext</code>, <code>BuildResources</code>, <code>CHECKPOINT</code>, <code>ConnectorContext</code>, <code>DATA</code>, <code>DATA_PORT</code>, <code>diagnose</code>, <code>ENTRY_POINT_GROUP</code>, <code>Factory</code>, <code>FIRST_PARTY_PACKS</code>, <code>fix_for</code>, <code>GUARDRAILS</code>, <code>IDENTITY</code>, <code>McpConnectorFactory</code>, <code>MODEL</code>, <code>MODEL_PORT</code>, <code>POLICY</code>, <code>ProviderSpec</code>, <code>REGISTRY</code>, <code>SECRETS</code>, <code>ServiceContainer</code>, <code>ServicePort</code>, <code>ServiceProviders</code>, <code>SyncServices</code></td></tr>
-<tr><td><code>ai_agent_lib_core.observability</code></td><td>What the people who run a service see: operational logs, traces and metrics.</td><td><code>ambient_provider_installed</code>, <code>bind_diagnostic_links</code>, <code>build_providers</code>, <code>configure_logging</code>, <code>configure_telemetry</code>, <code>Diagnostics</code>, <code>error_fields</code>, <code>explain</code>, <code>JsonlModelTraceSink</code>, <code>JsonLogFormatter</code>, <code>LIBRARY_LOGGERS</code>, <code>redact</code>, <code>report_error</code>, <code>shows_details</code>, <code>start_telemetry</code>, <code>your_code</code></td></tr>
-<tr><td><code>ai_agent_lib_core.integrations.langgraph</code></td><td>LangGraph bindings. The only package in core that imports <code>langgraph</code>.</td><td><code>AgentTracing</code>, <code>current_request_context</code>, <code>describe_model_response</code>, <code>govern_tools</code>, <code>GovernedChatModel</code>, <code>GovernedTool</code>, <code>InMemoryCheckpointBackend</code>, <code>LangGraphBindings</code>, <code>LangGraphModelProvider</code>, <code>LoopBridge</code>, <code>scoped_thread_id</code>, <code>ScopedCheckpointer</code>, <code>SqliteCheckpointBackend</code>, <code>SqliteCheckpointOptions</code>, <code>static_system_prompt</code>, <code>THREAD_NAMESPACE</code></td></tr>
-<tr><td><code>ai_agent_lib_core.integrations.mcp</code></td><td>MCP bindings. The only package in core that imports the MCP SDK.</td><td><code>DoorTokenVerifier</code>, <code>GovernedToolsMiddleware</code>, <code>HEALTH_PATHS</code>, <code>is_error_result</code>, <code>mcp_result_text</code>, <code>META_AUTHORIZATION</code>, <code>META_CLASSIFICATION_CEILING</code>, <code>META_REQUEST_ID</code>, <code>META_THREAD_ID</code>, <code>perimeter_refused</code>, <code>PerimeterDoor</code>, <code>resource_server_settings</code>, <code>tool_fingerprints</code>, <code>verify_registration</code></td></tr>
-<tr><td><code>ai_agent_lib_core.integrations.http</code></td><td>HTTP serving. The only package in core that imports Starlette and uvicorn.</td><td><code>add_health_routes</code>, <code>agent_app</code>, <code>agentcore_app</code>, <code>AgentService</code>, <code>AgentServices</code>, <code>build_agent_app</code>, <code>EXIT_INTERRUPTED</code>, <code>HEALTH_PATH</code>, <code>health_routes</code>, <code>InMemoryThreadAdmission</code>, <code>INVOCATIONS_PATH</code>, <code>INVOKE_PATH</code>, <code>OutcomeJournal</code>, <code>PING_PATH</code>, <code>PROFILES</code>, <code>read_question</code>, <code>READY_PATH</code>, <code>REQUEST_ID_HEADER_AGENTCORE</code>, <code>Run</code>, <code>run_agent</code>, <code>run_command</code>, <code>run_service</code>, <code>serve</code>, <code>ServiceLifecycle</code>, <code>ServiceState</code>, <code>SESSION_HEADER</code>, <code>SessionBaggageMiddleware</code>, <code>SqliteOutcomeJournal</code>, <code>Stream</code>, <code>STREAM_PATH</code>, <code>SupportsActivity</code>, <code>SupportsCustomRoutes</code>, <code>ThreadAdmission</code></td></tr>
-<tr><td><code>ai_agent_lib_core.testing</code></td><td>Fakes and contract test suites, shared with adapters and application teams.</td><td><code>ACCOUNT_COLUMNS</code>, <code>ACCOUNT_ENDPOINTS</code>, <code>ACCOUNT_QUERIES</code>, <code>ACCOUNT_ROWS</code>, <code>accounts_api</code>, <code>audit_records</code>, <code>calls_tool</code>, <code>calls_tools</code>, <code>fake_accounts_source</code>, <code>FAKE_PROVIDER</code>, <code>fake_providers</code>, <code>FakeChatModel</code>, <code>FakeChatModelProvider</code>, <code>FakeDataSource</code>, <code>FakeGuardrails</code>, <code>FakeIdentityVerifier</code>, <code>FakePolicyDecisionPoint</code>, <code>FakeQuery</code>, <code>FakeRegistry</code>, <code>Fakes</code>, <code>FakeSecretsProvider</code>, <code>FrozenClock</code>, <code>GuardrailAnswer</code>, <code>InMemoryAuditSink</code>, <code>last_shown_to_model</code>, <code>load_eval_config</code>, <code>load_test_config</code>, <code>PolicyAnswer</code>, <code>RecordingTelemetry</code>, <code>rest_stub_providers</code>, <code>rest_stub_transport</code>, <code>scripted_model</code>, <code>scripted_providers</code>, <code>SequentialIds</code>, <code>structured_reply</code>, <code>TEST_AGENT</code>, <code>write_accounts_endpoints</code>, <code>write_accounts_files</code></td></tr>
-<tr><td><code>ai_agent_lib_core.evaluation</code></td><td>Measuring how well an agent does its job, off the request path.</td><td><code>as_cases</code>, <code>calibrate</code>, <code>CalibrationReport</code>, <code>CaseResult</code>, <code>dataset_digest</code>, <code>EvalCase</code>, <code>EvalReport</code>, <code>exact</code>, <code>FEEDBACK_SCHEMA</code>, <code>FeedbackRecord</code>, <code>Interaction</code>, <code>INTERACTION_SCHEMA</code>, <code>JsonlFeedbackLog</code>, <code>judged</code>, <code>LabeledCase</code>, <code>load_cases</code>, <code>load_feedback</code>, <code>load_interactions</code>, <code>load_report</code>, <code>Regression</code>, <code>regressions</code>, <code>REPORT_SCHEMA</code>, <code>require_no_regression</code>, <code>run_eval</code>, <code>sampled</code>, <code>SavedReport</code>, <code>Score</code>, <code>score_interactions</code>, <code>scored_by</code>, <code>Scorer</code>, <code>Verdict</code>, <code>write_interactions</code></td></tr>
-<tr><td><code>ai_agent_lib_core.adapters</code></td><td>Local adapters that implement the ports without any cloud service.</td><td><code>AnthropicChatModelProvider</code>, <code>AnthropicModelOptions</code>, <code>CachingPolicyDecisionPoint</code>, <code>DuckDbCsvDataSource</code>, <code>DuckDbCsvOptions</code>, <code>EnvSecretsProvider</code>, <code>ExchangingJwtIdentity</code>, <code>FakeChatModel</code>, <code>FakeChatModelProvider</code>, <code>FileRegistryOptions</code>, <code>FileRegistrySource</code>, <code>GuardrailsOptions</code>, <code>JsonlAuditOptions</code>, <code>JsonlAuditSink</code>, <code>JwtIdentityOptions</code>, <code>JwtIdentityVerifier</code>, <code>JwtSettings</code>, <code>NoCheckpointBackend</code>, <code>NullTelemetry</code>, <code>OAuthTokenExchanger</code>, <code>OpaPolicyDecisionPoint</code>, <code>OpaPolicyOptions</code>, <code>OpenTelemetryTelemetry</code>, <code>PatternGuardrails</code>, <code>PatternGuardrailsOptions</code>, <code>PolicyCacheOptions</code>, <code>resolve_jwt_options</code>, <code>RestDataSource</code>, <code>RestOptions</code>, <code>RulesPolicyDecisionPoint</code>, <code>RulesPolicyOptions</code>, <code>ScriptedResponse</code>, <code>StaticIdentityOptions</code>, <code>StaticIdentityVerifier</code>, <code>SystemClock</code>, <code>TokenExchangeOptions</code>, <code>UuidGenerator</code></td></tr>
-<tr><td><code>ai_agent_lib_core.pipeline</code></td><td>The interceptor contract and the fixed-order request pipelines.</td><td><code>AgentCheck</code>, <code>allowed_agent</code>, <code>AuditableCall</code>, <code>AuditInterceptor</code>, <code>bind_request_context</code>, <code>bound_request_context</code>, <code>BudgetInterceptor</code>, <code>BudgetLedger</code>, <code>build_data_pipeline</code>, <code>build_model_pipeline</code>, <code>build_tool_pipeline</code>, <code>compose</code>, <code>DataCall</code>, <code>DataPolicyInterceptor</code>, <code>DataStage</code>, <code>DeadlineInterceptor</code>, <code>describe_query_result</code>, <code>enforce_decision</code>, <code>Evidence</code>, <code>frame_untrusted</code>, <code>FramingInterceptor</code>, <code>GovernedDataSource</code>, <code>Handler</code>, <code>IdentityInterceptor</code>, <code>InputGuardrailInterceptor</code>, <code>Interceptor</code>, <code>ModelCall</code>, <code>ModelPolicyInterceptor</code>, <code>ModelStage</code>, <code>name_actors</code>, <code>Operations</code>, <code>OutputGuardrailInterceptor</code>, <code>Pipeline</code>, <code>record_refused_sign_in</code>, <code>RegistryInterceptor</code>, <code>require_identified</code>, <code>ResilienceInterceptor</code>, <code>result_text</code>, <code>StructuredOutputInterceptor</code>, <code>tool_arguments_text</code>, <code>ToolCall</code>, <code>ToolPolicyInterceptor</code>, <code>ToolStage</code></td></tr>
-<tr><td><code>ai_agent_lib_core.kit</code></td><td>What a provider pack builds on.</td><td><code>agents_document</code>, <code>AUDIT</code>, <code>bind_parameters</code>, <code>build_statement</code>, <code>BuildContext</code>, <code>BuildResources</code>, <code>check_filter_columns</code>, <code>checked_base_url</code>, <code>CHECKPOINT</code>, <code>coerce_parameter</code>, <code>compile_query</code>, <code>CompiledQuery</code>, <code>ConnectorContext</code>, <code>content_revision</code>, <code>DATA</code>, <code>DATA_PORT</code>, <code>effective_row_cap</code>, <code>Factory</code>, <code>filter_rows</code>, <code>finish_result</code>, <code>GovernedStatement</code>, <code>GUARDRAILS</code>, <code>GuardrailsOptions</code>, <code>IDENTITY</code>, <code>load_registries</code>, <code>mask_rows</code>, <code>McpConnectorFactory</code>, <code>MODEL</code>, <code>MODEL_PORT</code>, <code>NamedQuery</code>, <code>parse_agents_document</code>, <code>parse_document_text</code>, <code>parse_tools_document</code>, <code>POLICY</code>, <code>ProviderSpec</code>, <code>QueryCatalog</code>, <code>REGISTRY</code>, <code>RegistryDocument</code>, <code>SECRETS</code>, <code>ServicePort</code>, <code>ServiceProviders</code>, <code>tls_verification</code>, <code>tools_document</code></td></tr>
-<tr><td><code>ai_agent_lib_aws</code></td><td>AWS adapters for the Enterprise Agentic Platform library.</td><td><code>register</code></td></tr>
+<tr><td><code>agentcraft2_core</code></td><td>Core package of the Enterprise Agentic Platform library.</td><td><code>AgentCraft2Error</code>, <code>bind_request_context</code>, <code>BudgetExceeded</code>, <code>Classification</code>, <code>ConfigurationError</code>, <code>CredentialsExpiredError</code>, <code>ExecutionPaused</code>, <code>IntegrityError</code>, <code>PolicyDenied</code>, <code>Principal</code>, <code>RequestContext</code>, <code>Scope</code>, <code>ServiceConfig</code>, <code>ServiceContainer</code>, <code>ServiceProviders</code>, <code>StructuredOutput</code>, <code>SyncServices</code>, <code>TransientError</code>, <code>ValidationFailed</code></td></tr>
+<tr><td><code>agentcraft2_core.contracts</code></td><td>Ports, value types, options models and errors.</td><td><code>Access</code>, <code>AccessQuery</code>, <code>AccessRule</code>, <code>ACCOUNT</code>, <code>AgentCraft2Error</code>, <code>AgentEntry</code>, <code>AgentRegistry</code>, <code>AgentSnapshot</code>, <code>AttemptRef</code>, <code>AUDIT_SCHEMA</code>, <code>AuditOptions</code>, <code>AuditOutcome</code>, <code>AuditRecord</code>, <code>AuditSink</code>, <code>AuditValue</code>, <code>BudgetExceeded</code>, <code>BudgetLimits</code>, <code>CallLimits</code>, <code>causes</code>, <code>ChatModelProvider</code>, <code>CheckpointBackend</code>, <code>CheckResult</code>, <code>Classification</code>, <code>Clock</code>, <code>ConfigSource</code>, <code>ConfigurationError</code>, <code>CredentialsExpiredError</code>, <code>current_schema</code>, <code>DataSource</code>, <code>Decision</code>, <code>DECISION_SCHEMA</code>, <code>DEFAULT_MODEL_ALIAS</code>, <code>DeploymentEnv</code>, <code>describe</code>, <code>DiagnosticLinks</code>, <code>DiagnosticSink</code>, <code>DiagnosticValue</code>, <code>EntryStatus</code>, <code>ExecutionPaused</code>, <code>ExternalSettings</code>, <code>generic_fix</code>, <code>GuardrailCheck</code>, <code>GuardrailFinding</code>, <code>GuardrailPoint</code>, <code>GuardrailVerdict</code>, <code>IdentityVerifier</code>, <code>IdGenerator</code>, <code>InspectionSection</code>, <code>IntegrityError</code>, <code>is_schema</code>, <code>kind_of</code>, <code>Limits</code>, <code>MASK</code>, <code>ModelAttempt</code>, <code>ModelCapabilities</code>, <code>ModelRef</code>, <code>ModelSection</code>, <code>ModelTraceSink</code>, <code>NO_ACCESS</code>, <code>no_access</code>, <code>NoOptions</code>, <code>NotStartedError</code>, <code>Obligations</code>, <code>OperationDecision</code>, <code>OperationSummary</code>, <code>OptionHelp</code>, <code>options_error</code>, <code>options_help</code>, <code>options_summary</code>, <code>OptionsModel</code>, <code>ParameterType</code>, <code>PolicyAction</code>, <code>PolicyDecisionPoint</code>, <code>PolicyDenied</code>, <code>PolicyRequest</code>, <code>PolicyResource</code>, <code>PresentedCredentials</code>, <code>Principal</code>, <code>PrincipalKind</code>, <code>Profile</code>, <code>ProviderSelection</code>, <code>query_parameters</code>, <code>QueryDescription</code>, <code>QueryParameter</code>, <code>QueryResult</code>, <code>redact</code>, <code>REDACTED</code>, <code>REGION</code>, <code>REGISTRY_SCHEMA</code>, <code>RegistrySource</code>, <code>RequestContext</code>, <code>RequestOutcome</code>, <code>RequestOutcomeJournal</code>, <code>RequestRecord</code>, <code>RequestVerifier</code>, <code>RowFilter</code>, <code>runtime_invocation_url</code>, <code>Scalar</code>, <code>schema_fingerprint</code>, <code>schema_mismatch</code>, <code>SchemaMismatch</code>, <code>Scope</code>, <code>SecretsProvider</code>, <code>Section</code>, <code>ServerEntry</code>, <code>ServiceConfig</code>, <code>shorten</code>, <code>shown_value</code>, <code>SourceMetadata</code>, <code>SpanNotes</code>, <code>StreamingGuardrailCheck</code>, <code>StructuredOutput</code>, <code>SupportsAsyncClose</code>, <code>SupportsValidation</code>, <code>Telemetry</code>, <code>TelemetryMode</code>, <code>TokenAuthenticator</code>, <code>TokenExchanger</code>, <code>TokenUsage</code>, <code>ToolEntry</code>, <code>ToolRegistry</code>, <code>ToolSnapshot</code>, <code>TransientError</code>, <code>TurnInspection</code>, <code>TurnInspector</code>, <code>type_words</code>, <code>UpstreamError</code>, <code>UsageField</code>, <code>ValidationFailed</code>, <code>Verified</code></td></tr>
+<tr><td><code>agentcraft2_core.config</code></td><td>Configuration: the only package that knows a variable name.</td><td><code>Binding</code>, <code>ConfigResolver</code>, <code>DEFAULT_BINDINGS</code>, <code>DotenvConfigSource</code>, <code>EnvironConfigSource</code>, <code>EnvSetting</code>, <code>Key</code>, <code>LayeredConfigSource</code>, <code>LEGACY_PREFIX</code>, <code>load_service_config</code>, <code>log_deprecation</code>, <code>log_resolution_warnings</code>, <code>MappingConfigSource</code>, <code>MASKED</code>, <code>options_key</code>, <code>PREFIX</code>, <code>PROFILE_DEFAULTS</code>, <code>ProfileDefaults</code>, <code>provider_key</code>, <code>render_env_example</code>, <code>render_env_file</code>, <code>render_reference</code>, <code>Resolution</code>, <code>secret_key</code>, <code>service_resolver</code>, <code>telemetry_enabled</code>, <code>ValueKind</code>, <code>variable_for</code></td></tr>
+<tr><td><code>agentcraft2_core.di</code></td><td>Select implementations at the composition boundary and manage their resources.</td><td><code>access_plan</code>, <code>AccessPlan</code>, <code>AdapterAccess</code>, <code>AUDIT</code>, <code>BuildContext</code>, <code>BuildResources</code>, <code>CHECKPOINT</code>, <code>ConnectorContext</code>, <code>DATA</code>, <code>DATA_PORT</code>, <code>diagnose</code>, <code>ENTRY_POINT_GROUP</code>, <code>Factory</code>, <code>FIRST_PARTY_PACKS</code>, <code>fix_for</code>, <code>GUARDRAILS</code>, <code>IDENTITY</code>, <code>McpConnectorFactory</code>, <code>MODEL</code>, <code>MODEL_PORT</code>, <code>POLICY</code>, <code>ProviderSpec</code>, <code>REGISTRY</code>, <code>SECRETS</code>, <code>ServiceContainer</code>, <code>ServicePort</code>, <code>ServiceProviders</code>, <code>SyncServices</code></td></tr>
+<tr><td><code>agentcraft2_core.observability</code></td><td>What the people who run a service see: operational logs, traces and metrics.</td><td><code>ambient_provider_installed</code>, <code>bind_diagnostic_links</code>, <code>build_providers</code>, <code>configure_logging</code>, <code>configure_telemetry</code>, <code>Diagnostics</code>, <code>error_fields</code>, <code>explain</code>, <code>JsonlModelTraceSink</code>, <code>JsonLogFormatter</code>, <code>LIBRARY_LOGGERS</code>, <code>redact</code>, <code>report_error</code>, <code>shows_details</code>, <code>start_telemetry</code>, <code>your_code</code></td></tr>
+<tr><td><code>agentcraft2_core.integrations.langgraph</code></td><td>LangGraph bindings. The only package in core that imports <code>langgraph</code>.</td><td><code>AgentTracing</code>, <code>current_request_context</code>, <code>describe_model_response</code>, <code>govern_tools</code>, <code>GovernedChatModel</code>, <code>GovernedTool</code>, <code>InMemoryCheckpointBackend</code>, <code>LangGraphBindings</code>, <code>LangGraphModelProvider</code>, <code>LoopBridge</code>, <code>scoped_thread_id</code>, <code>ScopedCheckpointer</code>, <code>SqliteCheckpointBackend</code>, <code>SqliteCheckpointOptions</code>, <code>static_system_prompt</code>, <code>THREAD_NAMESPACE</code></td></tr>
+<tr><td><code>agentcraft2_core.integrations.mcp</code></td><td>MCP bindings. The only package in core that imports the MCP SDK.</td><td><code>DoorTokenVerifier</code>, <code>GovernedToolsMiddleware</code>, <code>HEALTH_PATHS</code>, <code>is_error_result</code>, <code>mcp_result_text</code>, <code>META_AUTHORIZATION</code>, <code>META_CLASSIFICATION_CEILING</code>, <code>META_REQUEST_ID</code>, <code>META_THREAD_ID</code>, <code>perimeter_refused</code>, <code>PerimeterDoor</code>, <code>resource_server_settings</code>, <code>tool_fingerprints</code>, <code>verify_registration</code></td></tr>
+<tr><td><code>agentcraft2_core.integrations.http</code></td><td>HTTP serving. The only package in core that imports Starlette and uvicorn.</td><td><code>add_health_routes</code>, <code>agent_app</code>, <code>agentcore_app</code>, <code>AgentService</code>, <code>AgentServices</code>, <code>build_agent_app</code>, <code>EXIT_INTERRUPTED</code>, <code>HEALTH_PATH</code>, <code>health_routes</code>, <code>InMemoryThreadAdmission</code>, <code>INVOCATIONS_PATH</code>, <code>INVOKE_PATH</code>, <code>OutcomeJournal</code>, <code>PING_PATH</code>, <code>PROFILES</code>, <code>read_question</code>, <code>READY_PATH</code>, <code>REQUEST_ID_HEADER_AGENTCORE</code>, <code>Run</code>, <code>run_agent</code>, <code>run_command</code>, <code>run_service</code>, <code>serve</code>, <code>ServiceLifecycle</code>, <code>ServiceState</code>, <code>SESSION_HEADER</code>, <code>SessionBaggageMiddleware</code>, <code>SqliteOutcomeJournal</code>, <code>Stream</code>, <code>STREAM_PATH</code>, <code>SupportsActivity</code>, <code>SupportsCustomRoutes</code>, <code>ThreadAdmission</code></td></tr>
+<tr><td><code>agentcraft2_core.testing</code></td><td>Fakes and contract test suites, shared with adapters and application teams.</td><td><code>ACCOUNT_COLUMNS</code>, <code>ACCOUNT_ENDPOINTS</code>, <code>ACCOUNT_QUERIES</code>, <code>ACCOUNT_ROWS</code>, <code>accounts_api</code>, <code>audit_records</code>, <code>calls_tool</code>, <code>calls_tools</code>, <code>fake_accounts_source</code>, <code>FAKE_PROVIDER</code>, <code>fake_providers</code>, <code>FakeChatModel</code>, <code>FakeChatModelProvider</code>, <code>FakeDataSource</code>, <code>FakeGuardrails</code>, <code>FakeIdentityVerifier</code>, <code>FakePolicyDecisionPoint</code>, <code>FakeQuery</code>, <code>FakeRegistry</code>, <code>Fakes</code>, <code>FakeSecretsProvider</code>, <code>FrozenClock</code>, <code>GuardrailAnswer</code>, <code>InMemoryAuditSink</code>, <code>last_shown_to_model</code>, <code>load_eval_config</code>, <code>load_test_config</code>, <code>PolicyAnswer</code>, <code>RecordingTelemetry</code>, <code>rest_stub_providers</code>, <code>rest_stub_transport</code>, <code>scripted_model</code>, <code>scripted_providers</code>, <code>SequentialIds</code>, <code>structured_reply</code>, <code>TEST_AGENT</code>, <code>write_accounts_endpoints</code>, <code>write_accounts_files</code></td></tr>
+<tr><td><code>agentcraft2_core.evaluation</code></td><td>Measuring how well an agent does its job, off the request path.</td><td><code>as_cases</code>, <code>calibrate</code>, <code>CalibrationReport</code>, <code>CaseResult</code>, <code>dataset_digest</code>, <code>EvalCase</code>, <code>EvalReport</code>, <code>exact</code>, <code>FEEDBACK_SCHEMA</code>, <code>FeedbackRecord</code>, <code>Interaction</code>, <code>INTERACTION_SCHEMA</code>, <code>JsonlFeedbackLog</code>, <code>judged</code>, <code>LabeledCase</code>, <code>load_cases</code>, <code>load_feedback</code>, <code>load_interactions</code>, <code>load_report</code>, <code>Regression</code>, <code>regressions</code>, <code>REPORT_SCHEMA</code>, <code>require_no_regression</code>, <code>run_eval</code>, <code>sampled</code>, <code>SavedReport</code>, <code>Score</code>, <code>score_interactions</code>, <code>scored_by</code>, <code>Scorer</code>, <code>Verdict</code>, <code>write_interactions</code></td></tr>
+<tr><td><code>agentcraft2_core.adapters</code></td><td>Local adapters that implement the ports without any cloud service.</td><td><code>AnthropicChatModelProvider</code>, <code>AnthropicModelOptions</code>, <code>CachingPolicyDecisionPoint</code>, <code>DuckDbCsvDataSource</code>, <code>DuckDbCsvOptions</code>, <code>EnvSecretsProvider</code>, <code>ExchangingJwtIdentity</code>, <code>FakeChatModel</code>, <code>FakeChatModelProvider</code>, <code>FileRegistryOptions</code>, <code>FileRegistrySource</code>, <code>GuardrailsOptions</code>, <code>JsonlAuditOptions</code>, <code>JsonlAuditSink</code>, <code>JwtIdentityOptions</code>, <code>JwtIdentityVerifier</code>, <code>JwtSettings</code>, <code>NoCheckpointBackend</code>, <code>NullTelemetry</code>, <code>OAuthTokenExchanger</code>, <code>OpaPolicyDecisionPoint</code>, <code>OpaPolicyOptions</code>, <code>OpenTelemetryTelemetry</code>, <code>PatternGuardrails</code>, <code>PatternGuardrailsOptions</code>, <code>PolicyCacheOptions</code>, <code>resolve_jwt_options</code>, <code>RestDataSource</code>, <code>RestOptions</code>, <code>RulesPolicyDecisionPoint</code>, <code>RulesPolicyOptions</code>, <code>ScriptedResponse</code>, <code>StaticIdentityOptions</code>, <code>StaticIdentityVerifier</code>, <code>SystemClock</code>, <code>TokenExchangeOptions</code>, <code>UuidGenerator</code></td></tr>
+<tr><td><code>agentcraft2_core.pipeline</code></td><td>The interceptor contract and the fixed-order request pipelines.</td><td><code>AgentCheck</code>, <code>allowed_agent</code>, <code>AuditableCall</code>, <code>AuditInterceptor</code>, <code>bind_request_context</code>, <code>bound_request_context</code>, <code>BudgetInterceptor</code>, <code>BudgetLedger</code>, <code>build_data_pipeline</code>, <code>build_model_pipeline</code>, <code>build_tool_pipeline</code>, <code>compose</code>, <code>DataCall</code>, <code>DataPolicyInterceptor</code>, <code>DataStage</code>, <code>DeadlineInterceptor</code>, <code>describe_query_result</code>, <code>enforce_decision</code>, <code>Evidence</code>, <code>frame_untrusted</code>, <code>FramingInterceptor</code>, <code>GovernedDataSource</code>, <code>Handler</code>, <code>IdentityInterceptor</code>, <code>InputGuardrailInterceptor</code>, <code>Interceptor</code>, <code>ModelCall</code>, <code>ModelPolicyInterceptor</code>, <code>ModelStage</code>, <code>name_actors</code>, <code>Operations</code>, <code>OutputGuardrailInterceptor</code>, <code>Pipeline</code>, <code>record_refused_sign_in</code>, <code>RegistryInterceptor</code>, <code>require_identified</code>, <code>ResilienceInterceptor</code>, <code>result_text</code>, <code>StructuredOutputInterceptor</code>, <code>tool_arguments_text</code>, <code>ToolCall</code>, <code>ToolPolicyInterceptor</code>, <code>ToolStage</code></td></tr>
+<tr><td><code>agentcraft2_core.kit</code></td><td>What a provider pack builds on.</td><td><code>agents_document</code>, <code>AUDIT</code>, <code>bind_parameters</code>, <code>build_statement</code>, <code>BuildContext</code>, <code>BuildResources</code>, <code>check_filter_columns</code>, <code>checked_base_url</code>, <code>CHECKPOINT</code>, <code>coerce_parameter</code>, <code>compile_query</code>, <code>CompiledQuery</code>, <code>ConnectorContext</code>, <code>content_revision</code>, <code>DATA</code>, <code>DATA_PORT</code>, <code>effective_row_cap</code>, <code>Factory</code>, <code>filter_rows</code>, <code>finish_result</code>, <code>GovernedStatement</code>, <code>GUARDRAILS</code>, <code>GuardrailsOptions</code>, <code>IDENTITY</code>, <code>load_registries</code>, <code>mask_rows</code>, <code>McpConnectorFactory</code>, <code>MODEL</code>, <code>MODEL_PORT</code>, <code>NamedQuery</code>, <code>parse_agents_document</code>, <code>parse_document_text</code>, <code>parse_tools_document</code>, <code>POLICY</code>, <code>ProviderSpec</code>, <code>QueryCatalog</code>, <code>REGISTRY</code>, <code>RegistryDocument</code>, <code>SECRETS</code>, <code>ServicePort</code>, <code>ServiceProviders</code>, <code>tls_verification</code>, <code>tools_document</code></td></tr>
+<tr><td><code>agentcraft2_aws</code></td><td>AWS adapters for the Enterprise Agentic Platform library.</td><td><code>register</code></td></tr>
 </tbody></table></div>
   </details>
   <details class="lesson" id="errors">

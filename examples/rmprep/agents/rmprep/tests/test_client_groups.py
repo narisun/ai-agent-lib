@@ -9,16 +9,16 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from ai_agent_lib_core import Principal, ServiceContainer
-from ai_agent_lib_core.pipeline import bind_request_context
-from ai_agent_lib_core.pipeline.guardrails import frame_untrusted
-from ai_agent_lib_core.testing import (
+from agentcraft2_core import Principal, ServiceContainer
+from agentcraft2_core.pipeline import bind_request_context
+from agentcraft2_core.pipeline.guardrails import frame_untrusted
+from agentcraft2_core.testing import (
     audit_records,
     calls_tool,
     load_test_config,
     scripted_providers,
 )
-from ai_agent_lib_core.testing.mcp import InProcessMcpConnector
+from agentcraft2_core.testing.mcp import InProcessMcpConnector
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage
 
 from rmprep.clients import client_names, lookup_in_turn, recent_client_lookup

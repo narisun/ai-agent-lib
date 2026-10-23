@@ -8,9 +8,9 @@ import sys
 from collections.abc import Sequence
 
 from accounts_agent.graph import APPLICATION, ask
-from ai_agent_lib_core import ServiceConfig, ServiceContainer
-from ai_agent_lib_core.config import load_service_config
-from ai_agent_lib_core.observability import report_error, shows_details
+from agentcraft2_core import ServiceConfig, ServiceContainer
+from agentcraft2_core.config import load_service_config
+from agentcraft2_core.observability import report_error, shows_details
 
 __all__ = ["main"]
 

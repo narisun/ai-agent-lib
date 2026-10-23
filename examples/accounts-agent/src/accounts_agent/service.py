@@ -8,14 +8,14 @@ from typing import Any
 from langchain_core.messages import HumanMessage
 
 from accounts_agent.graph import APPLICATION, build_graph, registered_mcp_tools
-from ai_agent_lib_core import RequestContext, ServiceContainer
-from ai_agent_lib_core.integrations.http import (
+from agentcraft2_core import RequestContext, ServiceContainer
+from agentcraft2_core.integrations.http import (
     AgentService,
     ServiceLifecycle,
     build_agent_app,
     run_agent,
 )
-from ai_agent_lib_core.integrations.langgraph import AgentTracing
+from agentcraft2_core.integrations.langgraph import AgentTracing
 
 __all__ = ["SERVICE", "build_app", "main"]
 

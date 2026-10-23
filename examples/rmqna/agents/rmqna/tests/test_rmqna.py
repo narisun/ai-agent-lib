@@ -11,8 +11,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from ai_agent_lib_core import Principal, RequestContext
-from ai_agent_lib_core.testing import FakeChatModelProvider, Fakes, calls_tool
+from agentcraft2_core import Principal, RequestContext
+from agentcraft2_core.testing import FakeChatModelProvider, Fakes, calls_tool
 from langchain_core.messages import AIMessage
 from langchain_core.tools import StructuredTool
 

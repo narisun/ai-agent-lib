@@ -16,7 +16,7 @@ def test_installable_project_keeps_all_extras(tmp_path: Path) -> None:
 
 def test_ui_is_installed_only_in_its_own_environment() -> None:
     root = Path(__file__).resolve().parents[2]
-    assert editable_requirements(root / "packages/ai-agent-lib-ui/pyproject.toml") == []
+    assert editable_requirements(root / "packages/agentcraft2-ui/pyproject.toml") == []
 
 
 def test_workspace_expands_declared_agent_and_mcp_members(tmp_path: Path) -> None:

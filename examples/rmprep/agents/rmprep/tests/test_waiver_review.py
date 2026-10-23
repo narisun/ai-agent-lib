@@ -3,8 +3,8 @@
 import json
 
 import pytest
-from ai_agent_lib_core import ValidationFailed
-from ai_agent_lib_core.pipeline.guardrails import frame_untrusted
+from agentcraft2_core import ValidationFailed
+from agentcraft2_core.pipeline.guardrails import frame_untrusted
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda
 

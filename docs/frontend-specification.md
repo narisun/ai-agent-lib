@@ -1,7 +1,7 @@
 # Agent Lab: frontend specification
 
 Status: staged implementation; updated on 13 October 2026.
-The [Phase 1 contracts](frontend-contracts.md) and [Phase 2 local chat package](../packages/ai-agent-lib-ui/README.md)
+The [Phase 1 contracts](frontend-contracts.md) and [Phase 2 local chat package](../packages/agentcraft2-ui/README.md)
 are implemented in this checkout. Local `init`, `check`, `serve`, registry selection
 and SQLite conversation history are available as a development preview. Live
 drafts, response metrics and per-response trace links are also implemented.
@@ -15,12 +15,12 @@ The existing [release scope](release-scope.md) remains authoritative for today's
 
 ## 1. Purpose and recommendation
 
-**Agent Lab** is the application name; `ai-agent-lib-ui` is its separately
+**Agent Lab** is the application name; `agentcraft2-ui` is its separately
 installable Python package. It lets people
 use registered agents and lets authorized engineers inspect how an answer was
 produced. An engineer should be able to install it with Python and pip, start it
 from Windows Command Prompt, and open it in their existing browser. Its
-[flask logo](../packages/ai-agent-lib-ui/src/ai_agent_lib_ui/assets/agent-lab.svg)
+[flask logo](../packages/agentcraft2-ui/src/agentcraft2_ui/assets/agent-lab.svg)
 connects three nodes representing an agent, its tools, and saved state. Use the
 name and icon on chat, sign-in, and supporting pages, including browser titles
 and the favicon.
@@ -100,11 +100,11 @@ This table distinguishes existing capabilities from work the frontend needs.
 | Documents | Example agents return answer text; rmprep returns `output.answer`. | An optional, versioned artifact contract. Do not infer a memo from Markdown headings. |
 
 Code references:
-[registry](../packages/ai-agent-lib-core/src/ai_agent_lib_core/contracts/registry.py),
-[HTTP routes](../packages/ai-agent-lib-core/src/ai_agent_lib_core/integrations/http/agent.py),
-[checkpoint scope](../packages/ai-agent-lib-core/src/ai_agent_lib_core/integrations/langgraph/checkpoint.py),
-[model tracing](../packages/ai-agent-lib-core/src/ai_agent_lib_core/integrations/langgraph/model_trace.py),
-[usage recording](../packages/ai-agent-lib-core/src/ai_agent_lib_core/integrations/langgraph/model.py),
+[registry](../packages/agentcraft2-core/src/agentcraft2_core/contracts/registry.py),
+[HTTP routes](../packages/agentcraft2-core/src/agentcraft2_core/integrations/http/agent.py),
+[checkpoint scope](../packages/agentcraft2-core/src/agentcraft2_core/integrations/langgraph/checkpoint.py),
+[model tracing](../packages/agentcraft2-core/src/agentcraft2_core/integrations/langgraph/model_trace.py),
+[usage recording](../packages/agentcraft2-core/src/agentcraft2_core/integrations/langgraph/model.py),
 [identity](identity.md), and
 [rmprep's service](../examples/rmprep/agents/rmprep/src/rmprep/service.py).
 
@@ -482,12 +482,12 @@ it. Local identity mode must refuse remote binding or remote service destination
 The proposed consumer workflow is:
 
 ```bat
-rem Proposed commands, available after ai-agent-lib-ui is released
+rem Proposed commands, available after agentcraft2-ui is released
 python -m venv .venv
-.venv\Scripts\python.exe -m pip install ai-agent-lib-ui
-.venv\Scripts\python.exe -m ai_agent_lib_ui init
-.venv\Scripts\python.exe -m ai_agent_lib_ui check
-.venv\Scripts\python.exe -m ai_agent_lib_ui serve
+.venv\Scripts\python.exe -m pip install agentcraft2-ui
+.venv\Scripts\python.exe -m agentcraft2_ui init
+.venv\Scripts\python.exe -m agentcraft2_ui check
+.venv\Scripts\python.exe -m agentcraft2_ui serve
 ```
 
 `init` creates a commented configuration with registry and agent-binding paths.

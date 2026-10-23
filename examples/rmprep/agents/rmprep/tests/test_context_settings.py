@@ -10,10 +10,10 @@ from unittest.mock import AsyncMock, Mock
 
 import httpx
 import pytest
-from ai_agent_lib_core import ConfigurationError, Principal
-from ai_agent_lib_core.config import MappingConfigSource
-from ai_agent_lib_core.integrations.http import AgentService, ServiceLifecycle
-from ai_agent_lib_core.testing import FakeIdentityVerifier, Fakes
+from agentcraft2_core import ConfigurationError, Principal
+from agentcraft2_core.config import MappingConfigSource
+from agentcraft2_core.integrations.http import AgentService, ServiceLifecycle
+from agentcraft2_core.testing import FakeIdentityVerifier, Fakes
 
 from rmprep import __main__ as cli
 from rmprep import service

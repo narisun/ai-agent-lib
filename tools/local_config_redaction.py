@@ -124,7 +124,7 @@ def _url(value: str) -> str:
 
 def _text(value: str) -> str:
     """Catch recognizable credentials even inside an otherwise public text field."""
-    from ai_agent_lib_core.contracts.redaction import redact
+    from agentcraft2_core.contracts.redaction import redact
 
     if re.search(r"-----BEGIN [A-Z ]*PRIVATE KEY-----", value):
         return MASKED

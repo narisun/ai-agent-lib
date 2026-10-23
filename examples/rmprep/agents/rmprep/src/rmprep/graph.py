@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Sequence
 from typing import Any
 
-from ai_agent_lib_core import RequestContext, ServiceContainer
+from agentcraft2_core import RequestContext, ServiceContainer
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import BaseTool
 from langgraph.graph import END, START, StateGraph

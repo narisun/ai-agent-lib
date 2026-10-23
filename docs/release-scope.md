@@ -40,7 +40,7 @@ These changes landed afterward; each is documented where it is used and covered 
 
 | Change | Current behavior | Regression evidence |
 | --- | --- | --- |
-| Offline and online evals, with baselines | `ai_agent_lib_core.evaluation` scores a hand-written dataset, or sampled production interactions, and gates the result with `report.require` and `require_no_regression`. `agentcraft2 eval` runs a service's evals; `--accept` runs them itself and, if they pass, saves the report as `evals/baseline.json`. On an intentional regression it skips only the baseline gate. See [Measure an agent with evals](evals.md). | Core `test_evaluation*.py`; CLI `test_cli_check.py`. |
+| Offline and online evals, with baselines | `agentcraft2_core.evaluation` scores a hand-written dataset, or sampled production interactions, and gates the result with `report.require` and `require_no_regression`. `agentcraft2 eval` runs a service's evals; `--accept` runs them itself and, if they pass, saves the report as `evals/baseline.json`. On an intentional regression it skips only the baseline gate. See [Measure an agent with evals](evals.md). | Core `test_evaluation*.py`; CLI `test_cli_check.py`. |
 | Feedback capture and interaction export | Agent Lab appends thumbs up/down on accepted answers to `feedback.jsonl`. `export_interactions` turns saved conversations, joined with that feedback, into JSONL for online scoring. It is a Python entry point, not yet a CLI command. | UI `test_feedback.py`, `test_interactions_export.py`. |
 | `AgentService` and `run_agent` composition | One composition root wires configuration, tracing, lifecycle, readiness and serving around an agent's graph. Generated agents, accounts-agent and rmprep start through it. `app_extras` adds app options that need the live container. | Core `test_http_composition.py`. |
 | Agent Lab import contracts | import-linter contracts keep the UI's contracts free of every other module in its package, keep its application layer free of frameworks and adapters, and let only its integrations module import the browser framework. | `lint-imports` over the contracts in the UI package's `pyproject.toml`. |
@@ -94,6 +94,20 @@ These changes landed afterward; each is documented where it is used and covered 
   `agentlib.authz` is `agentcraft2.authz`, and `data.agentlib.rules` is
   `data.agentcraft2.rules`. A policy server loaded with an older bundle needs the
   new one, and the rules file must sit under `agentcraft2/`.
+- The four packages are renamed. Install and import them under the new names:
+
+  | Was | Is now |
+  |---|---|
+  | `ai-agent-lib-core`, `-cli`, `-aws`, `-ui` (distributions and folders) | `agentcraft2-core`, `-cli`, `-aws`, `-ui` |
+  | `ai_agent_lib_core`, `_cli`, `_aws`, `_ui` (imports, `python -m ...`) | `agentcraft2_core`, `_cli`, `_aws`, `_ui` |
+  | Provider entry-point group `ai_agent_lib.providers` | `agentcraft2.providers` |
+
+  A package that registers providers under the old entry-point group is not found.
+  Workspaces generated earlier name the old distributions in their `pyproject.toml`
+  files. `agentcraft2 update` rewrites the ones you have not edited and lists the
+  rest; change the names in those by hand, then reinstall. Editable installs made
+  from the old folders stop working: reinstall them.
+
 - Also renamed, from `agentlib` to `agentcraft2`:
 
   | What | Was | Is now |
@@ -123,7 +137,7 @@ These changes landed afterward; each is documented where it is used and covered 
   dashboards and alerts that filter on the old span attribute and metric names. The
   generated Terraform names the log group `/agentcraft2/<name>`, so the next apply
   replaces the old group and deletes the logs in it. Export anything you need first.
-- Not renamed: package and import names (`ai_agent_lib_*`), the `eap-*`
+- Not renamed: the repository name `ai-agent-lib`, the `eap-*`
   resource-name defaults, and two hash salts that derive stable identifiers in Agent
   Lab (`agentlib:answer:` and `agentlib:older:`). Renaming a salt would change the
   identifiers it produces for saved conversations.
@@ -151,8 +165,8 @@ These changes landed afterward; each is documented where it is used and covered 
 ## Using the new extension points
 
 ```python
-from ai_agent_lib_core.contracts import AuditSink
-from ai_agent_lib_core.kit import AUDIT, SECRETS, BuildContext, ServiceProviders
+from agentcraft2_core.contracts import AuditSink
+from agentcraft2_core.kit import AUDIT, SECRETS, BuildContext, ServiceProviders
 
 
 async def audit_factory(context: BuildContext) -> AuditSink:
@@ -176,7 +190,7 @@ Ambient task-local side effects are not a dependency-injection interface.
 
 Use your enterprise-approved Python and pip. Contributors run
 `python tools/install_dev.py`; consumers install the CLI with pip and run
-`python -m ai_agent_lib_cli install` inside a generated workspace. The local
+`python -m agentcraft2_cli install` inside a generated workspace. The local
 batch setup keeps agent/MCP, Agent Lab, and Phoenix dependencies in separate
 `.venv` package folders, loaded by the same default Python executable. Pip also
 runs under that default Python; environment-local binaries are not used. See [local startup](local-startup.md) for model selection and setup.

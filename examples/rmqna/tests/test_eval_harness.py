@@ -21,9 +21,9 @@ from types import ModuleType
 from typing import Any
 
 import pytest
-from ai_agent_lib_core.evaluation import EvalCase, EvalReport, run_eval
-from ai_agent_lib_core.pipeline.guardrails import frame_untrusted
-from ai_agent_lib_core.testing import (
+from agentcraft2_core.evaluation import EvalCase, EvalReport, run_eval
+from agentcraft2_core.pipeline.guardrails import frame_untrusted
+from agentcraft2_core.testing import (
     calls_tool,
     load_test_config,
     scripted_model,

@@ -23,8 +23,8 @@ why, read [ADR 0005](adr/0005-agentcore-target.md).
 
 ## 1. Prerequisites
 
-- The library's three distributions (`ai-agent-lib-core`, `ai-agent-lib-aws`,
-  `ai-agent-lib-cli`) on a package index the image build can reach. The example
+- The library's three distributions (`agentcraft2-core`, `agentcraft2-aws`,
+  `agentcraft2-cli`) on a package index the image build can reach. The example
   workspace installs the library from the local checkout (`[library] path` in
   `agentcraft2.toml`), and the plan warns that an image build cannot reach it.
 - Python 3.11 or newer with the CLI importable; the deployed image uses Python
@@ -49,8 +49,8 @@ With no `deploy.env` in a service's folder, the command writes a starting one
 and stops:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli deploy rmprep --target agentcore
-"%PYTHON%" -m ai_agent_lib_cli deploy rmprep-data --target agentcore
+"%PYTHON%" -m agentcraft2_cli deploy rmprep --target agentcore
+"%PYTHON%" -m agentcraft2_cli deploy rmprep-data --target agentcore
 ```
 
 Recorded output:
@@ -59,14 +59,14 @@ Recorded output:
   created  agents/rmprep/deploy.env
 
 Next:
-  add "ai-agent-lib-aws[bedrock,agentcore]" to the dependencies in agents/rmprep/pyproject.toml, then run 'python -m ai_agent_lib_cli install'
+  add "agentcraft2-aws[bedrock,agentcore]" to the dependencies in agents/rmprep/pyproject.toml, then run 'python -m agentcraft2_cli install'
   fill in agents/rmprep/deploy.env: its values are examples
   run 'agentcraft2 deploy rmprep --target agentcore --plan'
 
   created  mcp-servers/rmprep-data/deploy.env
 
 Next:
-  add "ai-agent-lib-aws" to the dependencies in mcp-servers/rmprep-data/pyproject.toml, then run 'python -m ai_agent_lib_cli install'
+  add "agentcraft2-aws" to the dependencies in mcp-servers/rmprep-data/pyproject.toml, then run 'python -m agentcraft2_cli install'
   fill in mcp-servers/rmprep-data/deploy.env: its values are examples
   run 'agentcraft2 deploy rmprep-data --target agentcore --plan'
 ```
@@ -198,8 +198,8 @@ the registry files are uploaded to `s3://<bucket>/registry/agents.yaml` and
 ## 4. Plan and generate
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli deploy rmprep --target agentcore --plan
-"%PYTHON%" -m ai_agent_lib_cli deploy rmprep-data --target agentcore --plan
+"%PYTHON%" -m agentcraft2_cli deploy rmprep --target agentcore --plan
+"%PYTHON%" -m agentcraft2_cli deploy rmprep-data --target agentcore --plan
 ```
 
 ### Verified dry run: October 23, 2026
@@ -319,7 +319,7 @@ command printed it; the fix is what changed in `deploy.env`.
 | `AC2_TELEMETRY=opentelemetry` (the Fargate value) | `AC2_TELEMETRY=opentelemetry installs the service's own tracer and meter providers, which collide with the ones ADOT installs on AgentCore Runtime; set AC2_TELEMETRY=ambient (or off) in agents/rmprep/deploy.env` | `AC2_TELEMETRY=ambient` |
 | `AC2_CHECKPOINT_PROVIDER=sqlite` (the local value) | Two problems: `checkpoint sqlite runs only on a developer's machine; select another ...` and `checkpoint sqlite has nowhere durable to write on AgentCore Runtime, whose disk ends with the session; set AC2_CHECKPOINT_PROVIDER to one of postgres, agentcore_memory, none ...`; plus the warning `AGENTCORE_MEMORY=create while checkpoint sqlite does not use AgentCore Memory` | `AC2_CHECKPOINT_PROVIDER=agentcore_memory` with `{"memory_id": "created_by_terraform"}` |
 | `AC2_DATA_SOURCES` copied from the server's `.env.example` (`duckdb_csv`) | `data source rmprep (duckdb_csv) runs only on a developer's machine; select another in mcp-servers/rmprep-data/deploy.env` | `redshift_data` with the server's `queries` folder (section 2) |
-| `ai-agent-lib-aws` missing from `agents/rmprep/pyproject.toml` | `audit firehose, checkpoint agentcore_memory, guardrails bedrock, model bedrock, registry s3_file, secrets secrets_manager need ai-agent-lib-aws, which rmprep does not install; list "ai-agent-lib-aws[agentcore,bedrock]" in the dependencies in agents/rmprep/pyproject.toml and run 'python -m ai_agent_lib_cli install'` | Add the dependency line. The plan checks the file, not the installed packages. |
+| `agentcraft2-aws` missing from `agents/rmprep/pyproject.toml` | `audit firehose, checkpoint agentcore_memory, guardrails bedrock, model bedrock, registry s3_file, secrets secrets_manager need agentcraft2-aws, which rmprep does not install; list "agentcraft2-aws[agentcore,bedrock]" in the dependencies in agents/rmprep/pyproject.toml and run 'python -m agentcraft2_cli install'` | Add the dependency line. The plan checks the file, not the installed packages. |
 | `AGENTCORE_MEMORY=rmprep_memory-abc123` with the placeholder still in the options | `AGENTCORE_MEMORY names the memory rmprep_memory-abc123, but the checkpoint option memory_id is 'created_by_terraform'; make them agree in agents/rmprep/deploy.env (AGENTCORE_MEMORY and AC2_CHECKPOINT_OPTIONS)` | Either `create` with the placeholder, or the same ID in both places once the memory exists. |
 | `AGENTCORE_AUTH=jwt` with neither clients nor audience | `AGENTCORE_ALLOWED_CLIENTS in agents/rmprep/deploy.env is not valid` / `expected: at least one client ID in AGENTCORE_ALLOWED_CLIENTS or one audience in AGENTCORE_ALLOWED_AUDIENCE` / `got: neither is set` | `AGENTCORE_ALLOWED_AUDIENCE=api://rmprep` |
 | `AGENTCORE_DISCOVERY_URL=https://login.microsoftonline.com/<tenant>/v2.0` | `AGENTCORE_DISCOVERY_URL in agents/rmprep/deploy.env is not valid` / `expected: an https URL ending in .well-known/openid-configuration` | Append `/.well-known/openid-configuration` |
@@ -333,8 +333,8 @@ after the plan, and nothing is written while one remains.
 ### Generate
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli deploy rmprep --target agentcore
-"%PYTHON%" -m ai_agent_lib_cli deploy rmprep-data --target agentcore
+"%PYTHON%" -m agentcraft2_cli deploy rmprep --target agentcore
+"%PYTHON%" -m agentcraft2_cli deploy rmprep-data --target agentcore
 ```
 
 Recorded output, for each service in turn:
@@ -526,7 +526,7 @@ The operator's steps. None of them ran in the dry run.
     credentials sign the calls, or `--agentcore-auth bearer` with a token file
     presents the Entra token. The UI derives the session header from the
     conversation and links each answer to the CloudWatch view. See
-    [Chat with an agent on AgentCore Runtime](../packages/ai-agent-lib-ui/README.md#chat-with-an-agent-on-agentcore-runtime).
+    [Chat with an agent on AgentCore Runtime](../packages/agentcraft2-ui/README.md#chat-with-an-agent-on-agentcore-runtime).
     This was not tried in the dry run: it needs the deployed runtime.
 
 ## Settings
@@ -550,7 +550,7 @@ the resolved values under `Runtime:`.
 | `AGENTCORE_MEMORY` | `none`, `create` (Terraform creates the memory the checkpoints go to) or a memory ID, which must then equal the checkpoint option `memory_id` | agent `create`, server `none` |
 
 The service's own variables are the `AC2_` ones of section 2; run
-`"%PYTHON%" -m ai_agent_lib_cli config explain rmprep` with `deploy.env` as the
+`"%PYTHON%" -m agentcraft2_cli config explain rmprep` with `deploy.env` as the
 settings file to see how each resolves. The generated `deploy/<service>/README.md`
 repeats the build and apply steps for that service.
 
@@ -607,7 +607,7 @@ nothing is written while a problem remains.
 | `AGENTCORE_MEMORY=create while checkpoint <provider> does not use AgentCore Memory; ...` (warning) | Either select `agentcore_memory`, or set `AGENTCORE_MEMORY=none` so that Terraform creates no memory. |
 | `AGENTCORE_MEMORY names the memory <id>, but the checkpoint option memory_id is '<other>'; make them agree ...` | Put the same ID in `AGENTCORE_MEMORY` and in `memory_id` of `AC2_CHECKPOINT_OPTIONS`, or go back to `create` with the placeholder. |
 | `data source rmprep (duckdb_csv) runs only on a developer's machine; select another ...` | Select `redshift_data` in `AC2_DATA_SOURCES` with `queries_dir`, `database` and `workgroup`, and load the CSV files into that workgroup. |
-| `... need ai-agent-lib-aws, which <service> does not install; list "ai-agent-lib-aws[agentcore,bedrock]" in the dependencies in <service>/pyproject.toml ...` | Add the dependency line to the service's `pyproject.toml`. The plan reads the file; no install is needed for it to pass. |
+| `... need agentcraft2-aws, which <service> does not install; list "agentcraft2-aws[agentcore,bedrock]" in the dependencies in <service>/pyproject.toml ...` | Add the dependency line to the service's `pyproject.toml`. The plan reads the file; no install is needed for it to pass. |
 | `AGENTCORE_ALLOWED_CLIENTS in <service>/deploy.env is not valid` / `expected: at least one client ID in AGENTCORE_ALLOWED_CLIENTS or one audience in AGENTCORE_ALLOWED_AUDIENCE` | With `AGENTCORE_AUTH=jwt`, uncomment `AGENTCORE_ALLOWED_AUDIENCE` (or list clients). |
 | `AGENTCORE_DISCOVERY_URL in <service>/deploy.env is not valid` / `expected: an https URL ending in .well-known/openid-configuration` | Use the full discovery document URL, not the issuer. |
 | `<service>/deploy.env describes a developer's machine, not a deployment` | `AC2_DEPLOYMENT_ENV=dev` or `prod`. `local` is for `.env`. |

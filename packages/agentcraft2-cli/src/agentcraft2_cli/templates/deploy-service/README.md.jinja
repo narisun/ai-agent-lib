@@ -1,0 +1,104 @@
+# Deploying {{ name }}
+
+Use this folder to build the service image and configure its AWS Fargate
+deployment. The CLI generates these files from `{{ folder }}/deploy.env`.
+
+## Prepare the deployment environment
+
+You need a build machine or CI runner with:
+
+- Python and pip, with access to published library packages on your approved index;
+- a container engine for building images and access to your image registry;
+- Terraform and AWS credentials with permission to manage the deployment;
+- the cluster, network, and other platform resources listed in `terraform.tfvars.example`.
+
+Start from the **workspace root** and follow
+[Select Python](../../README.md#select-python) to set `PYTHON`.
+Windows examples use **Command Prompt (cmd.exe)**. In bash/zsh, use `"$PYTHON"`
+where a command shows `"%PYTHON%"`.
+
+## 1. Review settings and generate files
+
+Edit `{{ folder }}/deploy.env` with the settings for your deployment. Use secret
+references for credentials. Review the plan, then regenerate the files:
+
+```bat
+"%PYTHON%" -m agentcraft2_cli deploy {{ name }} --plan
+"%PYTHON%" -m agentcraft2_cli deploy {{ name }}
+```
+
+The plan lists selected providers, required AWS permissions, supporting
+containers, and items that need manual review.
+
+| File | How to maintain it |
+| --- | --- |
+| `settings.tf` | Generated on each run from `deploy.env`; edit the settings file to change it |
+| `permissions.tf` | Generated on each run from the selected adapters' permission requirements |
+| `main.tf`, `variables.tf`, `Dockerfile`, `Dockerfile.dockerignore` | Created once; review and edit them for your deployment |
+
+In `permissions.tf`, `# check:` marks a permission whose resource needs manual
+review. Configure the specific resource in `deploy.env` where supported, or
+adjust the task policy in your service's `main.tf` before production use.
+
+## 2. Lock runtime dependencies
+
+Generate a dependency lock file in a release environment matching the image's
+Python version and operating system. The generated Dockerfile uses Python 3.11
+on Linux. From the workspace root on that Linux host, using bash:
+
+```bash
+python3.11 -m venv .venv-release
+PYTHON="$PWD/.venv-release/bin/python"
+"$PYTHON" -m pip install pip-tools
+"$PYTHON" -m piptools compile --generate-hashes --output-file=deploy/{{ name }}/requirements.lock {{ folder }}/pyproject.toml
+```
+
+**Expected result:** `deploy/{{ name }}/requirements.lock` contains pinned
+dependencies and hashes. Review and commit it. Regenerate it when dependencies
+change. Resolve library dependencies from your approved package index.
+
+## 3. Build and publish images
+
+On the image build host, run from the workspace root:
+
+```bat
+docker build -f deploy/{{ name }}/Dockerfile -t {{ name }} .
+```
+
+If the plan includes the OPA sidecar, also build its image:
+
+```bat
+docker build -f deploy/opa/Dockerfile -t {{ name }}-opa .
+```
+
+These Docker commands also work in bash. Tag and push the images using your
+team's registry workflow, then record their published image digests for step 4.
+
+`Dockerfile.dockerignore` limits the build context to runtime assets: the
+service's `src/` and `queries/`, plus shared `registry/` and `policies/`.
+Review and explicitly include any additional assets your service needs.
+Keep credentials in the runtime secrets provider.
+
+## 4. Review and apply infrastructure
+
+Copy `deploy/{{ name }}/terraform.tfvars.example` to
+`deploy/{{ name }}/terraform.tfvars`. Fill in the platform resource IDs and
+published image references. Use immutable image digests, as shown in the file.
+Set `opa_image` to `null` if the plan uses another policy provider.
+
+From the workspace root, run:
+
+```bat
+terraform -chdir=deploy/{{ name }} init
+terraform -chdir=deploy/{{ name }} plan
+```
+
+Review the planned resource changes. To apply them, run:
+
+```bat
+terraform -chdir=deploy/{{ name }} apply
+```
+
+The Terraform commands work in Command Prompt and bash. After deployment,
+check the ECS service status and startup logs, then verify `/readyz` through
+your configured service endpoint.

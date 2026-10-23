@@ -8,20 +8,20 @@ from pathlib import Path
 import pytest
 from architecture.containment import find_violations
 
-from ai_agent_lib_core.config import DEFAULT_BINDINGS
-from ai_agent_lib_core.config.bindings import (
+from agentcraft2_core.config import DEFAULT_BINDINGS
+from agentcraft2_core.config.bindings import (
     LEGACY_PREFIX,
     LEGACY_SECRET_VARIABLE_PREFIX,
     PREFIX,
     SECRET_VARIABLE_PREFIX,
     secret_name,
 )
-from ai_agent_lib_core.config.phoenix import PHOENIX_VARIABLES
+from agentcraft2_core.config.phoenix import PHOENIX_VARIABLES
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PACKAGES = (
-    Path("packages/ai-agent-lib-core/src/ai_agent_lib_core/config"),
-    Path("packages/ai-agent-lib-ui/src/ai_agent_lib_ui/config"),
+    Path("packages/agentcraft2-core/src/agentcraft2_core/config"),
+    Path("packages/agentcraft2-ui/src/agentcraft2_ui/config"),
 )
 
 
@@ -38,8 +38,8 @@ def test_the_scan_covers_the_library_but_not_config() -> None:
     files = _source_files_outside_config()
     relative = {path.relative_to(REPO_ROOT).as_posix() for path in files}
     assert any("/contracts/" in name for name in relative)
-    assert any("ai_agent_lib_aws" in name for name in relative)
-    assert any("ai_agent_lib_ui/application/" in name for name in relative)
+    assert any("agentcraft2_aws" in name for name in relative)
+    assert any("agentcraft2_ui/application/" in name for name in relative)
     assert not any("/config/" in name for name in relative)
 
 

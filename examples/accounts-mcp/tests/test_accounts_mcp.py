@@ -21,16 +21,16 @@ from mcp.server.mcpserver import MCPServer
 from accounts_agent import APPLICATION as AGENT
 from accounts_agent import ask
 from accounts_mcp import APPLICATION, SERVER_ID, build_server
-from ai_agent_lib_core import Classification, Principal, RequestContext, ServiceContainer
-from ai_agent_lib_core.contracts import MASK
-from ai_agent_lib_core.integrations.mcp import (
+from agentcraft2_core import Classification, Principal, RequestContext, ServiceContainer
+from agentcraft2_core.contracts import MASK
+from agentcraft2_core.integrations.mcp import (
     META_AUTHORIZATION,
     mcp_result_text,
     verify_registration,
 )
-from ai_agent_lib_core.pipeline import frame_untrusted
-from ai_agent_lib_core.testing import FakeChatModelProvider, calls_tool, scripted_model
-from ai_agent_lib_core.testing.mcp import InProcessMcpConnector
+from agentcraft2_core.pipeline import frame_untrusted
+from agentcraft2_core.testing import FakeChatModelProvider, calls_tool, scripted_model
+from agentcraft2_core.testing.mcp import InProcessMcpConnector
 
 
 @pytest.fixture

@@ -13,7 +13,7 @@ import pytest
 pytestmark = pytest.mark.slow  # every test runs import-linter in a subprocess
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PACKAGES = ("ai_agent_lib_core", "ai_agent_lib_aws", "ai_agent_lib_cli")
+PACKAGES = ("agentcraft2_core", "agentcraft2_aws", "agentcraft2_cli")
 _RUN_LINTER = (
     "import sys; from importlinter.cli import lint_imports; "
     "sys.exit(lint_imports(config_filename=sys.argv[1], no_cache=True))"
@@ -56,58 +56,58 @@ def test_the_real_code_keeps_every_import_rule() -> None:
     ("module", "planted_import", "broken_rule"),
     [
         (
-            "ai_agent_lib_core/contracts/planted.py",
-            "import ai_agent_lib_core.config",
+            "agentcraft2_core/contracts/planted.py",
+            "import agentcraft2_core.config",
             "contracts imports nothing else from the library",
         ),
         (
-            "ai_agent_lib_core/pipeline/planted.py",
-            "import ai_agent_lib_core.adapters",
+            "agentcraft2_core/pipeline/planted.py",
+            "import agentcraft2_core.adapters",
             "config, pipeline and adapters import contracts only",
         ),
         (
-            "ai_agent_lib_core/config/planted.py",
-            "import ai_agent_lib_core.di",
+            "agentcraft2_core/config/planted.py",
+            "import agentcraft2_core.di",
             "config, pipeline and adapters stay below di and integrations",
         ),
         (
-            "ai_agent_lib_core/adapters/planted.py",
+            "agentcraft2_core/adapters/planted.py",
             "import langgraph.graph",
             "only integrations.langgraph imports langgraph",
         ),
         (
-            "ai_agent_lib_core/di/planted.py",
+            "agentcraft2_core/di/planted.py",
             "import boto3",
             "core never imports the AWS SDK, the AWS package or the CLI",
         ),
         (
-            "ai_agent_lib_aws/planted.py",
-            "import ai_agent_lib_cli",
+            "agentcraft2_aws/planted.py",
+            "import agentcraft2_cli",
             "no runtime package imports the CLI",
         ),
         (
-            "ai_agent_lib_aws/planted.py",
-            "import ai_agent_lib_core.adapters.data_duckdb",
+            "agentcraft2_aws/planted.py",
+            "import agentcraft2_core.adapters.data_duckdb",
             "a provider pack builds on contracts and the kit only",
         ),
         (
-            "ai_agent_lib_aws/planted.py",
-            "import ai_agent_lib_core.di.container",
+            "agentcraft2_aws/planted.py",
+            "import agentcraft2_core.di.container",
             "a provider pack builds on contracts and the kit only",
         ),
         (
-            "ai_agent_lib_core/di/planted.py",
+            "agentcraft2_core/di/planted.py",
             "import starlette.applications",
             "only integrations.http imports the HTTP server framework",
         ),
         (
-            "ai_agent_lib_aws/planted.py",
+            "agentcraft2_aws/planted.py",
             "import langgraph.graph",
             "in the AWS package only the checkpoint stores import langgraph",
         ),
         (
-            "ai_agent_lib_core/adapters/planted.py",
-            "import ai_agent_lib_core.kit",
+            "agentcraft2_core/adapters/planted.py",
+            "import agentcraft2_core.kit",
             "config, pipeline and adapters stay below di and integrations",
         ),
     ],

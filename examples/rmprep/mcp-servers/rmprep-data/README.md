@@ -109,13 +109,13 @@ production data mappings require your team's policy.
 
 ```bat
 python -m pytest mcp-servers\rmprep-data\tests -q
-python -m ai_agent_lib_cli check
+python -m agentcraft2_cli check
 ```
 
 After intentionally changing a tool interface, refresh its registry pins:
 
 ```bat
-python -m ai_agent_lib_cli registry pin rmprep-data
+python -m agentcraft2_cli registry pin rmprep-data
 ```
 
 See the [data review](../../docs/data-review.md) for table coverage, quality

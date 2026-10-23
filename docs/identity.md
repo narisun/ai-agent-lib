@@ -182,7 +182,7 @@ Lambda, which AWS marks with `AWS_EXECUTION_ENV`, refuses to start until it
 names its environment as `dev` or `prod`. On other compute, the deployment
 must set `AC2_DEPLOYMENT_ENV` itself.
 
-To test against real tokens without Entra, `ai_agent_lib_core.testing.oauth`
+To test against real tokens without Entra, `agentcraft2_core.testing.oauth`
 has a stand-in identity provider that signs tokens, publishes its keys and
 answers the token endpoint.
 

@@ -5,7 +5,7 @@ description = "Read-only SQL over the relationship-manager data: a contained eng
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "ai-agent-lib-core[duckdb,jwt,mcp,otel,serve]",
+    "agentcraft2-core[duckdb,jwt,mcp,otel,serve]",
     # The validator reads the statement with sqlglot's syntax tree (exp.Expr, SetOperation) and
     # resolves CTE names with its scope analysis; the library itself allows older versions.
     "sqlglot>=30.0",

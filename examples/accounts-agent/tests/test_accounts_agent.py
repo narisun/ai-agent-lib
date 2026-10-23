@@ -11,10 +11,10 @@ from langchain_core.messages import AIMessage
 from accounts_agent import APPLICATION, ask
 from accounts_agent.__main__ import main
 from accounts_agent.tools import lookup_balance
-from ai_agent_lib_core import PolicyDenied, Principal, RequestContext, ServiceContainer
-from ai_agent_lib_core.config import ConfigResolver, MappingConfigSource
-from ai_agent_lib_core.pipeline import frame_untrusted
-from ai_agent_lib_core.testing import FakeChatModelProvider, Fakes, calls_tool
+from agentcraft2_core import PolicyDenied, Principal, RequestContext, ServiceContainer
+from agentcraft2_core.config import ConfigResolver, MappingConfigSource
+from agentcraft2_core.pipeline import frame_untrusted
+from agentcraft2_core.testing import FakeChatModelProvider, Fakes, calls_tool
 
 RULES = Path(__file__).parents[1] / "policies" / "agentcraft2" / "rules" / "data.yaml"
 

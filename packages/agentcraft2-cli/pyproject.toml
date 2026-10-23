@@ -1,0 +1,38 @@
+[project]
+name = "agentcraft2-cli"
+version = "0.1.0"
+description = "Developer tooling and project templates for the Enterprise Agentic Platform library."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    # With what a generated MCP server needs to start, so that its tools can be pinned.
+    "agentcraft2-core[duckdb,mcp]",
+    "click>=8.1",
+    "jinja2>=3.1",
+    "pyyaml>=6.0",
+    # Formats the code the templates produce, with the settings a workspace uses.
+    "ruff>=0.6",
+]
+
+[project.optional-dependencies]
+# For 'agentcraft2 new mcp --from-redshift', which reads the Redshift catalogue.
+aws = [
+    "agentcraft2-aws",
+]
+
+[project.scripts]
+agentcraft2 = "agentcraft2_cli.__main__:main"
+# The short name for the same command.
+ac2 = "agentcraft2_cli.__main__:main"
+
+[tool.uv.sources]
+agentcraft2-core = { workspace = true }
+agentcraft2-aws = { workspace = true }
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentcraft2_cli"]

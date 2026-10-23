@@ -23,7 +23,7 @@ multiple applications sharing the same checkpoints in one Python process, create
 one guard and pass it to each application with `admission=guard`.
 
 For multiple worker processes or replicas, inject an implementation of
-`ai_agent_lib_core.integrations.http.ThreadAdmission` backed by shared coordination,
+`agentcraft2_core.integrations.http.ThreadAdmission` backed by shared coordination,
 such as PostgreSQL advisory locks. Its `hold(context)` method is an async context
 manager: atomically acquire ownership and yield `True`, or yield `False` when
 busy. Release on success, error, and cancellation. Failed acquisition must prevent
@@ -36,6 +36,6 @@ outside `agent_app` must apply their own admission when they share threads.
 
 The public `agent_app` arguments and successful response envelopes remain
 compatible; `admission` is an optional keyword argument. Regression tests in
-[`test_http_admission.py`](../packages/ai-agent-lib-core/tests/unit/test_http_admission.py)
+[`test_http_admission.py`](../packages/agentcraft2-core/tests/unit/test_http_admission.py)
 exercise scoped checkpoints, route combinations, shared guards, outcome writes,
 cancellation, and broken connections.

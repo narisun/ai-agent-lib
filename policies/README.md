@@ -26,7 +26,7 @@ policies/
 Both engines evaluate the same document the same way: the first rule that
 covers a request allows it and supplies its obligations, and a request that no
 rule covers is denied. The contract suite `PolicyDecisionPointContract` in
-`ai_agent_lib_core.testing.contracts` runs against both.
+`agentcraft2_core.testing.contracts` runs against both.
 
 Both also check the document as strictly. The in-process engine refuses to
 start with a document that has an unknown key, a wrong type, an unknown action
@@ -72,7 +72,7 @@ name every sensitive column in the rule.
 opa fmt --fail policies/bundle
 opa check --strict policies/bundle
 opa test policies/bundle
-python -m pytest -m integration packages/ai-agent-lib-core/tests/integration/test_opa_live.py
+python -m pytest -m integration packages/agentcraft2-core/tests/integration/test_opa_live.py
 ```
 
 The last command needs the `opa` binary on `PATH`. It starts a local OPA server

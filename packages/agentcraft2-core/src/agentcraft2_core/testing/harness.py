@@ -1,0 +1,173 @@
+"""A ready-made set of fakes and the container that uses them."""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from typing import Any
+
+from agentcraft2_core.adapters import FakeChatModelProvider, ScriptedResponse
+from agentcraft2_core.contracts import (
+    CheckpointBackend,
+    ConfigurationError,
+    DataSource,
+    IdentityVerifier,
+    ProviderSelection,
+    Section,
+    ServiceConfig,
+)
+from agentcraft2_core.di import (
+    DATA_PORT,
+    MODEL_PORT,
+    BuildContext,
+    Factory,
+    ServiceContainer,
+    ServiceProviders,
+)
+from agentcraft2_core.integrations.langgraph import InMemoryCheckpointBackend
+from agentcraft2_core.testing.fakes import (
+    FakeGuardrails,
+    FakeIdentityVerifier,
+    FakePolicyDecisionPoint,
+    FakeRegistry,
+    FakeSecretsProvider,
+    FrozenClock,
+    InMemoryAuditSink,
+    RecordingTelemetry,
+    SequentialIds,
+)
+
+__all__ = ["FAKE_PROVIDER", "Fakes", "fake_providers"]
+
+FAKE_PROVIDER = "fake"
+"""The adapter name ``ServiceConfig.for_testing()`` selects for every section."""
+
+
+def _serve(service: object) -> Factory:
+    """Return a factory that always hands out ``service``."""
+
+    def factory(context: BuildContext) -> object:  # noqa: ARG001 - a fake needs no options
+        return service
+
+    return factory
+
+
+@dataclass
+class Fakes:
+    """One fake per port, kept together so a test can inspect them afterwards.
+
+    Policy and guardrails allow calls by default. Use these fakes for isolated
+    behavior tests; use ``load_test_config`` to exercise a service's local rules
+    and registry files. Create a new ``Fakes`` per test to avoid shared histories
+    and resource state.
+
+    Example::
+
+        import asyncio
+
+        from agentcraft2_core import Principal, RequestContext
+        from agentcraft2_core.pipeline import bind_request_context
+        from agentcraft2_core.testing import FakeChatModelProvider, Fakes
+
+        async def example():
+            fakes = Fakes(model=FakeChatModelProvider(["hello"]))
+            context = RequestContext(
+                principal=Principal(subject="user-1", tenant="tenant-1"),
+                application="example",
+                request_id="request-1",
+                thread_id="conversation-1",
+            )
+            async with fakes.container() as services:
+                with bind_request_context(context):
+                    reply = await services.model().ainvoke("Say hello")
+            assert reply.content == "hello"
+            assert fakes.audit.records[0].event == "model.call"
+
+        asyncio.run(example())
+
+    Attributes:
+        data_sources: Fake data sources by name. Each is served under that name
+            by ``services.data_source(name)``.
+        mcp_connector: Opens connections to MCP servers, for example an
+            ``InProcessMcpConnector`` from ``agentcraft2_core.testing.mcp``.
+    """
+
+    audit: InMemoryAuditSink = field(default_factory=InMemoryAuditSink)
+    secrets: FakeSecretsProvider = field(default_factory=FakeSecretsProvider)
+    identity: IdentityVerifier = field(default_factory=FakeIdentityVerifier)
+    checkpoint: CheckpointBackend = field(default_factory=InMemoryCheckpointBackend)
+    registry: FakeRegistry = field(default_factory=FakeRegistry)
+    policy: FakePolicyDecisionPoint = field(default_factory=FakePolicyDecisionPoint)
+    guardrails: FakeGuardrails = field(default_factory=FakeGuardrails)
+    model: FakeChatModelProvider = field(default_factory=FakeChatModelProvider)
+    clock: FrozenClock = field(default_factory=FrozenClock)
+    ids: SequentialIds = field(default_factory=SequentialIds)
+    telemetry: RecordingTelemetry = field(default_factory=RecordingTelemetry)
+    mcp_connector: Any = None
+    data_sources: dict[str, DataSource] = field(default_factory=dict)
+
+    def providers(self) -> ServiceProviders:
+        """Return new factory definitions that serve these existing fake instances."""
+        return (
+            ServiceProviders()
+            .register(Section.SECRETS, FAKE_PROVIDER, _serve(self.secrets))
+            .register(Section.AUDIT, FAKE_PROVIDER, _serve(self.audit))
+            .register(Section.IDENTITY, FAKE_PROVIDER, _serve(self.identity))
+            .register(Section.CHECKPOINT, FAKE_PROVIDER, _serve(self.checkpoint))
+            .register(Section.REGISTRY, FAKE_PROVIDER, _serve(self.registry))
+            .register(Section.POLICY, FAKE_PROVIDER, _serve(self.policy))
+            .register(Section.GUARDRAILS, FAKE_PROVIDER, _serve(self.guardrails))
+            .register(MODEL_PORT, FAKE_PROVIDER, _serve(self.model))
+            .register(DATA_PORT, FAKE_PROVIDER, self._data_source)
+        )
+
+    def _data_source(self, context: BuildContext) -> DataSource:
+        try:
+            return self.data_sources[context.instance]
+        except KeyError:
+            raise ConfigurationError(
+                f"no fake data source called {context.instance!r}; add it to Fakes.data_sources"
+            ) from None
+
+    def config(self) -> ServiceConfig:
+        """Return a test configuration that selects every fake, data sources included."""
+        return ServiceConfig.for_testing(
+            data_sources={
+                name: ProviderSelection(provider=FAKE_PROVIDER) for name in self.data_sources
+            }
+        )
+
+    def container(self, config: ServiceConfig | None = None) -> ServiceContainer:
+        """Return an unstarted container with these fakes and no retry delays.
+
+        Use it with ``async with``. The frozen clock advances only when the test
+        asks it to, so tests control deadlines without waiting for wall time.
+        """
+        return ServiceContainer(
+            config if config is not None else self.config(),
+            self.providers(),
+            clock=self.clock,
+            ids=self.ids,
+            telemetry=self.telemetry,
+            mcp_connector=self.mcp_connector,
+            sleep=_no_wait,
+        )
+
+
+async def _no_wait(seconds: float) -> None:  # noqa: ARG001 - a test does not wait between retries
+    return None
+
+
+def fake_providers(
+    model: FakeChatModelProvider | Sequence[ScriptedResponse] | None = None,
+) -> ServiceProviders:
+    """Return a registry of fakes, optionally with a scripted model.
+
+    Args:
+        model: A fake model provider, or just the script for one.
+    """
+    if model is None or isinstance(model, FakeChatModelProvider):
+        provider = model if model is not None else FakeChatModelProvider()
+    else:
+        provider = FakeChatModelProvider(model)
+    return Fakes(model=provider).providers()

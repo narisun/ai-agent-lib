@@ -1,0 +1,23 @@
+[project]
+name = "{{ name }}"
+version = "0.1.0"
+description = {{ description | toml }}
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "agentcraft2-core[{{ extras }}]{{ library.version or "" }}",
+{% if model_provider == "bedrock" %}
+    "agentcraft2-aws[bedrock]{{ library.version or "" }}",
+{% endif %}
+]
+
+[project.scripts]
+{{ name }} = "{{ package }}.__main__:main"
+{{ name }}-serve = "{{ package }}.service:main"
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/{{ package }}"]

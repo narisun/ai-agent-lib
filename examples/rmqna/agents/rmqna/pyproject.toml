@@ -5,7 +5,7 @@ description = "Answers relationship-manager questions by writing and running rea
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "ai-agent-lib-core[jwt,mcp,otel,serve,anthropic]",
+    "agentcraft2-core[jwt,mcp,otel,serve,anthropic]",
 ]
 
 [project.scripts]

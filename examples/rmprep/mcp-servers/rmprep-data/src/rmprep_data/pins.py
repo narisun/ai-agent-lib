@@ -9,8 +9,8 @@ from __future__ import annotations
 import asyncio
 import sys
 
-from ai_agent_lib_core import ServiceContainer
-from ai_agent_lib_core.integrations.mcp import tool_fingerprints
+from agentcraft2_core import ServiceContainer
+from agentcraft2_core.integrations.mcp import tool_fingerprints
 
 from rmprep_data.server import build_server
 from rmprep_data.settings import ENV_FILE

@@ -38,8 +38,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from ai_agent_lib_core import ServiceConfig, ServiceContainer, ServiceProviders
-from ai_agent_lib_core.evaluation import (
+from agentcraft2_core import ServiceConfig, ServiceContainer, ServiceProviders
+from agentcraft2_core.evaluation import (
     EvalCase,
     Scorer,
     dataset_digest,
@@ -49,8 +49,8 @@ from ai_agent_lib_core.evaluation import (
     run_eval,
     scored_by,
 )
-from ai_agent_lib_core.testing import load_eval_config, load_test_config
-from ai_agent_lib_core.testing.mcp import InProcessMcpConnector
+from agentcraft2_core.testing import load_eval_config, load_test_config
+from agentcraft2_core.testing.mcp import InProcessMcpConnector
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langgraph.graph.state import CompiledStateGraph
 

@@ -63,11 +63,11 @@ root. Keep this window open for the following steps:
 ```bat
 set "LIBRARY=%CD%"
 set "PYTHON=python"
-"%PYTHON%" -m pip install -e ./packages/ai-agent-lib-core -e ./packages/ai-agent-lib-cli
-"%PYTHON%" -m ai_agent_lib_cli init tutorial --dir .. --lib-path "%LIBRARY%" --owner learning
+"%PYTHON%" -m pip install -e ./packages/agentcraft2-core -e ./packages/agentcraft2-cli
+"%PYTHON%" -m agentcraft2_cli init tutorial --dir .. --lib-path "%LIBRARY%" --owner learning
 cd /d ..\tutorial
-"%PYTHON%" -m ai_agent_lib_cli new agent helper --description "A practice assistant" --model fake
-"%PYTHON%" -m ai_agent_lib_cli install
+"%PYTHON%" -m agentcraft2_cli new agent helper --description "A practice assistant" --model fake
+"%PYTHON%" -m agentcraft2_cli install
 "%PYTHON%" -m pytest
 "%PYTHON%" -m helper "Say hello to Ada."
 ```
@@ -82,11 +82,11 @@ Run from the library root and keep this terminal open:
 ```bash
 LIBRARY="$PWD"
 PYTHON=python3
-"$PYTHON" -m pip install -e ./packages/ai-agent-lib-core -e ./packages/ai-agent-lib-cli
-"$PYTHON" -m ai_agent_lib_cli init tutorial --dir .. --lib-path "$LIBRARY" --owner learning
+"$PYTHON" -m pip install -e ./packages/agentcraft2-core -e ./packages/agentcraft2-cli
+"$PYTHON" -m agentcraft2_cli init tutorial --dir .. --lib-path "$LIBRARY" --owner learning
 cd ../tutorial
-"$PYTHON" -m ai_agent_lib_cli new agent helper --description "A practice assistant" --model fake
-"$PYTHON" -m ai_agent_lib_cli install
+"$PYTHON" -m agentcraft2_cli new agent helper --description "A practice assistant" --model fake
+"$PYTHON" -m agentcraft2_cli install
 "$PYTHON" -m pytest
 "$PYTHON" -m helper "Say hello to Ada."
 ```
@@ -112,7 +112,7 @@ Here is what the setup commands did:
 | `python -m pytest` | Runs the generated tests |
 | `python -m helper` | Asks the generated agent one question |
 
-Run `"%PYTHON%" -m ai_agent_lib_cli install` again whenever you add a service
+Run `"%PYTHON%" -m agentcraft2_cli install` again whenever you add a service
 or change its dependencies.
 
 ### Command convention for the rest of this tutorial
@@ -238,7 +238,7 @@ Append this entry to the existing `samples:` list in
 ```
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli policy test
+"%PYTHON%" -m agentcraft2_cli policy test
 ```
 
 **Expected failure:** the new sample is denied because no rule names
@@ -256,16 +256,16 @@ It should look like:
     resources: [greet, farewell]
 ```
 
-Run `"%PYTHON%" -m ai_agent_lib_cli policy test` again. It should pass.
+Run `"%PYTHON%" -m agentcraft2_cli policy test` again. It should pass.
 
 ### D. Check that the graph calls the tool
 
 Create `agents/helper/tests/test_farewell_graph.py`:
 
 ```python
-from ai_agent_lib_core import Principal, RequestContext
-from ai_agent_lib_core.pipeline import frame_untrusted
-from ai_agent_lib_core.testing import FakeChatModelProvider, Fakes, calls_tool
+from agentcraft2_core import Principal, RequestContext
+from agentcraft2_core.pipeline import frame_untrusted
+from agentcraft2_core.testing import FakeChatModelProvider, Fakes, calls_tool
 
 from helper import APPLICATION, ask
 
@@ -306,8 +306,8 @@ sample in step C checks the actual rule. Run both to verify behavior and access:
 
 ```bat
 "%PYTHON%" -m pytest agents/helper
-"%PYTHON%" -m ai_agent_lib_cli policy test
-"%PYTHON%" -m ai_agent_lib_cli check
+"%PYTHON%" -m agentcraft2_cli policy test
+"%PYTHON%" -m agentcraft2_cli check
 ```
 
 **Expected result:** tests and policy samples pass. `check` also runs lint,
@@ -342,9 +342,9 @@ defaults. Relative file paths are resolved from the folder containing
 `.env`. Restart a service after editing its settings.
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli config explain helper
-"%PYTHON%" -m ai_agent_lib_cli config options model fake
-"%PYTHON%" -m ai_agent_lib_cli doctor helper
+"%PYTHON%" -m agentcraft2_cli config explain helper
+"%PYTHON%" -m agentcraft2_cli config options model fake
+"%PYTHON%" -m agentcraft2_cli doctor helper
 ```
 
 `explain` shows values and their sources, with secrets masked. `options`
@@ -363,11 +363,11 @@ agent is enough for a tool that only that agent needs.
 From `tutorial/`, add a sample server named `directory`:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli new mcp directory --description "The people directory"
-"%PYTHON%" -m ai_agent_lib_cli install
-"%PYTHON%" -m ai_agent_lib_cli link helper directory
+"%PYTHON%" -m agentcraft2_cli new mcp directory --description "The people directory"
+"%PYTHON%" -m agentcraft2_cli install
+"%PYTHON%" -m agentcraft2_cli link helper directory
 "%PYTHON%" -m pytest
-"%PYTHON%" -m ai_agent_lib_cli policy test
+"%PYTHON%" -m agentcraft2_cli policy test
 ```
 
 The server lives in `mcp-servers/directory/`. It has sample CSV data, named
@@ -384,7 +384,7 @@ After linking, start the server before asking the agent a question. In one
 terminal, with the Python variable set and the working directory at `tutorial/`:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli run directory
+"%PYTHON%" -m agentcraft2_cli run directory
 ```
 
 Wait for the server's `ready` log event. In a second terminal,
@@ -402,8 +402,8 @@ When a tool's arguments change, review the change and update its **schema
 pin**, the hash of its expected input definition:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli registry pin directory
-"%PYTHON%" -m ai_agent_lib_cli check
+"%PYTHON%" -m agentcraft2_cli registry pin directory
+"%PYTHON%" -m agentcraft2_cli check
 ```
 
 ## 6. Optional: call the agent over HTTP
@@ -412,7 +412,7 @@ HTTP lets another program call the agent. If you completed step 5, keep
 `directory` running in its own terminal. Start the agent in another:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli run helper
+"%PYTHON%" -m agentcraft2_cli run helper
 ```
 
 Wait for the agent's `ready` log event. Save this script as `try_http.py` in
@@ -475,11 +475,11 @@ id,team,amount,email
 Preview the proposal, then generate the server:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli new mcp claims-mcp --from-csv ./inputs/claims --propose
-"%PYTHON%" -m ai_agent_lib_cli new mcp claims-mcp --from-csv ./inputs/claims --description "Tools over practice claims"
-"%PYTHON%" -m ai_agent_lib_cli install
+"%PYTHON%" -m agentcraft2_cli new mcp claims-mcp --from-csv ./inputs/claims --propose
+"%PYTHON%" -m agentcraft2_cli new mcp claims-mcp --from-csv ./inputs/claims --description "Tools over practice claims"
+"%PYTHON%" -m agentcraft2_cli install
 "%PYTHON%" -m pytest mcp-servers/claims-mcp
-"%PYTHON%" -m ai_agent_lib_cli doctor claims-mcp
+"%PYTHON%" -m agentcraft2_cli doctor claims-mcp
 ```
 
 `--propose` prints proposed tools for review. The second command copies the CSV
@@ -494,15 +494,15 @@ results your application actually needs. For this dataset, inspect
 The agent can use this server after you link it:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli link helper claims-mcp
+"%PYTHON%" -m agentcraft2_cli link helper claims-mcp
 "%PYTHON%" -m pytest tests
-"%PYTHON%" -m ai_agent_lib_cli check
+"%PYTHON%" -m agentcraft2_cli check
 ```
 
 Start `claims-mcp` as well as `directory` before running the linked agent.
 The generated tests manage their own in-process servers. If you later change
 the tool arguments, review them and run
-`"%PYTHON%" -m ai_agent_lib_cli registry pin claims-mcp`.
+`"%PYTHON%" -m agentcraft2_cli registry pin claims-mcp`.
 
 ### A REST API described by OpenAPI
 
@@ -510,9 +510,9 @@ If you have an OpenAPI 3 document, save it as `inputs/rates.yaml` or replace
 that path below with your document's path:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli new mcp rates-mcp --from-openapi ./inputs/rates.yaml --propose
-"%PYTHON%" -m ai_agent_lib_cli new mcp rates-mcp --from-openapi ./inputs/rates.yaml --description "Tools over the rates API"
-"%PYTHON%" -m ai_agent_lib_cli install
+"%PYTHON%" -m agentcraft2_cli new mcp rates-mcp --from-openapi ./inputs/rates.yaml --propose
+"%PYTHON%" -m agentcraft2_cli new mcp rates-mcp --from-openapi ./inputs/rates.yaml --description "Tools over the rates API"
+"%PYTHON%" -m agentcraft2_cli install
 "%PYTHON%" -m pytest mcp-servers/rates-mcp
 ```
 
@@ -533,8 +533,8 @@ the following after replacing `your-workgroup` and `your-profile` with your
 approved values; adjust the schema and database names as needed:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli new mcp sales-mcp --from-redshift sales --database dev --workgroup your-workgroup --aws-profile your-profile --description "Tools over sales tables"
-"%PYTHON%" -m ai_agent_lib_cli install
+"%PYTHON%" -m agentcraft2_cli new mcp sales-mcp --from-redshift sales --database dev --workgroup your-workgroup --aws-profile your-profile --description "Tools over sales tables"
+"%PYTHON%" -m agentcraft2_cli install
 "%PYTHON%" -m pytest mcp-servers/sales-mcp
 ```
 
@@ -554,12 +554,12 @@ Add allowed and denied samples to `tests/policy-samples.yaml`, and assertions
 about returned rows and masked columns to the server's tests. Then run:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli policy test
+"%PYTHON%" -m agentcraft2_cli policy test
 "%PYTHON%" -m pytest
 ```
 
 If the deployment uses OPA (Open Policy Agent), also run
-`"%PYTHON%" -m ai_agent_lib_cli policy test --opa` on a machine where that
+`"%PYTHON%" -m agentcraft2_cli policy test --opa` on a machine where that
 policy engine is installed.
 
 ## 8. Optional: use and evaluate a real model
@@ -570,22 +570,22 @@ a model ID available to your account. Its calls can incur charges.
 First inspect the supported settings:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli config options model anthropic
-"%PYTHON%" -m ai_agent_lib_cli config options model bedrock
+"%PYTHON%" -m agentcraft2_cli config options model anthropic
+"%PYTHON%" -m agentcraft2_cli config options model bedrock
 ```
 
 Choose one provider and update `agents/helper/pyproject.toml`:
 
 - For Anthropic, add `anthropic` to the existing core extras. The generated
-  dependency becomes `ai-agent-lib-core[anthropic,jwt,mcp,otel,serve]`.
+  dependency becomes `agentcraft2-core[anthropic,jwt,mcp,otel,serve]`.
 - For Bedrock, keep the existing core dependency and add
-  `ai-agent-lib-aws[bedrock]` to the `dependencies` list.
+  `agentcraft2-aws[bedrock]` to the `dependencies` list.
 
 Keep any version constraints your project already uses. An **extra** is the
 optional dependency group in brackets. Install the updated dependencies:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli install
+"%PYTHON%" -m agentcraft2_cli install
 ```
 
 In `agents/helper/.env`, set `AC2_MODEL_PROVIDER` to your choice and
@@ -598,8 +598,8 @@ use, the environment-backed secret provider accepts
 Start any MCP servers linked to the agent, then check and ask:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli config explain helper
-"%PYTHON%" -m ai_agent_lib_cli doctor helper
+"%PYTHON%" -m agentcraft2_cli config explain helper
+"%PYTHON%" -m agentcraft2_cli doctor helper
 "%PYTHON%" -m helper "Say goodbye to Ada."
 ```
 
@@ -620,7 +620,7 @@ which with three cases means every case must pass. Read both, then follow the lo
 1. **Run the eval.** This command runs only the tests marked `eval`:
 
    ```bat
-   "%PYTHON%" -m ai_agent_lib_cli eval helper
+   "%PYTHON%" -m agentcraft2_cli eval helper
    ```
 
    These tests are excluded from `pytest` and `check`, so an ordinary run never
@@ -640,7 +640,7 @@ which with three cases means every case must pass. Read both, then follow the lo
    eval again with `--accept`:
 
    ```bat
-   "%PYTHON%" -m ai_agent_lib_cli eval helper --accept
+   "%PYTHON%" -m agentcraft2_cli eval helper --accept
    ```
 
    If the run passes, the CLI copies its report to
@@ -669,10 +669,10 @@ After upgrading the library, start from a committed or backed-up workspace.
 Preview the update, then apply it:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli update --plan
-"%PYTHON%" -m ai_agent_lib_cli update --diff
-"%PYTHON%" -m ai_agent_lib_cli install
-"%PYTHON%" -m ai_agent_lib_cli check
+"%PYTHON%" -m agentcraft2_cli update --plan
+"%PYTHON%" -m agentcraft2_cli update --diff
+"%PYTHON%" -m agentcraft2_cli install
+"%PYTHON%" -m agentcraft2_cli check
 ```
 
 **`update --plan` is the dry run.** It lists every file the update would replace
@@ -694,7 +694,7 @@ engine, Terraform, and permission to publish images and manage the AWS resources
 From `tutorial/`, create the deployment settings file:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli deploy helper
+"%PYTHON%" -m agentcraft2_cli deploy helper
 ```
 
 On the first run this writes `agents/helper/deploy.env` with example values.
@@ -704,9 +704,9 @@ to the service's dependencies; for example, Bedrock needs the AWS `bedrock`
 extra and a PostgreSQL checkpoint store needs its `postgres` extra.
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli install
-"%PYTHON%" -m ai_agent_lib_cli deploy helper --plan
-"%PYTHON%" -m ai_agent_lib_cli deploy helper
+"%PYTHON%" -m agentcraft2_cli install
+"%PYTHON%" -m agentcraft2_cli deploy helper --plan
+"%PYTHON%" -m agentcraft2_cli deploy helper
 ```
 
 The plan explains the adapters, permissions, supporting containers, and
@@ -758,7 +758,7 @@ Use these guides for common tasks:
 | --- | --- |
 | `No module named helper` | Use the interpreter from setup and rerun the workspace's `install` command. |
 | pip cannot find a package | Check the approved index or wheelhouse, Python version, and compatible wheels. |
-| A setting seems ignored | Run `"%PYTHON%" -m ai_agent_lib_cli config explain helper`; a process variable may override `.env`. Restart after changes. |
+| A setting seems ignored | Run `"%PYTHON%" -m agentcraft2_cli config explain helper`; a process variable may override `.env`. Restart after changes. |
 | The agent answers with `fake:` | That is the default model's expected behavior. Use scripted tests for tools or configure a real model. |
 | Connection refused after linking a server | Start each linked MCP server and check its address and port. |
 | A request is denied | Compare caller, application, action, and resource with the intended rule. Add a policy sample before changing permissions. |
@@ -780,5 +780,5 @@ reporting a bug, and remove credentials and sensitive data from reports.
 | Environment variables | [Configuration reference](variables.md) |
 | User identity and service delegation | [Identity guide](identity.md) |
 | Eval baselines, model judges, and scoring real conversations | [Measure an agent with evals](evals.md) |
-| AWS adapters and dependencies | [AWS package](../packages/ai-agent-lib-aws/README.md) |
+| AWS adapters and dependencies | [AWS package](../packages/agentcraft2-aws/README.md) |
 | Supported behavior and operational limits | [Release scope](release-scope.md) |

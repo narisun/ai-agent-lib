@@ -1,0 +1,33 @@
+"""Manual smoke test against the live Anthropic API.
+
+CI never runs it: the integration job has no Anthropic key, so there the test
+is skipped on purpose. Run it by hand with a real key and model ID in the
+environment before a release that changes the Anthropic adapter::
+
+    export ANTHROPIC_API_KEY=... EAP_MODEL_ID=...
+    python -m pytest -m integration packages/agentcraft2-core/tests/integration
+"""
+
+from __future__ import annotations
+
+import os
+
+import pytest
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import HumanMessage
+from pydantic import SecretStr
+
+from agentcraft2_core.adapters import AnthropicChatModelProvider
+
+pytestmark = [pytest.mark.integration, pytest.mark.enable_socket]
+
+
+async def test_the_live_api_answers_a_one_line_prompt() -> None:
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    model_id = os.environ.get("AC2_MODEL_ID")
+    if not api_key or not model_id:
+        pytest.skip("set ANTHROPIC_API_KEY and AC2_MODEL_ID to run the live smoke test")
+    model = AnthropicChatModelProvider(SecretStr(api_key)).create(model_id)
+    assert isinstance(model, BaseChatModel)
+    reply = await model.ainvoke([HumanMessage("Reply with the single word: ready")])
+    assert "ready" in str(reply.content).lower()

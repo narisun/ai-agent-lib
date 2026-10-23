@@ -11,10 +11,10 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from ai_agent_lib_core.config import Key
-from ai_agent_lib_core.config.bindings import options_key, provider_key, secret_key
-from ai_agent_lib_core.config.profiles import PROFILE_DEFAULTS
-from ai_agent_lib_core.contracts import Profile, Section
+from agentcraft2_core.config import Key
+from agentcraft2_core.config.bindings import options_key, provider_key, secret_key
+from agentcraft2_core.config.profiles import PROFILE_DEFAULTS
+from agentcraft2_core.contracts import Profile, Section
 
 
 @dataclass(frozen=True)

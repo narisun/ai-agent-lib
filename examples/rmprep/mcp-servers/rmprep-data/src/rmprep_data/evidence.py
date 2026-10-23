@@ -6,8 +6,8 @@ from collections.abc import Mapping
 from datetime import date, timedelta
 from typing import Any, Protocol, cast
 
-from ai_agent_lib_core import ValidationFailed
-from ai_agent_lib_core.contracts import QueryResult
+from agentcraft2_core import ValidationFailed
+from agentcraft2_core.contracts import QueryResult
 
 from rmprep_data.measurements import enrich_page
 from rmprep_data.sections import SECTIONS, ClientSection, ReferenceSection

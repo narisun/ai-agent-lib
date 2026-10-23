@@ -1,6 +1,6 @@
 """The contained SQL engine: DuckDB over the workspace's CSV files, behind the validator.
 
-The load follows ``ai_agent_lib_core.adapters.data_duckdb`` step for step: each content CSV is read
+The load follows ``agentcraft2_core.adapters.data_duckdb`` step for step: each content CSV is read
 with a plain ``read_csv`` into an in-memory DuckDB table named after its file (lower case, letters,
 digits and underscores), and then the engine is forbidden from reaching the file system or the
 network and from spilling to disk, so nothing a query says can read anything but those tables or
@@ -49,7 +49,7 @@ from typing import Any, Final
 from uuid import UUID
 
 import duckdb
-from ai_agent_lib_core.contracts import ConfigurationError, describe
+from agentcraft2_core.contracts import ConfigurationError, describe
 
 from rmqna_data.validate import SqlRefused, close_matches, validate_sql
 

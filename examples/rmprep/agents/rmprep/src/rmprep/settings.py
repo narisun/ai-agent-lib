@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ai_agent_lib_core.config import DotenvConfigSource, EnvironConfigSource, LayeredConfigSource
-from ai_agent_lib_core.contracts import ConfigSource, ConfigurationError
+from agentcraft2_core.config import DotenvConfigSource, EnvironConfigSource, LayeredConfigSource
+from agentcraft2_core.contracts import ConfigSource, ConfigurationError
 
 from rmprep.context import ContextBudget
 

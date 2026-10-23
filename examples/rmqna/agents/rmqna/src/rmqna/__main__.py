@@ -7,9 +7,9 @@ import asyncio
 import sys
 from collections.abc import Sequence
 
-from ai_agent_lib_core import ServiceConfig, ServiceContainer
-from ai_agent_lib_core.config import load_service_config
-from ai_agent_lib_core.observability import report_error, shows_details
+from agentcraft2_core import ServiceConfig, ServiceContainer
+from agentcraft2_core.config import load_service_config
+from agentcraft2_core.observability import report_error, shows_details
 
 from rmqna.graph import APPLICATION, ask
 from rmqna.settings import ENV_FILE

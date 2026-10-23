@@ -3,9 +3,9 @@
 from dataclasses import replace
 
 import pytest
-from ai_agent_lib_core import Principal, RequestContext
-from ai_agent_lib_core.pipeline import bind_request_context
-from ai_agent_lib_core.testing import FakeChatModelProvider, Fakes
+from agentcraft2_core import Principal, RequestContext
+from agentcraft2_core.pipeline import bind_request_context
+from agentcraft2_core.testing import FakeChatModelProvider, Fakes
 
 from rmprep import APPLICATION, answer, build_graph
 from rmprep.prompts import MEMO_PROMPT, QNA_PROMPT
