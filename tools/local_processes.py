@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import http.client
-import os
 import signal
 import socket
 import subprocess
+import sys
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -49,7 +49,7 @@ def check_ports(services: Sequence[Service]) -> None:
         raise ValueError("The selected services need different ports; check the UI configuration.")
     for service in services:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
-            if os.name == "nt":
+            if sys.platform == "win32":
                 listener.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
             try:
                 listener.bind(("127.0.0.1", service.port))
@@ -95,7 +95,10 @@ def stop_children(children: Sequence[RunningService]) -> bool:
             signalled = code is None
             if code is None:
                 report(f"Stopping {child.service.name}...")
-                event = signal.CTRL_BREAK_EVENT if os.name == "nt" else signal.SIGINT
+                if sys.platform == "win32":
+                    event = signal.CTRL_BREAK_EVENT
+                else:
+                    event = signal.SIGINT
                 child.process.send_signal(event)
                 # Core services allow up to 20 seconds for requests in flight,
                 # then close their adapters. Leave time for both.
@@ -103,7 +106,9 @@ def stop_children(children: Sequence[RunningService]) -> bool:
             # Uvicorn re-raises a handled shutdown signal after its lifespan
             # closes. Accept that platform exit only when we requested it;
             # unrelated failures (including exit 1) remain failures.
-            interrupt_codes = {130, 3221225786, -1073741510} if os.name == "nt" else {130, -2}
+            interrupt_codes = (
+                {130, 3221225786, -1073741510} if sys.platform == "win32" else {130, -2}
+            )
             if code != 0 and not (signalled and code in interrupt_codes):
                 graceful = False
                 report(f"{child.service.name} exited with code {code}; check {child.log}")
@@ -152,6 +157,9 @@ def _serve(
                 return
             log = log_dir / f"{service.name}.log"
             report(f"Starting {service.name}; log: {log}")
+            creation_flags = 0
+            if sys.platform == "win32":
+                creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP
             with log.open("wb") as output:
                 process = subprocess.Popen(  # noqa: S603 - explicit local Python commands
                     service.command,
@@ -160,8 +168,8 @@ def _serve(
                     stdin=subprocess.DEVNULL,
                     stdout=output,
                     stderr=subprocess.STDOUT,
-                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
-                    start_new_session=os.name != "nt",
+                    creationflags=creation_flags,
+                    start_new_session=sys.platform != "win32",
                 )
             children.append(RunningService(service, process, log))
             deadline = time.monotonic() + startup_timeout

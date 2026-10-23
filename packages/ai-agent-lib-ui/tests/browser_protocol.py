@@ -258,13 +258,16 @@ class LocalServer:
         )
 
     def start(self) -> None:
+        creation_flags = 0
+        if sys.platform == "win32":
+            creation_flags = subprocess.CREATE_NO_WINDOW
         self.process = subprocess.Popen(  # noqa: S603 - fixed module and owned test configuration
             python_command("-m", "ai_agent_lib_ui", "serve", "--config", str(self.config)),
             stdout=self.log,
             stderr=self.log,
             text=True,
             env=self.env,
-            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+            creationflags=creation_flags,
         )
         deadline = time.monotonic() + 25
         with httpx.Client(trust_env=False) as client:

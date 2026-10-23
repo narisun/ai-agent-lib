@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import socket
 import subprocess
 import sys
@@ -166,7 +165,7 @@ def test_shutdown_requires_confirmed_normal_exit(
     running = local_processes.RunningService(
         Service("ui", (), tmp_path, 8765), child, tmp_path / "ui.log"
     )
-    interrupt_codes = {130, 3221225786, -1073741510} if os.name == "nt" else {130, -2}
+    interrupt_codes = {130, 3221225786, -1073741510} if sys.platform == "win32" else {130, -2}
     expected = exit_code == 0 or (not already_exited and exit_code in interrupt_codes)
     assert local_processes.stop_children([running]) is expected
     child.kill.assert_not_called()
@@ -253,7 +252,7 @@ finally:
         f"serve(services, Path({str(logs)!r}))\n"
     )
     options: dict[str, Any] = {}
-    if os.name == "nt":
+    if sys.platform == "win32":
         startup = subprocess.STARTUPINFO()
         startup.dwFlags = subprocess.STARTF_USESHOWWINDOW
         startup.wShowWindow = 0
