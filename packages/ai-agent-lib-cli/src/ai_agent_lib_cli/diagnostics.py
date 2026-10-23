@@ -23,7 +23,7 @@ from ai_agent_lib_core.adapters import (
 )
 from ai_agent_lib_core.config import DEFAULT_BINDINGS, service_resolver
 from ai_agent_lib_core.config.phoenix import resolve_phoenix_settings
-from ai_agent_lib_core.contracts import AgentLibError, CheckResult
+from ai_agent_lib_core.contracts import AgentCraft2Error, CheckResult
 from ai_agent_lib_core.di import diagnose
 from ai_agent_lib_core.observability import redact
 
@@ -91,14 +91,14 @@ async def check_service(folder: Path) -> tuple[CheckResult, ...]:
     try:
         with _reported_here():
             resolution = service_resolver(dotenv).explain()
-    except AgentLibError as problem:
+    except AgentCraft2Error as problem:
         return (CheckResult.failed("settings", problem),)
     config = resolution.config
     phoenix_warnings: tuple[str, ...] = ()
     try:
         with _reported_here():
             phoenix_resolution = resolve_phoenix_settings(dotenv)
-    except AgentLibError as problem:
+    except AgentCraft2Error as problem:
         phoenix = CheckResult.failed("phoenix", problem)
     else:
         phoenix_warnings = phoenix_resolution.warnings
@@ -129,7 +129,7 @@ def _pins(
     results: list[CheckResult] = []
     for server in answers.mcp_servers:
         name = f"pins of {server.server_id}"
-        fix = f"Run: agentlib registry pin {server.server_id}"
+        fix = f"Run: agentcraft2 registry pin {server.server_id}"
         entry = registry.tools.get(server.server_id)
         if entry is None:
             results.append(
@@ -137,7 +137,7 @@ def _pins(
                     name,
                     ok=False,
                     detail=f"{server.server_id} is not in {TOOLS_FILE}",
-                    fix=f"Run: agentlib new mcp {server.name}",
+                    fix=f"Run: agentcraft2 new mcp {server.name}",
                 )
             )
             continue
@@ -176,7 +176,7 @@ def check_workspace(
                 tools_path=root.joinpath(*TOOLS_FILE.parts),
             )
         )
-    except AgentLibError as problem:
+    except AgentCraft2Error as problem:
         failed = CheckResult.failed("registries", problem)
         fix = failed.fix or "Correct the registry file the message names."
         return (CheckResult("registries", ok=False, detail=failed.detail, fix=fix),)
@@ -185,7 +185,7 @@ def check_workspace(
         RulesPolicyDecisionPoint(
             RulesPolicyOptions(path=root.joinpath(*RULES_FILE.parts)), UuidGenerator()
         )
-    except AgentLibError as problem:
+    except AgentCraft2Error as problem:
         failed = CheckResult.failed("rules", problem)
         fix = failed.fix or f"Correct {RULES_FILE}."
         results.append(CheckResult("rules", ok=False, detail=failed.detail, fix=fix))
@@ -224,7 +224,7 @@ def explain_service(folder: Path) -> tuple[Sequence[Setting], Sequence[str]]:
         with _reported_here():
             resolution = service_resolver(folder / _ENV).explain()
             phoenix = resolve_phoenix_settings(folder / _ENV)
-    except AgentLibError as problem:
+    except AgentCraft2Error as problem:
         raise CliError.from_error(problem) from None
     by_key = {binding.key: binding.name for binding in DEFAULT_BINDINGS}
     settings = [

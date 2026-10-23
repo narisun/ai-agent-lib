@@ -21,10 +21,10 @@ source.
 | Keep turns on one thread in order | [Thread admission](http-thread-admission.md) | Learn when an overlapping request gets HTTP 409 `thread_busy` and which coordination fits your deployment |
 | Deploy an agent to AWS Bedrock AgentCore | [AgentCore trial](agentcore-trial.md) | Generate the AgentCore deployment with `--target agentcore`, pass preflight, deploy the rmprep agent and its MCP server, and check the recorded run |
 | Understand the business example | [rmprep](../examples/rmprep/README.md) and [context management](../examples/rmprep/docs/context-management.md) | Follow client selection, memo generation, and same-thread questions |
-| Upgrade a generated workspace | [Keep generated files up to date](getting-started.md#9-keep-generated-files-up-to-date) and [updating generated code](../packages/ai-agent-lib-cli/README.md#updating-generated-code) | Preview with `agentlib update --plan`, which writes nothing, then run `agentlib update` |
+| Upgrade a generated workspace | [Keep generated files up to date](getting-started.md#9-keep-generated-files-up-to-date) and [updating generated code](../packages/ai-agent-lib-cli/README.md#updating-generated-code) | Preview with `agentcraft2 update --plan`, which writes nothing, then run `agentcraft2 update` |
 | Change the library | [Contributor setup](../README.md#working-on-the-library) | Install development dependencies and run the appropriate checks |
 
-Add `--diff` to `agentlib update --plan` to see the proposed changes to files you
+Add `--diff` to `agentcraft2 update --plan` to see the proposed changes to files you
 edited. Without `--plan`, `update --diff` **writes updates** to untouched files.
 
 The README, getting-started tutorial, and HTML developer guide use the same

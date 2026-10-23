@@ -68,7 +68,7 @@ async def _stream(
 def _outcomes(config: ServiceConfig) -> OutcomeJournal | None:
     # Local-only: a deployed service gets no durable journal from this library.
     if config.deployment_env == "local":
-        return SqliteOutcomeJournal(ENV_FILE.parent / ".agentlib" / "outcomes.sqlite")
+        return SqliteOutcomeJournal(ENV_FILE.parent / ".agentcraft2" / "outcomes.sqlite")
     return None
 
 

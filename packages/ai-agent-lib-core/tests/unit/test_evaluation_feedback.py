@@ -42,7 +42,7 @@ def test_a_line_with_another_schema_is_refused(tmp_path: Path) -> None:
 def test_a_verdict_is_up_or_down(tmp_path: Path) -> None:
     path = tmp_path / "feedback.jsonl"
     path.write_text(
-        '{"schema": "agentlib.feedback/v1", "request_id": "r", "thread_id": "t",'
+        '{"schema": "agentcraft2.feedback/v1", "request_id": "r", "thread_id": "t",'
         ' "application": "a", "subject": "s", "verdict": "sideways"}\n',
         encoding="utf-8",
     )

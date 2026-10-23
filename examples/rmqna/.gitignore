@@ -1,6 +1,6 @@
 # Local settings and local state. .env.example is committed; .env is not.
 .env
-.agentlib/
+.agentcraft2/
 
 # Python
 .venv/

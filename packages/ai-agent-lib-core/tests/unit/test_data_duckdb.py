@@ -11,7 +11,7 @@ import pytest
 
 from ai_agent_lib_core.adapters import DuckDbCsvDataSource, DuckDbCsvOptions
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     Classification,
     ConfigurationError,
     DeploymentEnv,
@@ -166,7 +166,7 @@ async def test_an_engine_error_does_not_repeat_values_in_its_message(tmp_path: P
     )
     await source.start()
     try:
-        with pytest.raises(AgentLibError) as caught:
+        with pytest.raises(AgentCraft2Error) as caught:
             await source.query("by_id", {"account": "not-a-number-7731"})
         assert "7731" not in str(caught.value)
         assert isinstance(caught.value.__cause__, duckdb.Error)

@@ -34,9 +34,9 @@ _LOG = logging.getLogger(__name__)
 # The ID of the model's tool call, for the duration of one invocation. LangChain
 # hands it to a tool only through an injected argument, so it is kept here for
 # the step that calls the wrapped tool.
-_TOOL_CALL_ID: ContextVar[str | None] = ContextVar("agentlib_tool_call_id", default=None)
+_TOOL_CALL_ID: ContextVar[str | None] = ContextVar("agentcraft2_tool_call_id", default=None)
 _NATIVE_TOOL_WRAPPER: ContextVar[str | None] = ContextVar(
-    "agentlib_native_tool_wrapper", default=None
+    "agentcraft2_native_tool_wrapper", default=None
 )
 
 

@@ -19,7 +19,7 @@ from ai_agent_lib_core.testing import FakeChatModelProvider, Fakes, calls_tool
 
 async def main() -> None:
     """Run two turns on one in-memory checkpoint thread and write their trace."""
-    trace_path = Path(".agentlib/react-demo.jsonl")
+    trace_path = Path(".agentcraft2/react-demo.jsonl")
     config = ServiceConfig.for_testing(model_trace_path=trace_path)
     fakes = Fakes(
         model=FakeChatModelProvider(

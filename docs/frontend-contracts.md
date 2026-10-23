@@ -42,7 +42,7 @@ Production destinations require HTTPS. Explicit local mode permits HTTP on
 
 ```json
 {
-  "schema": "agentlib.presentation/v1",
+  "schema": "agentcraft2.presentation/v1",
   "agent_id": "rmprep",
   "agent_version": "0.1.0",
   "registry_revision": "revision-1",
@@ -92,7 +92,7 @@ The future HTTP client must enforce the byte limit while reading the response;
 the mapper checks it again before decoding.
 
 Optional `output.artifacts` are read only if the manifest advertises `artifacts`.
-Each `agentlib.artifact/v1` version has its own ID, a stable document ID, a version
+Each `agentcraft2.artifact/v1` version has its own ID, a stable document ID, a version
 number, title, media type, timestamp, thread and request. It contains exactly one
 of inline content or an opaque content reference. A reference cannot be a local
 path or a URL. The verified invocation supplies tenant, subject and agent scope.
@@ -138,7 +138,7 @@ Checkpoint ports expose a scoped agent diagnostic API, never an unrestricted
 checkpoint database connection or an object deserializer.
 
 The local per-response inspector uses the additive `TurnInspector` port and
-`agentlib.turn-inspection/v1` envelope. An agent opts in with
+`agentcraft2.turn-inspection/v1` envelope. An agent opts in with
 `agent_app(inspector=...)`, exposing `GET /requests/{id}/inspection?thread_id=...`.
 The reader authorizes diagnostic content independently of agent invocation. The UI
 resolves the stored run's request and thread IDs after checking ownership, then
@@ -151,7 +151,7 @@ explicit truncation flag, with at most 64 KiB of text. Diagnostic content is esc
 `LocalTurnInspector` reads explicitly configured private JSONL files using all
 five correlation fields. It does not infer actual MCP execution from a model's
 proposed tool call. `GraphCheckpointPreview` uses the agent's scoped graph API
-and filters `agentlib_request_id` metadata added by `services.invocation()`.
+and filters `agentcraft2_request_id` metadata added by `services.invocation()`.
 Historical checkpoints without that metadata remain unavailable per turn. This
 preview does not enumerate subgraph checkpoint namespaces. No checkpoint state is
 deserialized in the UI, and diagnostic reads never invoke/resume the graph.
@@ -162,10 +162,10 @@ The additive core contracts are:
 
 | Schema | Meaning |
 | --- | --- |
-| `agentlib.model-usage/v1` | One observed SDK attempt, with usage, monotonic duration and explicit links. |
-| `agentlib.operation-decision/v1` | Pipeline or application acceptance/rejection of a specific model attempt. |
-| `agentlib.operation-summary/v1` | Terminal application outcome and the expected attempt references. |
-| `agentlib.request-outcome/v1` | Agent journal state, including an honest `unknown` outcome after uncertainty. |
+| `agentcraft2.model-usage/v1` | One observed SDK attempt, with usage, monotonic duration and explicit links. |
+| `agentcraft2.operation-decision/v1` | Pipeline or application acceptance/rejection of a specific model attempt. |
+| `agentcraft2.operation-summary/v1` | Terminal application outcome and the expected attempt references. |
+| `agentcraft2.request-outcome/v1` | Agent journal state, including an honest `unknown` outcome after uncertainty. |
 
 `DiagnosticSink` is a small async interface. Supply a sink and inject one recorder
 into both the container and HTTP entry point. For example, in the agent's
@@ -197,7 +197,7 @@ covered by `agent_app`, and await all model work before returning.
 
 Metadata capture is independent of `AC2_MODEL_TRACE_PATH`. Its default is off
 unless a recorder is injected. It stores no prompts, responses, tool arguments,
-provider exception text or credentials. The existing `agentlib.model-trace/v1`
+provider exception text or credentials. The existing `agentcraft2.model-trace/v1`
 records and audit format remain unchanged. When both captures are enabled, they
 share model call IDs and attempt numbers.
 

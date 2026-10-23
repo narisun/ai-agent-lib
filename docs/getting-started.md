@@ -158,10 +158,10 @@ the application workspace.
 | `agents/helper/.env.example` | Shareable settings used by the generated configuration tests |
 | `agents/helper/pyproject.toml` | This service's dependencies |
 | `registry/` | Registered agents and MCP tools |
-| `policies/agentlib/rules/data.yaml` | Rules that decide which actions are allowed |
+| `policies/agentcraft2/rules/data.yaml` | Rules that decide which actions are allowed |
 | `tests/policy-samples.yaml` | Requests the rules should allow or deny |
-| `agentlib.toml` | The answers used to generate the workspace |
-| `agentlib.lock` | Generated-file hashes used to preserve your edits when updating templates |
+| `agentcraft2.toml` | The answers used to generate the workspace |
+| `agentcraft2.lock` | Generated-file hashes used to preserve your edits when updating templates |
 
 A **graph** is a set of steps and the connections between them. LangGraph
 runs these steps. `ServiceContainer` supplies configured services to the
@@ -244,7 +244,7 @@ Append this entry to the existing `samples:` list in
 **Expected failure:** the new sample is denied because no rule names
 `farewell` yet.
 
-In `policies/agentlib/rules/data.yaml`, find the existing rule with
+In `policies/agentcraft2/rules/data.yaml`, find the existing rule with
 `id: helper-calls-its-own-tools`. Change its `resources` from `[greet]`
 to `[greet, farewell]`. Edit that rule in place; do not add a duplicate.
 It should look like:
@@ -630,7 +630,7 @@ which with three cases means every case must pass. Read both, then follow the lo
    running.
 
 2. **Read the report.** Each run writes
-   `agents/helper/.agentlib/eval-report.json`: the model and a digest of the
+   `agents/helper/.agentcraft2/eval-report.json`: the model and a digest of the
    dataset, the mean for each metric, and every case's score. Git ignores that
    folder, so the report is working state. pytest prints the score summary only
    when the run fails, so open the file to inspect individual cases as well as
@@ -682,7 +682,7 @@ file differs from what the templates now generate.
 
 **`update --diff` applies changes** to unmodified generated files. It preserves
 files you edited and prints their proposed template changes for you to merge.
-Review the resulting diff before committing. Keep `agentlib.lock`: its hashes
+Review the resulting diff before committing. Keep `agentcraft2.lock`: its hashes
 distinguish generated files from files you have changed.
 
 ## 10. Optional: prepare a deployment
@@ -725,11 +725,11 @@ To see the messages sent to the model and its responses, add this to
 `agents/helper/.env`, then restart the agent:
 
 ```dotenv
-AC2_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl
+AC2_MODEL_TRACE_PATH=.agentcraft2/model-trace.jsonl
 ```
 
 Run your questions with the same `--thread` value to continue a conversation.
-Inspect `agents/helper/.agentlib/model-trace.jsonl` for each model call's messages,
+Inspect `agents/helper/.agentcraft2/model-trace.jsonl` for each model call's messages,
 tool definitions, response, and attempt number. This opt-in file contains
 conversation content; use test data and keep it private. Remove the setting and
 restart to stop capture.

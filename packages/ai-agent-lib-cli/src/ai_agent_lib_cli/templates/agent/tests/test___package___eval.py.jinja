@@ -3,13 +3,13 @@
 Unit tests prove the plumbing with a scripted model; this measures the agent.
 It runs only when asked, and only with a real model set in the service's .env:
 
-    agentlib eval {{ name }}
+    agentcraft2 eval {{ name }}
 
-The report is written to .agentlib/eval-report.json. Keep it with the change
+The report is written to .agentcraft2/eval-report.json. Keep it with the change
 that produced it, and raise the bar as the agent gets better.
 
-When evals/baseline.json exists — written by `agentlib eval {{ name }} --accept` —
-the run also fails on regressions against it. `agentlib eval {{ name }} --accept`
+When evals/baseline.json exists — written by `agentcraft2 eval {{ name }} --accept` —
+the run also fails on regressions against it. `agentcraft2 eval {{ name }} --accept`
 leaves a marker beside the report for this run only, so it skips just that
 gate to move the bar on purpose.
 """
@@ -35,9 +35,9 @@ from {{ package }} import APPLICATION, answer, build_graph
 
 SERVICE = Path(__file__).resolve().parents[1]
 CASES = SERVICE / "evals" / "cases.jsonl"
-REPORT = SERVICE / ".agentlib" / "eval-report.json"
+REPORT = SERVICE / ".agentcraft2" / "eval-report.json"
 BASELINE = SERVICE / "evals" / "baseline.json"
-ACCEPT_MARKER = SERVICE / ".agentlib" / "eval-accept.flag"
+ACCEPT_MARKER = SERVICE / ".agentcraft2" / "eval-accept.flag"
 
 
 def mentions(case: EvalCase, output: str) -> bool:
@@ -78,7 +78,7 @@ async def test_{{ package }}_meets_its_bar(tmp_path: Path) -> None:
     REPORT.write_text(report.to_json(), encoding="utf-8")
     print("\n".join(report.summary()))
     if BASELINE.exists() and not ACCEPT_MARKER.exists():
-        # A passing run may still be worse than the last accepted one. agentlib
+        # A passing run may still be worse than the last accepted one. agentcraft2
         # eval --accept leaves ACCEPT_MARKER to move the bar on purpose.
         require_no_regression(report, load_report(BASELINE), tolerance=0.05)
     report.require({"mentions": 0.8})

@@ -76,7 +76,7 @@ def main() -> None:
     version = tomllib.loads((root / "packages/ai-agent-lib-core/pyproject.toml").read_text())[
         "project"
     ]["version"]
-    parent = root / ".agentlib" / "consumers"
+    parent = root / ".agentcraft2" / "consumers"
     parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=parent) as temporary:
         work = Path(temporary)
@@ -243,7 +243,7 @@ def main() -> None:
                 run("-m", "pytest", "-q", cwd=workspace)
                 # Run the installed provider through native framework invocation,
                 # tools and structured parsing at both dependency-version bounds.
-                env["AGENTLIB_CONSUMER_MODEL"] = provider
+                env["AGENTCRAFT2_CONSUMER_MODEL"] = provider
                 suite = work / "test_installed_model.py"
                 shutil.copyfile(root / "tools/consumer_model_contract.py", suite)
                 run("-m", "pytest", "-q", "--asyncio-mode=auto", str(suite))

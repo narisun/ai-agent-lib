@@ -14,8 +14,8 @@ from pydantic import SecretStr
 from ai_agent_lib_core import bind_request_context
 from ai_agent_lib_core.adapters import StaticIdentityOptions, StaticIdentityVerifier
 from ai_agent_lib_core.contracts import (
+    AgentCraft2Error,
     AgentEntry,
-    AgentLibError,
     CallLimits,
     Classification,
     ConfigurationError,
@@ -350,7 +350,7 @@ class _ClassifyingConnector:
     def credential_meta(self, token: SecretStr | None) -> dict[str, str]:
         return {}
 
-    def classify(self, error: BaseException, *, where: str) -> AgentLibError | None:
+    def classify(self, error: BaseException, *, where: str) -> AgentCraft2Error | None:
         self.classified.append(where)
         if not isinstance(error, MCPError):
             return None
@@ -410,7 +410,7 @@ async def test_the_connector_is_asked_first_when_calling_a_tool() -> None:
         assert denied.value.__cause__ is None
 
         connector.fail = MCPError(code=-32099, message="something else")
-        with bind_request_context(CONTEXT), pytest.raises(AgentLibError) as other:
+        with bind_request_context(CONTEXT), pytest.raises(AgentCraft2Error) as other:
             await tool.ainvoke({"office": "lisbon"})
         assert other.value.message.endswith("the server answered with an error"), (
             "an unclassified error falls through to the agent side's own mapping"

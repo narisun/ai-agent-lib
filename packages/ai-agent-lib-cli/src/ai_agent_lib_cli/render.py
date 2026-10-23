@@ -96,7 +96,7 @@ def validate_files(files: Mapping[PurePosixPath, str]) -> None:
                 tomllib.loads(text)
             elif path.suffix in {".yaml", ".yml"}:
                 yaml.safe_load(text)
-            elif path.suffix == ".json" or path.name == "agentlib.lock":
+            elif path.suffix == ".json" or path.name == "agentcraft2.lock":
                 json.loads(text)
         except (SyntaxError, ValueError, yaml.YAMLError) as error:
             raise CliError(

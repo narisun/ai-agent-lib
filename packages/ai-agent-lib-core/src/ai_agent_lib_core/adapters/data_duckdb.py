@@ -26,7 +26,7 @@ from pydantic import Field
 
 from ai_agent_lib_core.adapters.sql import CompiledQuery, QueryCatalog, compile_query, finish_result
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     Clock,
     ConfigurationError,
     NotStartedError,
@@ -174,7 +174,7 @@ class DuckDbCsvDataSource:
             ValidationFailed: If the query is unknown or a parameter is invalid.
             PolicyDenied: If an obligation cannot be enforced.
             TransientError: If the query ran longer than the timeout.
-            AgentLibError: If the engine rejected the query.
+            AgentCraft2Error: If the engine rejected the query.
         """
         catalog, connection = self._started()
         bound = catalog.bind(name, parameters)
@@ -218,7 +218,7 @@ class DuckDbCsvDataSource:
         except duckdb.Error as exc:
             # The engine's message can repeat parameter values, so it is the detail:
             # shown on a developer's machine, never in deployed logs.
-            raise AgentLibError(
+            raise AgentCraft2Error(
                 f"query {name!r} failed on data source {self._name!r} ({type(exc).__name__})",
                 fix="run the query's SQL on the CSV files with the same parameters to see why",
                 detail=describe(exc),

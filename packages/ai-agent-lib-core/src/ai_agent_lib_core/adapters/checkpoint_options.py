@@ -20,4 +20,4 @@ class SqliteCheckpointOptions(OptionsModel):
         path: The database file. Parent directories are created.
     """
 
-    path: Path = Path(".agentlib/checkpoints.sqlite")
+    path: Path = Path(".agentcraft2/checkpoints.sqlite")

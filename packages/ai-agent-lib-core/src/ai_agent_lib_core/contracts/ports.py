@@ -18,7 +18,7 @@ from typing import Protocol, runtime_checkable
 from pydantic import SecretStr
 
 from ai_agent_lib_core.contracts.audit import AuditRecord, AuditValue
-from ai_agent_lib_core.contracts.errors import AgentLibError
+from ai_agent_lib_core.contracts.errors import AgentCraft2Error
 from ai_agent_lib_core.contracts.identity import (
     PresentedCredentials,
     Principal,
@@ -287,7 +287,7 @@ class ChatModelProvider(Protocol):
         """Return a chat model for ``model_id``."""
         ...
 
-    def classify_error(self, error: BaseException) -> AgentLibError | None:
+    def classify_error(self, error: BaseException) -> AgentCraft2Error | None:
         """Map a vendor error to the library's taxonomy.
 
         Returns:

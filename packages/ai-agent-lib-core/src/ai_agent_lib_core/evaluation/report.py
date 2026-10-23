@@ -14,7 +14,7 @@ from ai_agent_lib_core.evaluation.scorers import Score
 
 __all__ = ["REPORT_SCHEMA", "CaseResult", "EvalReport"]
 
-REPORT_SCHEMA = "agentlib.eval-report/v1"
+REPORT_SCHEMA = "agentcraft2.eval-report/v1"
 """The identity of the JSON a report writes; load_report checks it."""
 
 

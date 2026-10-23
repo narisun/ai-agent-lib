@@ -31,7 +31,7 @@ from sqlglot.generator import Generator
 from ai_agent_lib_aws.redshift_target import RedshiftTarget, target_problem
 from ai_agent_lib_aws.session import AwsSessionFactory
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     Clock,
     ConfigurationError,
     Obligations,
@@ -336,7 +336,7 @@ class RedshiftDataSource:
             TransientError: If the query ran longer than the timeout, was
                 stopped, or AWS throttled the call.
             ConfigurationError: If AWS refused the server's access.
-            AgentLibError: If the database rejected the query.
+            AgentCraft2Error: If the database rejected the query.
         """
         catalog = self._started()
         bound = catalog.bind(name, parameters)
@@ -370,7 +370,7 @@ class RedshiftDataSource:
             await self._run(_CHECK, _Request(sql="SELECT 1 AS ready", parameters=()), limit=1)
         except ConfigurationError:
             raise
-        except AgentLibError as exc:
+        except AgentCraft2Error as exc:
             raise ConfigurationError.from_error(exc) from exc
 
     async def aclose(self) -> None:
@@ -541,7 +541,7 @@ class RedshiftDataSource:
         for statement_id in submitted:
             try:
                 await self._sessions.invoke(_WHAT, self._client.cancel_statement, Id=statement_id)
-            except (aws.BotoCoreError, aws.ClientError, AgentLibError) as exc:
+            except (aws.BotoCoreError, aws.ClientError, AgentCraft2Error) as exc:
                 _warn_cancel_failed(statement_id, exc)
 
     async def _call(self, label: str, operation: Callable[..., Any], **arguments: Any) -> Any:

@@ -1,5 +1,5 @@
-# Written by agentlib. It records the answers this workspace was generated from.
-# Generate the same workspace elsewhere with: agentlib init --answers agentlib.toml <folder>
+# Written by agentcraft2. It records the answers this workspace was generated from.
+# Generate the same workspace elsewhere with: agentcraft2 init --answers agentcraft2.toml <folder>
 
 [workspace]
 name = "rmqna"

@@ -5,7 +5,7 @@ from urllib.parse import urlsplit
 
 from pydantic import ValidationError
 
-from ai_agent_lib_core.contracts import AgentEntry, EntryStatus
+from ai_agent_lib_core.contracts import AgentEntry, EntryStatus, is_schema
 from ai_agent_lib_ui.contracts.catalog import AgentBinding, AgentCoreRuntime, PresentationManifest
 from ai_agent_lib_ui.contracts.queries import ContractError, ErrorCode
 
@@ -29,7 +29,7 @@ def same_agent_binding(saved: AgentBinding, current: AgentBinding) -> bool:
 
 def read_manifest(value: Mapping[str, object]) -> PresentationManifest:
     """Reject unsupported schema versions with a stable, content-free error."""
-    if value.get("schema") != "agentlib.presentation/v1":
+    if not is_schema(value.get("schema"), "agentcraft2.presentation/v1"):
         raise ContractError(ErrorCode.UNSUPPORTED_SCHEMA)
     try:
         return PresentationManifest.model_validate(value)

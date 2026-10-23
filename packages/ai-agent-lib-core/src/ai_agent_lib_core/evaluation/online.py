@@ -18,7 +18,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from ai_agent_lib_core.contracts import ValidationFailed
+from ai_agent_lib_core.contracts import ValidationFailed, is_schema
 from ai_agent_lib_core.evaluation.cases import EvalCase
 from ai_agent_lib_core.evaluation.report import EvalReport
 from ai_agent_lib_core.evaluation.run import run_eval
@@ -34,7 +34,7 @@ __all__ = [
     "write_interactions",
 ]
 
-INTERACTION_SCHEMA = "agentlib.interaction/v1"
+INTERACTION_SCHEMA = "agentcraft2.interaction/v1"
 """The identity each interaction line carries; load_interactions checks it."""
 
 
@@ -89,7 +89,7 @@ def load_interactions(path: Path) -> list[Interaction]:
                 expected="one interaction object per line",
                 actual=str(problem),
             ) from problem
-        if not isinstance(data, dict) or data.get("schema") != INTERACTION_SCHEMA:
+        if not isinstance(data, dict) or not is_schema(data.get("schema"), INTERACTION_SCHEMA):
             actual_schema = (
                 f"schema {data.get('schema')!r}" if isinstance(data, dict) else "not an object"
             )

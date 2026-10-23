@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ai_agent_lib_core.contracts import ValidationFailed
+from ai_agent_lib_core.contracts import ValidationFailed, is_schema
 from ai_agent_lib_core.evaluation.report import REPORT_SCHEMA, EvalReport
 
 __all__ = ["Regression", "SavedReport", "load_report", "regressions", "require_no_regression"]
@@ -58,15 +58,15 @@ def load_report(path: Path) -> SavedReport:
             f"the baseline {path} cannot be read",
             expected="the JSON an eval writes with report.to_json()",
             actual=str(problem),
-            fix="write the baseline with agentlib eval SERVICE --accept",
+            fix="write the baseline with agentcraft2 eval SERVICE --accept",
         ) from problem
     wrong = not isinstance(data, dict) or not isinstance(data.get("means"), dict)
-    if wrong or data.get("schema", REPORT_SCHEMA) != REPORT_SCHEMA:
+    if wrong or not is_schema(data.get("schema", REPORT_SCHEMA), REPORT_SCHEMA):
         raise ValidationFailed(
             f"the baseline {path} is not an eval report",
             expected=f'an object with "means" and schema {REPORT_SCHEMA}',
             actual="another shape or schema",
-            fix="write the baseline with agentlib eval SERVICE --accept",
+            fix="write the baseline with agentcraft2 eval SERVICE --accept",
         )
     results = data.get("results", [])
     try:
@@ -84,7 +84,7 @@ def load_report(path: Path) -> SavedReport:
             f"the baseline {path} is not an eval report",
             expected="means, scores and metadata as the eval writes them",
             actual=str(problem),
-            fix="write the baseline with agentlib eval SERVICE --accept",
+            fix="write the baseline with agentcraft2 eval SERVICE --accept",
         ) from problem
 
 
@@ -135,5 +135,5 @@ def require_no_regression(
             f"{', '.join(r.cases[:10]) or 'none listed'})"
             for r in found
         ),
-        fix="fix the regression, or accept the new report: agentlib eval SERVICE --accept",
+        fix="fix the regression, or accept the new report: agentcraft2 eval SERVICE --accept",
     )

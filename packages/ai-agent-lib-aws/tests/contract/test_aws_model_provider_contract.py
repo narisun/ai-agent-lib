@@ -7,7 +7,7 @@ from botocore import exceptions as aws
 from ai_agent_lib_aws.model_bedrock import BedrockChatModelProvider
 from ai_agent_lib_aws.testing import offline_sessions
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     ChatModelProvider,
     ConfigurationError,
     CredentialsExpiredError,
@@ -29,7 +29,7 @@ class TestBedrockChatModelProvider(LangGraphModelProviderContract):
     def make_provider(self) -> ChatModelProvider:
         return BedrockChatModelProvider(offline_sessions())
 
-    def vendor_errors(self) -> list[tuple[BaseException, type[AgentLibError]]]:
+    def vendor_errors(self) -> list[tuple[BaseException, type[AgentCraft2Error]]]:
         return [
             (_client_error("ThrottlingException", 429), TransientError),
             (_client_error("ModelTimeoutException", 408), TransientError),

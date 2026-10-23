@@ -2,7 +2,7 @@
   "output": {
     "answer": "The synthetic preparation memo is ready.",
     "artifacts": [{
-      "schema": "agentlib.artifact/v1",
+      "schema": "agentcraft2.artifact/v1",
       "id": "memo-version-1",
       "document_id": "meeting-memo",
       "version": 1,

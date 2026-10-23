@@ -1,4 +1,4 @@
-# agentlib-service
+# agentcraft2-service
 
 A Terraform module that runs one ai-agent-lib service on ECS Fargate.
 
@@ -22,8 +22,8 @@ Use a Terraform version that supports mocked providers. Run these commands
 from the workspace root, in Windows Command Prompt or bash:
 
 ```bat
-terraform -chdir=deploy/modules/agentlib-service init -backend=false
-terraform -chdir=deploy/modules/agentlib-service test
+terraform -chdir=deploy/modules/agentcraft2-service init -backend=false
+terraform -chdir=deploy/modules/agentcraft2-service test
 ```
 
 **Expected result:** the module tests pass using mocked AWS providers.
@@ -38,7 +38,7 @@ The module creates:
 - A task role with `task_policy_json`, derived from the selected adapters,
   plus permissions the collector needs for X-Ray and CloudWatch.
 - An execution role for pulling images and writing service logs.
-- A log group named `/agentlib/NAME`.
+- A log group named `/agentcraft2/NAME`.
 
 Containers use a read-only root filesystem and a writable `/tmp` volume.
 The `volume-init` container prepares that volume before the service starts

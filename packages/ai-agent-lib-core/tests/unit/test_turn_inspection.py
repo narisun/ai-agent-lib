@@ -28,7 +28,7 @@ def owner() -> RequestContext:
 
 def record(event: str = "model.request", **changes: object) -> dict[str, object]:
     return {
-        "schema": "agentlib.audit/v1" if event == "tool.call" else "agentlib.model-trace/v1",
+        "schema": "agentcraft2.audit/v1" if event == "tool.call" else "agentcraft2.model-trace/v1",
         "event": event,
         "tenant": "bank",
         "subject": "developer",
@@ -106,7 +106,7 @@ async def test_checkpoint_request_metadata_separates_same_thread_turns_and_owner
         two = await reader(second, "second")
         assert one.record_count == two.record_count == 3
         assert "second question" not in one.text
-        assert '"agentlib_request_id": "second"' in two.text
+        assert '"agentcraft2_request_id": "second"' in two.text
         other = replace(first, principal=replace(first.principal, subject="other"))
         assert (await reader(other, "request")).record_count == 0
         assert (await reader(first, "absent")).record_count == 0

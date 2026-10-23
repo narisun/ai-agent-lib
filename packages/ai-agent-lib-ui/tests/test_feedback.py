@@ -41,7 +41,7 @@ def settings_at(path: Path) -> Settings:
     agents.write_text(
         json.dumps(
             {
-                "schema": "agentlib.registry/v1",
+                "schema": "agentcraft2.registry/v1",
                 "agents": [
                     {
                         "id": "memo",
@@ -54,7 +54,7 @@ def settings_at(path: Path) -> Settings:
         ),
         encoding="utf-8",
     )
-    tools.write_text('{"schema":"agentlib.registry/v1","servers":[]}', encoding="utf-8")
+    tools.write_text('{"schema":"agentcraft2.registry/v1","servers":[]}', encoding="utf-8")
     snapshot, _ = read_registries(agents, tools)
     urls = frozenset({"http://127.0.0.1:8199/memo"})
     return Settings(

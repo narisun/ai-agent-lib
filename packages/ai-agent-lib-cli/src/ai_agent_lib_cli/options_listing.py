@@ -1,4 +1,4 @@
-"""What 'agentlib config options' prints: the adapters, and each one's options."""
+"""What 'agentcraft2 config options' prints: the adapters, and each one's options."""
 
 from __future__ import annotations
 
@@ -64,8 +64,8 @@ def adapter_lines(providers: ServiceProviders, ports: Sequence[str] = PORTS) -> 
                 notes.append(f"{count} option{'s' if count != 1 else ''}")
             lines.append(f"  {name:<16} {', '.join(notes)}".rstrip())
     lines.append("")
-    lines.append("Show one adapter's options: agentlib config options PORT NAME")
-    lines.append("Show the timeouts, retries and budgets: agentlib config options limits")
+    lines.append("Show one adapter's options: agentcraft2 config options PORT NAME")
+    lines.append("Show the timeouts, retries and budgets: agentcraft2 config options limits")
     return lines
 
 

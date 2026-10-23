@@ -30,7 +30,7 @@ from opentelemetry import propagate
 from pydantic import PrivateAttr, SecretStr
 
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     IntegrityError,
     NotStartedError,
     PolicyDenied,
@@ -92,7 +92,7 @@ class SupportsErrorClassification(Protocol):
     to its own mapping for anything it leaves alone.
     """
 
-    def classify(self, error: BaseException, *, where: str) -> AgentLibError | None:
+    def classify(self, error: BaseException, *, where: str) -> AgentCraft2Error | None:
         """Return the library error for ``error``, or ``None`` to leave it to the caller.
 
         Args:
@@ -105,7 +105,7 @@ class SupportsErrorClassification(Protocol):
 
 def _classified(
     connector: McpConnector, error: BaseException, *, where: str
-) -> AgentLibError | None:
+) -> AgentCraft2Error | None:
     """Ask the connector what ``error`` means, when it can say."""
     if isinstance(connector, SupportsErrorClassification):
         return connector.classify(error, where=where)
@@ -116,7 +116,7 @@ _REFUSED_STATUS = frozenset({401, 403})
 
 # The token of the call in progress. ``HttpMcpConnector.connect`` binds it for the
 # enclosed block; the SDK's transport tasks, started inside that block, inherit it.
-_CALL_TOKEN: ContextVar[SecretStr | None] = ContextVar("agentlib_mcp_call_token", default=None)
+_CALL_TOKEN: ContextVar[SecretStr | None] = ContextVar("agentcraft2_mcp_call_token", default=None)
 
 
 class _TokenOfTheCall(httpx2.Auth):
@@ -340,7 +340,7 @@ class GovernedMcpTool(GovernedToolBase):
             if isinstance(error, MCPError):
                 # The server's own text can repeat what the caller sent, so it is
                 # kept for a developer's machine only, never in the message or facts.
-                raise AgentLibError(
+                raise AgentCraft2Error(
                     f"{where}: the server answered with an error",
                     actual=f"an MCP error of type {type(error).__name__}",
                     fix="look at the server's log line for this request ID",
@@ -441,7 +441,7 @@ async def load_mcp_tools(
                 f"MCP server {server.id!r} could not be reached ({describe(error)})",
                 expected=f"an MCP server answering at {server.url}",
                 fix=(
-                    f"start it (in a workspace: agentlib run {server.id}), or correct its "
+                    f"start it (in a workspace: agentcraft2 run {server.id}), or correct its "
                     "url in the tool registry"
                 ),
             ) from error

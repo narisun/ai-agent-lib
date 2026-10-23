@@ -130,7 +130,7 @@ no delegated scope as an application's own.
 
 ```json
 {
-  "schema": "agentlib.decision/v1",
+  "schema": "agentcraft2.decision/v1",
   "principal": {
     "subject": "<user object ID>",
     "tenant": "<tenant ID>",
@@ -245,8 +245,8 @@ The AgentCore quick starts use Amazon Cognito, so the `jwt` provider has a
 `cognito` preset beside `entra`:
 
 ```bash
-EAP_IDENTITY_PROVIDER=jwt
-EAP_IDENTITY_OPTIONS={"preset": "cognito", "user_pool_id": "<region>_<pool id>", "audience": "<app client id>"}
+AC2_IDENTITY_PROVIDER=jwt
+AC2_IDENTITY_OPTIONS={"preset": "cognito", "user_pool_id": "<region>_<pool id>", "audience": "<app client id>"}
 ```
 
 The preset fills in the user pool's issuer and key location from
@@ -262,8 +262,8 @@ in the header `X-Amzn-Bedrock-AgentCore-Runtime-User-Id`, and nothing else
 about them. The AWS pack's `agentcore_runtime` provider trusts that perimeter:
 
 ```bash
-EAP_IDENTITY_PROVIDER=agentcore_runtime
-EAP_IDENTITY_OPTIONS={"tenant": "<tenant>", "roles": ["analyst"]}
+AC2_IDENTITY_PROVIDER=agentcore_runtime
+AC2_IDENTITY_OPTIONS={"tenant": "<tenant>", "roles": ["analyst"]}
 ```
 
 The principal is the user ID as `subject`, the configured `tenant`, because
@@ -298,7 +298,7 @@ AgentCore Identity for a token the MCP server accepts. The `agentcore_runtime`
 provider does this when it has `exchange` options:
 
 ```bash
-EAP_IDENTITY_OPTIONS={"tenant": "<tenant>", "exchange": {"credential_provider": "entra-provider", "scopes": ["{audience}/.default"], "workload_name": "accounts-agent"}}
+AC2_IDENTITY_OPTIONS={"tenant": "<tenant>", "exchange": {"credential_provider": "entra-provider", "scopes": ["{audience}/.default"], "workload_name": "accounts-agent"}}
 ```
 
 `credential_provider` is the name of the credential provider in AgentCore
@@ -322,7 +322,7 @@ it. `return_url` says where the browser goes afterwards.
 The permissions this needs, `bedrock-agentcore:GetResourceOauth2Token`,
 `GetWorkloadAccessToken` and `GetWorkloadAccessTokenForUserId` on the
 workload identity directory and the agent's workload identity, are declared by
-the adapter like every other AWS permission and appear in `agentlib deploy
+the adapter like every other AWS permission and appear in `agentcraft2 deploy
 SERVICE --plan`. A JWT-mode runtime that exchanges tokens directly with the
 identity provider keeps using the `jwt` provider's `exchange` options and
 needs none of them.

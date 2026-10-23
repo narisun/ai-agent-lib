@@ -18,7 +18,7 @@ def settings_at(path: Path, *agents: str) -> Settings:
     agents_path.write_text(
         json.dumps(
             {
-                "schema": "agentlib.registry/v1",
+                "schema": "agentcraft2.registry/v1",
                 "agents": [
                     {"id": name, "owner": "team", "version": "1", "url": f"{AGENT_URL}/{name}"}
                     for name in names
@@ -27,7 +27,7 @@ def settings_at(path: Path, *agents: str) -> Settings:
         ),
         encoding="utf-8",
     )
-    tools_path.write_text('{"schema":"agentlib.registry/v1","servers":[]}', encoding="utf-8")
+    tools_path.write_text('{"schema":"agentcraft2.registry/v1","servers":[]}', encoding="utf-8")
     snapshot, _ = read_registries(agents_path, tools_path)
     urls = frozenset(f"{AGENT_URL}/{name}" for name in names)
     return Settings(

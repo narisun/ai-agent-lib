@@ -12,7 +12,7 @@ see [Phoenix tracing](docs/tracing.md). Those are optional after the local tests
 
 ## Before you start
 
-Run all commands from the **workspace root**, where `agentlib.toml` lives.
+Run all commands from the **workspace root**, where `agentcraft2.toml` lives.
 Follow [Select Python](../../README.md#select-python) in the workspace README
 to set `PYTHON` to your approved Python executable. Do this in every
 new terminal. These examples use Windows Command Prompt; in bash/zsh replace `"%PYTHON%"`
@@ -141,7 +141,7 @@ also ask one question directly. This command exits after printing the answer:
 
 The local development identity supplies the caller when no token is sent.
 Its roles are configured in `AC2_IDENTITY_OPTIONS`. Local audit logs and
-conversation checkpoints are under `agents/rmqna/.agentlib/`.
+conversation checkpoints are under `agents/rmqna/.agentcraft2/`.
 
 ## What to read
 
@@ -180,13 +180,13 @@ Start with this agent's scripted example, from the workspace root:
 
 ```bat
 "%PYTHON%" -m rmqna.examples.trace_react
-"%PYTHON%" examples\read_trace.py agents/rmqna/.agentlib/react-demo/model-trace.jsonl --last 6
+"%PYTHON%" examples\read_trace.py agents/rmqna/.agentcraft2/react-demo/model-trace.jsonl --last 6
 ```
 
 It runs this graph against the real `rmqna-data` server in the same process, with scripted
 model replies: the model's SQL runs on the real engine, so the trace shows the tool call
 and the framed rows. Expect 2, 4, 6 and 8 messages on successive model calls. It needs no
-running service and writes `agents/rmqna/.agentlib/react-demo/model-trace.jsonl`.
+running service and writes `agents/rmqna/.agentcraft2/react-demo/model-trace.jsonl`.
 
 To try Anthropic, follow [this agent's setup instructions](docs/anthropic-example.md),
 then run:
@@ -196,7 +196,7 @@ then run:
 ```
 
 This sends two questions on one thread, prints the checkpoints and model trace,
-and saves the files under `agents/rmqna/.agentlib/anthropic-demo/`.
+and saves the files under `agents/rmqna/.agentcraft2/anthropic-demo/`.
 It uses your configured model and API tokens. Add `--thread "your-thread-id"`
 to continue a saved conversation. This example builds the graph without MCP tools, so
 the model answers from the schema document in its prompt; the normal CLI and HTTP entry
@@ -206,7 +206,7 @@ To capture calls from the normal CLI or HTTP entry point, use the following step
 Add this setting to `agents/rmqna/.env`, then restart the agent:
 
 ```dotenv
-AC2_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl
+AC2_MODEL_TRACE_PATH=.agentcraft2/model-trace.jsonl
 ```
 
 Run a question with a named conversation after starting any required MCP servers:
@@ -216,7 +216,7 @@ Run a question with a named conversation after starting any required MCP servers
 "%PYTHON%" -m rmqna "Which of them has the largest facility?" --thread debug-canada
 ```
 
-Open `agents/rmqna/.agentlib/model-trace.jsonl`. Each line is a JSON event:
+Open `agents/rmqna/.agentcraft2/model-trace.jsonl`. Each line is a JSON event:
 
 - `model.request` contains the complete ordered messages, normalized tool
   definitions, binding options, and per-call options.
@@ -297,7 +297,7 @@ registry and AWS permissions.
 
 Reopen the conversation to check its saved outcome. The UI only reads status; it
 never repeats the question. The generated local service keeps confirmed outcomes
-in `.agentlib\outcomes.sqlite`. Protect this file like the checkpoint database.
+in `.agentcraft2\outcomes.sqlite`. Protect this file like the checkpoint database.
 If no confirmed outcome exists, the UI keeps the thread held.
 
 The HTTP service accepts one active turn per caller and thread. A second request

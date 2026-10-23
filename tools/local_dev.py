@@ -27,7 +27,7 @@ UI_PROJECT = Path("packages/ai-agent-lib-ui")
 WORKSPACE = Path("examples/rmprep")
 AGENT_ENV = WORKSPACE / "agents/rmprep/.env"
 MCP_ENV = WORKSPACE / "mcp-servers/rmprep-data/.env"
-UI_CONFIG = Path(".agentlib/ui-rmprep/config.json")
+UI_CONFIG = Path(".agentcraft2/ui-rmprep/config.json")
 
 
 def run(command: Sequence[str], root: Path) -> None:
@@ -350,7 +350,7 @@ def main(argv: Sequence[str] | None = None, *, root: Path = ROOT) -> int:
             services_for(
                 root, args.scenario, config, ui_port, agent_env=agent_env, phoenix=phoenix
             ),
-            root / ".agentlib/local-runs" / uuid4().hex,
+            root / ".agentcraft2/local-runs" / uuid4().hex,
             smoke_test=args.smoke_test,
         )
         return 0

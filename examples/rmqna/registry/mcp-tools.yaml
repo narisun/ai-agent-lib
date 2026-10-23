@@ -1,8 +1,8 @@
 # The MCP tool registry: which servers and tools exist. An agent can only use a tool
 # that is listed here, and only if the tool's live input schema still matches its pin.
-# After changing a tool's arguments, pin it again: agentlib registry pin <server>
-# agentlib rewrites this file when it adds, links or pins a service; comments are not kept.
-schema: agentlib.registry/v1
+# After changing a tool's arguments, pin it again: agentcraft2 registry pin <server>
+# agentcraft2 rewrites this file when it adds, links or pins a service; comments are not kept.
+schema: agentcraft2.registry/v1
 servers:
 - id: rmqna-data
   owner: commercial-banking

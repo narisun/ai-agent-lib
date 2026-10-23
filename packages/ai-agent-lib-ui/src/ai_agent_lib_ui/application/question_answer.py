@@ -7,6 +7,7 @@ from typing import Annotated
 
 from pydantic import Field, ValidationError
 
+from ai_agent_lib_core.contracts import is_schema
 from ai_agent_lib_core.contracts.diagnostics import DiagnosticValue, Identifier, TokenUsage
 from ai_agent_lib_ui.contracts.artifacts import Artifact, ScopedArtifact
 from ai_agent_lib_ui.contracts.catalog import PresentationManifest
@@ -120,7 +121,9 @@ class QuestionAnswerAdapter:
         )
 
     def _artifact(self, value: object, view: ViewContext, answer: AcceptedAnswer) -> ScopedArtifact:
-        if not isinstance(value, dict) or value.get("schema") != "agentlib.artifact/v1":
+        if not isinstance(value, dict) or not is_schema(
+            value.get("schema"), "agentcraft2.artifact/v1"
+        ):
             raise ValueError("unsupported artifact schema")
         artifact = Artifact.model_validate(value)
         if artifact.thread_id != answer.thread_id or artifact.request_id != answer.request_id:

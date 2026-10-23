@@ -323,7 +323,7 @@ class McpBindings:
                 expected=f"{server!r} among the registered servers",
                 actual=f"registered servers: {known}",
                 fix=(
-                    f"register it (agentlib new mcp does this), or check "
+                    f"register it (agentcraft2 new mcp does this), or check "
                     f"{variable_for(options_key(Section.REGISTRY))} points at the right registry"
                 ),
             )

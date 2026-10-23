@@ -54,7 +54,7 @@ from pydantic import SecretStr
 
 from ai_agent_lib_aws.session import AwsSessionFactory
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     ConfigurationError,
     NotStartedError,
     PolicyDenied,
@@ -102,7 +102,7 @@ class _Call:
 
 # Bound by ``AgentCoreMcpConnector.connect`` for the enclosed block; the SDK's
 # transport tasks, started inside that block, inherit it.
-_CALL: ContextVar[_Call | None] = ContextVar("agentlib_agentcore_mcp_call", default=None)
+_CALL: ContextVar[_Call | None] = ContextVar("agentcraft2_agentcore_mcp_call", default=None)
 
 
 class _SessionIds:
@@ -255,7 +255,7 @@ class AgentCoreMcpConnector:
         """Return nothing: over HTTP the credential is in a header."""
         return {}
 
-    def classify(self, error: BaseException, *, where: str) -> AgentLibError | None:
+    def classify(self, error: BaseException, *, where: str) -> AgentCraft2Error | None:
         """Map the platform's JSON-RPC error onto the library's taxonomy, or return ``None``."""
         return classify_agentcore_mcp_error(error, where=where)
 
@@ -269,7 +269,7 @@ class AgentCoreMcpConnector:
 
 def _jsonrpc_error(error: BaseException) -> tuple[int, str] | None:
     """Return the code and message of a JSON-RPC error the MCP SDK raised, if that is what it is."""
-    if isinstance(error, AgentLibError):
+    if isinstance(error, AgentCraft2Error):
         return None
     data: Any = getattr(error, "error", None)
     code: Any = getattr(data, "code", None) if data is not None else None
@@ -281,7 +281,7 @@ def _jsonrpc_error(error: BaseException) -> tuple[int, str] | None:
     return code, message if isinstance(message, str) else str(error)
 
 
-def classify_agentcore_mcp_error(error: BaseException, *, where: str) -> AgentLibError | None:
+def classify_agentcore_mcp_error(error: BaseException, *, where: str) -> AgentCraft2Error | None:
     """Map a JSON-RPC error from the AgentCore platform onto the library's taxonomy.
 
     The platform's own text may repeat what the caller sent, so it goes into

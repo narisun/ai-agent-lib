@@ -22,7 +22,7 @@ from starlette.responses import JSONResponse, Response
 from starlette.types import Receive, Scope, Send
 
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     BudgetExceeded,
     ExecutionPaused,
     IdGenerator,
@@ -131,7 +131,7 @@ def unavailable() -> JSONResponse:
     return response
 
 
-def status_of(error: AgentLibError) -> tuple[int, str]:
+def status_of(error: AgentCraft2Error) -> tuple[int, str]:
     """The HTTP status and the code that describe a failed run to the caller."""
     if isinstance(error, PolicyDenied):
         return 403, "denied"
@@ -146,14 +146,14 @@ def status_of(error: AgentLibError) -> tuple[int, str]:
     return 500, "internal"
 
 
-def level_of(error: AgentLibError) -> int:
+def level_of(error: AgentCraft2Error) -> int:
     """Refusals are the caller's problem; anything else is the service's."""
     if isinstance(error, PolicyDenied | ValidationFailed | BudgetExceeded | ExecutionPaused):
         return logging.WARNING
     return logging.ERROR
 
 
-def failure(error: AgentLibError, request_id: str) -> Reply:
+def failure(error: AgentCraft2Error, request_id: str) -> Reply:
     """Describe a failed run to the caller: a code, never the error's own text."""
     status, name = status_of(error)
     more = {"reason": error.reason_code} if isinstance(error, PolicyDenied) else {}
@@ -346,7 +346,7 @@ class RequestPrelude:
                 extra={"request_id": request_id, "reason_code": refusal.reason_code},
             )
             return _unauthorized(refusal.reason_code)
-        except AgentLibError as error:
+        except AgentCraft2Error as error:
             _LOG.error("the caller could not be signed in", exc_info=error)
             return failure(error, request_id or self._services.ids.new_id()).response()
 

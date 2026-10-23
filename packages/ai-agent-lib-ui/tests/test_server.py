@@ -28,7 +28,7 @@ async def login(client: httpx.AsyncClient, runtime: Runtime) -> None:
     response = await client.post("/login", data={"code": runtime.access_code})
     assert response.status_code == 303, response.text
     assert response.headers["location"] == "/chat/"
-    assert "agentlib_session" in response.cookies
+    assert "agentcraft2_session" in response.cookies
 
 
 async def test_login_checks_the_access_code_and_opens_a_session(
@@ -37,7 +37,7 @@ async def test_login_checks_the_access_code_and_opens_a_session(
     refused = await client.post("/login", data={"code": "not the code"})
     assert refused.status_code == 401
     assert refused.json() == {"detail": "Access code did not match"}
-    assert "agentlib_session" not in refused.cookies
+    assert "agentcraft2_session" not in refused.cookies
     await login(client, runtime)
     listing = await client.get("/api/threads")
     assert listing.status_code == 200

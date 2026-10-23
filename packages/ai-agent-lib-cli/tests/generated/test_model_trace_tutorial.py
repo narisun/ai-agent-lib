@@ -58,7 +58,7 @@ def test_trace_tutorial_shows_tools_then_checkpoint_history(tmp_path: Path, name
     assert "Checkpoint message types: ['human', 'ai', 'tool', 'ai', 'human', 'ai']" in result.stdout
     captured = [
         json.loads(line)
-        for line in (service / ".agentlib/react-demo.jsonl")
+        for line in (service / ".agentcraft2/react-demo.jsonl")
         .read_text(encoding="utf-8")
         .splitlines()
     ]
@@ -243,7 +243,7 @@ def test_anthropic_entrypoint_records_real_adapter_messages_and_persisted_histor
     monkeypatch.setattr(langchain_anthropic.ChatAnthropic, "_acreate", create_reply)
     for _ in range(2):
         assert example.main(["--thread", "continued-thread"] if resume else []) == 0
-    runs = list((service / ".agentlib/anthropic-demo").iterdir())
+    runs = list((service / ".agentcraft2/anthropic-demo").iterdir())
     assert len(runs) == 2
     assert len(calls) == 6
     lengths = []

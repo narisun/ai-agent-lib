@@ -16,13 +16,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# For 'agentlib new mcp --from-redshift', which reads the Redshift catalogue.
+# For 'agentcraft2 new mcp --from-redshift', which reads the Redshift catalogue.
 aws = [
     "ai-agent-lib-aws",
 ]
 
 [project.scripts]
-agentlib = "ai_agent_lib_cli.__main__:main"
+agentcraft2 = "ai_agent_lib_cli.__main__:main"
+# The short name for the same command.
+ac2 = "ai_agent_lib_cli.__main__:main"
 
 [tool.uv.sources]
 ai-agent-lib-core = { workspace = true }

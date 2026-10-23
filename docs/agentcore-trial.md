@@ -1,6 +1,6 @@
 # Deploying rmprep to AgentCore Runtime
 
-`agentlib deploy SERVICE --target agentcore` writes what runs a service as an
+`agentcraft2 deploy SERVICE --target agentcore` writes what runs a service as an
 Amazon Bedrock AgentCore Runtime: a `deploy.env` to fill in, a plan that refuses
 what the platform cannot run, and a Terraform root module with an ARM64
 Dockerfile. This trial takes the `examples/rmprep` workspace through it twice:
@@ -26,7 +26,7 @@ why, read [ADR 0005](adr/0005-agentcore-target.md).
 - The library's three distributions (`ai-agent-lib-core`, `ai-agent-lib-aws`,
   `ai-agent-lib-cli`) on a package index the image build can reach. The example
   workspace installs the library from the local checkout (`[library] path` in
-  `agentlib.toml`), and the plan warns that an image build cannot reach it.
+  `agentcraft2.toml`), and the plan warns that an image build cannot reach it.
 - Python 3.11 or newer with the CLI importable; the deployed image uses Python
   3.13, which the services' `requires-python = ">=3.11"` allows.
 - Terraform 1.5 or later. The trial used 1.14.7 and the AWS provider 6.70.0,
@@ -61,14 +61,14 @@ Recorded output:
 Next:
   add "ai-agent-lib-aws[bedrock,agentcore]" to the dependencies in agents/rmprep/pyproject.toml, then run 'python -m ai_agent_lib_cli install'
   fill in agents/rmprep/deploy.env: its values are examples
-  run 'agentlib deploy rmprep --target agentcore --plan'
+  run 'agentcraft2 deploy rmprep --target agentcore --plan'
 
   created  mcp-servers/rmprep-data/deploy.env
 
 Next:
   add "ai-agent-lib-aws" to the dependencies in mcp-servers/rmprep-data/pyproject.toml, then run 'python -m ai_agent_lib_cli install'
   fill in mcp-servers/rmprep-data/deploy.env: its values are examples
-  run 'agentlib deploy rmprep-data --target agentcore --plan'
+  run 'agentcraft2 deploy rmprep-data --target agentcore --plan'
 ```
 
 The starting file already selects the `aws` profile, `dev`, `ambient` telemetry,
@@ -169,7 +169,7 @@ instead, and the connector derives the invocation URL from the ARN. The trial
 replaced the `url` line of the copy's registry, keeping the four pinned tools:
 
 ```yaml
-schema: agentlib.registry/v1
+schema: agentcraft2.registry/v1
 servers:
 - id: rmprep-data
   owner: commercial-banking
@@ -431,7 +431,7 @@ Record the pushed digest and set `image` in `deploy\rmprep-data\terraform.tfvars
 `<account>.dkr.ecr.eu-west-1.amazonaws.com/rmprep-data@sha256:<digest>`. Repeat
 for `rmprep`. `Dockerfile.dockerignore` admits only `pyproject.toml`,
 `README.md`, `src/**` and `queries/**` of the service, plus `registry/**`,
-`policies/**` and the lock; `.env` files, `.agentlib/`, databases and keys are
+`policies/**` and the lock; `.env` files, `.agentcraft2/`, databases and keys are
 excluded even inside those folders. The server's `data/` folder is not in the
 image, which is why its data source is Redshift.
 
@@ -613,7 +613,7 @@ nothing is written while a problem remains.
 | `<service>/deploy.env describes a developer's machine, not a deployment` | `AC2_DEPLOYMENT_ENV=dev` or `prod`. `local` is for `.env`. |
 | `<service>/deploy.env holds secrets, and its values become the task's environment` | Remove every `AC2_SECRET_*` line; the service reads its secrets from Secrets Manager under `AC2_SECRETS_OPTIONS`'s prefix. |
 | `the service reads the data sources rmprep locally, but <service>/deploy.env does not configure them, so the deployed service cannot find them; set AC2_DATA_SOURCES there` (warning) | The server's `.env.example` names a data source the deployment does not. Configure it with an AWS adapter, as above. |
-| `this workspace installs the library from a local checkout, which an image build cannot reach; publish the library to a package index before building the image` (warning) | Expected for the example workspace. Publish the distributions, or change `[library]` in `agentlib.toml` to the index. |
+| `this workspace installs the library from a local checkout, which an image build cannot reach; publish the library to a package index before building the image` (warning) | Expected for the example workspace. Publish the distributions, or change `[library]` in `agentcraft2.toml` to the index. |
 | `terraform validate` reports a missing provider | Run `terraform -chdir=deploy\<service> init -backend=false` first; it needs network access to fetch `hashicorp/aws`. |
 | `The settings deploy a container: set image to the ARM64 image pushed to the repository, pinned by digest.` (at `terraform plan`) | Copy `terraform.tfvars.example` to `terraform.tfvars` and set `image` to the pushed digest (section 6). |
 

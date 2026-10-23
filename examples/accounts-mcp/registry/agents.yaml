@@ -1,5 +1,5 @@
 # The agent registry: which agents exist and which MCP servers each may call.
-schema: agentlib.registry/v1
+schema: agentcraft2.registry/v1
 agents:
   - id: accounts-agent
     owner: treasury-data

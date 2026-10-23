@@ -65,13 +65,15 @@ class SessionBoundary:
                 return
             cookie = SimpleCookie()
             cookie.load(headers.get(b"cookie", b"").decode("latin1"))
-            token = cookie["agentlib_session"].value if "agentlib_session" in cookie else ""
+            token = cookie["agentcraft2_session"].value if "agentcraft2_session" in cookie else ""
             await self.resources.store.session(token, self.resources.identity)
             if path == "/chat/mcp" or path.startswith("/chat/project/file"):
                 raise HTTPException(404, "This feature is not enabled")
-            if "agentlib_chat" in cookie and path != "/chat/auth/header":
+            if "agentcraft2_chat" in cookie and path != "/chat/auth/header":
                 claims = jwt.decode(
-                    cookie["agentlib_chat"].value, self.resources.auth_secret, algorithms=["HS256"]
+                    cookie["agentcraft2_chat"].value,
+                    self.resources.auth_secret,
+                    algorithms=["HS256"],
                 )
                 if claims.get("identifier") != self.resources.identity:
                     raise HTTPException(401, "Session identities differ")
@@ -81,7 +83,7 @@ class SessionBoundary:
                 "headers": [
                     (key, value)
                     for key, value in scope["headers"]
-                    if key.lower() not in {b"authorization", b"x-agentlib-user"}
+                    if key.lower() not in {b"authorization", b"x-agentcraft2-user"}
                 ],
             }
             context = session_token.set(token)

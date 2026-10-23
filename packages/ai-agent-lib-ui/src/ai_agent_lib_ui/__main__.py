@@ -23,7 +23,7 @@ def arguments() -> argparse.Namespace:
     commands = parser.add_subparsers(dest="command", required=True)
     for name in ("init", "check", "serve"):
         command = commands.add_parser(name)
-        command.add_argument("--config", type=Path, default=Path(".agentlib/ui/config.json"))
+        command.add_argument("--config", type=Path, default=Path(".agentcraft2/ui/config.json"))
         if name == "init":
             command.add_argument("--env-file", type=Path, required=True)
             command.add_argument(

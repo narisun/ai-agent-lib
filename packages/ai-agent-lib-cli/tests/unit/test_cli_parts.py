@@ -52,7 +52,7 @@ def test_a_name_of_lower_case_words_joined_by_hyphens_is_accepted(name: str) -> 
 @pytest.mark.parametrize(
     "name",
     ["", "Hello", "hello_agent", "-hello", "hello-", "hello--agent", "9lives", "x" * 29,
-     "hello agent", "héllo", "test", "mcp", "class", "agentlib"],
+     "hello agent", "héllo", "test", "mcp", "class", "agentcraft2"],
 )  # fmt: skip
 def test_a_name_that_cannot_be_a_folder_a_package_and_an_id_is_refused(name: str) -> None:
     with pytest.raises(CliError, match="name"):
@@ -258,7 +258,7 @@ def test_the_registries_round_trip_through_their_files(tmp_path: Path) -> None:
 
 def test_rules_are_appended_once_and_what_is_there_is_never_changed() -> None:
     empty = rules_text(None, [])
-    assert yaml.safe_load(empty) == {"schema": "agentlib.rules/v1", "rules": []}
+    assert yaml.safe_load(empty) == {"schema": "agentcraft2.rules/v1", "rules": []}
     first = rules_text(empty, [RULE], title="hello-agent: its models.")
     assert "  # hello-agent: its models.\n  - id: hello-agent-uses-its-models\n" in first
     assert "    actions: [model.route]\n" in first
@@ -286,8 +286,8 @@ def test_rules_are_appended_once_and_what_is_there_is_never_changed() -> None:
 
 def test_a_rules_file_that_cannot_be_extended_safely_is_left_alone() -> None:
     with pytest.raises(CliError, match="is not valid YAML"):
-        rules_text("schema: agentlib.rules/v1\nrules: [", [RULE])
-    reordered = "rules: []\nschema: agentlib.rules/v1\n"
+        rules_text("schema: agentcraft2.rules/v1\nrules: [", [RULE])
+    reordered = "rules: []\nschema: agentcraft2.rules/v1\n"
     with pytest.raises(CliError, match="add these by hand: hello-agent-uses-its-models"):
         rules_text(reordered, [RULE])
 
@@ -310,7 +310,7 @@ def test_an_agents_settings_select_the_shared_files_and_a_model(tmp_path: Path) 
     assert registry.agents_path.resolve() == (tmp_path / "registry" / "agents.yaml").resolve()
     assert (
         rules.path.resolve()
-        == (tmp_path / "policies" / "agentlib" / "rules" / "data.yaml").resolve()
+        == (tmp_path / "policies" / "agentcraft2" / "rules" / "data.yaml").resolve()
     )
     identity = config.section(Section.IDENTITY).parse_options(StaticIdentityOptions)
     assert (identity.roles, identity.audience) == (("analyst",), None)

@@ -14,7 +14,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     CheckResult,
     Clock,
     ConfigurationError,
@@ -240,7 +240,7 @@ class AdapterGraph:
             raise ConfigurationError(
                 f"startup validation failed for {count} adapter{'s' if count != 1 else ''}",
                 actual=" | ".join(problems),
-                fix="run 'agentlib doctor' for one line per adapter with what to do",
+                fix="run 'agentcraft2 doctor' for one line per adapter with what to do",
             )
 
     async def check(self) -> tuple[CheckResult, ...]:
@@ -259,7 +259,7 @@ class AdapterGraph:
                 continue
             try:
                 await service.validate()
-            except AgentLibError as problem:
+            except AgentCraft2Error as problem:
                 results.append(CheckResult.failed(name, problem))
             else:
                 results.append(CheckResult(name, ok=True, detail="checked"))
@@ -374,7 +374,7 @@ class AdapterGraph:
         self._lifetimes.append(lifetime)
         try:
             service = await lifetime.start()
-        except AgentLibError as error:
+        except AgentCraft2Error as error:
             error.add_note(where_configured(key))
             raise
         finally:

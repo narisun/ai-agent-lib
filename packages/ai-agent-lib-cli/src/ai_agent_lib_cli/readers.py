@@ -32,7 +32,7 @@ from ai_agent_lib_core.adapters import (
     RestOptions,
     SystemClock,
 )
-from ai_agent_lib_core.contracts import AgentLibError, DataSource, SupportsAsyncClose
+from ai_agent_lib_core.contracts import AgentCraft2Error, DataSource, SupportsAsyncClose
 from ai_agent_lib_core.kit import checked_base_url
 from ai_agent_lib_core.testing import rest_stub_transport
 
@@ -137,14 +137,14 @@ async def check_queries(
     """
     try:
         return await _try(open_source, suffix, queries), []
-    except AgentLibError:
+    except AgentCraft2Error:
         pass  # at least one does not work: find out which
     kept: list[PlannedQuery] = []
     notes: list[str] = []
     for query in queries:
         try:
             kept += await _try(open_source, suffix, [query])
-        except AgentLibError as problem:
+        except AgentCraft2Error as problem:
             # The summary keeps the facts and the fix; the class name alone says nothing.
             notes.append(f"dropped {query.name}: {problem.summary}")
     return kept, notes
@@ -213,7 +213,7 @@ async def from_openapi(
         raise CliError(f"{document} names no server address this reader can use; give --base-url")
     try:
         address = checked_base_url("the API", reading.base_url, allow_http=False)
-    except AgentLibError as problem:
+    except AgentCraft2Error as problem:
         raise CliError(str(problem)) from None
     notes = list(reading.notes)
     proposed = selected(reading.queries, only)

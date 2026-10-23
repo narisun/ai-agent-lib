@@ -220,6 +220,8 @@ __marimo__/
 .streamlit/secrets.toml
 
 # ai-agent-lib local development state (audit log, SQLite stores)
+.agentcraft2/
+# The folder this state used before the rename; checkouts that ran older versions still have it.
 .agentlib/
 
 # OPA bundle manifests are source files, not the PyInstaller output ignored above

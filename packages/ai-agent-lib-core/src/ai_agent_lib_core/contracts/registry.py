@@ -36,7 +36,7 @@ __all__ = [
     "schema_fingerprint",
 ]
 
-REGISTRY_SCHEMA = "agentlib.registry/v1"
+REGISTRY_SCHEMA = "agentcraft2.registry/v1"
 """The schema identifier every registry document must declare."""
 
 _SHA256_HEX_LENGTH = 64

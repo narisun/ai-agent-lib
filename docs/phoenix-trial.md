@@ -29,11 +29,11 @@ convention and its Python requirement.
 | `start-phoenix.bat` | `./start-phoenix.sh` |
 | `start-local.bat` | `./start-local.sh` |
 | `stop-local.bat` | `./stop-local.sh` |
-| `type .agentlib\ui-rmprep\access-code` | `cat .agentlib/ui-rmprep/access-code` |
+| `type .agentcraft2\ui-rmprep\access-code` | `cat .agentcraft2/ui-rmprep/access-code` |
 
 ## Generated services: one setting
 
-A service made with `agentlib new agent`, and any service that starts through
+A service made with `agentcraft2 new agent`, and any service that starts through
 `run_agent`, has no tracing code to write. `run_agent` resolves the Phoenix
 settings, starts the exporter, hands the same adapter to the service container
 and to the HTTP app, and closes it after the container so spans flush last. Turn
@@ -75,7 +75,7 @@ start-phoenix.bat setup
 ```
 
 The script installs `arize-phoenix==20.21.1` with pip into the package folder
-`.agentlib\phoenix\.venv`, using your existing Python. Agent Lab and the agent
+`.agentcraft2\phoenix\.venv`, using your existing Python. Agent Lab and the agent
 keep their own `.venv` packages. All three run with the default Python
 executable, without using environment-local Python or pip binaries. You only
 need to repeat setup after changing the pinned Phoenix version, changing the
@@ -124,15 +124,15 @@ missing, run `start-phoenix.bat setup`, then try again.
 Open Agent Lab at <http://127.0.0.1:8765> and Phoenix at
 <http://127.0.0.1:6006>. This local, single-user Phoenix setup needs no separate
 login. Check the printed model and settings before testing. Read the Agent Lab
-access code with `type .agentlib\ui-rmprep\access-code` in another terminal.
+access code with `type .agentcraft2\ui-rmprep\access-code` in another terminal.
 
 Keep the launcher window open. Run `stop-local.bat` in a second terminal
 to stop the UI, agent, MCP server, and Phoenix, in that order. It also stops a
 standalone `start-phoenix.bat` run from this checkout. **Ctrl+C** in the original
 window also works. SQLite stores traces in
-`.agentlib\phoenix\data\phoenix.db`; restarting keeps them. The `.agentlib` folder
+`.agentcraft2\phoenix\data\phoenix.db`; restarting keeps them. The `.agentcraft2` folder
 is excluded from Git. Phoenix's startup log appears alongside the other service
-logs in `.agentlib\local-runs\<run-id>\phoenix.log`.
+logs in `.agentcraft2\local-runs\<run-id>\phoenix.log`.
 Service log files use UTF-8, including first-run database messages on Windows.
 
 `start-local.bat services` also includes Phoenix when enabled. UI-only and scripted
@@ -193,11 +193,11 @@ In Phoenix, inspect:
 
 | Item | What to look for |
 | --- | --- |
-| Root `rmprep.turn` span | One trace per invocation; the three traces share `session.id` and `agentlib.thread_id`. |
+| Root `rmprep.turn` span | One trace per invocation; the three traces share `session.id` and `agentcraft2.thread_id`. |
 | `model` spans | Select a model span, then view **Input** and **Output** on its **Info** tab. Switch between **Messages** and **Raw**. The next model call includes the preceding tool result. |
-| `rmprep-data.find_clients` span | MCP arguments, result, duration, and `agentlib.mcp_server`. The synthetic search should return zero matches. |
+| `rmprep-data.find_clients` span | MCP arguments, result, duration, and `agentcraft2.mcp_server`. The synthetic search should return zero matches. |
 | Usage | Prompt/completion tokens and cache read/write counts. Prompt totals already include cache tokens. |
-| Checkpoints | `agentlib.checkpoints` on the root span contains checkpoint IDs and parent IDs for that request. Use Agent Lab's **Logs** page to inspect saved state; chat links directly to Phoenix. Failed runs include available checkpoints and an error status; their rejected drafts remain in model traces, not accepted chat history. |
+| Checkpoints | `agentcraft2.checkpoints` on the root span contains checkpoint IDs and parent IDs for that request. Use Agent Lab's **Logs** page to inspect saved state; chat links directly to Phoenix. Failed runs include available checkpoints and an error status; their rejected drafts remain in model traces, not accepted chat history. |
 | Follow-up | Its model input includes the earlier exchange, and its answer reports the same search and count. |
 
 Model spans measure provider-call duration; the root measures agent work including
@@ -413,9 +413,9 @@ real conversations such as feedback logs and exported interactions:
   substitute for keeping the data private: a question or answer that contains a
   secret is retained verbatim.
 - **Keep them private.** Local Phoenix keeps traces in
-  `.agentlib\phoenix\data\phoenix.db`, and the optional model-trace JSONL
-  (`AC2_MODEL_TRACE_PATH`) usually sits in a service's `.agentlib` folder; Git
-  ignores `.agentlib`. Never commit them, and restrict access to them the way
+  `.agentcraft2\phoenix\data\phoenix.db`, and the optional model-trace JSONL
+  (`AC2_MODEL_TRACE_PATH`) usually sits in a service's `.agentcraft2` folder; Git
+  ignores `.agentcraft2`. Never commit them, and restrict access to them the way
   you would restrict access to the Phoenix server.
 - **Use approved test data locally.** Enable capture only for data you are
   cleared to inspect, and turn it off again when you finish.

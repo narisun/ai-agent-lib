@@ -148,8 +148,8 @@ def test_opentelemetry_adapter_emits_a_span_event_a_count_and_a_duration() -> No
         for scope in resource.scope_metrics
         for metric in scope.metrics
     }
-    (count,) = metrics["agentlib.events"].data.data_points
-    (duration,) = metrics["agentlib.duration"].data.data_points
+    (count,) = metrics["agentcraft2.events"].data.data_points
+    (duration,) = metrics["agentcraft2.duration"].data.data_points
     assert isinstance(count, NumberDataPoint)
     assert isinstance(duration, HistogramDataPoint)
     assert count.value == 1

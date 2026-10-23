@@ -1,9 +1,9 @@
 # Policies
 
 `bundle/` is the platform's Rego bundle. It holds one small, fixed evaluator,
-`data.agentlib.authz.decision`, and its tests. It does not say what is
+`data.agentcraft2.authz.decision`, and its tests. It does not say what is
 allowed; it evaluates a rules document that each service supplies as data at
-`data.agentlib.rules`.
+`data.agentcraft2.rules`.
 
 ## One rules document, two engines
 
@@ -11,12 +11,12 @@ A service keeps its rules in a folder laid out as an OPA bundle:
 
 ```text
 policies/
-  .manifest                  {"revision": "...", "roots": ["agentlib/rules"]}
-  agentlib/rules/data.yaml   schema: agentlib.rules/v1
+  .manifest                  {"revision": "...", "roots": ["agentcraft2/rules"]}
+  agentcraft2/rules/data.yaml   schema: agentcraft2.rules/v1
 ```
 
 * In local development the in-process `rules` policy provider reads
-  `policies/agentlib/rules/data.yaml`. No policy server is needed.
+  `policies/agentcraft2/rules/data.yaml`. No policy server is needed.
 * Everywhere else the service asks OPA, which loads both bundles:
 
   ```bash

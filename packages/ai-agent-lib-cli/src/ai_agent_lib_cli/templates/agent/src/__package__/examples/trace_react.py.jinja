@@ -19,7 +19,7 @@ from {{ package }}.settings import ENV_FILE
 
 async def main() -> None:
     """Run two turns on one in-memory checkpoint thread and write their trace."""
-    trace_path = ENV_FILE.parent / ".agentlib/react-demo.jsonl"
+    trace_path = ENV_FILE.parent / ".agentcraft2/react-demo.jsonl"
     config = ServiceConfig.for_testing(model_trace_path=trace_path)
     fakes = Fakes(
         model=FakeChatModelProvider(

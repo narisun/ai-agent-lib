@@ -1,4 +1,4 @@
-"""'agentlib check': the gate a change passes before it is shared."""
+"""'agentcraft2 check': the gate a change passes before it is shared."""
 
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ def check(
         try:
             context.invoke(policy_test, with_opa=with_opa, bundle=None, workspace=root)
         except CliError as problem:
-            click.echo(f"agentlib: error: {problem}", err=True)
+            click.echo(f"agentcraft2: error: {problem}", err=True)
             results.append(("policy samples", False))
         else:
             results.append(("policy samples", True))
@@ -80,7 +80,7 @@ def evals(tools: Toolbox, service: str | None, accept: bool, workspace: Path | N
     """Run the evals of SERVICE, or of every service: its tests marked eval, with a real model.
 
     An eval skips itself until a real model is set in the service's .env. Each
-    writes a report to the service's .agentlib/eval-report.json.
+    writes a report to the service's .agentcraft2/eval-report.json.
     --accept saves the passing report as evals/baseline.json; later runs fail
     on regressions against it. --accept still enforces the absolute bar. While
     the pytest run is in flight it leaves a marker beside the eval report. The
@@ -89,12 +89,12 @@ def evals(tools: Toolbox, service: str | None, accept: bool, workspace: Path | N
     of deadlocking on it. The marker is removed once the run ends.
     """
     if accept and not service:
-        raise CliError("--accept needs a service", fix="agentlib eval SERVICE --accept")
+        raise CliError("--accept needs a service", fix="agentcraft2 eval SERVICE --accept")
     root = workspace_root(workspace)
     target = service_folder(root, load_answers(root), service) if service else root
     arguments = ("-m", "eval", "-q", "-rs", target.relative_to(root).as_posix() if service else ".")
     click.echo(f"== evals: python -m pytest {' '.join(arguments)}")
-    accept_marker = target / ".agentlib" / "eval-accept.flag"
+    accept_marker = target / ".agentcraft2" / "eval-accept.flag"
     # A marker left by a killed --accept run must not skip later regression gates.
     accept_marker.unlink(missing_ok=True)
     if accept:
@@ -109,12 +109,12 @@ def evals(tools: Toolbox, service: str | None, accept: bool, workspace: Path | N
     if code == _NO_TESTS:
         raise CliError(
             f"there are no evals in {target.relative_to(root).as_posix() or 'this workspace'}",
-            fix="add a test marked @pytest.mark.eval; 'agentlib new agent' writes one",
+            fix="add a test marked @pytest.mark.eval; 'agentcraft2 new agent' writes one",
         )
     if code != 0:
         raise CliError("the evals did not meet their bar", fix="read the report above")
     if accept:
-        report = target / ".agentlib" / "eval-report.json"
+        report = target / ".agentcraft2" / "eval-report.json"
         if not report.is_file():
             raise CliError(
                 f"there is no report at {report.relative_to(root).as_posix()}",

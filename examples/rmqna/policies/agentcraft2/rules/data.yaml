@@ -3,11 +3,11 @@
 #
 # One document, two engines. In local development the in-process `rules`
 # provider reads this file. A deployed service asks OPA, which loads the
-# `policies` folder as a bundle (this file becomes `data.agentlib.rules`).
+# `policies` folder as a bundle (this file becomes `data.agentcraft2.rules`).
 #
-# This file is yours. agentlib appends the rules a new service needs and never
+# This file is yours. agentcraft2 appends the rules a new service needs and never
 # changes or removes a rule that is here.
-schema: agentlib.rules/v1
+schema: agentcraft2.rules/v1
 rules:
   # rmqna-data: who may call its tools. The server runs SQL the model wrote, not a named
   # query, so there is no data.query decision and no per-role column mask or row limit: the

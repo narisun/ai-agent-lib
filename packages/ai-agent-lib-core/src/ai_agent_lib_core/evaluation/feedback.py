@@ -9,11 +9,11 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal
 
-from ai_agent_lib_core.contracts import ValidationFailed
+from ai_agent_lib_core.contracts import ValidationFailed, is_schema
 
 __all__ = ["FEEDBACK_SCHEMA", "FeedbackRecord", "JsonlFeedbackLog", "load_feedback"]
 
-FEEDBACK_SCHEMA = "agentlib.feedback/v1"
+FEEDBACK_SCHEMA = "agentcraft2.feedback/v1"
 """The identity each feedback line carries; load_feedback checks it."""
 
 
@@ -88,7 +88,7 @@ def load_feedback(path: Path) -> list[FeedbackRecord]:
                 expected="one feedback object per line",
                 actual=str(problem),
             ) from problem
-        if not isinstance(data, dict) or data.get("schema") != FEEDBACK_SCHEMA:
+        if not isinstance(data, dict) or not is_schema(data.get("schema"), FEEDBACK_SCHEMA):
             schema_repr = data.get("schema") if isinstance(data, dict) else None
             actual = f"schema {schema_repr!r}" if isinstance(data, dict) else "not an object"
             raise ValidationFailed(

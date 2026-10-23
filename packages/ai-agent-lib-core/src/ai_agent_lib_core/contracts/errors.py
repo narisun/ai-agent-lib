@@ -1,6 +1,6 @@
 """The error taxonomy.
 
-Every exception the library raises derives from :class:`AgentLibError`. Two
+Every exception the library raises derives from :class:`AgentCraft2Error`. Two
 class attributes tell the resilience layer how an error may be handled, so no
 caller has to keep its own list of which errors are safe to retry:
 
@@ -27,7 +27,7 @@ from typing import ClassVar, Self
 from ai_agent_lib_core.contracts.redaction import redact, shorten
 
 __all__ = [
-    "AgentLibError",
+    "AgentCraft2Error",
     "BudgetExceeded",
     "ConfigurationError",
     "CredentialsExpiredError",
@@ -48,7 +48,7 @@ _MAX_DESCRIBED = 300
 _SHOWN_VALUE_LENGTH = 40
 
 
-class AgentLibError(Exception):
+class AgentCraft2Error(Exception):
     """Base class for every error raised by the library.
 
     Args:
@@ -103,7 +103,7 @@ class AgentLibError(Exception):
         return f"{self.message} ({facts})" if facts else self.message
 
     @classmethod
-    def from_error(cls, error: AgentLibError) -> Self:
+    def from_error(cls, error: AgentCraft2Error) -> Self:
         """Return an error of this kind that says what ``error`` says, facts and detail included."""
         return cls(
             error.message,
@@ -118,14 +118,14 @@ class AgentLibError(Exception):
         return (_rebuild, (type(self), state))
 
 
-def _rebuild(kind: type[AgentLibError], state: dict[str, object]) -> AgentLibError:
+def _rebuild(kind: type[AgentCraft2Error], state: dict[str, object]) -> AgentCraft2Error:
     error = kind.__new__(kind)
     Exception.__init__(error, state.get("message", ""))
     error.__dict__.update(state)
     return error
 
 
-class ConfigurationError(AgentLibError):
+class ConfigurationError(AgentCraft2Error):
     """Configuration is invalid or missing. Raised at startup."""
 
 
@@ -146,7 +146,7 @@ class NotStartedError(ConfigurationError):
         )
 
 
-class CredentialsExpiredError(AgentLibError):
+class CredentialsExpiredError(AgentCraft2Error):
     """A sign-in session or token has expired.
 
     Attributes:
@@ -169,7 +169,7 @@ class CredentialsExpiredError(AgentLibError):
         self.fix_command = fix_command
 
 
-class PolicyDenied(AgentLibError):
+class PolicyDenied(AgentCraft2Error):
     """A policy, entitlement or guardrail refused the request.
 
     Attributes:
@@ -194,22 +194,22 @@ class PolicyDenied(AgentLibError):
         return [("reason", self.reason_code), *super().facts()]
 
 
-class BudgetExceeded(AgentLibError):
+class BudgetExceeded(AgentCraft2Error):
     """A call or token limit has been reached."""
 
 
-class ExecutionPaused(AgentLibError):
+class ExecutionPaused(AgentCraft2Error):
     """The execution pause is set, so no new work may start."""
 
 
-class TransientError(AgentLibError):
+class TransientError(AgentCraft2Error):
     """Throttling, a timeout or a server error that may clear on its own."""
 
     retryable: ClassVar[bool] = True
     fallback_allowed: ClassVar[bool] = True
 
 
-class UpstreamError(AgentLibError):
+class UpstreamError(AgentCraft2Error):
     """A provider or database answered with an error that is not the caller's doing.
 
     The request was well formed and permitted, and the failure is not known
@@ -239,11 +239,11 @@ class UpstreamError(AgentLibError):
         return [("code", self.code), *super().facts()] if self.code else super().facts()
 
 
-class IntegrityError(AgentLibError):
+class IntegrityError(AgentCraft2Error):
     """Evidence could not be recorded, or a hash or pin did not match."""
 
 
-class ValidationFailed(AgentLibError):
+class ValidationFailed(AgentCraft2Error):
     """Structured output or a schema check failed."""
 
 
@@ -273,7 +273,7 @@ def describe(error: BaseException, *, limit: int = _MAX_DESCRIBED) -> str:
 
     For the library's own errors only the message is used, never ``detail``.
     """
-    text = error.message if isinstance(error, AgentLibError) else str(error)
+    text = error.message if isinstance(error, AgentCraft2Error) else str(error)
     text = shorten(" ".join(redact(text).split()), limit)
     return f"{type(error).__name__}: {text}" if text else type(error).__name__
 

@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
-from ai_agent_lib_core.contracts import Principal
+from ai_agent_lib_core.contracts import Principal, current_schema
 from ai_agent_lib_ui.application.catalog import validate_destination, validate_runtime_destination
 from ai_agent_lib_ui.contracts.catalog import AgentBinding
 
@@ -37,7 +37,9 @@ class Settings(BaseModel):
     """A local-only server configuration stored beside its private SQLite state."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
-    schema_version: Literal["agentlib.ui-local/v1"] = "agentlib.ui-local/v1"
+    schema_version: Annotated[
+        Literal["agentcraft2.ui-local/v1"], BeforeValidator(current_schema)
+    ] = "agentcraft2.ui-local/v1"
     agents_path: Path
     tools_path: Path
     identity: LocalIdentity

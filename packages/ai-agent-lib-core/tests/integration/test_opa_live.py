@@ -50,11 +50,12 @@ class OpaServer:
 
     def start(self, directory: Path, document: Mapping[str, object]) -> str:
         rules = directory / f"rules-{len(self._processes)}"
-        (rules / "agentlib" / "rules").mkdir(parents=True)
+        (rules / "agentcraft2" / "rules").mkdir(parents=True)
         (rules / ".manifest").write_text(
-            json.dumps({"revision": "test-rules-1", "roots": ["agentlib/rules"]}), encoding="utf-8"
+            json.dumps({"revision": "test-rules-1", "roots": ["agentcraft2/rules"]}),
+            encoding="utf-8",
         )
-        (rules / "agentlib" / "rules" / "data.json").write_text(
+        (rules / "agentcraft2" / "rules" / "data.json").write_text(
             json.dumps(document), encoding="utf-8"
         )
         port = free_port()
@@ -153,8 +154,8 @@ def test_opa_refuses_exactly_the_documents_the_local_engine_refuses(tmp_path: Pa
     )
     query = (
         "[decision | some document in input.documents; request := input.request; "
-        "decision := data.agentlib.authz.decision "
-        "with data.agentlib.rules as document with input as request]"
+        "decision := data.agentcraft2.authz.decision "
+        "with data.agentcraft2.rules as document with input as request]"
     )
     result = subprocess.run(  # noqa: S603 - a fixed command line, no shell
         [opa_binary(), "eval", "--format", "json", "-d", str(BUNDLE), "-i", str(question), query],

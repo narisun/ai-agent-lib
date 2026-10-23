@@ -80,7 +80,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--thread must not be empty")
     run_id = uuid4().hex
     thread_id = args.thread or f"anthropic-demo-{run_id}"
-    folder = SERVICE / ".agentlib" / "anthropic-demo" / run_id
+    folder = SERVICE / ".agentcraft2" / "anthropic-demo" / run_id
     trace_path = folder / "model-trace.jsonl"
     history_path = folder / "checkpoint-history.json"
     try:

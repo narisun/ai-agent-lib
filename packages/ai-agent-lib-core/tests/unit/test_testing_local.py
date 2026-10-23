@@ -35,7 +35,7 @@ from ai_agent_lib_core.testing import (
 from ai_agent_lib_core.testing.mcp import call_tool_as
 
 RULES = """\
-schema: agentlib.rules/v1
+schema: agentcraft2.rules/v1
 rules:
   - id: hello-uses-its-models
     actions: [model.route]
@@ -131,7 +131,7 @@ async def test_only_a_scripted_model_can_be_looked_at(tmp_path: Path) -> None:
 # ------------------------------------------------------------- an MCP server
 
 SERVER_RULES = """\
-schema: agentlib.rules/v1
+schema: agentcraft2.rules/v1
 rules:
   - id: staff-call-the-tools
     actions: [tool.call]

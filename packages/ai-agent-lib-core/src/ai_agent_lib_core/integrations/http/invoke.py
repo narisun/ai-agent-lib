@@ -15,7 +15,7 @@ from typing import Any
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from ai_agent_lib_core.contracts import AgentLibError, PolicyDenied, RequestContext
+from ai_agent_lib_core.contracts import AgentCraft2Error, PolicyDenied, RequestContext
 from ai_agent_lib_core.contracts.inspection import TurnInspector
 from ai_agent_lib_core.integrations.http.admission import ThreadAdmission
 from ai_agent_lib_core.integrations.http.live import live_response
@@ -177,8 +177,8 @@ class InvokeRoute:
     async def _answer(self, context: RequestContext, given: object) -> Reply:
         """Run the agent for one caller and describe the outcome."""
         attributes = {
-            "agentlib.application": self._application,
-            "agentlib.request_id": context.request_id,
+            "agentcraft2.application": self._application,
+            "agentcraft2.request_id": context.request_id,
         }
         try:
             # Inside the run every log line and every governed call belongs to this request.
@@ -187,7 +187,7 @@ class InvokeRoute:
                 content_free_span(_INSTRUMENTATION, "agent.invoke", attributes=attributes),
             ):
                 output = await self._run(context, given)
-        except AgentLibError as error:
+        except AgentCraft2Error as error:
             # What was expected and what was found are logged: the library's
             # errors never put caller content in those.
             _LOG.log(

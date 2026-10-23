@@ -18,7 +18,7 @@ from ai_agent_lib_core.contracts import RequestContext
 
 __all__ = ["bind_request_context", "bound_request_context"]
 
-_BOUND: ContextVar[RequestContext | None] = ContextVar("agentlib_request_context", default=None)
+_BOUND: ContextVar[RequestContext | None] = ContextVar("agentcraft2_request_context", default=None)
 
 
 @contextmanager

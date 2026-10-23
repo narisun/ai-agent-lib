@@ -78,7 +78,7 @@ class LocalServer:
                 if owner.document:
                     output["artifacts"] = [
                         {
-                            "schema": "agentlib.artifact/v1",
+                            "schema": "agentcraft2.artifact/v1",
                             "document_id": "meeting",
                             "media_type": "text/markdown",
                             "created_at": "2026-10-13T12:00:00Z",
@@ -161,7 +161,7 @@ class LocalServer:
                     }
                     data = json.dumps(
                         {
-                            "schema": "agentlib.turn-inspection/v1",
+                            "schema": "agentcraft2.turn-inspection/v1",
                             "scope": {
                                 "tenant": "dev-tenant",
                                 "subject": "dev-user",
@@ -204,7 +204,7 @@ class LocalServer:
         (path / "agents.json").write_text(
             json.dumps(
                 {
-                    "schema": "agentlib.registry/v1",
+                    "schema": "agentcraft2.registry/v1",
                     "agents": [
                         {"id": name, "version": "1", "owner": "team", "url": url}
                         for name in ("memo", "helper")
@@ -212,11 +212,11 @@ class LocalServer:
                 }
             )
         )
-        (path / "tools.json").write_text('{"schema":"agentlib.registry/v1","servers":[]}')
+        (path / "tools.json").write_text('{"schema":"agentcraft2.registry/v1","servers":[]}')
         (path / "agent.env").write_text(
             'AC2_REGISTRY_OPTIONS={"agents_path":"agents.json","tools_path":"tools.json"}\n'
         )
-        self.config = path / ".agentlib/ui/config.json"
+        self.config = path / ".agentcraft2/ui/config.json"
         self.env = {key: value for key, value in os.environ.items() if key != "LITERAL_API_KEY"}
         result = self.command(
             "init",

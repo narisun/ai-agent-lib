@@ -92,7 +92,7 @@ class ModelCall:
             "gen_ai.operation.name": "chat",
             "gen_ai.provider.name": _GEN_AI_PROVIDERS.get(self.provider, self.provider),
             "gen_ai.request.model": self.model_id,
-            "agentlib.model_alias": self.alias,
+            "agentcraft2.model_alias": self.alias,
         }
 
     def signal_attributes(self) -> Mapping[str, AuditValue]:
@@ -147,10 +147,10 @@ class ToolCall:
         attributes: dict[str, AuditValue] = {
             "gen_ai.operation.name": "execute_tool",
             "gen_ai.tool.name": _shown(self.tool),
-            "agentlib.read_only": self.read_only,
+            "agentcraft2.read_only": self.read_only,
         }
         if self.server is not None:
-            attributes["agentlib.mcp_server"] = self.server
+            attributes["agentcraft2.mcp_server"] = self.server
         return attributes
 
     def signal_attributes(self) -> Mapping[str, AuditValue]:
@@ -203,9 +203,9 @@ class DataCall:
         return {
             "db.operation.name": "query",
             "db.query.summary": f"{self.source}.{self.query}",
-            "agentlib.data_source": self.source,
-            "agentlib.query": self.query,
-            "agentlib.classification": self.classification.name.lower(),
+            "agentcraft2.data_source": self.source,
+            "agentcraft2.query": self.query,
+            "agentcraft2.classification": self.classification.name.lower(),
         }
 
     def signal_attributes(self) -> Mapping[str, AuditValue]:

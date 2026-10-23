@@ -80,7 +80,7 @@ def test_foreground_start_preserves_existing_database(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     package_runtime.package_folder(tmp_path, "phoenix").mkdir(parents=True)
-    database = tmp_path / ".agentlib/phoenix/data/phoenix.db"
+    database = tmp_path / ".agentcraft2/phoenix/data/phoenix.db"
     database.parent.mkdir(parents=True)
     database.write_bytes(b"existing database")
     run = Mock()
@@ -91,7 +91,7 @@ def test_foreground_start_preserves_existing_database(
     assert server.command[0] == sys.executable
     assert server.command[1:3] == ("-I", "-S")
     assert server.command[-4:] == ("--host", "127.0.0.1", "--port", "6006")
-    assert run.call_args.args[1].parent == tmp_path / ".agentlib/local-runs"
+    assert run.call_args.args[1].parent == tmp_path / ".agentcraft2/local-runs"
     assert database.read_bytes() == b"existing database"
 
 
@@ -201,7 +201,7 @@ def test_installed_phoenix_collects_traces_without_unused_services(
         "llm.provider": "anthropic",
         "input.value": "Synthetic input",
         "output.value": "Synthetic output",
-        "agentlib.checkpoints": '[{"checkpoint_id":"synthetic-checkpoint"}]',
+        "agentcraft2.checkpoints": '[{"checkpoint_id":"synthetic-checkpoint"}]',
     }.items():
         span.attributes.add(key=key).value.string_value = value
     span.attributes.add(key="llm.token_count.prompt").value.int_value = 10
@@ -277,7 +277,7 @@ def test_installed_phoenix_collects_traces_without_unused_services(
     assert attributes["llm"]["provider"] == "anthropic"
     assert attributes["input"]["value"] == "Synthetic input"
     assert attributes["output"]["value"] == "Synthetic output"
-    assert "synthetic-checkpoint" in attributes["agentlib"]["checkpoints"]
+    assert "synthetic-checkpoint" in attributes["agentcraft2"]["checkpoints"]
     assert row[1:] == (10, 5)
 
 

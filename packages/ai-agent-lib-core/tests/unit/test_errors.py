@@ -6,7 +6,7 @@ import pytest
 
 from ai_agent_lib_core.contracts import errors
 from ai_agent_lib_core.contracts.errors import (
-    AgentLibError,
+    AgentCraft2Error,
     BudgetExceeded,
     ConfigurationError,
     CredentialsExpiredError,
@@ -20,7 +20,7 @@ from ai_agent_lib_core.contracts.errors import (
 )
 
 # exception -> (retryable, fallback_allowed), one row per exception in the spec.
-TAXONOMY: dict[type[AgentLibError], tuple[bool, bool]] = {
+TAXONOMY: dict[type[AgentCraft2Error], tuple[bool, bool]] = {
     ConfigurationError: (False, False),
     CredentialsExpiredError: (False, False),
     PolicyDenied: (False, False),
@@ -34,8 +34,8 @@ TAXONOMY: dict[type[AgentLibError], tuple[bool, bool]] = {
 }
 
 
-def _all_subclasses(cls: type[AgentLibError]) -> set[type[AgentLibError]]:
-    found: set[type[AgentLibError]] = set()
+def _all_subclasses(cls: type[AgentCraft2Error]) -> set[type[AgentCraft2Error]]:
+    found: set[type[AgentCraft2Error]] = set()
     for sub in cls.__subclasses__():
         found.add(sub)
         found |= _all_subclasses(sub)
@@ -43,13 +43,15 @@ def _all_subclasses(cls: type[AgentLibError]) -> set[type[AgentLibError]]:
 
 
 def test_every_library_error_has_exactly_one_taxonomy_row() -> None:
-    defined = {cls for cls in _all_subclasses(AgentLibError) if cls.__module__ == errors.__name__}
+    defined = {
+        cls for cls in _all_subclasses(AgentCraft2Error) if cls.__module__ == errors.__name__
+    }
     assert defined == set(TAXONOMY)
 
 
 @pytest.mark.parametrize(("error", "expected"), TAXONOMY.items())
 def test_handling_flags_match_the_taxonomy(
-    error: type[AgentLibError], expected: tuple[bool, bool]
+    error: type[AgentCraft2Error], expected: tuple[bool, bool]
 ) -> None:
     assert (error.retryable, error.fallback_allowed) == expected
 
@@ -71,7 +73,7 @@ def test_credentials_expired_names_the_fix_command() -> None:
 
 
 def test_module_exports_are_complete() -> None:
-    helpers = {"AgentLibError", "causes", "describe", "kind_of", "shown_value"}
+    helpers = {"AgentCraft2Error", "causes", "describe", "kind_of", "shown_value"}
     assert set(errors.__all__) == {cls.__name__ for cls in TAXONOMY} | helpers
 
 

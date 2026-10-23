@@ -111,12 +111,12 @@ async def test_memo_followups_have_distinct_traces_same_session_and_real_checkpo
             assert root.context
             assert root.attributes
             assert output["trace"]["trace_id"] == format(root.context.trace_id, "032x")
-            assert root.attributes["agentlib.request_id"] == request_id
-            checkpoints = json.loads(str(root.attributes["agentlib.checkpoints"]))
+            assert root.attributes["agentcraft2.request_id"] == request_id
+            checkpoints = json.loads(str(root.attributes["agentcraft2.checkpoints"]))
             assert checkpoints
             assert all(c["checkpoint_id"] for c in checkpoints)
             assert all(
-                s.attributes["agentlib.request_id"] == request_id
+                s.attributes["agentcraft2.request_id"] == request_id
                 for s in spans
                 if s.context and s.context.trace_id == root.context.trace_id and s.attributes
             )
@@ -140,7 +140,7 @@ async def test_memo_followups_have_distinct_traces_same_session_and_real_checkpo
         assert generations[1].attributes["llm.token_count.prompt"] == 100
         assert generations[1].attributes["llm.token_count.completion"] == 10
         assert generations[1].attributes["llm.token_count.prompt_details.cache_read"] == 60
-        assert all((tool.attributes or {})["agentlib.mcp_server"] == SERVER_ID for tool in tools)
+        assert all((tool.attributes or {})["agentcraft2.mcp_server"] == SERVER_ID for tool in tools)
         text = str([dict(s.attributes or {}) for s in spans])
         assert ("credit_metrics[uen=JONE-0022]" in text) == content
         if content:

@@ -1,5 +1,5 @@
 {
-  "schema": "agentlib.lock/v1",
+  "schema": "agentcraft2.lock/v1",
   "files": {
     ".github/workflows/check.yml": "9e55652ae5e18c3b2d7ed2716c161683361b41822c2b3a77e100e985f44a1320",
     ".gitignore": "dc6fe2579c9fa72589f53b41544c768dcd2d3143cf10f3fb365e8f31a90b9bfc",
@@ -18,7 +18,7 @@
     "agents/rmqna/src/rmqna/examples/trace_react.py": "4ae6f20a22b229834b3bc059a217f6534743d82a3154e9b9672c24bf535ddaac",
     "agents/rmqna/src/rmqna/graph.py": "3064d98f8c77a23afaa1f5bf9dfe1ff06d6b2d3c6b1a77fdfe5468229c02ea56",
     "agents/rmqna/src/rmqna/py.typed": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "agents/rmqna/src/rmqna/service.py": "0395f65ae2b4f9ba27496718b5433b695c12d664a058eefd9458ad2fe1244135",
+    "agents/rmqna/src/rmqna/service.py": "2adb8dfc978b893d49e7a9588fef9e36c82f87c27e8fe7d7442361355e9b5c80",
     "agents/rmqna/src/rmqna/settings.py": "65454618c23ca28987d6baf1da6ae3da0633068c26bcc86739635b5f656ec08b",
     "agents/rmqna/src/rmqna/tools.py": "d64e314626bb9a14d62913d35f184fcaf796ba87b8f59533dfff27f0e1d7a316",
     "agents/rmqna/tests/test_rmqna.py": "55aaf2e46e3dae7dc2ed7b230ef28ad21097a52d5f68e440fce188d175f259fe",

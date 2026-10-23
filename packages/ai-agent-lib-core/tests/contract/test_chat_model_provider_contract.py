@@ -8,7 +8,7 @@ from pydantic import SecretStr
 
 from ai_agent_lib_core.adapters import AnthropicChatModelProvider, FakeChatModelProvider
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     ChatModelProvider,
     ConfigurationError,
     TransientError,
@@ -27,7 +27,7 @@ class TestAnthropicChatModelProvider(LangGraphModelProviderContract):
     def make_provider(self) -> ChatModelProvider:
         return AnthropicChatModelProvider(SecretStr("sk-test-key"))
 
-    def vendor_errors(self) -> list[tuple[BaseException, type[AgentLibError]]]:
+    def vendor_errors(self) -> list[tuple[BaseException, type[AgentCraft2Error]]]:
         return [
             (_status(429), TransientError),
             (_status(503), TransientError),

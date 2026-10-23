@@ -33,7 +33,7 @@ LIBRARY_LOGGERS = ("ai_agent_lib_core", "ai_agent_lib_aws", "uvicorn.error")
 _MAX_MESSAGE = 2_000
 _MAX_FIELD = 300
 _MAX_FRAMES = 8
-_HANDLER_MARK = "_agentlib_handler"
+_HANDLER_MARK = "_agentcraft2_handler"
 _DETAIL = "detail"
 """An ``extra`` that may hold caller content: written only when details are on."""
 

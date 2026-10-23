@@ -1,4 +1,4 @@
-"""agentlib deploy: write what runs a service on Fargate or AgentCore Runtime, from its settings."""
+"""agentcraft2 deploy: write what runs a service on Fargate or AgentCore, from its settings."""
 
 from __future__ import annotations
 

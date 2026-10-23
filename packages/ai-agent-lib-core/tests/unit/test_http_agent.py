@@ -10,7 +10,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     BudgetExceeded,
     ConfigurationError,
     ExecutionPaused,
@@ -41,7 +41,7 @@ class Services:
 
     def __init__(self) -> None:
         self.ids = SequentialIds()
-        self.fail_with: AgentLibError | None = None
+        self.fail_with: AgentCraft2Error | None = None
         self.asked: list[dict[str, Any]] = []
 
     async def authenticate(
@@ -202,7 +202,7 @@ async def test_the_token_scheme_is_matched_whatever_its_case(service: Service) -
     ],
 )
 async def test_a_failed_run_is_reported_by_a_code_and_never_by_its_text(
-    service: Service, failure: AgentLibError, status: int, body: dict[str, str]
+    service: Service, failure: AgentCraft2Error, status: int, body: dict[str, str]
 ) -> None:
     service.agent.fail_with = failure
     reply = await service.invoke(**{"x-request-id": "r-9"})

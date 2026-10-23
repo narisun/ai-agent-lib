@@ -257,7 +257,11 @@ async def test_a_signed_in_user_reaches_the_tool_through_token_exchange_and_opa_
                 ),
                 "AC2_SECRET_ENTRA_CLIENT_SECRET": "agent-s3cret",
                 "AC2_POLICY_OPTIONS": json.dumps(
-                    {"path": str(HERE.parent / "accounts-agent/policies/agentlib/rules/data.yaml")}
+                    {
+                        "path": str(
+                            HERE.parent / "accounts-agent/policies/agentcraft2/rules/data.yaml"
+                        )
+                    }
                 ),
                 "AC2_REGISTRY_OPTIONS": registry_options,
                 "AC2_AUDIT_OPTIONS": json.dumps({"path": str(tmp_path / "agent-audit.jsonl")}),

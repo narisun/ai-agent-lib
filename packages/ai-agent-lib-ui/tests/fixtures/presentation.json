@@ -1,5 +1,5 @@
 {
-  "schema": "agentlib.presentation/v1",
+  "schema": "agentcraft2.presentation/v1",
   "agent_id": "rmprep",
   "agent_version": "0.1.0",
   "registry_revision": "revision-1",

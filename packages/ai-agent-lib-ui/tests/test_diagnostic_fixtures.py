@@ -38,6 +38,6 @@ def test_rejected_draft_and_failed_sdk_call_remain_separate_from_accepted_output
 
 def test_unknown_diagnostic_schema_cannot_be_silently_read_as_v1() -> None:
     value = json.loads(FIXTURE.read_bytes())[0]
-    value["schema"] = "agentlib.model-usage/v2"
+    value["schema"] = "agentcraft2.model-usage/v2"
     with pytest.raises(ValidationError):
         TypeAdapter(DiagnosticEvent).validate_python(value)

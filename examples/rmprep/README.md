@@ -104,7 +104,7 @@ Checkpoint: 8 messages
 ```
 
 The command prints paths to `model-trace.jsonl` and `checkpoint-history.json`
-in a new folder under `agents\rmprep\.agentlib\react-demo`. The trace contains
+in a new folder under `agents\rmprep\.agentcraft2\react-demo`. The trace contains
 four model request/response pairs with input message counts `2, 4, 6, 8`,
 including each specialist's system instructions.
 
@@ -199,11 +199,11 @@ with Ctrl+C.
 To capture model inputs and outputs, add this to the agent's `.env`:
 
 ```dotenv
-AC2_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl
+AC2_MODEL_TRACE_PATH=.agentcraft2/model-trace.jsonl
 ```
 
 Traces contain client evidence and conversation content. Keep them in the ignored
-`.agentlib` folder and follow your team's data-handling rules when sharing them.
+`.agentcraft2` folder and follow your team's data-handling rules when sharing them.
 If an answer needs revision, the trace includes the draft and correction request.
 The conversation checkpoint stores the accepted answer, so follow-ups do not
 inherit rejected drafts.
@@ -287,7 +287,7 @@ before using a production data source. `rm_scenarios.csv` supplies expected
 outcomes to tests only and is excluded from the tools.
 
 The CLI created the starting workspace, MCP and agent. The business implementation
-is maintained in these source files. `agentlib.toml` records generation inputs
+is maintained in these source files. `agentcraft2.toml` records generation inputs
 and the query inventory; generating from it creates scaffolding, not a copy of
 the custom composite tools and graph. Copy this example to retain those changes.
 
@@ -313,7 +313,7 @@ references, comparisons, long histories, tool argument drift and older checkpoin
 The [Phoenix trial](../../docs/phoenix-trial.md) uses the same Python, a separate package folder, and SQLite.
 Run `start-phoenix.bat setup` once from the library repository root, then follow
 the guide to enable Phoenix in the root `.env`. `start-local.bat` starts the local
-Phoenix server before rmprep and Agent Lab, using the package folder `.agentlib\phoenix\.venv`.
+Phoenix server before rmprep and Agent Lab, using the package folder `.agentcraft2\phoenix\.venv`.
 `stop-local.bat` in another Command Prompt stops the stack and preserves
 conversations, traces, and checkpoints. **Ctrl+C** in the original launcher also works.
 Each response links to its Phoenix trace; the existing turn inspector remains available.

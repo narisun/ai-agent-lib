@@ -34,7 +34,7 @@ from ai_agent_lib_core.config import Key, deprecations, secret_key, variable_for
 from ai_agent_lib_core.config.bindings import legacy_spelling
 
 PINS = {"hello.greet": "ab" * 32, "hello.people_by_team": "cd" * 32}
-RULES = Path("policies/agentlib/rules/data.yaml")
+RULES = Path("policies/agentcraft2/rules/data.yaml")
 SAMPLES = Path("tests/policy-samples.yaml")
 
 
@@ -100,12 +100,12 @@ def test_doctor_names_what_is_wrong_and_how_to_fix_it_and_exits_with_one(
     captured = capsys.readouterr()
     out = captured.out
     assert "  FAIL  pins of hello: changed or not pinned: hello.greet, hello.new_tool" in out
-    assert "        fix: Run: agentlib registry pin hello" in out
+    assert "        fix: Run: agentcraft2 registry pin hello" in out
     assert "  FAIL  settings:" in out
     assert "Copy .env.example to .env" in out
     assert "  FAIL  startup:" in out  # the agent cannot be built without its rules file
     assert "no-such-rules.yaml" in out
-    assert captured.err.strip() == "agentlib: error: 3 checks failed"
+    assert captured.err.strip() == "agentcraft2: error: 3 checks failed"
 
     # One service alone, with the developer's own fix applied.
     (workspace / "mcp-servers/hello-mcp/.env").write_text(
@@ -122,7 +122,7 @@ def test_doctor_names_what_is_wrong_and_how_to_fix_it_and_exits_with_one(
 def test_doctor_reports_broken_shared_files_and_unknown_services(
     workspace: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    (workspace / RULES).write_text("schema: agentlib.rules/v1\nrules: [", encoding="utf-8")
+    (workspace / RULES).write_text("schema: agentcraft2.rules/v1\nrules: [", encoding="utf-8")
     capsys.readouterr()
     assert run("doctor", "--no-pins", "--workspace", workspace) == 1
     out = capsys.readouterr().out
@@ -386,7 +386,7 @@ def test_a_sample_that_comes_out_differently_fails_and_says_what_was_expected(
     assert "        expected: allow (hello-staff-call-the-tools)" in captured.out
     assert "  FAIL  an auditor may not query: deny (no_matching_rule)" in captured.out
     assert "        expected: allow\n" in captured.out
-    assert captured.err.strip() == "agentlib: error: 2 samples did not come out as expected"
+    assert captured.err.strip() == "agentcraft2: error: 2 samples did not come out as expected"
 
 
 def test_samples_are_appended_once_and_the_developers_are_kept() -> None:
@@ -417,9 +417,9 @@ def test_samples_are_appended_once_and_the_developers_are_kept() -> None:
     [
         ("samples: [", "not valid YAML"),
         ("schema: other/v1\nsamples: []\n", "not a samples document"),
-        ("schema: agentlib.policy-samples/v1\nsamples:\n  - name: x\n", "action"),
+        ("schema: agentcraft2.policy-samples/v1\nsamples:\n  - name: x\n", "action"),
         (
-            "schema: agentlib.policy-samples/v1\nsamples:\n"
+            "schema: agentcraft2.policy-samples/v1\nsamples:\n"
             + "  - {name: x, action: tool.call, application: a, resource: r, expect: allow}\n" * 2,
             "used more than once",
         ),
@@ -690,7 +690,7 @@ def test_the_update_command_lists_what_it_did_and_can_show_the_difference(
     assert run("update", "--workspace", workspace) == 0
     out = capsys.readouterr().out
     assert "  kept     agents/hello-agent/src/hello_agent/tools.py  (you changed it)" in out
-    assert "agentlib update --diff" in out
+    assert "agentcraft2 update --diff" in out
     assert run("update", "--diff", "--workspace", workspace) == 0
     out = capsys.readouterr().out
     assert '    -    return f"Good day, {cleaned}!"' in out
@@ -724,9 +724,9 @@ def test_the_diff_hint_in_plan_mode_names_the_command_that_writes_nothing(
 
     assert run("update", "--plan", "--workspace", workspace) == 0
     out = capsys.readouterr().out
-    assert "agentlib update --plan --diff" in out
+    assert "agentcraft2 update --plan --diff" in out
     # Plain `update --diff` writes; the dry-run hint must not send people to it.
-    assert "agentlib update --diff" not in out
+    assert "agentcraft2 update --diff" not in out
     assert "Good day" in tools.read_text(encoding="utf-8")
 
     # Once --diff is given there is nothing left to suggest.

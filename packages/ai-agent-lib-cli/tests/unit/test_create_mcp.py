@@ -77,7 +77,7 @@ def test_a_server_whose_tools_cannot_be_pinned_is_still_created(workspace: Path)
     assert created.not_pinned == "the tools of hello_mcp could not be pinned: no module named mcp"
     assert created.pin_note == (
         "  not pinned: the tools of hello_mcp could not be pinned: no module named mcp\n"
-        "  Pin later with: agentlib registry pin hello"
+        "  Pin later with: agentcraft2 registry pin hello"
     )
     assert (workspace / "mcp-servers/hello-mcp/src/hello_mcp/server.py").is_file()
     assert all(tool.schema_sha256 is None for tool in read_servers(workspace)[0].tools)

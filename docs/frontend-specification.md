@@ -93,7 +93,7 @@ This table distinguishes existing capabilities from work the frontend needs.
 | Agent HTTP | `POST /invoke` accepts `input` and `thread_id`; returns `output`, `thread_id`, and `request_id`. | A UI-side transport adapter and explicit mapping between text chat and an agent's input/output shape. |
 | Progress | Optional `POST /invoke/stream` emits SSE `update`, `end`, or `error`. Updates are application-defined graph steps. | Safe progress projection and capability detection. Current agents do not provide model-token streaming or resumable event cursors. |
 | Conversation state | LangGraph checkpoints are scoped by tenant, subject, application, and thread. Listing requires one authorized thread. | A thread catalog for navigation; opt-in, read-only checkpoint inspection endpoints on the owning agent. |
-| Model diagnostics | `agentlib.model-trace/v1` records request/response/error, model, call ID, attempt, request, thread, tenant, and subject. Responses retain framework usage metadata. | Authorized indexed queries, content-capture status, and explicit links to graph nodes/checkpoints and accepted or rejected drafts. |
+| Model diagnostics | `agentcraft2.model-trace/v1` records request/response/error, model, call ID, attempt, request, thread, tenant, and subject. Responses retain framework usage metadata. | Authorized indexed queries, content-capture status, and explicit links to graph nodes/checkpoints and accepted or rejected drafts. |
 | Audit and logs | Audit records correlate governed operations; HTTP logs include request IDs and durations. | Searchable, bounded read APIs and a merged request timeline. General service logs must be filtered independently of conversation access. |
 | Usage | Model audit describes input/output counts; provider usage is recorded even when a later validation rejects a response. | A normalized per-attempt usage event independent of content tracing, including available cache fields and completeness information. |
 | Identity | Static local identity, JWT verification, and OAuth/Entra on-behalf-of exchange exist. | Browser sign-in, server sessions, catalog/diagnostic authorization, and acquisition of agent-audience access tokens. |
@@ -369,7 +369,7 @@ For example, this proposed additive output preserves the existing answer field:
   "output": {
     "answer": "The preparation memo is ready.",
     "artifacts": [{
-      "schema": "agentlib.artifact/v1",
+      "schema": "agentcraft2.artifact/v1",
       "id": "memo-version-1",
       "document_id": "meeting-memo",
       "version": 1,
@@ -402,7 +402,7 @@ execution path regardless of which transport submits the message.
 | Browser to UI | `GET /api/ui/v1/catalog`; list/create/get/rename/archive `/api/ui/v1/threads`; submit `/threads/{id}/turns`; read `/runs/{id}` and `/runs/{id}/events?after=...` |
 | Browser to UI inspector | Scoped `/threads/{id}/checkpoints`, `/runs/{id}/models`, `/runs/{id}/tools`, `/runs/{id}/logs`, and artifact metadata/content reads |
 | UI to existing agent | `POST /invoke`; optionally `/invoke/stream` with a supported progress projection; existing liveness/readiness routes |
-| UI to enhanced agent | Opt-in `/agentlib/diagnostics/v1/threads/{id}/checkpoints` and checkpoint detail; `/agentlib/diagnostics/v1/requests/{id}` for outcome and checkpoint references |
+| UI to enhanced agent | Opt-in `/agentcraft2/diagnostics/v1/threads/{id}/checkpoints` and checkpoint detail; `/agentcraft2/diagnostics/v1/requests/{id}` for outcome and checkpoint references |
 
 All list operations use bounded pages and opaque cursors bound to the caller's
 scope and filters. Detail APIs distinguish unsupported, disabled, pending,
@@ -561,7 +561,7 @@ metadata into PostgreSQL with idempotent record IDs. Track ingestion watermarks;
 “not arrived” differs from “no calls.” Never scan all S3 objects on each UI request.
 Start with request/time/event lookup; a dedicated search service is optional later.
 
-Use separate typed UI configuration with a reserved `AGENTLIB_UI_` prefix; do not
+Use separate typed UI configuration with a reserved `AGENTCRAFT2_UI_` prefix; do not
 pass new names to core's strict `AC2_` parser. The implementation must publish one
 generated variable table with name, purpose, local/AWS examples, defaults, and
 sensitivity. Settings cover bind address, registry/bindings, identity/session,

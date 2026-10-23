@@ -28,8 +28,8 @@ from pydantic import SecretStr
 
 from ai_agent_lib_core.contracts import (
     MASK,
+    AgentCraft2Error,
     AgentEntry,
-    AgentLibError,
     AuditOutcome,
     AuditRecord,
     AuditSink,
@@ -309,9 +309,9 @@ class TelemetryContract(abc.ABC):
     def test_a_span_opens_takes_facts_as_it_ends_and_never_raises(self) -> None:
         telemetry = self.make_telemetry()
         with telemetry.span("chat model-x", {"gen_ai.operation.name": "chat"}) as note:
-            note({"agentlib.outcome": "success", "gen_ai.usage.input_tokens": 3, "none": None})
+            note({"agentcraft2.outcome": "success", "gen_ai.usage.input_tokens": 3, "none": None})
         with telemetry.span("execute_tool lookup", {}) as note:
-            note({"agentlib.outcome": "failed"}, ValueError("the private text"))
+            note({"agentcraft2.outcome": "failed"}, ValueError("the private text"))
 
     def test_an_error_inside_a_span_passes_through_it(self) -> None:
         telemetry = self.make_telemetry()
@@ -326,7 +326,7 @@ class ChatModelProviderContract(abc.ABC):
     def make_provider(self) -> ChatModelProvider:
         """Return a provider. It must not need the network to be constructed."""
 
-    def vendor_errors(self) -> list[tuple[BaseException, type[AgentLibError]]]:
+    def vendor_errors(self) -> list[tuple[BaseException, type[AgentCraft2Error]]]:
         """Return vendor errors and the taxonomy class each must map to."""
         return []
 
@@ -590,7 +590,7 @@ class PolicyDecisionPointContract(abc.ABC):
     """
 
     rules_document: Mapping[str, object] = {
-        "schema": "agentlib.rules/v1",
+        "schema": "agentcraft2.rules/v1",
         "rules": [
             {
                 "id": "analysts-query-accounts",
@@ -777,7 +777,7 @@ class PolicyDecisionPointContract(abc.ABC):
         assert second.bundle_revision == first.bundle_revision
 
     async def test_an_empty_rule_set_denies_everything(self, tmp_path: Path) -> None:
-        policy = await self.make_policy(tmp_path, {"schema": "agentlib.rules/v1", "rules": []})
+        policy = await self.make_policy(tmp_path, {"schema": "agentcraft2.rules/v1", "rules": []})
         try:
             assert not (await policy.decide(self.question())).allow
         finally:

@@ -100,7 +100,7 @@ class ModelTrace:
         context = call.context
         try:
             record = {
-                "schema": "agentlib.model-trace/v1",
+                "schema": "agentcraft2.model-trace/v1",
                 "time": self._clock.now().isoformat(),
                 "event": event,
                 "call_id": trace.call_id,

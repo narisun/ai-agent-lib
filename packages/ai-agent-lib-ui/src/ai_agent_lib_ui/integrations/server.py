@@ -197,9 +197,9 @@ def parent_app(resources: Runtime) -> FastAPI:
         token = await resources.store.new_session(resources.identity)
         response = RedirectResponse(login_destination(return_to), status_code=303)
         response.set_cookie(
-            "agentlib_session", token, httponly=True, samesite="strict", max_age=3600
+            "agentcraft2_session", token, httponly=True, samesite="strict", max_age=3600
         )
-        response.delete_cookie("agentlib_chat")
+        response.delete_cookie("agentcraft2_chat")
         return response
 
     @app.get("/")

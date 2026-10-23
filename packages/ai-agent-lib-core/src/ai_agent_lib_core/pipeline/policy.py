@@ -76,8 +76,8 @@ def _denial(decision: Decision, request: PolicyRequest | None) -> PolicyDenied:
         expected=wanted,
         actual=decision.explanation or f"the policy decided {decision.reason_code!r}",
         fix=(
-            "add or widen that rule in the rules file (policies/agentlib/rules/data.yaml in "
-            "a workspace), then check it with 'agentlib policy test'"
+            "add or widen that rule in the rules file (policies/agentcraft2/rules/data.yaml in "
+            "a workspace), then check it with 'agentcraft2 policy test'"
         ),
     )
 

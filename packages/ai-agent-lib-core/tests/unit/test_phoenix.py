@@ -475,7 +475,7 @@ async def test_turns_tools_input_output_usage_checkpoints_and_local_sink(
             s.resource.attributes["openinference.project.name"] == "agent-lab" for s in spans
         )
         for root in roots:
-            checkpoints = json.loads(str((root.attributes or {})["agentlib.checkpoints"]))
+            checkpoints = json.loads(str((root.attributes or {})["agentcraft2.checkpoints"]))
             assert len(checkpoints) >= 3
             assert all(c["checkpoint_id"] for c in checkpoints)
         attributes = models[1].attributes or {}
@@ -553,7 +553,7 @@ def test_long_messages_preserve_usage_correlation_and_bounded_redacted_content()
     ]
     try:
         with tracing.tracer.start_as_current_span(
-            "model", attributes={"agentlib.request_id": "request", "session.id": "session"}
+            "model", attributes={"agentcraft2.request_id": "request", "session.id": "session"}
         ) as span:
             _content(tracing.schema, span, "input", {"messages": messages})
             _content(tracing.schema, span, "output", messages[-1])
@@ -563,10 +563,10 @@ def test_long_messages_preserve_usage_correlation_and_bounded_redacted_content()
         tracing.provider.force_flush()
         normal, oversized = exporter.get_finished_spans()
         attributes = normal.attributes or {}
-        assert attributes["agentlib.request_id"] == "request"
+        assert attributes["agentcraft2.request_id"] == "request"
         assert attributes["session.id"] == "session"
         assert attributes["llm.token_count.prompt"] == 1000
-        assert attributes["agentlib.input_messages_truncated"] is True
+        assert attributes["agentcraft2.input_messages_truncated"] is True
         assert "Turn 49" in str(attributes["input.value"])
         assert "private-key" not in str(attributes)
         assert len(attributes) < 256
@@ -661,7 +661,7 @@ async def test_failed_turn_keeps_trace_and_checkpoint_links_in_http_and_journal(
         root = roots[0]
         assert root.status.status_code == StatusCode.ERROR
         assert format(root.context.trace_id, "032x") == wire["trace"]["trace_id"]
-        assert json.loads(str((root.attributes or {})["agentlib.checkpoints"]))
+        assert json.loads(str((root.attributes or {})["agentcraft2.checkpoints"]))
         assert "private invalid draft" not in str(root.attributes)
     finally:
         tracing.close()
@@ -751,7 +751,7 @@ async def test_independent_agent_records_tools_usage_context_and_preserves_callb
         assert usage["llm.token_count.prompt_details.cache_write"] == 20
         for root in roots:
             assert root.attributes
-            assert len(json.loads(str(root.attributes["agentlib.checkpoints"]))) >= 3
+            assert len(json.loads(str(root.attributes["agentcraft2.checkpoints"]))) >= 3
         if content:
             assert models[-1].attributes
             saved = json.loads(str(models[-1].attributes["input.value"]))
@@ -860,7 +860,7 @@ async def test_checkpoint_diagnostics_are_bounded_and_preserve_cancellation(mode
             return self
 
         async def aget_state_history(self, config: Any, **kwargs: Any) -> Any:
-            assert kwargs == {"filter": {"agentlib_request_id": "a"}, "limit": 65}
+            assert kwargs == {"filter": {"agentcraft2_request_id": "a"}, "limit": 65}
             entered.set()
             try:
                 if mode in {"stalled", "cancelled"}:
@@ -904,7 +904,7 @@ async def test_checkpoint_diagnostics_are_bounded_and_preserve_cancellation(mode
         assert tracing.provider.force_flush()
         (root,) = exporter.get_finished_spans()
         attributes = root.attributes or {}
-        prefix = "agentlib."
+        prefix = "agentcraft2."
         if mode == "unlimited":
             assert len(json.loads(str(attributes[prefix + "checkpoints"]))) == 64
             assert attributes[prefix + "checkpoints_truncated"] is True

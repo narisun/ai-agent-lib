@@ -30,5 +30,5 @@ def documents(corpus: dict[str, Any], group: str) -> list[tuple[str, dict[str, A
                 ("last", [corpus["grant"], probe]),
             ):
                 label = f"{name} ({form.replace('_', ' ')}, {place})"
-                built.append((label, {"schema": "agentlib.rules/v1", "rules": rules}))
+                built.append((label, {"schema": "agentcraft2.rules/v1", "rules": rules}))
     return built

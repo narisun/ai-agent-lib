@@ -44,7 +44,7 @@ python3 tools/package_runtime.py ui --check
 
 Commands are shown for Windows, then for POSIX where they differ. Paths in the
 prose use Windows separators; on macOS/Linux use `/` and `python3`, for example
-`.agentlib/ui/config.json`.
+`.agentcraft2/ui/config.json`.
 
 The `chat` extra installs Chainlit 2.12.0 and its required dependencies into
 `packages\ai-agent-lib-ui\.venv\Lib\site-packages` (`.venv/lib/python3.x/site-packages`
@@ -132,10 +132,10 @@ uses `AC2_PROFILE=local`, the `file` registry and `static` identity providers. M
 keys and shell overrides are not imported. Confirm the file matches the running
 service's settings.
 
-The command creates `.agentlib\ui\config.json`, an access code and a session
+The command creates `.agentcraft2\ui\config.json`, an access code and a session
 secret. Serving creates `conversations.sqlite` beside them. Keep this folder
 private and out of source control; it contains conversation text. The repository
-already ignores `.agentlib`.
+already ignores `.agentcraft2`.
 
 Repeat `--agent` and `--allow-url` for more agents. All selected agents must use
 the same **static tenant, subject and roles** as the UI identity. Each UI process
@@ -149,14 +149,14 @@ not start services, call a model, or claim that an agent is ready to answer.
 ## 4. Sign in and chat
 
 ```bat
-type .agentlib\ui\access-code
+type .agentcraft2\ui\access-code
 python tools\package_runtime.py ui -m ai_agent_lib_ui serve
 ```
 
 Or on POSIX:
 
 ```bash
-cat .agentlib/ui/access-code
+cat .agentcraft2/ui/access-code
 python3 tools/package_runtime.py ui -m ai_agent_lib_ui serve
 ```
 
@@ -179,7 +179,7 @@ code to sign in. Use the exact `127.0.0.1` address. Keep the server window open.
    completed messages and selected agent remain.
 
 **Rate an answer.** Thumbs up and thumbs down appear beneath each accepted
-answer. A click, with an optional comment, appends one `agentlib.feedback/v1` line
+answer. A click, with an optional comment, appends one `agentcraft2.feedback/v1` line
 to `feedback.jsonl` in the UI state folder, beside `conversations.sqlite`. The line
 records the request, thread, agent, who rated it and the verdict (`up` or `down`).
 Feedback is evidence, so the log is append-only: Agent Lab refuses to delete a
@@ -243,7 +243,7 @@ file-based diagnostics and saved checkpoint state. They load only when opened;
 inspection never reruns the agent or calls an MCP tool.
 
 The local rmprep service supplies the diagnostic reader. Set
-`AC2_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl` in the agent's `.env`, then
+`AC2_MODEL_TRACE_PATH=.agentcraft2/model-trace.jsonl` in the agent's `.env`, then
 restart the agent to capture model exchanges for new turns. For the batch stack,
 run `stop-local.bat`, then `start-local.bat` (`./stop-local.sh`, then `./start-local.sh`
 on POSIX).
@@ -342,7 +342,7 @@ questions. The UI database records the reconciliation in the same transaction.
 If the agent has no confirmed outcome, the thread stays held.
 
 The local rmprep launcher and newly generated local agents keep a journal in
-`<agent folder>\.agentlib\outcomes.sqlite`. Restart updated services to enable
+`<agent folder>\.agentcraft2\outcomes.sqlite`. Restart updated services to enable
 it. Requests made before the journal was enabled cannot be recovered through it.
 Treat this file like the checkpoint database: it contains accepted answers.
 Other deployments can inject an `OutcomeJournal` into `agent_app`; a shared
@@ -360,7 +360,7 @@ or a different UI state folder.
 Saved conversations and viewer feedback can become an eval set without calling any
 agent. `export_interactions`, in `ai_agent_lib_ui.adapters.interactions`, writes
 every completed exchange the identity owns, active and archived conversations
-alike, as `agentlib.interaction/v1` JSONL. Given `feedback.jsonl`, each exchange
+alike, as `agentcraft2.interaction/v1` JSONL. Given `feedback.jsonl`, each exchange
 carries its latest verdict, matched by request ID. It reads only the UI's existing
 state, so run it after real traffic has been saved.
 
@@ -372,7 +372,7 @@ sampling and scoring the export follow in
 
 ## Configuration and common fixes
 
-Settings live in `.agentlib\ui\config.json`. Paths can be absolute or relative
+Settings live in `.agentcraft2\ui\config.json`. Paths can be absolute or relative
 to that file. Stop the UI before editing settings or refreshing pins.
 
 | Setting | Purpose and local default |
@@ -383,7 +383,7 @@ to that file. Stop the UI before editing settings or refreshing pins.
 | `allowed_urls` | Exact loopback agent base URLs approved during initialization. |
 | `port` | UI port, default `8765`; initialize with `--port` to change it. |
 | `timeout_seconds` | Total HTTP deadline, default `180`, maximum `600`. A timeout means unknown. |
-| `schema_version` | Configuration version, `agentlib.ui-local/v1`. |
+| `schema_version` | Configuration version, `agentcraft2.ui-local/v1`. |
 
 Use `--config path\to\config.json` on each command for another local state folder.
 The server always binds to `127.0.0.1`.
@@ -507,8 +507,8 @@ The [Phoenix trial](../../docs/phoenix-trial.md) uses the same Python, a separat
 Run `start-phoenix.bat setup` (`./start-phoenix.sh setup` on POSIX) once from the
 library repository root, then follow the guide to enable Phoenix in the root `.env`.
 `start-local.bat` (`./start-local.sh`) starts the local Phoenix server before rmprep
-and Agent Lab, using `.agentlib\phoenix\.venv\Lib\site-packages`
-(`.agentlib/phoenix/.venv/lib/python3.x/site-packages` on POSIX).
+and Agent Lab, using `.agentcraft2\phoenix\.venv\Lib\site-packages`
+(`.agentcraft2/phoenix/.venv/lib/python3.x/site-packages` on POSIX).
 `stop-local.bat` (`./stop-local.sh`) in another terminal stops the stack and keeps saved
 conversations, traces, and checkpoints. **Ctrl+C** in the launcher window also works.
 Each response links to its Phoenix trace using **Open trace in Agent Lab**.
@@ -516,7 +516,7 @@ The **Logs** page provides local diagnostic inspection.
 
 ## Chat with an agent on AgentCore Runtime
 
-An agent deployed with `agentlib deploy --target agentcore` is reached through
+An agent deployed with `agentcraft2 deploy --target agentcore` is reached through
 the AgentCore service endpoint instead of a loopback URL. Pin it at `init` with
 its runtime ARN; the registry entry needs no `url` for such an agent. Run the
 first command as one line:

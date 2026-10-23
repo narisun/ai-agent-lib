@@ -1,4 +1,4 @@
-"""The pieces of 'agentlib deploy', each on its own: dependencies, Terraform, files, starter."""
+"""The pieces of 'agentcraft2 deploy', each on its own: dependencies, Terraform, files, starter."""
 
 from __future__ import annotations
 
@@ -251,7 +251,7 @@ def test_deployment_files_are_the_module_the_service_and_two_derived_files() -> 
     }
     assert MODULE_FOLDER / "main.tf" in files
     assert not any(path.is_relative_to(OPA_FOLDER) for path in files)
-    header = "# Written by 'agentlib deploy helper' from agents/helper/deploy.env.\n"
+    header = "# Written by 'agentcraft2 deploy helper' from agents/helper/deploy.env.\n"
     assert files[PurePosixPath("deploy/helper/settings.tf")].startswith(header)
     assert files[PurePosixPath("deploy/helper/permissions.tf")].startswith(header)
     assert (
@@ -261,9 +261,12 @@ def test_deployment_files_are_the_module_the_service_and_two_derived_files() -> 
 
 
 def test_deployment_files_copy_the_bundle_only_when_the_task_has_the_sidecar() -> None:
-    bundle = {PurePosixPath("agentlib/authz/authz.rego"): "package agentlib.authz\n"}
+    bundle = {PurePosixPath("agentcraft2/authz/authz.rego"): "package agentcraft2.authz\n"}
     with_opa = deployment_files(_plan(AGENT, opa=True), bundle)
-    assert with_opa[OPA_FOLDER / "bundle/agentlib/authz/authz.rego"] == "package agentlib.authz\n"
+    assert (
+        with_opa[OPA_FOLDER / "bundle/agentcraft2/authz/authz.rego"]
+        == "package agentcraft2.authz\n"
+    )
     assert OPA_FOLDER / "Dockerfile" in with_opa
     assert OPA_FOLDER / "Dockerfile" not in deployment_files(_plan(AGENT, opa=False), bundle)
 
@@ -301,14 +304,14 @@ def test_write_deployment_keeps_the_developers_files_and_rewrites_its_own(tmp_pa
 
 def test_read_bundle_takes_the_given_folder_and_leaves_the_tests_out(tmp_path: Path) -> None:
     folder = tmp_path / "bundle"
-    (folder / "agentlib").mkdir(parents=True)
-    (folder / "agentlib" / "authz.rego").write_text("package agentlib\n", encoding="utf-8")
-    (folder / "agentlib" / "authz_test.rego").write_text("package agentlib_test\n", "utf-8")
+    (folder / "agentcraft2").mkdir(parents=True)
+    (folder / "agentcraft2" / "authz.rego").write_text("package agentcraft2\n", encoding="utf-8")
+    (folder / "agentcraft2" / "authz_test.rego").write_text("package agentcraft2_test\n", "utf-8")
     (folder / "data.json").write_text("{}\n", encoding="utf-8")
     answers = WorkspaceAnswers("demo", "team", LibrarySource(kind="index", version=">=0.1"))
 
     assert read_bundle(answers, folder) == {
-        PurePosixPath("agentlib/authz.rego"): "package agentlib\n",
+        PurePosixPath("agentcraft2/authz.rego"): "package agentcraft2\n",
         PurePosixPath("data.json"): "{}\n",
     }
 
@@ -355,7 +358,7 @@ def test_starter_settings_of_an_mcp_server_keep_no_conversations_and_name_no_mod
     assert "AC2_CHECKPOINT_PROVIDER=none\n" in text
     assert "AC2_MODEL_ID" not in text
     assert "AC2_CHECKPOINT_OPTIONS" not in text
-    assert "'agentlib deploy people --plan'" in text
+    assert "'agentcraft2 deploy people --plan'" in text
 
 
 def test_next_steps_ask_for_the_aws_adapters_only_when_the_service_lacks_them(
@@ -366,7 +369,7 @@ def test_next_steps_ask_for_the_aws_adapters_only_when_the_service_lacks_them(
     assert steps[0].startswith('add "ai-agent-lib-aws[bedrock,postgres]" to the dependencies')
     assert steps[1:] == [
         "fill in agents/helper/deploy.env: its values are examples",
-        "run 'agentlib deploy helper --plan'",
+        "run 'agentcraft2 deploy helper --plan'",
     ]
 
     _service(tmp_path, SERVER, '"ai-agent-lib-core"')
@@ -510,7 +513,8 @@ def test_agentcore_deployment_files_are_one_root_module_with_the_artifacts_files
         "deploy/helper/variables.tf",
     }
     header = (
-        "# Written by 'agentlib deploy helper --target agentcore' from agents/helper/deploy.env.\n"
+        "# Written by 'agentcraft2 deploy helper --target agentcore' "
+        "from agents/helper/deploy.env.\n"
     )
     assert container[PurePosixPath("deploy/helper/settings.tf")].startswith(header)
     assert container[PurePosixPath("deploy/helper/permissions.tf")].startswith(header)
@@ -557,7 +561,7 @@ def test_agentcore_next_steps_ask_for_the_memory_extra(tmp_path: Path) -> None:
     _service(tmp_path, AGENT, '"ai-agent-lib-core"')
     steps = next_steps(tmp_path, AGENT_ON_AGENTCORE)
     assert steps[0].startswith('add "ai-agent-lib-aws[bedrock,agentcore]" to the dependencies')
-    assert steps[-1] == "run 'agentlib deploy helper --target agentcore --plan'"
+    assert steps[-1] == "run 'agentcraft2 deploy helper --target agentcore --plan'"
     _service(tmp_path, SERVER, '"ai-agent-lib-core"')
     assert next_steps(tmp_path, SERVER_ON_AGENTCORE)[0].startswith('add "ai-agent-lib-aws" to')
 

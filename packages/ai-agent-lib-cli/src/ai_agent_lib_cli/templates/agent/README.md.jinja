@@ -12,7 +12,7 @@ see [Phoenix tracing](docs/tracing.md). Those are optional after the local tests
 
 ## Before you start
 
-Run all commands from the **workspace root**, where `agentlib.toml` lives.
+Run all commands from the **workspace root**, where `agentcraft2.toml` lives.
 Follow [Select Python](../../README.md#select-python) in the workspace README
 to set `PYTHON` to your approved Python executable. Do this in every
 new terminal. These examples use Windows Command Prompt; in bash/zsh replace `"%PYTHON%"`
@@ -158,7 +158,7 @@ also ask one question directly. This command exits after printing the answer:
 
 The local development identity supplies the caller when no token is sent.
 Its roles are configured in `{{ var.identity_options }}`. Local audit logs and
-conversation checkpoints are under `agents/{{ name }}/.agentlib/`.
+conversation checkpoints are under `agents/{{ name }}/.agentcraft2/`.
 
 ## What to read
 
@@ -178,7 +178,7 @@ These paths are relative to this service folder:
 2. Implement the function in `src/{{ package }}/tools.py` and add it to the list
    in `src/{{ package }}/graph.py`.
 3. Add its name to `{{ name }}-calls-its-own-tools` in the workspace's
-   `policies/agentlib/rules/data.yaml` and add a policy sample. Unlisted tools
+   `policies/agentcraft2/rules/data.yaml` and add a policy sample. Unlisted tools
    are denied; test this with `tests/test_{{ package }}_as_configured.py`.
 4. Run the workspace checks:
 
@@ -192,7 +192,7 @@ Start with this agent's scripted example, from the workspace root:
 
 ```bat
 "%PYTHON%" -m {{ package }}.examples.trace_react
-"%PYTHON%" examples\read_trace.py agents/{{ name }}/.agentlib/react-demo.jsonl --last 6
+"%PYTHON%" examples\read_trace.py agents/{{ name }}/.agentcraft2/react-demo.jsonl --last 6
 ```
 
 It uses this graph and the local `greet` tool, with scripted model replies and
@@ -207,7 +207,7 @@ then run:
 ```
 
 This sends two questions on one thread, prints the checkpoints and model trace,
-and saves the files under `agents/{{ name }}/.agentlib/anthropic-demo/`.
+and saves the files under `agents/{{ name }}/.agentcraft2/anthropic-demo/`.
 It uses your configured model and API tokens. Add `--thread "your-thread-id"`
 to continue a saved conversation. The examples offer the local greeting tool;
 the normal CLI and HTTP entry points also discover any linked MCP tools.
@@ -220,7 +220,7 @@ To capture calls from the normal CLI or HTTP entry point, use the following step
 Add this setting to `agents/{{ name }}/.env`, then restart the agent:
 
 ```dotenv
-{{ var.model_trace_path }}=.agentlib/model-trace.jsonl
+{{ var.model_trace_path }}=.agentcraft2/model-trace.jsonl
 ```
 
 Run a question with a named conversation after starting any required MCP servers:
@@ -230,7 +230,7 @@ Run a question with a named conversation after starting any required MCP servers
 "%PYTHON%" -m {{ package }} "What is my name?" --thread debug-ada
 ```
 
-Open `agents/{{ name }}/.agentlib/model-trace.jsonl`. Each line is a JSON event:
+Open `agents/{{ name }}/.agentcraft2/model-trace.jsonl`. Each line is a JSON event:
 
 - `model.request` contains the complete ordered messages, normalized tool
   definitions, binding options, and per-call options.
@@ -306,7 +306,7 @@ registry and AWS permissions.
 
 Reopen the conversation to check its saved outcome. The UI only reads status; it
 never repeats the question. The generated local service keeps confirmed outcomes
-in `.agentlib\outcomes.sqlite`. Protect this file like the checkpoint database.
+in `.agentcraft2\outcomes.sqlite`. Protect this file like the checkpoint database.
 If no confirmed outcome exists, the UI keeps the thread held.
 
 The HTTP service accepts one active turn per caller and thread. A second request

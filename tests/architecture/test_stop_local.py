@@ -20,7 +20,7 @@ from tools.local_processes import Service
 
 
 def run_folder(root: Path, name: str = "run") -> Path:
-    folder = root / ".agentlib/local-runs" / name
+    folder = root / ".agentcraft2/local-runs" / name
     folder.mkdir(parents=True)
     return folder
 
@@ -185,7 +185,7 @@ def test_real_supervisor_stops_in_reverse_order_and_preserves_saved_files(
             listener.bind(("127.0.0.1", 0))
             ports.append(listener.getsockname()[1])
     journal = tmp_path / "stopped.txt"
-    logs = tmp_path / ".agentlib/local-runs/real-run"
+    logs = tmp_path / ".agentcraft2/local-runs/real-run"
     saved = [
         tmp_path / name
         for name in (

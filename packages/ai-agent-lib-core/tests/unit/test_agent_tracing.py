@@ -123,13 +123,13 @@ async def test_observe_needs_no_container_and_names_tool_servers_from_the_regist
         spans = {span.name: span for span in exporter.get_finished_spans()}
         assert set(spans) == {"support.turn", "greet"}
         tool = spans["greet"].attributes or {}
-        assert tool["agentlib.mcp_server"] == "data"
+        assert tool["agentcraft2.mcp_server"] == "data"
         root = spans["support.turn"].attributes or {}
-        assert json.loads(str(root["agentlib.checkpoints"])) == [
+        assert json.loads(str(root["agentcraft2.checkpoints"])) == [
             {"checkpoint_id": "c0", "parent_id": None},
             {"checkpoint_id": "c1", "parent_id": None},
         ]
-        assert json.loads(str(root["agentlib.artifact_ids"])) == ["a1"]
+        assert json.loads(str(root["agentcraft2.artifact_ids"])) == ["a1"]
     finally:
         tracing.close()
 
@@ -156,7 +156,7 @@ async def test_run_derives_registry_and_invocation_from_the_services_object() ->
         assert graph.configs == [{"configurable": {"thread_id": "one"}}]
         assert tracing.provider.force_flush()
         tool = next(s for s in exporter.get_finished_spans() if s.name == "greet")
-        assert (tool.attributes or {})["agentlib.mcp_server"] == "data"
+        assert (tool.attributes or {})["agentcraft2.mcp_server"] == "data"
     finally:
         tracing.close()
 

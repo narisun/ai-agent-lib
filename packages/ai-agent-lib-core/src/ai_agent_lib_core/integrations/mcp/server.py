@@ -17,7 +17,7 @@ from mcp_types import CallToolResult, TextContent
 from opentelemetry import propagate, trace
 
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     AgentRegistry,
     AuditSink,
     Classification,
@@ -245,7 +245,7 @@ class _Ended:
     """How one tool call ended, for its log line."""
 
     outcome: str
-    error: AgentLibError | None = None
+    error: AgentCraft2Error | None = None
     detail: str | None = None
 
 
@@ -329,9 +329,9 @@ class GovernedToolsMiddleware:
         """
         tool = call.tool if _TOOL_NAME.match(call.tool) else _UNNAMED
         request_id = call.context.request_id if call.context is not None else None
-        attributes = {"agentlib.application": self._application, "agentlib.tool": tool}
+        attributes = {"agentcraft2.application": self._application, "agentcraft2.tool": tool}
         if request_id is not None:
-            attributes["agentlib.request_id"] = request_id
+            attributes["agentcraft2.request_id"] = request_id
         started = time.perf_counter()
         ended = _Ended(_ERROR)  # what stands if the tool raises something of its own
         try:
@@ -374,7 +374,7 @@ class GovernedToolsMiddleware:
             return reply, _Ended(_DENIED, denied)
         except ValidationFailed as invalid:
             return _error(f"The call was refused: {invalid.summary}."), _Ended(_INVALID, invalid)
-        except AgentLibError as error:
+        except AgentCraft2Error as error:
             reply = _error(f"The call failed ({type(error).__name__}).")
             return reply, _Ended(_FAILED, error)
         if is_error_result(result):

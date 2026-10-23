@@ -86,7 +86,7 @@ def config_options(port: str | None, name: str | None, schema: bool) -> None:
         if port is None or name is None:
             raise CliError(
                 "--schema needs a PORT and a NAME",
-                fix="e.g. agentlib config options audit jsonl --schema",
+                fix="e.g. agentcraft2 config options audit jsonl --schema",
             )
         click.echo(options_schema(providers, port, name))
         return

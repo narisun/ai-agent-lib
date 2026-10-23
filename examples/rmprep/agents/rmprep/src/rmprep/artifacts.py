@@ -22,7 +22,7 @@ def memo_artifacts(state: State, context: RequestContext) -> list[dict[str, Any]
         ):
             return [
                 {
-                    "schema": "agentlib.artifact/v1",
+                    "schema": "agentcraft2.artifact/v1",
                     "id": memo["memo_id"],
                     "document_id": "rm-memo-" + memo["uen"],
                     "version": memo["version"],

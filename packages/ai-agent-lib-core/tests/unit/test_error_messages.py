@@ -27,7 +27,7 @@ def local(tmp_path: Path, **values: str) -> dict[str, str]:
 
 
 def rules(tmp_path: Path) -> None:
-    (tmp_path / "rules.yaml").write_text("schema: agentlib.rules/v1\nrules: []\n", "utf-8")
+    (tmp_path / "rules.yaml").write_text("schema: agentcraft2.rules/v1\nrules: []\n", "utf-8")
 
 
 async def test_an_adapter_that_cannot_be_built_names_the_variables_that_chose_it(

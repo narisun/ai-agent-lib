@@ -22,7 +22,7 @@ from uuid import uuid4
 ENVIRONMENTS = {
     "agent": Path(".venv"),
     "ui": Path("packages/ai-agent-lib-ui/.venv"),
-    "phoenix": Path(".agentlib/phoenix/.venv"),
+    "phoenix": Path(".agentcraft2/phoenix/.venv"),
 }
 MANIFEST = ".python-runtime.json"
 

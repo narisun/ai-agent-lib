@@ -11,7 +11,7 @@ says how to use the server.
 
 ## Before you start
 
-Run commands from the **workspace root**, where `agentlib.toml` lives.
+Run commands from the **workspace root**, where `agentcraft2.toml` lives.
 Follow [Select Python](../../README.md#select-python) in the workspace README
 to set `PYTHON` to your approved Python executable. Select it again in
 every new terminal. These commands use Windows Command Prompt; in bash/zsh replace
@@ -96,7 +96,7 @@ output or run `"%PYTHON%" -m ai_agent_lib_cli doctor rmqna-data` to diagnose a f
 
 On this machine a caller without a token is the development identity in
 `AC2_IDENTITY_OPTIONS`. Local state is written under
-`mcp-servers/rmqna-data/.agentlib/`.
+`mcp-servers/rmqna-data/.agentcraft2/`.
 
 The server's log has one line per call: the tool, its duration, row and column counts, whether
 the result was cut, and the error kind. It never holds SQL or a search text. The SQL is on the
@@ -133,4 +133,4 @@ The data is the workspace's `data/` folder, one table per file, except `data_mod
 This server is local-only. It loads the workspace's `data/` folder and the agent's schema document
 by their place in the repository, and runs SQL a model wrote; the controls that make that
 acceptable are for synthetic data on a developer's machine (`docs/sql-governance.md` says what
-would have to change). `agentlib deploy` is not set up for it.
+would have to change). `agentcraft2 deploy` is not set up for it.

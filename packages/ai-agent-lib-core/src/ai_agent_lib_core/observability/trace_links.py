@@ -16,7 +16,7 @@ class TraceResult:
     link: dict[str, str] | None = None
 
 
-_result: ContextVar[TraceResult | None] = ContextVar("agentlib_trace_result", default=None)
+_result: ContextVar[TraceResult | None] = ContextVar("agentcraft2_trace_result", default=None)
 
 
 @contextmanager

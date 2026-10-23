@@ -2,9 +2,9 @@
 
 from typing import Annotated, Literal, Self
 
-from pydantic import AwareDatetime, Field, model_validator
+from pydantic import AwareDatetime, BeforeValidator, Field, model_validator
 
-from ai_agent_lib_core.contracts import Scope
+from ai_agent_lib_core.contracts import Scope, current_schema
 from ai_agent_lib_core.contracts.diagnostics import DiagnosticValue, Identifier
 
 
@@ -15,9 +15,9 @@ class Artifact(DiagnosticValue):
     must authorize it within scope. Renderers treat Markdown as untrusted content.
     """
 
-    schema_version: Literal["agentlib.artifact/v1"] = Field(
-        default="agentlib.artifact/v1", alias="schema"
-    )
+    schema_version: Annotated[
+        Literal["agentcraft2.artifact/v1"], BeforeValidator(current_schema)
+    ] = Field(default="agentcraft2.artifact/v1", alias="schema")
     id: Identifier
     document_id: Identifier
     version: Annotated[int, Field(strict=True, ge=1)]

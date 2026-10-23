@@ -18,7 +18,7 @@ accounts-mcp            # serves http://127.0.0.1:8001/mcp, with /healthz and /r
 ```
 
 No model, key or policy server is needed. Local state is written under
-`.agentlib/`: the audit log as JSON lines. The server compiles no graph, so its
+`.agentcraft2/`: the audit log as JSON lines. The server compiles no graph, so its
 configuration selects no checkpoint store (`AC2_CHECKPOINT_PROVIDER=none`).
 
 ## Call it from the reference agent
@@ -35,7 +35,7 @@ ANTHROPIC_API_KEY=... AC2_MODEL_ID=<model id> accounts-agent "Which accounts are
 
 The agent exchanges the caller's identity for a short-lived development token
 bound to `accounts-mcp`; the server rebuilds the caller from it. What each role
-gets is decided by `policies/agentlib/rules/data.yaml`:
+gets is decided by `policies/agentcraft2/rules/data.yaml`:
 
 | Role | Tool call | Data |
 | --- | --- | --- |
@@ -66,7 +66,7 @@ opa run --server --addr 127.0.0.1:8181 -b ../../policies/bundle policies
 AC2_POLICY_PROVIDER=opa accounts-mcp
 ```
 
-OPA evaluates the same `policies/agentlib/rules/data.yaml`, so the outcome is
+OPA evaluates the same `policies/agentcraft2/rules/data.yaml`, so the outcome is
 the same.
 
 ## What to read
@@ -76,7 +76,7 @@ the same.
 | `src/accounts_mcp/server.py` | The two places the library appears in a server |
 | `src/accounts_mcp/__main__.py` | Building the container and checking the registry at startup |
 | `queries/*.sql` | Named queries: declared parameters, a row cap and a classification |
-| `policies/agentlib/rules/data.yaml` | The rules, one document for the `rules` provider and for OPA |
+| `policies/agentcraft2/rules/data.yaml` | The rules, one document for the `rules` provider and for OPA |
 | `registry/*.yaml` | The agent and tool registries, with schema pins |
 | `tests/` | Testing a server and an agent together, in process |
 

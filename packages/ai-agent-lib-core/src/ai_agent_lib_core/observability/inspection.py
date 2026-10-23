@@ -5,7 +5,7 @@ import json
 from collections.abc import Awaitable, Callable, Iterator
 from pathlib import Path
 
-from ai_agent_lib_core.contracts import RequestContext
+from ai_agent_lib_core.contracts import RequestContext, is_schema
 from ai_agent_lib_core.contracts.inspection import InspectionSection, TurnInspection
 
 CheckpointPreview = Callable[[RequestContext, str], Awaitable[InspectionSection]]
@@ -69,7 +69,7 @@ def read_records(
         "thread_id": context.thread_id,
         "request_id": request_id,
     }
-    schema = "agentlib.audit/v1" if event == "tool.call" else "agentlib.model-trace/v1"
+    schema = "agentcraft2.audit/v1" if event == "tool.call" else "agentcraft2.model-trace/v1"
     accepted = {event, "model.error"} if event == "model.response" else {event}
     for path in paths:
         for record in _file_records(path):
@@ -78,7 +78,7 @@ def read_records(
                 continue
             if any(record.get(key) != value for key, value in identity.items()):
                 continue
-            if record.get("schema") != schema or record.get("event") not in accepted:
+            if not is_schema(record.get("schema"), schema) or record.get("event") not in accepted:
                 continue
             key = json.dumps(record, sort_keys=True)
             if key in seen:

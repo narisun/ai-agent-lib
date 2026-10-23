@@ -213,7 +213,7 @@ async def test_sdk_retry_is_a_distinct_attempt_with_unavailable_usage(tmp_path: 
     assert attempts[0].usage.input_tokens is None
     assert attempts[0].usage.kind == "unavailable"
     legacy = [json.loads(line) for line in trace.read_text().splitlines()]
-    assert {item["schema"] for item in legacy} == {"agentlib.model-trace/v1"}
+    assert {item["schema"] for item in legacy} == {"agentcraft2.model-trace/v1"}
     assert {item["call_id"] for item in legacy} == {attempts[0].ref.call_id}
     assert "private" not in "".join(item.model_dump_json() for item in capture.events)
 
@@ -457,7 +457,7 @@ def test_wire_versions_and_journal_crash_uncertainty() -> None:
     assert RequestOutcome.model_validate_json(outcome.model_dump_json(by_alias=True)) == outcome
     with pytest.raises(ValidationError):
         RequestOutcome.model_validate(
-            {**outcome.model_dump(by_alias=True), "schema": "agentlib.request-outcome/v2"}
+            {**outcome.model_dump(by_alias=True), "schema": "agentcraft2.request-outcome/v2"}
         )
     with pytest.raises(ValidationError):
         AttemptRef(call_id="call-1", attempt=True)

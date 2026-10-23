@@ -426,7 +426,7 @@ async def test_a_call_without_a_token_is_the_servers_own_development_principal()
     ("make_token", "reason"),
     [
         (lambda token: token[:-3] + "xyz", "credential_invalid"),
-        (lambda token: "agentlib-dev.not-a-token", "credential_invalid"),
+        (lambda token: "agentcraft2-dev.not-a-token", "credential_invalid"),
     ],
 )
 async def test_a_bad_token_is_refused_and_the_reason_is_recorded(
@@ -672,7 +672,7 @@ async def test_r10_the_servers_error_text_stays_out_of_the_logged_facts() -> Non
 
     from mcp import MCPError
 
-    from ai_agent_lib_core.contracts import AgentLibError
+    from ai_agent_lib_core.contracts import AgentCraft2Error
     from ai_agent_lib_core.observability import error_fields
 
     class _Refusing:
@@ -687,7 +687,7 @@ async def test_r10_the_servers_error_text_stays_out_of_the_logged_facts() -> Non
             yield _Refusing()
 
         world.connector.connect = broken  # type: ignore[method-assign]
-        with bind_request_context(CONTEXT), pytest.raises(AgentLibError) as caught:
+        with bind_request_context(CONTEXT), pytest.raises(AgentCraft2Error) as caught:
             await tool.ainvoke({"region": "west"})
 
     error = caught.value

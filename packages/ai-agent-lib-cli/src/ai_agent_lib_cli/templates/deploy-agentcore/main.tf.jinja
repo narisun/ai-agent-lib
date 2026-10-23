@@ -1,5 +1,5 @@
-# {{ name }} on Amazon Bedrock AgentCore Runtime. agentlib wrote this file once; it is yours to change.
-# settings.tf and permissions.tf are rewritten by every 'agentlib deploy {{ name }} --target agentcore'.
+# {{ name }} on Amazon Bedrock AgentCore Runtime. agentcraft2 wrote this file once; it is yours to change.
+# settings.tf and permissions.tf are rewritten by every 'agentcraft2 deploy {{ name }} --target agentcore'.
 #
 # The runtime runs one session per microVM from the artifact (an ARM64 image in the
 # ECR repository created here, or a zip in the S3 bucket created here), as the
@@ -265,7 +265,7 @@ resource "aws_bedrockagentcore_memory" "this" {
 
 resource "aws_bedrockagentcore_agent_runtime" "this" {
   agent_runtime_name = local.runtime_name
-  description        = "{{ name }}, deployed by agentlib from {{ folder }}/deploy.env."
+  description        = "{{ name }}, deployed by agentcraft2 from {{ folder }}/deploy.env."
   role_arn           = aws_iam_role.runtime.arn
 
   agent_runtime_artifact {

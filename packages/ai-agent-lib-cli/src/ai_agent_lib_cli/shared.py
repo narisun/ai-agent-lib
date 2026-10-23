@@ -24,7 +24,7 @@ from ai_agent_lib_core.adapters.registry_documents import (
     parse_tools_document,
     tools_document,
 )
-from ai_agent_lib_core.contracts import AgentEntry, AgentLibError, ServerEntry, describe
+from ai_agent_lib_core.contracts import AgentCraft2Error, AgentEntry, ServerEntry, describe
 
 __all__ = [
     "AGENTS_FILE",
@@ -40,10 +40,11 @@ __all__ = [
 
 AGENTS_FILE = PurePosixPath("registry/agents.yaml")
 TOOLS_FILE = PurePosixPath("registry/mcp-tools.yaml")
-RULES_FILE = PurePosixPath("policies/agentlib/rules/data.yaml")
+RULES_FILE = PurePosixPath("policies/agentcraft2/rules/data.yaml")
 
 _MAINTAINED = (
-    "# agentlib rewrites this file when it adds, links or pins a service; comments are not kept.\n"
+    "# agentcraft2 rewrites this file when it adds, links or pins a service; "
+    "comments are not kept.\n"
 )
 _AGENTS_HEADER = (
     "# The agent registry: which agents exist and which MCP servers each may call.\n" + _MAINTAINED
@@ -51,7 +52,7 @@ _AGENTS_HEADER = (
 _TOOLS_HEADER = (
     "# The MCP tool registry: which servers and tools exist. An agent can only use a tool\n"
     "# that is listed here, and only if the tool's live input schema still matches its pin.\n"
-    "# After changing a tool's arguments, pin it again: agentlib registry pin <server>\n"
+    "# After changing a tool's arguments, pin it again: agentcraft2 registry pin <server>\n"
     + _MAINTAINED
 )
 _RULES_HEADER = """\
@@ -60,11 +61,11 @@ _RULES_HEADER = """\
 #
 # One document, two engines. In local development the in-process `rules`
 # provider reads this file. A deployed service asks OPA, which loads the
-# `policies` folder as a bundle (this file becomes `data.agentlib.rules`).
+# `policies` folder as a bundle (this file becomes `data.agentcraft2.rules`).
 #
-# This file is yours. agentlib appends the rules a new service needs and never
+# This file is yours. agentcraft2 appends the rules a new service needs and never
 # changes or removes a rule that is here.
-schema: agentlib.rules/v1
+schema: agentcraft2.rules/v1
 rules: []
 """
 
@@ -88,7 +89,7 @@ def read_agents(root: Path) -> tuple[AgentEntry, ...]:
     raw = _load(root.joinpath(*AGENTS_FILE.parts), "the agent registry")
     try:
         return parse_agents_document(raw) if raw is not None else ()
-    except AgentLibError as exc:
+    except AgentCraft2Error as exc:
         raise CliError.from_error(exc) from None
 
 
@@ -97,7 +98,7 @@ def read_servers(root: Path) -> tuple[ServerEntry, ...]:
     raw = _load(root.joinpath(*TOOLS_FILE.parts), "the tool registry")
     try:
         return parse_tools_document(raw) if raw is not None else ()
-    except AgentLibError as exc:
+    except AgentCraft2Error as exc:
         raise CliError.from_error(exc) from None
 
 
@@ -128,12 +129,12 @@ def _rule_ids(text: str, what: str) -> list[str]:
     try:
         raw = yaml.safe_load(text)
         return [rule.id for rule in parse_rules_document(raw, what=what)]
-    except AgentLibError as exc:
+    except AgentCraft2Error as exc:
         raise CliError.from_error(exc) from None
     except yaml.YAMLError as exc:
         raise CliError(
             f"{what} is not valid YAML",
-            expected="a rules document: 'schema: agentlib.rules/v1' and a list of rules",
+            expected="a rules document: 'schema: agentcraft2.rules/v1' and a list of rules",
             actual=str(exc).splitlines()[0][:120],
         ) from None
 

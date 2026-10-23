@@ -101,7 +101,7 @@ async def run_demo(output_dir: Path) -> list[dict[str, Any]]:
 
 def main() -> None:
     """Show the scripted answers and where to inspect each model call."""
-    folder = ENV_FILE.parent / ".agentlib" / "react-demo" / uuid4().hex
+    folder = ENV_FILE.parent / ".agentcraft2" / "react-demo" / uuid4().hex
     history = asyncio.run(run_demo(folder))
     print("Supplied CSV snapshot; model decisions and answers are scripted.")
     for turn in history:

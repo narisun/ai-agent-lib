@@ -14,7 +14,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Annotated, Literal
 
-from pydantic import Field, StringConstraints, ValidationError
+from pydantic import BeforeValidator, Field, StringConstraints, ValidationError
 
 from ai_agent_lib_core.contracts import (
     Classification,
@@ -25,6 +25,7 @@ from ai_agent_lib_core.contracts import (
     PolicyRequest,
     PrincipalKind,
     RowFilter,
+    current_schema,
     options_error,
 )
 
@@ -37,7 +38,7 @@ __all__ = [
     "parse_rules_document",
 ]
 
-RULES_SCHEMA = "agentlib.rules/v1"
+RULES_SCHEMA = "agentcraft2.rules/v1"
 """The schema identifier every rules document must declare."""
 
 _OBLIGATION_KEYS = frozenset({"row_filter", "mask_columns", "max_rows", "require_approval"})
@@ -118,7 +119,9 @@ class _RuleModel(OptionsModel):
 
 
 class _RulesDocument(OptionsModel):
-    schema_: Literal["agentlib.rules/v1"] = Field(alias="schema")
+    schema_: Annotated[Literal["agentcraft2.rules/v1"], BeforeValidator(current_schema)] = Field(
+        alias="schema"
+    )
     rules: list[_RuleModel] = Field(default_factory=list)
 
 
@@ -258,10 +261,10 @@ def parse_rules_document(raw: object, *, what: str = "policy rules") -> tuple[Ru
             what, _RulesDocument, exc, whole="the file", noun="field", show_values=False
         )
         raise ConfigurationError(
-            f"{what} do not match the agentlib.rules/v1 schema",
+            f"{what} do not match the agentcraft2.rules/v1 schema",
             expected=found.expected,
             actual=found.actual,
-            fix="correct the file, then run 'agentlib policy test'",
+            fix="correct the file, then run 'agentcraft2 policy test'",
         ) from None
     ids = [rule.id for rule in document.rules]
     repeated = sorted({rule_id for rule_id in ids if ids.count(rule_id) > 1})

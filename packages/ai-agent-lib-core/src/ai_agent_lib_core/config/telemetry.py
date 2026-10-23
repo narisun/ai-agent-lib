@@ -1,7 +1,7 @@
 """Whether a service sends operational traces and metrics: one answer for everyone.
 
 The container picks the telemetry adapter, a service's entry point starts the
-SDK, and ``agentlib deploy`` adds the collector and checks the ``otel`` extra.
+SDK, and ``agentcraft2 deploy`` adds the collector and checks the ``otel`` extra.
 All of them ask this function, so they cannot disagree.
 """
 

@@ -3,7 +3,7 @@
 Unit tests prove the plumbing with a scripted model; this measures the agent.
 It runs only when asked, and only with a real model set in the service's .env:
 
-    agentlib eval rmqna
+    agentcraft2 eval rmqna
 
 The model is real and live; everything it reaches is not. The `rmqna-data` tools are connected in
 process, so there is no server to start, and the engine behind them is the one the real server
@@ -13,12 +13,12 @@ by `results_match`. The scorers and the task live in this module, and
 `tests/test_eval_harness.py` at the workspace root proves them with a scripted model, so the
 plumbing is checked on every CI run even though this test is not.
 
-The report is written to .agentlib/eval-report.json, and what the agent said and ran for each case
-to .agentlib/eval-outputs.json (both private; the second holds the model's answers). Keep the report
+The report is written to .agentcraft2/eval-report.json, and what the agent said and ran for each case
+to .agentcraft2/eval-outputs.json (both private; the second holds the model's answers). Keep the report
 with the change that produced it, and raise the bar as the agent gets better.
 
-When evals/baseline.json exists — written by `agentlib eval rmqna --accept` —
-the run also fails on regressions against it. `agentlib eval rmqna --accept`
+When evals/baseline.json exists — written by `agentcraft2 eval rmqna --accept` —
+the run also fails on regressions against it. `agentcraft2 eval rmqna --accept`
 leaves a marker beside the report for this run only, so it skips just that
 gate to move the bar on purpose.
 """
@@ -62,10 +62,10 @@ from rmqna_data.settings import DATA_DIR
 
 SERVICE = Path(__file__).resolve().parents[1]
 CASES = SERVICE / "evals" / "cases.jsonl"
-REPORT = SERVICE / ".agentlib" / "eval-report.json"
-OUTPUTS = SERVICE / ".agentlib" / "eval-outputs.json"
+REPORT = SERVICE / ".agentcraft2" / "eval-report.json"
+OUTPUTS = SERVICE / ".agentcraft2" / "eval-outputs.json"
 BASELINE = SERVICE / "evals" / "baseline.json"
-ACCEPT_MARKER = SERVICE / ".agentlib" / "eval-accept.flag"
+ACCEPT_MARKER = SERVICE / ".agentcraft2" / "eval-accept.flag"
 SERVER_ENV = SERVICE.parents[1] / "mcp-servers" / "rmqna-data" / ".env.example"
 
 EXECUTE_SQL = "rmqna-data_execute_sql"
@@ -453,7 +453,7 @@ async def test_rmqna_meets_its_bar(tmp_path: Path) -> None:
     OUTPUTS.write_text(json.dumps(outputs, indent=2, default=str), encoding="utf-8")
     print("\n".join(report.summary()))
     if BASELINE.exists() and not ACCEPT_MARKER.exists():
-        # A passing run may still be worse than the last accepted one. agentlib
+        # A passing run may still be worse than the last accepted one. agentcraft2
         # eval --accept leaves ACCEPT_MARKER to move the bar on purpose.
         require_no_regression(report, load_report(BASELINE), tolerance=0.05)
     # Starting bars, set below what a first live run is expected to reach. Raise them to just under

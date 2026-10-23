@@ -16,7 +16,7 @@ from ai_agent_lib_core.config import ConfigResolver, MappingConfigSource
 from ai_agent_lib_core.pipeline import frame_untrusted
 from ai_agent_lib_core.testing import FakeChatModelProvider, Fakes, calls_tool
 
-RULES = Path(__file__).parents[1] / "policies" / "agentlib" / "rules" / "data.yaml"
+RULES = Path(__file__).parents[1] / "policies" / "agentcraft2" / "rules" / "data.yaml"
 
 
 def context(subject: str = "u-1", thread: str = "th-1") -> RequestContext:
@@ -138,8 +138,8 @@ def test_the_command_line_prints_the_answer(
     monkeypatch.setenv("AC2_POLICY_OPTIONS", json.dumps({"path": str(RULES)}))
     assert main(["Hello there"]) == 0
     assert capsys.readouterr().out == "fake: Hello there\n"
-    assert (tmp_path / ".agentlib" / "audit.jsonl").exists()
-    assert (tmp_path / ".agentlib" / "checkpoints.sqlite").exists()
+    assert (tmp_path / ".agentcraft2" / "audit.jsonl").exists()
+    assert (tmp_path / ".agentcraft2" / "checkpoints.sqlite").exists()
 
 
 def test_the_command_line_reports_configuration_problems(

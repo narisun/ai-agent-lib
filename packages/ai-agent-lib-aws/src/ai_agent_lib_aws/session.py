@@ -18,7 +18,7 @@ from botocore import exceptions as aws
 from botocore.config import Config
 
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     ConfigurationError,
     CredentialsExpiredError,
     ExternalSettings,
@@ -75,7 +75,7 @@ def _error_code(error: aws.ClientError) -> tuple[str, int]:
 
 def classify_aws_error(
     error: BaseException, *, what: str, sign_in: str | None = None
-) -> AgentLibError | None:
+) -> AgentCraft2Error | None:
     """Map an AWS SDK error to the library's taxonomy.
 
     The SDK's own message is never copied into the new error, because it can
@@ -346,7 +346,7 @@ class AwsSessionFactory:
             # The SDK error stays as the cause: describe() never copies its text into a message.
             raise mapped from exc
 
-    def classify(self, error: BaseException, *, what: str) -> AgentLibError | None:
+    def classify(self, error: BaseException, *, what: str) -> AgentCraft2Error | None:
         """Map an SDK error to the taxonomy, naming this session's sign-in command."""
         return classify_aws_error(error, what=what, sign_in=self.sign_in)
 
