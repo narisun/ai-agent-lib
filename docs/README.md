@@ -19,6 +19,7 @@ source.
 | Measure an agent offline and online | [Evals guide](evals.md) | Run generated evals, accept a baseline, capture feedback, and score sampled production answers |
 | Understand who is calling | [Identity guide](identity.md) | Follow a signed token from sign-in through the agent and MCP server to policy, and learn why a call was refused |
 | Keep turns on one thread in order | [Thread admission](http-thread-admission.md) | Learn when an overlapping request gets HTTP 409 `thread_busy` and which coordination fits your deployment |
+| Deploy an agent to AWS Bedrock AgentCore | [AgentCore trial](agentcore-trial.md) | Generate the AgentCore deployment with `--target agentcore`, pass preflight, deploy the rmprep agent and its MCP server, and check the recorded run |
 | Understand the business example | [rmprep](../examples/rmprep/README.md) and [context management](../examples/rmprep/docs/context-management.md) | Follow client selection, memo generation, and same-thread questions |
 | Upgrade a generated workspace | [Keep generated files up to date](getting-started.md#9-keep-generated-files-up-to-date) and [updating generated code](../packages/ai-agent-lib-cli/README.md#updating-generated-code) | Preview with `agentlib update --plan`, which writes nothing, then run `agentlib update` |
 | Change the library | [Contributor setup](../README.md#working-on-the-library) | Install development dependencies and run the appropriate checks |
@@ -110,6 +111,14 @@ future work. The [ADRs](adr/README.md) record decisions; the
 The [code structure and reliability review](design/code-structure-review-2026-10-13.md)
 records three resolved issues, reproduction evidence, and proposed simplifications.
 Its proposed commands are recommendations, not commands available in this checkout.
+The [code structure, exception handling, and test review](design/code-review-2026-10-22.md)
+records the follow-up pass over the whole checkout with prioritized findings and a
+suggested fix order. The
+[implementation plan](design/implementation-plan-2026-10-22.md) sequences those
+fixes and the changes needed to deploy agents and MCP servers to Amazon Bedrock
+AgentCore; its status block says which phases are implemented and where the code
+departs from the plan's text. [ADR 0005](adr/0005-agentcore-target.md) records
+the AgentCore decisions, and the [AgentCore trial](agentcore-trial.md) the pilot.
 
 The [enterprise architecture review](design/enterprise-architecture-review-2026-10-18.md)
 (18 October 2026) judges the library against its goals, and the

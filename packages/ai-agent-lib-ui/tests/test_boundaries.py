@@ -5,7 +5,10 @@ import subprocess
 import tomllib
 from pathlib import Path
 
+import pytest
 from python_runtime import python_command
+
+pytestmark = pytest.mark.slow
 
 PACKAGE = Path(__file__).resolve().parents[1]
 ROOT = PACKAGE.parents[1]

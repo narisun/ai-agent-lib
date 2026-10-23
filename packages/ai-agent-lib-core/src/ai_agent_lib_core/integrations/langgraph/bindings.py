@@ -157,17 +157,21 @@ class LangGraphBindings:
         self,
         server: ServerEntry,
         *,
-        connector: McpConnector | None,
+        connector: McpConnector,
         exchanger: TokenExchanger | None,
         require_pins: bool,
     ) -> list[BaseTool]:
-        """Return the registered tools of an MCP server, governed by the tool pipeline."""
+        """Return the registered tools of an MCP server, governed by the tool pipeline.
+
+        The connector is the caller's: the composition root (``McpBindings``)
+        owns one HTTP connector per container and closes it with the container.
+        """
         # Imported here so that an agent which uses no MCP server does not load the SDK.
-        from ai_agent_lib_core.integrations.mcp.client import HttpMcpConnector, load_mcp_tools
+        from ai_agent_lib_core.integrations.mcp.client import load_mcp_tools
 
         return await load_mcp_tools(
             server=server,
-            connector=connector if connector is not None else HttpMcpConnector(),
+            connector=connector,
             exchanger=exchanger,
             pipeline=self._tool_pipeline,
             bridge=self._bridge,

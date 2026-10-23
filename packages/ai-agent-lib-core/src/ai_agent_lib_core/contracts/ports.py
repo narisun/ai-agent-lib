@@ -19,7 +19,12 @@ from pydantic import SecretStr
 
 from ai_agent_lib_core.contracts.audit import AuditRecord, AuditValue
 from ai_agent_lib_core.contracts.errors import AgentLibError
-from ai_agent_lib_core.contracts.identity import Principal, RequestContext
+from ai_agent_lib_core.contracts.identity import (
+    PresentedCredentials,
+    Principal,
+    RequestContext,
+    Verified,
+)
 
 __all__ = [
     "AuditSink",
@@ -31,6 +36,7 @@ __all__ = [
     "IdentityVerifier",
     "ModelCapabilities",
     "ModelTraceSink",
+    "RequestVerifier",
     "SecretsProvider",
     "SpanNotes",
     "SupportsAsyncClose",
@@ -157,6 +163,36 @@ class IdentityVerifier(Protocol):
 
         Raises:
             PolicyDenied: If the verifier rejects the credential under its rules.
+        """
+        ...
+
+
+@runtime_checkable
+class RequestVerifier(Protocol):
+    """Optional: an identity verifier that reads a request's headers, not only its token.
+
+    A hosting platform may authenticate the caller at its perimeter and hand
+    the service the result in headers, with no bearer token at all. A verifier
+    that trusts such a perimeter implements this protocol beside
+    :class:`IdentityVerifier`; the entry points call ``verify_request`` when a
+    verifier offers it, and ``verify`` otherwise.
+    """
+
+    @property
+    def trusts_perimeter(self) -> bool:
+        """Whether a request with no bearer token may still be accepted from the perimeter.
+
+        A service's door lets such requests through only when this is true;
+        the verifier then refuses any request whose headers the perimeter did
+        not set.
+        """
+        ...
+
+    async def verify_request(self, credentials: PresentedCredentials) -> Verified:
+        """Return who the caller is and the credential to keep for exchange.
+
+        Raises:
+            PolicyDenied: If the credentials are missing or not acceptable.
         """
         ...
 

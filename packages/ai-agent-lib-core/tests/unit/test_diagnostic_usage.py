@@ -13,6 +13,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel, ValidationError
 
 from ai_agent_lib_core.contracts import (
+    PresentedCredentials,
     Principal,
     RequestContext,
     ServiceConfig,
@@ -235,6 +236,13 @@ async def test_sink_failure_preserves_chat_and_marks_capture_incomplete(
     assert not summary.capture_complete
     assert len(summary.expected_attempts) == 1
     assert "private" not in caplog.text
+    failed = [
+        record for record in caplog.records if record.getMessage() == "diagnostics.write_failed"
+    ]
+    assert failed, "a failed diagnostics write must be logged"
+    assert all(record.exc_info is None for record in failed), "sink text must not be logged"
+    assert all(getattr(record, "error_type", None) for record in failed)
+    assert all(getattr(record, "request_id", None) == CONTEXT.request_id for record in failed)
 
 
 async def test_parallel_operations_and_sync_bridge_keep_scopes_separate() -> None:
@@ -322,7 +330,7 @@ async def test_http_legacy_envelope_is_unchanged_with_terminal_capture() -> None
 
         async def authenticate(
             self,
-            credential: str | None,
+            credential: str | PresentedCredentials | None,
             *,
             application: str,
             thread_id: str,

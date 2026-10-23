@@ -1,7 +1,7 @@
 """Scope, bounded pagination, permissions and safe frontend error semantics."""
 
 from enum import StrEnum
-from typing import Annotated, Generic, Literal, Self, TypeVar
+from typing import Annotated, Generic, Self, TypeVar
 
 from pydantic import Field, model_validator
 
@@ -49,20 +49,6 @@ class PageRequest(DiagnosticValue):
 
     limit: Annotated[int, Field(strict=True, ge=1, le=200)] = 50
     cursor: Annotated[str, Field(min_length=1, max_length=4096)] | None = None
-
-
-class QueryBinding(DiagnosticValue):
-    """Persist/sign this binding with a cursor; IDs alone never establish access."""
-
-    scope: Scope
-    resource: Literal["threads", "checkpoints", "diagnostics", "artifacts"]
-    thread_id: Identifier | None = None
-    request_id: Identifier | None = None
-    filters: tuple[tuple[Identifier, str], ...] = ()
-
-    def matches(self, other: "QueryBinding") -> bool:
-        """Compare the entire query, including scope, without relaxing filters."""
-        return self == other
 
 
 Item = TypeVar("Item")
@@ -113,18 +99,3 @@ class ContractError(ValueError):
     def __init__(self, code: ErrorCode) -> None:
         self.code = code
         super().__init__(code.value)
-
-
-class ContentPreview(DiagnosticValue):
-    """A decoded text preview bounded to 64 KiB, with explicit truncation."""
-
-    text: str
-    truncated: bool
-    availability: Availability = Availability.AVAILABLE
-
-    @model_validator(mode="after")
-    def check_bytes(self) -> Self:
-        """Bound UTF-8 bytes, including multibyte characters."""
-        if len(self.text.encode("utf-8")) > 65_536:
-            raise ValueError("preview exceeds 64 KiB")
-        return self

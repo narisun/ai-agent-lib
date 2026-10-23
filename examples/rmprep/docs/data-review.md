@@ -117,7 +117,7 @@ the same interpretation rules with the data.
 
 | Record | Supported interpretation |
 | --- | --- |
-| Waiver exception | Report the requirement, status, owner, due date and recorded expiry. Execution, active coverage and syndicate approval conditions remain unknown. Ask for the executed document. |
+| Waiver exception | Report the requirement, status, owner, due date and recorded expiry. These establish neither execution nor non-execution. Active coverage, approval conditions and blockers remain unknown; overdue statements do not establish a cause of delay. Ask whether an executed document or a documented blocker exists. |
 | Open commitment or blank receipt date | Report recorded status. Verify delivery separately; these fields do not prove that nothing was delivered. Commitments have no `received_date` field. |
 | Audited-statement requirement | Report the requirement. It does not identify a fiscal year or establish whether the supplied financial facts were audited or delivered. |
 | Closed Won opportunity or Closed service request | Report the sales stage or request status. Successful implementation and client acceptance require further evidence. |
@@ -142,7 +142,10 @@ results and that the reply fits its word budget. It allows two revisions before
 raising a validation error. This catches abbreviated references and excessive
 length. It also catches citation placeholders such as "corresponding references"
 and dated audited-statement wording when the exception's reporting year is
-unknown. These are checks for known failure patterns, not a proof that every
+unknown. Waiver checks reject known execution/non-execution claims and invented
+blockers, including hedges such as "overdue statements may be blocking execution".
+They use the existing execution limit, so saved evidence from older checkpoints
+is covered too. These are checks for known failure patterns, not a proof that every
 claim follows from a cited row. Review the accepted prose against the records.
 When an answer cites a financial page and names a common financial comparison,
 it must include both references for that concept. This catches a paragraph that

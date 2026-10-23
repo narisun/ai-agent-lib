@@ -15,6 +15,7 @@ from ai_agent_lib_core.contracts import (
     Classification,
     ConfigurationError,
     DeploymentEnv,
+    NotStartedError,
     Principal,
     ProviderSelection,
     RequestContext,
@@ -176,7 +177,7 @@ async def test_an_engine_error_does_not_repeat_values_in_its_message(tmp_path: P
 
 async def test_lifecycle_is_checked(tmp_path: Path) -> None:
     source = make_source(tmp_path)
-    with pytest.raises(RuntimeError, match="not started"):
+    with pytest.raises(NotStartedError, match="not started"):
         source.describe()
     with pytest.raises(ConfigurationError, match="not started"):
         await source.validate()
@@ -251,7 +252,7 @@ async def test_the_container_builds_a_named_source_from_its_own_options(tmp_path
         assert result.source is not None
         assert result.source.source == "ledger"
         assert result.source.retrieved_at == fakes.clock.now()
-    with pytest.raises(RuntimeError, match="not started"):
+    with pytest.raises(NotStartedError, match="not started"):
         source.describe()
 
 

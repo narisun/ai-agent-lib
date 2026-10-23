@@ -40,7 +40,7 @@ def register_documents(app: FastAPI, resources: Runtime) -> None:
     async def versions(
         thread_id: str, before: Annotated[int | None, Query(ge=1, le=2**63 - 1)] = None
     ) -> object:
-        principal = current_principal()
+        principal = await current_principal(resources)
         conversation = await resources.store.get(principal, thread_id)
         return await documents.versions(
             view_for(principal, conversation.thread.scope.application), thread_id, before=before
@@ -48,7 +48,7 @@ def register_documents(app: FastAPI, resources: Runtime) -> None:
 
     @app.get("/api/threads/{thread_id}/documents/{artifact_id}")
     async def content(thread_id: str, artifact_id: str) -> HTMLResponse:
-        principal = current_principal()
+        principal = await current_principal(resources)
         conversation = await resources.store.get(principal, thread_id)
         item = await documents.get(
             view_for(principal, conversation.thread.scope.application), thread_id, artifact_id

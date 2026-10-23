@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import sys
 from typing import Any
 
+import httpx
 import jwt
 import pytest
 from pydantic import SecretStr
@@ -364,6 +366,65 @@ async def test_an_outage_at_the_issuer_fails_closed_unless_keys_are_already_held
     clock.advance(120)
     assert (await warm.verify(token)).subject == "u-1"
     await warm.aclose()
+
+
+class GatedTransport(httpx.AsyncBaseTransport):
+    """Holds every request until the test opens the gate, as a slow issuer would."""
+
+    def __init__(self, idp: FakeIdentityProvider) -> None:
+        self.gate = asyncio.Event()
+        self._inner = idp.transport
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        await self.gate.wait()
+        return await self._inner.handle_async_request(request)
+
+
+async def test_a_slow_key_refresh_does_not_stall_verifications_that_need_no_refresh() -> None:
+    idp = FakeIdentityProvider()
+    clock = FrozenClock()
+    transport = GatedTransport(idp)
+    settings = resolve_jwt_options(JwtIdentityOptions.model_validate(idp.options(API)))
+    identity = JwtIdentityVerifier(settings, clock, transport=transport)
+    good = idp.user_token(audience=API, subject="u-1")
+    transport.gate.set()
+    await identity.verify(good)
+    assert len(idp.requests) == 1
+
+    # A minute later an unknown key ID earns one more read, which the issuer is slow to answer.
+    clock.advance(60)
+    transport.gate.clear()
+    other = FakeIdentityProvider()
+    other.rotate_keys()  # signs as key-2, which this issuer never published
+    forged = other.sign(idp.claims(audience=API, subject="u-9"))
+    waiting = [asyncio.create_task(refusal(identity, forged)) for _ in range(3)]
+    await asyncio.sleep(0)
+    assert not any(task.done() for task in waiting)
+    # Tokens signed with a key already held are verified while that read is in flight.
+    principal = await asyncio.wait_for(identity.verify(good), timeout=2)
+    assert principal.subject == "u-1"
+    assert not any(task.done() for task in waiting)
+
+    transport.gate.set()
+    assert await asyncio.gather(*waiting) == ["credential_invalid"] * 3
+    # The verifications that needed the read shared one request instead of each making its own.
+    assert len(idp.requests) == 2
+    await identity.aclose()
+
+
+async def test_an_issuer_that_answers_with_an_error_status_has_the_status_reported() -> None:
+    idp = FakeIdentityProvider()
+    settings = resolve_jwt_options(JwtIdentityOptions.model_validate(idp.options(API)))
+    unavailable = httpx.MockTransport(lambda request: httpx.Response(503, text="try later"))
+    identity = JwtIdentityVerifier(settings, FrozenClock(), transport=unavailable)
+    with pytest.raises(ConfigurationError) as caught:
+        await identity.validate()
+    assert "HTTP 503" in str(caught.value)
+    assert "HTTP 503" in str(caught.value.actual)
+    assert "try later" not in str(caught.value)
+    token = idp.user_token(audience=API, subject="u-1")
+    assert await refusal(identity, token) == "identity_unavailable"
+    await identity.aclose()
 
 
 async def test_keys_that_cannot_sign_are_ignored() -> None:

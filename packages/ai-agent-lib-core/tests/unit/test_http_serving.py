@@ -19,7 +19,12 @@ from typing import Any
 import httpx
 import pytest
 
-from ai_agent_lib_core.contracts import ConfigurationError, Principal, RequestContext
+from ai_agent_lib_core.contracts import (
+    ConfigurationError,
+    PresentedCredentials,
+    Principal,
+    RequestContext,
+)
 from ai_agent_lib_core.integrations.http import (
     ServiceLifecycle,
     ServiceState,
@@ -37,14 +42,15 @@ class Services:
 
     async def authenticate(
         self,
-        credential: str | None,
+        credential: str | PresentedCredentials | None,
         *,
         application: str,
         thread_id: str,
         request_id: str | None = None,
     ) -> RequestContext:
+        bearer = credential.bearer if isinstance(credential, PresentedCredentials) else credential
         return RequestContext(
-            principal=Principal(subject=credential or "dev", tenant="t-1"),
+            principal=Principal(subject=bearer or "dev", tenant="t-1"),
             application=application,
             request_id=request_id or "r-1",
             thread_id=thread_id,
@@ -136,7 +142,9 @@ async def test_a_request_in_flight_finishes_before_the_service_returns(running: 
 
         running.stop.set()
         await running.until(ServiceState.STOPPING)
-        await asyncio.sleep(0.3)
+        # Stopping with a request held: the service is still running and the
+        # request has not finished. The 200 reply below proves the listener
+        # stayed open until the run completed; no wait on the clock is needed.
         assert not running.task.done(), "the service returned with a request still running"
         assert running.agent.finished == []
 

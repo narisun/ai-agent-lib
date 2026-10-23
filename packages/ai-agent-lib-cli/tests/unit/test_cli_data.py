@@ -381,7 +381,9 @@ async def test_a_proposed_query_that_does_not_run_is_dropped_and_the_rest_kept(
 
     kept, notes = await check_queries(csv_source(data, "claims"), ".sql", [good, broken])
     assert kept == [good]
-    assert notes == ["dropped no_such_column: ConfigurationError"]
+    assert len(notes) == 1
+    assert notes[0].startswith("dropped no_such_column: ")
+    assert "ConfigurationError" not in notes[0], "the summary says what failed, not the class"
 
 
 async def test_from_csv_proposes_a_plan_that_ran_over_the_files(exports: Path) -> None:
@@ -536,7 +538,7 @@ def test_the_data_options_need_a_data_source_to_read(
     capsys.readouterr()
     assert run("new", "mcp", "hello-mcp", "--propose", "--workspace", workspace) == 1
     assert "--propose needs a data option such as --from-csv" in capsys.readouterr().err
-    assert run("new", "mcp", "hello-mcp", "--query", "x", "--workspace", workspace) == 1
+    assert run("new", "mcp", "hello-mcp", "--query", "x", "--workspace", workspace) == 2
     assert "which was not given: --query" in capsys.readouterr().err
     assert not (workspace / "mcp-servers/hello-mcp").exists()
     assert (

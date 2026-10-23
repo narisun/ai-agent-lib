@@ -10,6 +10,9 @@ import pytest
 
 import ai_agent_lib_aws
 from ai_agent_lib_aws.access import (
+    agentcore_exchange_access,
+    agentcore_identity_access,
+    agentcore_memory_access,
     bedrock_guardrails_access,
     bedrock_model_access,
     firehose_audit_access,
@@ -18,6 +21,7 @@ from ai_agent_lib_aws.access import (
     s3_registry_access,
     secrets_manager_access,
 )
+from ai_agent_lib_aws.token_exchange_agentcore import AgentCoreExchangeOptions
 from ai_agent_lib_core.config import ConfigResolver, MappingConfigSource
 from ai_agent_lib_core.contracts import Access, AccessQuery, ConfigurationError, ProviderSelection
 from ai_agent_lib_core.di import access_plan
@@ -179,6 +183,64 @@ def test_the_checkpoint_database_is_reached_as_its_user() -> None:
     assert "resource ID" in found.note
 
 
+AGENTCORE_EXCHANGE = {
+    "credential_provider": "entra-provider",
+    "scopes": ["{audience}/.default"],
+    "workload_name": "accounts-agent",
+}
+DIRECTORY = "arn:aws:bedrock-agentcore:{region}:{account}:workload-identity-directory/default"
+
+
+def test_the_memory_is_the_one_resource_and_snapshots_also_list_sessions() -> None:
+    (legacy,) = agentcore_memory_access(_query("agentcore_memory", memory_id="eap_mem-0123456789"))
+    (snapshot,) = agentcore_memory_access(
+        _query("agentcore_memory", memory_id="eap_mem-0123456789", checkpoint_format="snapshot")
+    )
+
+    assert legacy.actions == (
+        "bedrock-agentcore:CreateEvent",
+        "bedrock-agentcore:ListEvents",
+        "bedrock-agentcore:GetEvent",
+        "bedrock-agentcore:DeleteEvent",
+    )
+    assert legacy.resources == (
+        "arn:aws:bedrock-agentcore:{region}:{account}:memory/eap_mem-0123456789",
+    )
+    assert snapshot.actions == (*legacy.actions, "bedrock-agentcore:ListSessions")
+    assert snapshot.resources == legacy.resources
+
+
+def test_the_exchange_narrows_to_the_workload_and_flags_an_unknown_one() -> None:
+    (named,) = agentcore_exchange_access(
+        AgentCoreExchangeOptions.model_validate(AGENTCORE_EXCHANGE)
+    )
+    (unknown,) = agentcore_exchange_access(
+        AgentCoreExchangeOptions.model_validate({**AGENTCORE_EXCHANGE, "workload_name": None})
+    )
+
+    assert named.actions == (
+        "bedrock-agentcore:GetResourceOauth2Token",
+        "bedrock-agentcore:GetWorkloadAccessToken",
+        "bedrock-agentcore:GetWorkloadAccessTokenForUserId",
+    )
+    assert named.resources == (DIRECTORY, f"{DIRECTORY}/workload-identity/accounts-agent")
+    assert named.note == ""
+    assert unknown.resources == (DIRECTORY, f"{DIRECTORY}/workload-identity/*")
+    assert "set workload_name" in unknown.note
+
+
+def test_the_runtime_identity_needs_nothing_from_aws_unless_it_exchanges() -> None:
+    verifying = agentcore_identity_access(_query("agentcore_runtime", tenant="acme"))
+    exchanging = agentcore_identity_access(
+        _query("agentcore_runtime", tenant="acme", exchange=AGENTCORE_EXCHANGE)
+    )
+
+    assert verifying == ()
+    assert exchanging == agentcore_exchange_access(
+        AgentCoreExchangeOptions.model_validate(AGENTCORE_EXCHANGE)
+    )
+
+
 def test_bad_options_fail_as_configuration_errors() -> None:
     with pytest.raises(ConfigurationError):
         firehose_audit_access(_query("firehose", stream="no spaces allowed"))
@@ -217,7 +279,7 @@ def test_a_missing_option_says_which_adapter_was_being_worked_out() -> None:
     ]
 
 
-_SDK_CALL = re.compile(r"self\._client\.([a-z_]+)")
+_SDK_CALL = re.compile(r"self\._client\.([a-z0-9_]+)")
 _ADAPTERS = [
     # module, IAM service prefix, the rule, options that reach every call
     ("audit_firehose", "firehose", firehose_audit_access, {"stream": "s"}),
@@ -235,7 +297,21 @@ _ADAPTERS = [
         redshift_data_access,
         {"queries_dir": "q", "database": "d", "workgroup": "w"},
     ),
+    (
+        "token_exchange_agentcore",
+        "bedrock-agentcore",
+        agentcore_identity_access,
+        {"tenant": "acme", "exchange": AGENTCORE_EXCHANGE},
+    ),
+    (
+        "checkpoint_agentcore_memory",
+        "bedrock-agentcore",
+        agentcore_memory_access,
+        {"memory_id": "eap_mem-0123456789"},
+    ),
 ]
+# The memory checkpointer makes its own calls, on a client it builds itself.
+_SAVER_CALL = re.compile(r"self\.client\.([a-z0-9_]+)\(")
 
 
 @pytest.mark.parametrize(("module", "prefix", "rule", "options"), _ADAPTERS)
@@ -252,3 +328,29 @@ def test_every_sdk_call_an_adapter_makes_is_declared(
 
     assert called
     assert called <= declared, f"{module} calls {sorted(called - declared)} but does not declare it"
+
+
+@pytest.mark.parametrize(
+    ("checkpoint_format", "modules"),
+    [("legacy", ("helpers",)), ("snapshot", ("helpers", "snapshot"))],
+)
+def test_every_call_the_memory_checkpointer_makes_is_declared(
+    checkpoint_format: str, modules: tuple[str, ...]
+) -> None:
+    saver = pytest.importorskip("langgraph_checkpoint_aws.checkpoint.agentcore.saver")
+    package = Path(saver.__file__).parent
+    called = {
+        f"bedrock-agentcore:{''.join(part.title() for part in name.split('_'))}"
+        for module in modules
+        for name in _SAVER_CALL.findall((package / f"{module}.py").read_text(encoding="utf-8"))
+    }
+    (found,) = agentcore_memory_access(
+        _query(
+            "agentcore_memory", memory_id="eap_mem-0123456789", checkpoint_format=checkpoint_format
+        )
+    )
+
+    assert "bedrock-agentcore:CreateEvent" in called
+    assert called <= set(found.actions), (
+        f"the checkpointer calls {sorted(called - set(found.actions))}"
+    )

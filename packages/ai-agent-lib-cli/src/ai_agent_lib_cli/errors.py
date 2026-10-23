@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from typing import Self
 
-from ai_agent_lib_core.contracts import AgentLibError
+import click
 
-__all__ = ["EXIT_FAILED", "EXIT_OK", "EXIT_USAGE", "CliError"]
+from ai_agent_lib_core.contracts import AgentLibError
+from ai_agent_lib_core.observability import explain
+
+__all__ = ["EXIT_FAILED", "EXIT_OK", "EXIT_USAGE", "CliError", "report_error"]
 
 EXIT_OK = 0
 EXIT_FAILED = 1
@@ -15,32 +18,26 @@ EXIT_USAGE = 2
 """The command line itself was wrong: an unknown option, a missing argument."""
 
 
-class CliError(Exception):
+class CliError(AgentLibError):
     """A problem the developer can fix, reported in a few lines without a traceback.
+
+    It is one of the library's errors, so it carries the same facts
+    (``expected``, ``actual``, ``fix``) and is printed the same way. What sets
+    it apart is its audience: its message is written for the person at the
+    terminal and names what they typed or which file to change.
 
     Args:
         message: What went wrong.
         expected: What the command needed.
         actual: What it found instead.
         fix: What to do about it.
+        detail: Text that may hold file content, shown only with the facts.
     """
 
-    def __init__(
-        self,
-        message: str,
-        *,
-        expected: str | None = None,
-        actual: str | None = None,
-        fix: str | None = None,
-    ) -> None:
-        super().__init__(message)
-        self.message = message
-        self.expected = expected
-        self.actual = actual
-        self.fix = fix
-
     @classmethod
-    def from_error(cls, error: AgentLibError, *, where: str | None = None) -> Self:
+    def from_error(  # narrower than the base: adds `where`
+        cls, error: AgentLibError, *, where: str | None = None
+    ) -> Self:
         """Return a command-line error that says what ``error`` says, its facts kept apart.
 
         Args:
@@ -54,10 +51,17 @@ class CliError(Exception):
             expected=error.expected,
             actual=error.actual,
             fix=error.fix,
+            detail=error.detail,
         )
 
-    def __str__(self) -> str:
-        facts = [("expected", self.expected), ("got", self.actual), ("fix", self.fix)]
-        return "\n".join(
-            [self.message, *(f"  {label}: {value}" for label, value in facts if value)]
-        )
+
+def report_error(problem: AgentLibError) -> int:
+    """Print ``problem`` for the terminal and return the exit code to use.
+
+    A :class:`CliError` is shown as written, because its message already
+    speaks to the developer. Any other library error is explained with its
+    type, facts, notes and causes, as ``explain`` does.
+    """
+    text = str(problem) if isinstance(problem, CliError) else explain(problem)
+    click.echo(f"agentlib: error: {text}", err=True)
+    return EXIT_FAILED

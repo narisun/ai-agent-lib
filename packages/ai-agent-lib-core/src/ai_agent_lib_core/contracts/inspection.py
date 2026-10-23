@@ -7,6 +7,8 @@ from pydantic import Field, model_validator
 from ai_agent_lib_core.contracts.diagnostics import DiagnosticValue, RequestRecord
 from ai_agent_lib_core.contracts.identity import RequestContext
 
+__all__ = ["InspectionSection", "TurnInspection", "TurnInspector"]
+
 
 class InspectionSection(DiagnosticValue):
     """A text preview; truncation and missing capture are always explicit."""

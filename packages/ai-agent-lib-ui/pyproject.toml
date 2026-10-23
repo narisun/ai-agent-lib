@@ -9,7 +9,9 @@ dependencies = ["ai-agent-lib-core>=0.1.0,<0.2", "pydantic>=2.7,<3"]
 
 [project.optional-dependencies]
 chat = ["chainlit==2.12.0", "httpx>=0.27,<1", "python-dotenv>=1,<2", "filelock>=3.16,<4", "markdown-it-py>=3,<5"]
-dev = ["pytest>=8.2", "pytest-asyncio>=0.24", "aiohttp>=3.10", "mypy>=1.11", "ruff>=0.6", "hatchling>=1.25", "import-linter>=2.0"]
+# SigV4 signing for an agent on AgentCore Runtime; bearer mode needs no extra.
+aws = ["boto3>=1.35"]
+dev = ["pytest>=8.2", "pytest-asyncio>=0.24", "aiohttp>=3.10", "mypy>=1.11", "ruff>=0.6", "hatchling>=1.25", "import-linter>=2.0", "boto3>=1.35"]
 
 [build-system]
 requires = ["hatchling>=1.25"]
@@ -28,6 +30,9 @@ addopts = ["--import-mode=importlib", "--strict-config", "--strict-markers", "-r
 filterwarnings = ["error"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "slow: spawns other processes or depends on the real clock; deselect with -m 'not slow' for a quick loop",
+]
 
 [tool.mypy]
 python_version = "3.11"
@@ -45,6 +50,19 @@ extend = "../../pyproject.toml"
 "src/ai_agent_lib_ui/integrations/callbacks.py" = ["ARG001"]
 "src/ai_agent_lib_ui/__main__.py" = ["T201"]
 
+[[tool.mypy.overrides]]
+module = ["boto3", "boto3.*", "botocore", "botocore.*"]
+# boto3 ships no inline types; the signer imports it lazily behind a Protocol.
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "ai_agent_lib_ui.integrations.callbacks"
+# Chainlit's Message.send and user_session.get lack annotations in the pinned release.
+disallow_untyped_calls = false
+
+# ------------------------------------------------------------------ import-linter
+# The same rules tests/test_boundaries.py checks by parsing, enforced by the
+# linter in CI so a violation names the import that broke it.
 [tool.importlinter]
 root_packages = ["ai_agent_lib_ui"]
 include_external_packages = true
@@ -82,8 +100,3 @@ source_modules = [
     "ai_agent_lib_ui.contracts",
 ]
 forbidden_modules = ["chainlit"]
-
-[[tool.mypy.overrides]]
-module = "ai_agent_lib_ui.integrations.callbacks"
-# Chainlit's Message.send and user_session.get lack annotations in the pinned release.
-disallow_untyped_calls = false

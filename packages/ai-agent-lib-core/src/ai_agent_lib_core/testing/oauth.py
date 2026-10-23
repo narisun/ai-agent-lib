@@ -108,12 +108,24 @@ class FakeIdentityProvider:
             claims, self._keys[key_id], algorithm="RS256", headers={"kid": key_id, **headers}
         )
 
-    def claims(self, *, audience: str, subject: str, expires_in: int = 3600) -> dict[str, Any]:
-        """Return the claims every token of this provider carries."""
+    def claims(
+        self,
+        *,
+        audience: str,
+        subject: str,
+        expires_in: int = 3600,
+        audience_claim: str = "aud",
+    ) -> dict[str, Any]:
+        """Return the claims every token of this provider carries.
+
+        ``audience_claim`` names the claim that carries the audience: ``aud``
+        by the standard, or another, as Amazon Cognito's access tokens name
+        the app client in ``client_id`` and carry no ``aud`` at all.
+        """
         now = int(self._clock.now().timestamp())
         return {
             "iss": self.issuer,
-            "aud": audience,
+            audience_claim: audience,
             "tid": self.tenant_id,
             "oid": subject,
             "sub": f"pairwise-{subject}",
@@ -132,18 +144,29 @@ class FakeIdentityProvider:
         client_id: str = "chat-ui",
         scopes: str = "access_as_user",
         expires_in: int = 3600,
+        audience_claim: str = "aud",
         **extra: Any,
     ) -> str:
         """Return a token a user obtained for ``audience`` through ``client_id``."""
-        claims = self.claims(audience=audience, subject=subject, expires_in=expires_in)
+        claims = self.claims(
+            audience=audience, subject=subject, expires_in=expires_in, audience_claim=audience_claim
+        )
         claims.update({"azp": client_id, "scp": scopes, "roles": list(roles), **extra})
         return self.sign({key: value for key, value in claims.items() if value is not None})
 
     def app_token(
-        self, *, audience: str, client_id: str, roles: Iterable[str] = (), **extra: Any
+        self,
+        *,
+        audience: str,
+        client_id: str,
+        roles: Iterable[str] = (),
+        audience_claim: str = "aud",
+        **extra: Any,
     ) -> str:
         """Return a token an application obtained for itself, with no user."""
-        claims = self.claims(audience=audience, subject=f"sp-{client_id}")
+        claims = self.claims(
+            audience=audience, subject=f"sp-{client_id}", audience_claim=audience_claim
+        )
         claims.update({"azp": client_id, "idtyp": "app", "roles": list(roles), **extra})
         return self.sign({key: value for key, value in claims.items() if value is not None})
 

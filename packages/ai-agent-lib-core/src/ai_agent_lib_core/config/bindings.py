@@ -289,15 +289,18 @@ def _owned_and_external_bindings() -> tuple[Binding, ...]:
         Binding(
             name=f"{PREFIX}TELEMETRY",
             key=Key.TELEMETRY,
-            description="Operational traces and metrics: off or opentelemetry.",
+            description="Operational traces and metrics: off, opentelemetry or ambient.",
             example="off",
             details=(
                 "With `opentelemetry` every governed call is a span named after the GenAI "
                 "conventions, and the `agentlib.events` and `agentlib.duration` metrics are "
                 "recorded, through the OpenTelemetry API. A service entry point sends them by "
-                "calling `start_telemetry()` (`run_agent` does), which installs the providers "
-                "through `configure_telemetry()` when this is on; where to is set with the "
-                "standard `OTEL_` variables. The audit option `tracing: true` also turns it on."
+                "calling `start_telemetry()` (`run_agent` and `run_service` do), which installs "
+                "the providers through `configure_telemetry()` when this is on; where to is set "
+                "with the standard `OTEL_` variables. With `ambient` the same signals go to the "
+                "providers the host installed, as `opentelemetry-instrument` does, and the "
+                "service installs none; it refuses to start when no provider is found. The audit "
+                "option `tracing: true` also turns it on."
             ),
         ),
         Binding(

@@ -922,5 +922,7 @@ async def test_checkpoint_diagnostics_are_bounded_and_preserve_cancellation(mode
 
 @pytest.mark.parametrize("timeout", [0, -1, float("inf"), float("nan")])
 def test_checkpoint_deadline_must_be_finite_and_positive(timeout: float) -> None:
-    with pytest.raises(ValueError, match="finite and positive"):
+    with pytest.raises(ConfigurationError, match="checkpoint_timeout_seconds") as caught:
         PhoenixTracing(PhoenixSettings(), application="test", checkpoint_timeout_seconds=timeout)
+    assert caught.value.expected == "a finite number of seconds greater than zero"
+    assert caught.value.actual == repr(timeout)

@@ -8,10 +8,9 @@ from collections.abc import Sequence
 import click
 
 from ai_agent_lib_cli.app import cli
-from ai_agent_lib_cli.errors import EXIT_FAILED, EXIT_OK, EXIT_USAGE, CliError
+from ai_agent_lib_cli.errors import EXIT_FAILED, EXIT_OK, EXIT_USAGE, report_error
 from ai_agent_lib_cli.toolbox import Toolbox
 from ai_agent_lib_core.contracts import AgentLibError
-from ai_agent_lib_core.observability import explain
 
 __all__ = ["main"]
 
@@ -45,12 +44,9 @@ def main(argv: Sequence[str] | None = None, toolbox: Toolbox | None = None) -> i
     except click.Abort:
         click.echo("agentlib: stopped", err=True)
         return EXIT_FAILED
-    except CliError as problem:
-        click.echo(f"agentlib: error: {problem}", err=True)
-        return EXIT_FAILED
     except AgentLibError as problem:
-        click.echo(f"agentlib: error: {explain(problem)}", err=True)
-        return EXIT_FAILED
+        # CliError is one of these: one place prints every error the CLI reports.
+        return report_error(problem)
     return result if isinstance(result, int) else EXIT_OK
 
 

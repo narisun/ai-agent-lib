@@ -26,7 +26,9 @@ def test_without_arguments_every_port_lists_its_adapters(
 def test_one_port_lists_only_its_adapters(capsys: pytest.CaptureFixture[str]) -> None:
     assert run("config", "options", "checkpoint") == 0
     out = capsys.readouterr().out
-    assert out.startswith("checkpoint\n  none             no options\n")
+    assert out.startswith("checkpoint\n")
+    assert "  none             no options\n" in out
+    assert "  agentcore_memory 3 options\n" in out
     assert "audit" not in out
 
 

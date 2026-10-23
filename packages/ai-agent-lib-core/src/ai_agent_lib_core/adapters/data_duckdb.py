@@ -29,6 +29,7 @@ from ai_agent_lib_core.contracts import (
     AgentLibError,
     Clock,
     ConfigurationError,
+    NotStartedError,
     Obligations,
     OptionsModel,
     ParameterType,
@@ -250,5 +251,5 @@ class DuckDbCsvDataSource:
 
     def _started(self) -> tuple[QueryCatalog, duckdb.DuckDBPyConnection]:
         if self._catalog is None or self._connection is None:
-            raise RuntimeError(f"data source {self._name!r} is not started")
+            raise NotStartedError(f"data source {self._name!r}")
         return self._catalog, self._connection

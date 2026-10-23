@@ -17,6 +17,22 @@ Identifier = Annotated[str, Field(min_length=1, max_length=256, pattern=r"^[A-Za
 TokenCount = Annotated[int, Field(strict=True, ge=0)]
 
 
+__all__ = [
+    "AttemptRef",
+    "DiagnosticLinks",
+    "DiagnosticSink",
+    "DiagnosticValue",
+    "ModelAttempt",
+    "OperationDecision",
+    "OperationSummary",
+    "RequestOutcome",
+    "RequestOutcomeJournal",
+    "RequestRecord",
+    "TokenUsage",
+    "UsageField",
+]
+
+
 class DiagnosticValue(BaseModel):
     """An immutable, explicitly versioned wire value with no unexpected fields."""
 

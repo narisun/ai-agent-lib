@@ -220,6 +220,113 @@ that grant for this purpose; its delegation uses the JWT bearer grant of RFC
 7523 with one Microsoft parameter, which the library calls `on_behalf_of`. That
 difference is the whole of the provider-specific code.
 
+## On AWS Bedrock AgentCore
+
+An AgentCore runtime authenticates the caller before a request reaches the
+container, in one of two modes. Which mode a runtime uses decides which
+identity provider the service behind it selects.
+
+### JWT mode, the recommended one
+
+The runtime checks the bearer token against a JWT authorizer and, when told
+to, passes the token on. The service then verifies it again with the `jwt`
+provider, exactly as it would anywhere else. That second check is the point:
+the runtime's authorizer is the perimeter, the library's verifier is what the
+principal, the roles and the audit record are built from, and the two must
+agree. The authorizer's settings map onto `JwtIdentityOptions` one to one:
+
+| Runtime authorizer | `jwt` option | Note |
+| --- | --- | --- |
+| `discoveryUrl` | `issuer` | The issuer the discovery document names must be the `issuer` the preset or the options give |
+| `allowedAudience`, `allowedClients` | `audience` | The same value or values |
+| `requestHeaderAllowlist` | must include `Authorization` | Without it no token reaches the container, and every request is refused with `credential_missing` |
+
+The AgentCore quick starts use Amazon Cognito, so the `jwt` provider has a
+`cognito` preset beside `entra`:
+
+```bash
+EAP_IDENTITY_PROVIDER=jwt
+EAP_IDENTITY_OPTIONS={"preset": "cognito", "user_pool_id": "<region>_<pool id>", "audience": "<app client id>"}
+```
+
+The preset fills in the user pool's issuer and key location from
+`user_pool_id`; `audience` is the app client ID the runtime's `allowedClients`
+names. Everything else, roles included, follows the same rules as any other
+issuer.
+
+### IAM (SigV4) mode
+
+With IAM authentication the caller signs the request with AWS credentials and
+no bearer token exists. The runtime passes the caller on as an opaque user ID
+in the header `X-Amzn-Bedrock-AgentCore-Runtime-User-Id`, and nothing else
+about them. The AWS pack's `agentcore_runtime` provider trusts that perimeter:
+
+```bash
+EAP_IDENTITY_PROVIDER=agentcore_runtime
+EAP_IDENTITY_OPTIONS={"tenant": "<tenant>", "roles": ["analyst"]}
+```
+
+The principal is the user ID as `subject`, the configured `tenant`, because
+the runtime does not say which tenant a caller is in, and the configured
+`roles`, because it passes none. Its `authenticated_by` is
+`agentcore-runtime` rather than an issuer, so a policy can tell a
+perimeter-trusted identity from a verified token and, for instance, keep the
+most sensitive tools to the latter. A request without the header, and a bare
+bearer token with no headers, is refused with `perimeter_identity_missing`; a
+user ID that is not a usable identifier with `credential_invalid`. An MCP
+server on such a runtime admits a request with no token at its door when its
+identity trusts the perimeter and the runtime's headers are present.
+
+The provider cannot be selected in local development: there is no runtime to
+trust on a laptop, so a service whose deployment environment is `local`
+refuses to start with it. It is the one adapter with the opposite rule to
+`static`.
+
+The header is only as trustworthy as the callers allowed to set it. A caller
+with `bedrock-agentcore:InvokeAgentRuntimeForUser` names the user ID itself.
+Follow the AWS guidance: deny that action on every runtime that does not need
+user delegation, and allow it on the rest only to the applications that act
+for signed-in users, such as the chat UI's own role.
+
+### Outbound: tokens for the services an agent calls
+
+On AgentCore the runtime, not the agent, holds the client secrets of the
+downstream identity providers, in AgentCore Identity *credential providers*.
+The runtime hands the agent a workload access token in a header
+(`X-Amz-Bedrock-AgentCore-Identity-WAT`); the agent exchanges it through
+AgentCore Identity for a token the MCP server accepts. The `agentcore_runtime`
+provider does this when it has `exchange` options:
+
+```bash
+EAP_IDENTITY_OPTIONS={"tenant": "<tenant>", "exchange": {"credential_provider": "entra-provider", "scopes": ["{audience}/.default"], "workload_name": "accounts-agent"}}
+```
+
+`credential_provider` is the name of the credential provider in AgentCore
+Identity; `scopes` are asked for with `{audience}` replaced by the audience the
+tool registry gives the server; `workload_name` is the agent's own workload
+identity, used to mint a workload token when a request brought none and for
+the agent's own token. The flow follows the caller: `USER_FEDERATION` for a
+person, so the downstream token names them, and `M2M` for the service acting
+in its own name, for example when it lists a server's tools at startup. As
+everywhere in the library, the caller's own credential is used only to obtain
+the downstream token and is never forwarded. Tokens are reused for
+`cache_seconds` per caller and audience.
+
+User federation needs the person to have authorised the agent for the
+downstream service once, through the credential provider's consent flow. Until
+they have, AgentCore answers with a URL for their browser instead of a token,
+and the call is refused with `user_consent_required`. The URL is for the
+person, not for a log or an error message; the application decides how to show
+it. `return_url` says where the browser goes afterwards.
+
+The permissions this needs, `bedrock-agentcore:GetResourceOauth2Token`,
+`GetWorkloadAccessToken` and `GetWorkloadAccessTokenForUserId` on the
+workload identity directory and the agent's workload identity, are declared by
+the adapter like every other AWS permission and appear in `agentlib deploy
+SERVICE --plan`. A JWT-mode runtime that exchanges tokens directly with the
+identity provider keeps using the `jwt` provider's `exchange` options and
+needs none of them.
+
 ## Why a call was refused
 
 The reason code is in the audit record and, for a tool call, in the refusal the
@@ -239,6 +346,8 @@ and which applications presented the request (`actors`).
 | `service_token_refused` | An application's own token, where those are not accepted |
 | `identity_unavailable` | The signing keys could not be read and none were held |
 | `token_exchange_refused` | The identity provider refused to issue the downstream token |
+| `perimeter_identity_missing` | On an AgentCore runtime in IAM mode: the request carries no caller identity from the runtime, or only a bearer token |
+| `user_consent_required` | The user has not yet authorised this service for the downstream one through AgentCore Identity |
 | `server_refused_token` | An MCP server answered 401 or 403 at its door: the token is not valid there, or the agent is not listed for it |
 | `agent_unidentified` | The token names no agent, on a deployed server |
 | `agent_unregistered`, `agent_disabled`, `server_not_allowed` | The agent fails the registry check |

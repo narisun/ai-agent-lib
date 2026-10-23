@@ -21,12 +21,14 @@ from ai_agent_lib_core.contracts import (
     IdGenerator,
     Limits,
     PolicyDecisionPoint,
+    QueryResult,
     RegistrySource,
     Telemetry,
 )
 from ai_agent_lib_core.pipeline.audit import AuditInterceptor
 from ai_agent_lib_core.pipeline.budget import BudgetInterceptor, BudgetLedger
-from ai_agent_lib_core.pipeline.calls import ModelCall, ToolCall
+from ai_agent_lib_core.pipeline.calls import DataCall, ModelCall, ToolCall
+from ai_agent_lib_core.pipeline.data import DataPolicyInterceptor, describe_query_result
 from ai_agent_lib_core.pipeline.deadline import DeadlineInterceptor
 from ai_agent_lib_core.pipeline.guardrails import (
     FramingInterceptor,
@@ -39,10 +41,10 @@ from ai_agent_lib_core.pipeline.identity import IdentityInterceptor
 from ai_agent_lib_core.pipeline.policy import ModelPolicyInterceptor, ToolPolicyInterceptor
 from ai_agent_lib_core.pipeline.registry import AgentCheck, RegistryInterceptor
 from ai_agent_lib_core.pipeline.resilience import ResilienceInterceptor
-from ai_agent_lib_core.pipeline.stages import ModelStage, Pipeline, ToolStage
+from ai_agent_lib_core.pipeline.stages import DataStage, ModelStage, Pipeline, ToolStage
 from ai_agent_lib_core.pipeline.structured import StructuredOutputInterceptor
 
-__all__ = ["Operations", "build_model_pipeline", "build_tool_pipeline"]
+__all__ = ["Operations", "build_data_pipeline", "build_model_pipeline", "build_tool_pipeline"]
 
 ResponseT = TypeVar("ResponseT")
 
@@ -250,3 +252,55 @@ def build_tool_pipeline(
 def _only_reads(call: ToolCall) -> bool:
     """A tool that changes something is never called twice."""
     return call.read_only
+
+
+def build_data_pipeline(
+    *,
+    audit: AuditSink,
+    telemetry: Telemetry,
+    clock: Clock,
+    ids: IdGenerator,
+    policy: PolicyDecisionPoint,
+    environment: str = "local",
+    operations: Operations | None = None,
+) -> Pipeline[DataStage, DataCall, QueryResult]:
+    """Return the data pipeline with every stage that is implemented so far.
+
+    Every query is recorded, held to the caller's deadline and put to the
+    policy, whose obligations narrow it. With operations, a query that fails
+    transiently is retried within the tool limits: a named query only reads,
+    so repeating it is safe, and its result is the same kind of untrusted
+    data a read-only tool returns.
+
+    Args:
+        audit: The audit port.
+        telemetry: The telemetry port.
+        clock: The clock port.
+        ids: The identifier port.
+        policy: The policy decision point. A data source is never ungoverned.
+        environment: Where the process is running, as the policy is told.
+        operations: Timeouts, retries and budgets. Without them the resilience
+            stage is left out.
+    """
+    audit_stage: AuditInterceptor[DataCall, QueryResult] = AuditInterceptor(
+        audit, telemetry, clock, ids, describe_query_result
+    )
+    policy_stage: DataPolicyInterceptor[QueryResult] = DataPolicyInterceptor(
+        policy, clock, environment
+    )
+    pipeline = (
+        Pipeline[DataStage, DataCall, QueryResult]()
+        .with_stage(DataStage.AUDIT, audit_stage)
+        .with_stage(DataStage.DEADLINE, DeadlineInterceptor(clock, "data query"))
+        .with_stage(DataStage.POLICY, policy_stage)
+    )
+    if operations is not None:
+        resilience_stage: ResilienceInterceptor[DataCall, QueryResult] = ResilienceInterceptor(
+            operations.limits.tool,
+            clock,
+            what="data query",
+            variable=operations.variable,
+            sleep=operations.sleep,
+        )
+        pipeline = pipeline.with_stage(DataStage.RESILIENCE, resilience_stage)
+    return pipeline

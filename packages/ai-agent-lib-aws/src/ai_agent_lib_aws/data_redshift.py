@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import threading
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -39,6 +40,7 @@ from ai_agent_lib_core.contracts import (
     QueryResult,
     SourceMetadata,
     TransientError,
+    UpstreamError,
 )
 from ai_agent_lib_core.kit import (
     CompiledQuery,
@@ -51,6 +53,7 @@ from ai_agent_lib_core.kit import (
 __all__ = ["RedshiftDataOptions", "RedshiftDataSource"]
 
 _WHAT = "the redshift_data data source"
+_LOG = logging.getLogger(__name__)
 _DIALECT = "redshift"
 _CHECK = "connection_check"
 
@@ -218,6 +221,14 @@ def _error_code(error: BaseException) -> str:
     if isinstance(error, aws.ClientError):
         return str(error.response.get("Error", {}).get("Code") or type(error).__name__)
     return type(error).__name__
+
+
+def _warn_cancel_failed(statement_id: str, error: BaseException) -> None:
+    """Record that a statement may still be running; its ID finds it in SYS_QUERY_HISTORY."""
+    _LOG.warning(
+        "redshift.cancel_failed",
+        extra={"statement_id": statement_id, "error_type": _error_code(error)},
+    )
 
 
 _CLEANUP_SECONDS = 10.0
@@ -397,13 +408,13 @@ class RedshiftDataSource:
                 submitted.append(statement_id)
                 await self._wait(label, statement_id)
                 return await self._fetch(label, statement_id, limit)
-        except TimeoutError:
+        except TimeoutError as exc:
             self._cancel_late(submission, submitted, late)
             await self._cancel(submitted)
             raise TransientError(
                 f"query {label!r} on data source {self._name!r} took longer than "
                 f"{self._options.timeout_seconds:g} seconds"
-            ) from None
+            ) from exc
         except asyncio.CancelledError:
             self._cancel_late(submission, submitted, late)
             await self._cancel(submitted)
@@ -451,15 +462,19 @@ class RedshiftDataSource:
                 statement_id = reply.get("Id") if isinstance(reply, Mapping) else None
                 if isinstance(statement_id, str) and statement_id:
                     # Best effort, in this thread: no one is waiting for the answer.
-                    with contextlib.suppress(Exception):
+                    try:
                         client.cancel_statement(Id=statement_id)
+                    except (aws.BotoCoreError, aws.ClientError) as exc:
+                        _warn_cancel_failed(statement_id, exc)
             return reply
 
         reply = await self._call(label, execute, **arguments)
         statement_id = reply.get("Id")
         if not isinstance(statement_id, str) or not statement_id:
-            raise AgentLibError(
-                f"query {label!r} on data source {self._name!r} was not accepted by the database"
+            raise UpstreamError(
+                f"query {label!r} on data source {self._name!r} was not accepted by the database",
+                expected="a statement ID from ExecuteStatement",
+                actual="a reply without one",
             )
         return statement_id
 
@@ -474,9 +489,10 @@ class RedshiftDataSource:
                 # The database's message can repeat parameter values, so it is the
                 # detail: shown on a developer's machine, never in deployed logs.
                 message = str(reply.get("Error") or "no message")
-                raise AgentLibError(
+                raise UpstreamError(
                     f"query {label!r} failed on data source {self._name!r} "
                     f"(statement {statement_id})",
+                    code=_FAILED,
                     fix=(
                         "run the query's SQL in the Redshift query editor with the same "
                         "parameters; the statement ID finds it in SYS_QUERY_HISTORY"
@@ -520,15 +536,20 @@ class RedshiftDataSource:
 
     async def _cancel(self, submitted: Sequence[str]) -> None:
         # Best effort: the statement may have ended, or the call may fail as well.
+        # A failed cancellation is logged, because the statement may still be
+        # running at the warehouse and costing money.
         for statement_id in submitted:
-            with contextlib.suppress(Exception):
+            try:
                 await self._sessions.invoke(_WHAT, self._client.cancel_statement, Id=statement_id)
+            except (aws.BotoCoreError, aws.ClientError, AgentLibError) as exc:
+                _warn_cancel_failed(statement_id, exc)
 
     async def _call(self, label: str, operation: Callable[..., Any], **arguments: Any) -> Any:
         try:
             return await self._sessions.invoke(_WHAT, operation, **arguments)
         except (aws.BotoCoreError, aws.ClientError) as exc:
             # The service's message can repeat the statement, so it stays in the cause.
-            raise AgentLibError(
-                f"query {label!r} failed on data source {self._name!r} ({_error_code(exc)})"
+            raise UpstreamError(
+                f"query {label!r} failed on data source {self._name!r} ({_error_code(exc)})",
+                code=_error_code(exc),
             ) from exc

@@ -20,84 +20,29 @@ from fastapi import HTTPException
 
 from ai_agent_lib_ui.adapters.sqlite import now
 from ai_agent_lib_ui.application.chat import view_for
-from ai_agent_lib_ui.contracts.conversations import RunRecord
 from ai_agent_lib_ui.contracts.feedback import FeedbackRecord
 from ai_agent_lib_ui.contracts.queries import ContractError, ErrorCode, PageRequest
-from ai_agent_lib_ui.integrations.answer_format import present_answer
-from ai_agent_lib_ui.integrations.runtime import runtime
+from ai_agent_lib_ui.integrations.answer_format import answer_id, outcome_text
+from ai_agent_lib_ui.integrations.runtime import Runtime
 from ai_agent_lib_ui.integrations.security import current_principal
-
-
-def answer_id(run: RunRecord) -> str:
-    """Keep the accepted message ID stable across sends, refreshes and restarts."""
-    return str(uuid5(NAMESPACE_URL, "agentlib:answer:" + run.run_id))
-
-
-def outcome_text(run: RunRecord) -> str:
-    """Show the answer, usage and trace link; keep evidence in the saved outcome."""
-    usage = run.usage
-    incoming = f"{usage.input_tokens:,}" if usage.input_tokens is not None else "unavailable"
-    outgoing = f"{usage.output_tokens:,}" if usage.output_tokens is not None else "unavailable"
-    elapsed = f"{run.elapsed_ms / 1000:.2f} s" if run.elapsed_ms is not None else "unavailable"
-    metrics = f"Input tokens: {incoming} · Output tokens: {outgoing} · Time: {elapsed}"
-    if usage.cache_read_tokens is not None and usage.input_tokens:
-        metrics += f" · Cache hit: {usage.cache_read_tokens / usage.input_tokens:.1%}"
-    if usage.cache_read_tokens is not None:
-        metrics += f" · Cache read: {usage.cache_read_tokens:,}"
-    if usage.cache_write_tokens is not None:
-        metrics += f" · Cache write: {usage.cache_write_tokens:,}"
-    if usage.kind in {"simulated", "estimated"}:
-        metrics += f" · {usage.kind.capitalize()} usage"
-    if run.trace is not None:
-        # Local Phoenix ships embedded as Agent Lab's trace viewer, so the link text
-        # names the product the user is in, not the tracing backend behind it.
-        metrics += f"\n\n[Open trace in Agent Lab]({run.trace.url})"
-    return _outcome(run) + "\n\n---\n\n" + metrics
-
-
-def _outcome(run: RunRecord) -> str:
-    """Explain incomplete outcomes without presenting a draft as an accepted answer."""
-    if run.state == "completed":
-        body = present_answer(run.answer or "").body
-        if run.artifact_warning == "invalid_artifacts":
-            body += (
-                "\n\nThe answer was saved, but the agent returned an invalid document. "
-                "Check the agent logs before requesting another memo."
-            )
-        return body
-    if run.state == "failed":
-        if run.failure_code == "invalid":
-            return (
-                "The agent could not accept this request or produce a response that passed "
-                "its checks. You can send a new question in this thread."
-            )
-        return (
-            "This request failed. Check the agent logs for the cause. "
-            "You can send a new question in this thread."
-        )
-    if run.state == "unknown":
-        return (
-            "The request outcome is unknown. It may have reached the agent. "
-            "This thread is held to prevent duplicate work. Reopen it to check the agent's "
-            "saved outcome. Reopening never resends the question. If the agent has no "
-            "confirmed outcome, the thread stays held; check the agent logs."
-        )
-    return "The request is still running. Reopen this thread to see its saved outcome."
 
 
 class DataLayer(BaseDataLayer):
     """Authorize framework endpoints and derive their messages from the UI store."""
 
+    def __init__(self, resources: Runtime) -> None:
+        self.resources = resources
+
     async def get_user(self, identifier: str) -> PersistedUser | None:
         """Return only the user authenticated by the parent session."""
-        current_principal()
-        if identifier != runtime().identity:
+        await current_principal(self.resources)
+        if identifier != self.resources.identity:
             raise HTTPException(404, "User not found")
         return PersistedUser(
             id=identifier,
             identifier=identifier,
             createdAt=now().isoformat(),
-            display_name=runtime().settings.identity.subject,
+            display_name=self.resources.settings.identity.subject,
             metadata={"provider": "header"},
         )
 
@@ -107,17 +52,17 @@ class DataLayer(BaseDataLayer):
 
     async def get_thread_author(self, thread_id: str) -> str:
         """Check ownership before exposing the framework author identifier."""
-        await runtime().store.get(current_principal(), thread_id)
-        return runtime().identity
+        await self.resources.store.get(await current_principal(self.resources), thread_id)
+        return self.resources.identity
 
     async def get_thread(self, thread_id: str) -> ThreadDict | None:
         """Restore messages exclusively from durable admitted turns."""
-        principal = current_principal()
-        conversation = await runtime().store.get(principal, thread_id)
+        principal = await current_principal(self.resources)
+        conversation = await self.resources.store.get(principal, thread_id)
         thread = conversation.thread
         view = view_for(principal, thread.scope.application)
         steps: list[StepDict] = []
-        history = await runtime().store.history_page(view, thread_id, PageRequest())
+        history = await self.resources.store.history_page(view, thread_id, PageRequest())
         if history.next_cursor:
             query = urlencode({"cursor": history.next_cursor})
             steps.append(
@@ -163,8 +108,8 @@ class DataLayer(BaseDataLayer):
             "id": thread_id,
             "createdAt": thread.created_at.isoformat(),
             "name": thread.title,
-            "userId": runtime().identity,
-            "userIdentifier": runtime().identity,
+            "userId": self.resources.identity,
+            "userIdentifier": self.resources.identity,
             "tags": [],
             "metadata": {"chat_profile": thread.scope.application},
             "steps": steps,
@@ -175,10 +120,10 @@ class DataLayer(BaseDataLayer):
         self, pagination: Pagination, filters: ThreadFilter
     ) -> PaginatedResponse[ThreadDict]:
         """Return bounded, owner-filtered summaries with a signed cursor."""
-        principal = current_principal()
-        if filters.userId and filters.userId != runtime().identity:
+        principal = await current_principal(self.resources)
+        if filters.userId and filters.userId != self.resources.identity:
             raise HTTPException(404, "User not found")
-        page = await runtime().store.list_owned(
+        page = await self.resources.store.list_owned(
             principal,
             PageRequest(limit=min(max(pagination.first, 1), 100), cursor=pagination.cursor),
             search=filters.search or "",
@@ -188,8 +133,8 @@ class DataLayer(BaseDataLayer):
                 "id": thread.thread_id,
                 "createdAt": thread.created_at.isoformat(),
                 "name": thread.title,
-                "userId": runtime().identity,
-                "userIdentifier": runtime().identity,
+                "userId": self.resources.identity,
+                "userIdentifier": self.resources.identity,
                 "tags": [],
                 "metadata": {"chat_profile": thread.scope.application},
                 "steps": [],
@@ -208,11 +153,11 @@ class DataLayer(BaseDataLayer):
         tags: list[str] | None = None,
     ) -> None:
         """Accept title changes; framework metadata cannot change ownership or agent."""
-        principal = current_principal()
-        if user_id is not None and user_id != runtime().identity:
+        principal = await current_principal(self.resources)
+        if user_id is not None and user_id != self.resources.identity:
             raise HTTPException(404, "User not found")
         try:
-            conversation = await runtime().store.get(principal, thread_id)
+            conversation = await self.resources.store.get(principal, thread_id)
         except ContractError as error:
             # Chainlit writes lifecycle metadata before on_chat_start. Only the
             # application create operation may establish agent binding/ownership.
@@ -220,14 +165,14 @@ class DataLayer(BaseDataLayer):
                 return
             raise
         if name is not None:
-            await runtime().store.change(
+            await self.resources.store.change(
                 view_for(principal, conversation.thread.scope.application), thread_id, title=name
             )
         # Framework session metadata and tags cannot change a stored agent binding.
 
     async def create_step(self, step_dict: StepDict) -> None:
         """Authenticate lifecycle callbacks without persisting framework drafts."""
-        current_principal()
+        await current_principal(self.resources)
         # Chainlit emits drafts and lifecycle steps. Admission/completion, not this
         # callback, owns the transcript transaction in SqliteThreads.
 
@@ -237,38 +182,38 @@ class DataLayer(BaseDataLayer):
 
     async def delete_thread(self, thread_id: str) -> None:
         """Keep destructive framework deletion disabled; provide explicit archiving."""
-        await runtime().store.get(current_principal(), thread_id)
-        raise HTTPException(409, "Use Logs to archive this thread")
+        await self.resources.store.get(await current_principal(self.resources), thread_id)
+        raise HTTPException(409, "Archive this thread from the Conversations page instead")
 
     async def delete_step(self, step_id: str) -> None:
         """Keep the accepted transcript immutable."""
-        current_principal()
+        await current_principal(self.resources)
         raise HTTPException(404, "Message operation unavailable")
 
     async def create_element(self, element: Element) -> None:
         """Keep documents in scoped artifacts, outside Chainlit's element storage."""
-        current_principal()
+        await current_principal(self.resources)
         raise HTTPException(404, "Document elements are not enabled")
 
     async def get_element(self, thread_id: str, element_id: str) -> ElementDict | None:
         """Check the thread owner before reporting unsupported elements."""
-        await runtime().store.get(current_principal(), thread_id)
+        await self.resources.store.get(await current_principal(self.resources), thread_id)
         return None
 
     async def delete_element(self, element_id: str, thread_id: str | None = None) -> None:
         """Keep saved document versions immutable; Chainlit elements are unsupported."""
-        current_principal()
+        await current_principal(self.resources)
         raise HTTPException(404, "Document elements are not enabled")
 
     async def upsert_feedback(self, feedback: Feedback) -> str:
         """Record a judgement of an accepted answer as append-only evidence."""
-        principal = current_principal()
+        principal = await current_principal(self.resources)
         if not feedback.threadId:
             raise HTTPException(404, "Feedback needs a thread")
-        conversation = await runtime().store.get(principal, feedback.threadId)
+        conversation = await self.resources.store.get(principal, feedback.threadId)
         application = conversation.thread.scope.application
         view = view_for(principal, application)
-        history = await runtime().store.history_page(view, feedback.threadId, PageRequest())
+        history = await self.resources.store.history_page(view, feedback.threadId, PageRequest())
         run = next(
             (
                 stored.run
@@ -288,12 +233,12 @@ class DataLayer(BaseDataLayer):
             comment=feedback.comment or "",
             created_at=now().isoformat(),
         )
-        await runtime().feedback.write(record)
+        await self.resources.feedback.write(record)
         return answer_id(run)
 
     async def delete_feedback(self, feedback_id: str) -> bool:
         """Keep judgements append-only; recorded evidence is never unrecorded."""
-        current_principal()
+        await current_principal(self.resources)
         raise HTTPException(404, "Feedback cannot be deleted")
 
     async def get_favorite_steps(self, user_id: str) -> list[StepDict]:
@@ -303,12 +248,12 @@ class DataLayer(BaseDataLayer):
 
     async def build_debug_url(self) -> str:
         """Link to Logs for saved turns and their diagnostics."""
-        current_principal()
+        await current_principal(self.resources)
         return "/logs"
 
     async def close(self) -> None:
-        """Nothing to close: each store operation releases its own short-lived connection.
+        """Release nothing: each store operation closes its own short-lived connection.
 
-        Server resources close in the parent lifespan.
+        The server's shared resources close in the parent application lifespan.
         """
         return None

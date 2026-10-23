@@ -14,16 +14,23 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from ai_agent_lib_core.config import telemetry_enabled
-from ai_agent_lib_core.contracts import ConfigurationError, ServiceConfig
+from ai_agent_lib_core.config import Key, telemetry_enabled, variable_for
+from ai_agent_lib_core.contracts import ConfigurationError, ServiceConfig, TelemetryMode
 
 if TYPE_CHECKING:
     from opentelemetry.sdk.metrics import MeterProvider
     from opentelemetry.sdk.trace import TracerProvider
 
-__all__ = ["build_providers", "configure_telemetry", "start_telemetry"]
+__all__ = [
+    "ambient_provider_installed",
+    "build_providers",
+    "configure_telemetry",
+    "start_telemetry",
+]
 
 _INSTALL = "install it with: pip install 'ai-agent-lib-core[otel]'"
+_UNINSTALLED_PROVIDERS = frozenset({"ProxyTracerProvider", "NoOpTracerProvider"})
+"""The API's own placeholders: what ``get_tracer_provider`` returns until a host installs one."""
 
 
 def build_providers(
@@ -104,16 +111,44 @@ def _nothing_to_flush() -> None:
     return None
 
 
+def ambient_provider_installed() -> bool:
+    """Whether a host has installed a tracer provider, as ``opentelemetry-instrument`` does.
+
+    Only the API is consulted: the provider's class name tells the API's own
+    placeholders from anything a host put in place, without importing the SDK.
+    """
+    from opentelemetry import trace
+
+    return type(trace.get_tracer_provider()).__name__ not in _UNINSTALLED_PROVIDERS
+
+
 def start_telemetry(service: str, config: ServiceConfig | None) -> Callable[[], None]:
     """Install the providers when the configuration turns telemetry on; else do nothing.
 
     A service's entry point calls this once, after logging is set up, and
-    calls what it returns when the service stops.
+    calls what it returns when the service stops. With telemetry ``ambient``
+    nothing is installed: the host's providers are used, and the service fails
+    fast if there are none.
 
     Raises:
-        ConfigurationError: If telemetry is on and the ``otel`` extra is missing.
+        ConfigurationError: If telemetry is on and the ``otel`` extra is
+            missing, or telemetry is ambient and no provider is installed.
     """
     if config is None or not telemetry_enabled(config):
+        return _nothing_to_flush
+    if config.telemetry is TelemetryMode.AMBIENT:
+        if not ambient_provider_installed():
+            own = f"{variable_for(Key.TELEMETRY)}={TelemetryMode.OPENTELEMETRY.value}"
+            raise ConfigurationError(
+                "telemetry is ambient, but no OpenTelemetry provider is installed",
+                expected=f"a process started under opentelemetry-instrument, or {own}",
+                actual="the OpenTelemetry API's placeholder provider",
+                fix=(
+                    "start the service with opentelemetry-instrument (the ADOT distribution "
+                    f"does this on AgentCore Runtime), or set {own} to have the service "
+                    "install its own providers"
+                ),
+            )
         return _nothing_to_flush
     try:
         return configure_telemetry(service)

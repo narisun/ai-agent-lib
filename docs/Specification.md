@@ -455,6 +455,29 @@ servers:
         read_only: true
 ```
 
+A server hosted on an AgentCore runtime is registered by its ARN instead of a
+URL; the invocation URL is derived from it. With `auth: sigv4` the agent signs
+its calls with its own AWS role and needs `bedrock-agentcore:InvokeAgentRuntime`
+on the runtime; with the default `auth: bearer` it presents the exchanged token
+to the runtime's JWT authorizer. A `tool_prefix` says what a gateway or the
+server puts before each tool's name; tools are registered without it.
+
+```yaml
+servers:
+  - id: accounts
+    owner: treasury-data
+    runtime_arn: arn:aws:bedrock-agentcore:us-east-1:123456789012:runtime/accounts_mcp-abc123
+    qualifier: DEFAULT        # optional: the runtime endpoint
+    auth: sigv4               # or bearer (the default)
+    tool_prefix: accounts___  # optional: the server lists accounts___lookup
+    tools:
+      - name: lookup
+        version: 1.2.0
+        schema_sha256: <hash of the tool's input schema>
+        classification: restricted
+        read_only: true
+```
+
 `registry/agents.yaml`:
 
 ```yaml
@@ -649,6 +672,25 @@ Each agent and each MCP server runs as its own ECS service on Fargate, in a task
 - **Health.** Readiness and liveness helpers report container validation and dependency reachability.
 - **Graceful stop.** On SIGTERM the container stops accepting work, lets in-flight runs checkpoint, and closes within the task's stop timeout.
 - **Twelve-factor configuration.** Everything comes from environment variables, so the task definition is the only deployment-specific file.
+
+### AWS AgentCore deployment
+
+The same service can run as an Amazon Bedrock AgentCore Runtime instead: `agentlib deploy SERVICE --target agentcore` reads the same `deploy.env`, with an `AGENTCORE_` block that describes the deployment itself and never reaches the container, and writes a root module that stands alone. The runtime runs one session in one microVM and brings its own identity, memory, gateway and observability services, so the platform replaces the sidecars rather than hosting them.
+
+| Element | Choice |
+| --- | --- |
+| Compute | One runtime per agent or MCP server; a session per microVM, idle and lifetime bounds from `deploy.env` |
+| Contract | The service's `agentcore` profile: HTTP agents on `0.0.0.0:8080` (`POST /invocations`, `GET /ping`), MCP servers on `0.0.0.0:8000` at `/mcp` |
+| Artifact | An ARM64 image in an ECR repository the module creates, or a Python 3.13 zip (`build_zip.py`: ARM64 manylinux wheels, the service, a `main.py` shim) in an S3 bucket it creates |
+| Inbound identity | IAM (callers sign requests and hold `bedrock-agentcore:InvokeAgentRuntime`) or JWT from an OpenID discovery URL with allowed clients, audiences and scopes; the token is passed through to the identity adapter |
+| Policy | No sidecar: the in-process `rules` adapter or an OPA the runtime can reach; Cedar at the gateway is the second layer. `policy=opa` on the loopback address is refused |
+| Telemetry | `EAP_TELEMETRY=ambient`: the runtime starts the process under ADOT's `opentelemetry-instrument`, which owns the providers; the service installs none. `opentelemetry` is refused |
+| State | AgentCore Memory (created by the module or named) or Postgres for checkpoints; SQLite stores are refused, the disk ends with the session |
+| Gateway | Optional: the module creates one with the same inbound identity and one MCP target per MCP server named in `mcp_targets` |
+| AWS access | One execution role trusting `bedrock-agentcore.amazonaws.com`: the adapters' declared statements plus the platform's (artifact, log group, traces and metrics, workload identity) |
+| Network | `PUBLIC`, or `VPC` with subnets and security groups |
+
+The plan prints the runtime (protocol, port, inbound identity, network, artifact, memory, gateway) before the adapters and refuses, naming the variable to change, every setting the platform cannot honour. A service goes to one platform at a time: both targets write to `deploy/<service>/`, and the files written once are the developer's.
 
 **Other targets**
 

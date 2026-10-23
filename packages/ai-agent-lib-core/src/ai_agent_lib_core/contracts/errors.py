@@ -33,8 +33,10 @@ __all__ = [
     "CredentialsExpiredError",
     "ExecutionPaused",
     "IntegrityError",
+    "NotStartedError",
     "PolicyDenied",
     "TransientError",
+    "UpstreamError",
     "ValidationFailed",
     "causes",
     "describe",
@@ -127,6 +129,23 @@ class ConfigurationError(AgentLibError):
     """Configuration is invalid or missing. Raised at startup."""
 
 
+class NotStartedError(ConfigurationError):
+    """An adapter was used before ``start()`` or after ``aclose()``.
+
+    The container starts and closes every adapter; seeing this error means a
+    component was constructed by hand and used without its lifecycle.
+    """
+
+    def __init__(self, what: str, *, detail: str | None = None) -> None:
+        super().__init__(
+            f"{what} is not started",
+            expected="start() to have run and aclose() not to have",
+            actual="a call outside the adapter's lifecycle",
+            fix="obtain the adapter from the service container, which owns its lifecycle",
+            detail=detail,
+        )
+
+
 class CredentialsExpiredError(AgentLibError):
     """A sign-in session or token has expired.
 
@@ -188,6 +207,36 @@ class TransientError(AgentLibError):
 
     retryable: ClassVar[bool] = True
     fallback_allowed: ClassVar[bool] = True
+
+
+class UpstreamError(AgentLibError):
+    """A provider or database answered with an error that is not the caller's doing.
+
+    The request was well formed and permitted, and the failure is not known
+    to be transient: a query the database rejected, a service that gave no
+    verdict. The provider's own message may repeat caller content, so it
+    belongs in ``detail`` or in the cause, never in the message.
+
+    Attributes:
+        code: The provider's short error code, when it gave one.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str | None = None,
+        expected: str | None = None,
+        actual: str | None = None,
+        fix: str | None = None,
+        detail: str | None = None,
+    ) -> None:
+        super().__init__(message, expected=expected, actual=actual, fix=fix, detail=detail)
+        self.code = code
+
+    def facts(self) -> list[tuple[str, str]]:
+        """Return the provider's code first, then expected, got and fix."""
+        return [("code", self.code), *super().facts()] if self.code else super().facts()
 
 
 class IntegrityError(AgentLibError):

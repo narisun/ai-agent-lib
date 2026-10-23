@@ -1,0 +1,44 @@
+output "agent_runtime_arn" {
+  description = "The runtime of {{ name }}. Callers need bedrock-agentcore:InvokeAgentRuntime on it."
+  value       = aws_bedrockagentcore_agent_runtime.this.agent_runtime_arn
+}
+
+output "agent_runtime_id" {
+  description = "The runtime's ID: the one in its log group's name and in the console."
+  value       = aws_bedrockagentcore_agent_runtime.this.agent_runtime_id
+}
+
+output "role_arn" {
+  description = "The role the runtime runs as. It holds what the adapters declared plus what the platform needs."
+  value       = aws_iam_role.runtime.arn
+}
+
+output "log_group_name" {
+  description = "Where the runtime's logs go."
+  value       = aws_cloudwatch_log_group.runtime.name
+}
+
+output "repository_url" {
+  description = "The ECR repository to push the ARM64 image to, or null for a code deployment."
+  value       = local.container ? aws_ecr_repository.this[0].repository_url : null
+}
+
+output "code_bucket" {
+  description = "The bucket the code artifact is uploaded to, or null for a container deployment."
+  value       = local.code ? aws_s3_bucket.code[0].bucket : null
+}
+
+output "memory_id" {
+  description = "The memory the checkpoints go to: the one created here, the one the settings name, or null."
+  value       = local.create_memory ? aws_bedrockagentcore_memory.this[0].id : local.memory_id
+}
+
+output "gateway_id" {
+  description = "The gateway created in front of the runtime, or null."
+  value       = local.make_gateway ? aws_bedrockagentcore_gateway.this[0].gateway_id : null
+}
+
+output "gateway_url" {
+  description = "The MCP endpoint of the created gateway, or null."
+  value       = local.make_gateway ? aws_bedrockagentcore_gateway.this[0].gateway_url : null
+}

@@ -29,6 +29,21 @@ PROFILES = (
     "generated-bedrock",
 )
 
+# The UI tests that start the installed wheel as a server, and what they share.
+UI_PROTOCOL_TESTS = (
+    "test_browser_branding.py",
+    "test_browser_chat.py",
+    "test_browser_resume.py",
+    "test_browser_security.py",
+)
+UI_PROTOCOL_SUPPORT = (
+    "conftest.py",
+    "browser_protocol.py",
+    "chat_support.py",
+    "local_runtime.py",
+    "python_runtime.py",
+)
+
 
 def distribution_paths(wheels: Path, packages: list[str], version: str, *, chat: bool) -> list[str]:
     """Select this checkout's wheels and request the optional chat extra explicitly."""
@@ -125,7 +140,7 @@ def main() -> None:
                 "import sys, importlib.util; "
                 "import ai_agent_lib_ui as ui; "
                 "from ai_agent_lib_ui.application.question_answer import QuestionAnswerAdapter; "
-                "from ai_agent_lib_ui.contracts.ports import DiagnosticReader; "
+                "from ai_agent_lib_ui.contracts.ports import ConversationStore; "
                 "from ai_agent_lib_core.contracts.diagnostics import ModelAttempt; "
                 "assert 'site-packages' in ui.__file__; "
                 "assert not any(n.split('.')[0] in {'langgraph','langchain_core','mcp','chainlit'} "
@@ -142,19 +157,20 @@ def main() -> None:
                 "assert files(ui).joinpath('migrations/001_local.sql').is_file()",
             )
             run("-m", "pip", "install", "pytest>=8.2", "pytest-asyncio>=0.24", "aiohttp>=3.10")
-            suite = work / "test_ui_protocol.py"
-            shutil.copyfile(root / "packages/ai-agent-lib-ui/tests/test_browser_protocol.py", suite)
-            shutil.copyfile(
-                root / "packages/ai-agent-lib-ui/tests/python_runtime.py",
-                work / "python_runtime.py",
-            )
+            # The browser protocol tests, with the fixtures and helpers they share, run
+            # against the installed wheel from a folder that has no source tree.
+            tests = root / "packages/ai-agent-lib-ui/tests"
+            suites = [work / name for name in UI_PROTOCOL_TESTS]
+            for name in (*UI_PROTOCOL_TESTS, *UI_PROTOCOL_SUPPORT):
+                shutil.copyfile(tests / name, work / name)
             config = work / "pytest.ini"
             config.write_text(
                 "[pytest]\nasyncio_mode=auto\nasyncio_default_fixture_loop_scope=function\n"
-                "filterwarnings=error\n",
+                "filterwarnings=error\n"
+                "markers =\n    slow: spawns other processes\n",
                 encoding="utf-8",
             )
-            run("-m", "pytest", "-q", "-c", str(config), str(suite))
+            run("-m", "pytest", "-q", "-c", str(config), *map(str, suites))
         elif args.profile == "aws":
             run(
                 "-c",

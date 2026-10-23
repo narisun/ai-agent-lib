@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize(
     ("ending", "code"),
     [

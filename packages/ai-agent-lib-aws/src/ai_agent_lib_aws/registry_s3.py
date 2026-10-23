@@ -7,6 +7,7 @@ version ID, and that ID is the registry's revision in each audit record.
 
 from __future__ import annotations
 
+import contextlib
 from pathlib import PurePosixPath
 from typing import Any
 
@@ -126,8 +127,8 @@ class S3RegistrySource:
                 raise ConfigurationError(
                     f"{what}: the object does not exist. An empty registry is a document "
                     "with no entries, not a missing one."
-                ) from None
-            raise ConfigurationError(f"{what}: the object could not be read ({code})") from None
+                ) from exc
+            raise ConfigurationError(f"{what}: the object could not be read ({code})") from exc
         except aws.BotoCoreError as exc:
             raise ConfigurationError(
                 f"{what}: the object could not be read ({describe(exc)})"
@@ -141,7 +142,9 @@ class S3RegistrySource:
     def _get(self, **arguments: Any) -> tuple[bytes, str | None]:
         # Runs in a worker thread: reading the body is part of the network call.
         reply = self._client.get_object(**arguments)
-        content = reply["Body"].read(_MAX_BYTES + 1)
+        # Close the streaming body even when the object is larger than the cap.
+        with contextlib.closing(reply["Body"]) as body:
+            content = body.read(_MAX_BYTES + 1)
         version = reply.get("VersionId")
         if not isinstance(version, str) or not version or version == _UNVERSIONED:
             return bytes(content), None

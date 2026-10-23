@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import threading
-import time
 from collections.abc import Callable
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -27,6 +26,7 @@ from ai_agent_lib_core.contracts import (
     RowFilter,
     ServiceConfig,
     TransientError,
+    UpstreamError,
 )
 from ai_agent_lib_core.di import ServiceContainer
 from ai_agent_lib_core.testing import Fakes, FrozenClock, write_accounts_files
@@ -305,7 +305,7 @@ async def test_a_statement_that_gets_no_id_fails(tmp_path: Path) -> None:
     client = Scripted([("a", "int4")], [{"longValue": 1}])
     client.statement_id = None
     source = await scripted_source(tmp_path, client)
-    with pytest.raises(AgentLibError, match="was not accepted"):
+    with pytest.raises(UpstreamError, match="was not accepted"):
         await source.query("everything")
 
 
@@ -338,7 +338,7 @@ async def test_waiting_backs_off_and_stays_under_two_seconds_a_check(tmp_path: P
 async def test_a_statement_the_database_rejects_fails_without_its_message(tmp_path: Path) -> None:
     source, database, _ = await started(tmp_path)
     database.end_as = "FAILED"
-    with pytest.raises(AgentLibError, match="statement-1") as caught:
+    with pytest.raises(UpstreamError, match="statement-1") as caught:
         await source.query("accounts_by_region", {"region": "a-secret-value"})
     assert not isinstance(caught.value, TransientError | ConfigurationError)
     assert "a-secret-value" not in str(caught.value)
@@ -353,6 +353,25 @@ async def test_a_stopped_statement_can_be_tried_again(tmp_path: Path) -> None:
     assert caught.value.retryable
 
 
+def hold_accept(database: FakeRedshiftData) -> threading.Event:
+    """Make the database accept the next statement only once the returned event is set."""
+    accept = database.execute_statement
+    release = threading.Event()
+
+    def held_accept(**request: Any) -> dict[str, Any]:
+        assert release.wait(5), "the test never released the held statement"
+        return accept(**request)
+
+    database.execute_statement = held_accept  # type: ignore[method-assign]
+    return release
+
+
+# The adapter's query deadline is asyncio's own timeout, so the four tests
+# marked slow run on the real clock with a 50 ms deadline. They wait on events
+# and on the loop settling, never on a fixed sleep.
+
+
+@pytest.mark.slow
 async def test_a_statement_that_runs_too_long_is_cancelled(tmp_path: Path) -> None:
     source, database, _ = await started(tmp_path, timeout_seconds=0.05)
     database.end_as = "STARTED"
@@ -361,22 +380,18 @@ async def test_a_statement_that_runs_too_long_is_cancelled(tmp_path: Path) -> No
     assert database.cancelled == ["statement-1"]
 
 
+@pytest.mark.slow
 async def test_r12_a_statement_accepted_after_the_deadline_is_still_cancelled(
     tmp_path: Path,
 ) -> None:
     source, database, _ = await started(tmp_path, timeout_seconds=0.05)
     database.end_as = "STARTED"
-    accept = database.execute_statement
-
-    def slow_accept(**request: Any) -> dict[str, Any]:
-        time.sleep(0.3)  # the database answers well after the query's deadline
-        return accept(**request)
-
-    database.execute_statement = slow_accept  # type: ignore[method-assign]
+    release = hold_accept(database)  # the database answers only after the query's deadline
     with pytest.raises(TransientError, match=r"longer than 0\.05 seconds"):
         await source.query("all_accounts")
     assert database.cancelled == []  # no ID yet when the deadline passed
 
+    release.set()
     await source.aclose()  # waits for the cancellation still owed
     assert database.cancelled == ["statement-1"]
 
@@ -385,8 +400,7 @@ async def test_a_cancelled_call_cancels_its_statement(tmp_path: Path) -> None:
     source, database, _ = await started(tmp_path)
     database.end_as = "STARTED"
     call = asyncio.ensure_future(source.query("all_accounts"))
-    while not database.requests:
-        await asyncio.sleep(0.005)
+    await until(lambda: bool(database.requests))
     call.cancel()
     with pytest.raises(asyncio.CancelledError):
         await call
@@ -396,7 +410,7 @@ async def test_a_cancelled_call_cancels_its_statement(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("failure", "expected", "text"),
     [
-        (client_error("ValidationException", "ExecuteStatement"), AgentLibError, "Validation"),
+        (client_error("ValidationException", "ExecuteStatement"), UpstreamError, "Validation"),
         (
             client_error("AccessDeniedException", "ExecuteStatement", status=403),
             ConfigurationError,
@@ -522,53 +536,92 @@ async def held_submission(
     monkeypatch.setattr(data_redshift, "_CLEANUP_SECONDS", 0.05)
     source, database, _ = await started(tmp_path, timeout_seconds=0.05)
     database.end_as = "STARTED"
-    accept = database.execute_statement
-    release = threading.Event()
-
-    def held_accept(**request: Any) -> dict[str, Any]:
-        release.wait(5)
-        return accept(**request)
-
-    database.execute_statement = held_accept  # type: ignore[method-assign]
+    release = hold_accept(database)
     with pytest.raises(TransientError):
         await source.query("all_accounts")
     return source, database, release
 
 
-async def until(condition: Callable[[], bool]) -> None:
-    for _ in range(200):
-        if condition():
-            return
-        await asyncio.sleep(0.01)
+async def until(condition: Callable[[], bool], *, timeout: float = 5.0) -> None:
+    """Wait for ``condition`` to hold, failing after ``timeout`` seconds."""
+    async with asyncio.timeout(timeout):
+        while not condition():
+            await asyncio.sleep(0.01)
 
 
+def others_running(*excluded: asyncio.Future[Any] | None) -> bool:
+    """Whether any task other than the current one and ``excluded`` is still running."""
+    skipped = {asyncio.current_task(), *excluded}
+    return any(not task.done() for task in asyncio.all_tasks() if task not in skipped)
+
+
+@pytest.mark.slow
 async def test_f4_a_statement_accepted_after_close_gave_up_is_still_cancelled_once(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source, database, release = await held_submission(tmp_path, monkeypatch)
-    started_at = time.monotonic()
-    await source.aclose()  # the close wait ends while the worker still holds the statement
-    assert time.monotonic() - started_at < 1
+    async with asyncio.timeout(1):
+        await source.aclose()  # the close wait ends while the worker still holds the statement
     assert database.cancelled == []
 
     release.set()
     await until(lambda: bool(database.cancelled))
-    await asyncio.sleep(0.05)
+    await until(lambda: not others_running())  # nothing more can happen on the loop
     assert database.cancelled == ["statement-1"]
 
 
+@pytest.mark.slow
 async def test_f4_cancelling_close_itself_does_not_lose_the_statement(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source, database, release = await held_submission(tmp_path, monkeypatch)
     monkeypatch.setattr(data_redshift, "_CLEANUP_SECONDS", 5.0)
     closing = asyncio.ensure_future(source.aclose())
-    await asyncio.sleep(0.02)
+    await until(lambda: others_running(closing))  # close is waiting on the held worker
     closing.cancel()
     with pytest.raises(asyncio.CancelledError):
         await closing
 
     release.set()
     await until(lambda: bool(database.cancelled))
-    await asyncio.sleep(0.05)
+    await until(lambda: not others_running())
     assert database.cancelled == ["statement-1"]
+
+
+async def test_a_rejected_statement_carries_the_database_status_as_its_code(
+    tmp_path: Path,
+) -> None:
+    source, database, _ = await started(tmp_path)
+    database.end_as = "FAILED"
+    with pytest.raises(UpstreamError) as caught:
+        await source.query("all_accounts")
+    assert caught.value.code == "FAILED"
+    assert "code: FAILED" in str(caught.value)
+
+
+async def test_a_cancellation_that_fails_is_logged_with_the_statement_id(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    source, database, _ = await started(tmp_path, timeout_seconds=0.05)
+    database.end_as = "STARTED"
+
+    def refuse(*, Id: str) -> dict[str, Any]:  # noqa: N803 - the SDK's name
+        raise client_error("ValidationException", "CancelStatement")
+
+    database.cancel_statement = refuse  # type: ignore[method-assign]
+    with caplog.at_level("WARNING"), pytest.raises(TransientError, match="longer than"):
+        await source.query("all_accounts")
+    warnings = [r for r in caplog.records if r.getMessage() == "redshift.cancel_failed"]
+    assert len(warnings) == 1
+    assert getattr(warnings[0], "statement_id", None) == "statement-1"
+    assert getattr(warnings[0], "error_type", None) == "ValidationException"
+
+
+async def test_an_sdk_failure_keeps_the_sdk_error_as_its_cause(tmp_path: Path) -> None:
+    source, database, _ = await started(tmp_path)
+    database.fail_with = client_error("ValidationException", "ExecuteStatement")
+    with pytest.raises(UpstreamError) as caught:
+        await source.query("accounts_by_region", {"region": "west"})
+    assert isinstance(caught.value.__cause__, aws.ClientError)
+    assert caught.value.code == "ValidationException"
+    assert "the service's own message" not in str(caught.value)

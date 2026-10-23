@@ -12,8 +12,10 @@ from ai_agent_lib_core.contracts.errors import (
     CredentialsExpiredError,
     ExecutionPaused,
     IntegrityError,
+    NotStartedError,
     PolicyDenied,
     TransientError,
+    UpstreamError,
     ValidationFailed,
 )
 
@@ -27,6 +29,8 @@ TAXONOMY: dict[type[AgentLibError], tuple[bool, bool]] = {
     TransientError: (True, True),
     IntegrityError: (False, False),
     ValidationFailed: (False, False),
+    NotStartedError: (False, False),
+    UpstreamError: (False, False),
 }
 
 

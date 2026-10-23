@@ -1,0 +1,29 @@
+# The image of {{ name }} for AgentCore Runtime, which runs ARM64 containers.
+# Build and push it from the workspace folder (see README.md):
+#   docker buildx build --platform linux/arm64 -f deploy/{{ name }}/Dockerfile -t <repository>:<tag> --push .
+FROM --platform=linux/arm64 python:{{ python }}-slim
+
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /app
+COPY deploy/{{ name }}/requirements.lock /tmp/requirements.lock
+RUN python -m pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock
+# The runtime expects the process under opentelemetry-instrument, which this ADOT
+# distribution provides. It installs the tracer and meter providers before the
+# service's code runs; the service uses them when its telemetry is ambient, and
+# sends nothing of its own when it is off.
+RUN python -m pip install --no-cache-dir "aws-opentelemetry-distro>=0.18.0"
+# Dockerfile.dockerignore admits only this service's code and runtime assets.
+COPY {{ folder }} {{ folder }}
+COPY registry registry
+COPY policies policies
+RUN python -m pip install --no-cache-dir --no-deps ./{{ folder }}
+
+# The service runs as a user with no rights over its own code.
+RUN useradd --system --uid 10001 --no-create-home service
+USER 10001
+WORKDIR /app/{{ folder }}
+# AgentCore Runtime reaches an HTTP agent on 8080 and an MCP server on 8000.
+EXPOSE {{ port }}
+CMD {{ command_json }}

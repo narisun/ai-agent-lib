@@ -7,10 +7,11 @@ import hashlib
 import json
 import logging
 import math
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
+from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 from uuid import UUID
 
 from langchain_core.callbacks import BaseCallbackHandler
@@ -21,12 +22,16 @@ from opentelemetry.trace import Span, Status, StatusCode, set_span_in_context
 from ai_agent_lib_core.contracts import (
     ConfigurationError,
     ModelTraceSink,
+    RegistrySource,
     RequestContext,
+    ServiceConfig,
 )
 from ai_agent_lib_core.contracts.structured import model_safe_name
+from ai_agent_lib_core.integrations.langgraph._trace_schema import SpanSchema, TraceSettings
 from ai_agent_lib_core.integrations.langgraph.context import current_diagnostic_links
 from ai_agent_lib_core.integrations.langgraph.model_trace import diagnostic_content
 from ai_agent_lib_core.integrations.langgraph.tools import current_native_tool_wrapper
+from ai_agent_lib_core.observability.model_trace import JsonlModelTraceSink
 from ai_agent_lib_core.observability.trace_links import publish_trace
 from ai_agent_lib_core.observability.usage import normalize_usage
 from ai_agent_lib_core.pipeline import bind_request_context
@@ -34,16 +39,30 @@ from ai_agent_lib_core.pipeline import bind_request_context
 if TYPE_CHECKING:
     from opentelemetry.sdk.trace.export import SpanExporter
 
-    from ai_agent_lib_core.di.container import ServiceContainer
+TurnResponse = Callable[[Any, RequestContext, Any], Awaitable[dict[str, Any]]]
+"""An agent's response function for :meth:`AgentTracing.observe`.
 
-from ai_agent_lib_core.integrations.langgraph._trace_schema import SpanSchema, TraceSettings
+It receives the observed graph, the request context and the input, and returns
+the agent's existing output dictionary.
+"""
 
-GraphResponse = Callable[[Any, "ServiceContainer", RequestContext, Any], Awaitable[dict[str, Any]]]
+GraphResponse = Callable[[Any, Any, RequestContext, Any], Awaitable[dict[str, Any]]]
+"""An agent's response function for :meth:`AgentTracing.run`.
+
+Like :data:`TurnResponse`, but it also receives the agent's services object
+exactly as it was passed to ``run``, between the graph and the request context.
+"""
+
+InvocationArguments = Callable[[RequestContext], Mapping[str, Any]]
+"""Return the ``ainvoke`` arguments for one request; ``["config"]`` locates its checkpoints."""
 
 _LOG = logging.getLogger(__name__)
 # The most serialized JSON text kept on one span, counted in characters, not bytes.
 # Longer content is replaced by a ``truncated`` marker with a preview of this length.
 _CONTENT_LIMIT = 262_144
+_OTEL_EXTRA = 'python -m pip install "ai-agent-lib-core[otel]"'
+
+T = TypeVar("T", bound="AgentTracing")
 
 
 @dataclass
@@ -68,6 +87,47 @@ def _content(schema: SpanSchema, span: Span, kind: str, value: object) -> None:
         text = json.dumps({"truncated": True, "preview": text[:_CONTENT_LIMIT]})
         schema.metadata(span, f"{kind}_truncated", True)
     schema.content(span, kind, text)
+
+
+def otlp_exporter(endpoint: str, *, headers: Mapping[str, str], backend: str) -> SpanExporter:
+    """Build the OTLP/HTTP exporter only once a backend is enabled.
+
+    The OpenTelemetry SDK is an optional extra, so the import happens here
+    rather than at module load: disabled tracing must work without it.
+
+    Args:
+        endpoint: The backend's trace ingestion URL.
+        headers: Authentication and protocol headers; credentials never reach a URL.
+        backend: The backend's name, for the message when the extra is missing.
+
+    Raises:
+        ConfigurationError: If the optional OpenTelemetry extra is not installed.
+    """
+    try:
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+    except ImportError as error:
+        raise ConfigurationError(f"{backend} export needs: {_OTEL_EXTRA}") from error
+    return OTLPSpanExporter(endpoint=endpoint, headers=dict(headers), timeout=5)
+
+
+def local_model_trace(config: ServiceConfig) -> ModelTraceSink | None:
+    """Return the configured JSONL model trace, an independent destination beside any exporter."""
+    return JsonlModelTraceSink(config.model_trace_path) if config.model_trace_path else None
+
+
+@asynccontextmanager
+async def tracing_lifetime(tracing: T | None) -> AsyncIterator[T | None]:
+    """Own one optional tracing adapter for a service lifetime.
+
+    The caller constructs the adapter, with its settings, exporter and local
+    sink already decided, or passes ``None`` for disabled tracing. On exit the
+    adapter is flushed and closed off the event loop, after requests drained.
+    """
+    try:
+        yield tracing
+    finally:
+        if tracing is not None:
+            await asyncio.to_thread(tracing.close)
 
 
 class _ToolSpans(BaseCallbackHandler):
@@ -137,6 +197,24 @@ class _ToolSpans(BaseCallbackHandler):
             span.end()
 
 
+def _turn_dependencies(services: object) -> tuple[RegistrySource, InvocationArguments]:
+    """Derive the turn's collaborators from a service container.
+
+    This is what the deprecated ``run`` convenience does for existing agents;
+    new callers give :meth:`AgentTracing.observe` the two collaborators directly.
+    """
+    registry = getattr(services, "registry", None)
+    invocation = getattr(services, "invocation", None)
+    if registry is None or not callable(invocation):
+        raise ConfigurationError(
+            "agent tracing: the turn's tool registry and invocation arguments are not available",
+            expected="a service container as services, or observe() with registry= and invocation=",
+            actual=f"services of type {type(services).__name__} without them",
+            fix="call observe(..., registry=services.registry, invocation=services.invocation)",
+        )
+    return registry, invocation
+
+
 class AgentTracing:
     """Own a trace exporter and, optionally, also feed the local JSONL model-trace sink.
 
@@ -162,16 +240,19 @@ class AgentTracing:
         checkpoint_timeout_seconds: float = 1.0,
     ) -> None:
         if not math.isfinite(checkpoint_timeout_seconds) or checkpoint_timeout_seconds <= 0:
-            raise ValueError("checkpoint_timeout_seconds must be finite and positive")
+            raise ConfigurationError(
+                "agent tracing: checkpoint_timeout_seconds is not usable",
+                expected="a finite number of seconds greater than zero",
+                actual=repr(checkpoint_timeout_seconds),
+                fix="give the tracing a positive checkpoint read deadline, such as 1.0",
+            )
         self.checkpoint_timeout_seconds = checkpoint_timeout_seconds
         try:
             from opentelemetry.sdk.resources import Resource
             from opentelemetry.sdk.trace import SpanLimits, TracerProvider
             from opentelemetry.sdk.trace.export import BatchSpanProcessor
         except ImportError as error:
-            raise ConfigurationError(
-                'Agent tracing needs: python -m pip install "ai-agent-lib-core[otel]"'
-            ) from error
+            raise ConfigurationError(f"Agent tracing needs: {_OTEL_EXTRA}") from error
         self.application = application
         self.settings = settings
         self.local_sink = local_sink
@@ -189,13 +270,22 @@ class AgentTracing:
         """Fan out sanitized provider events; each diagnostic destination fails independently."""
         try:
             self._model_event(record)
-        except Exception:  # noqa: BLE001 - diagnostics must not discard an accepted answer
-            _LOG.warning("agent_tracing.model_record_failed")
+        except Exception as error:  # noqa: BLE001 - diagnostics must not discard an accepted answer
+            _LOG.warning(
+                "agent_tracing.model_record_failed",
+                extra={"error_type": type(error).__name__, "request_id": record.get("request_id")},
+            )
         if self.local_sink is not None:
             try:
                 await self.local_sink.write(record)
-            except Exception:  # noqa: BLE001 - destinations fail independently
-                _LOG.warning("agent_tracing.local_record_failed")
+            except Exception as error:  # noqa: BLE001 - destinations fail independently
+                _LOG.warning(
+                    "agent_tracing.local_record_failed",
+                    extra={
+                        "error_type": type(error).__name__,
+                        "request_id": record.get("request_id"),
+                    },
+                )
 
     def _model_event(self, record: Mapping[str, object]) -> None:
         """Open a span for a model request, or finish it with its response or error."""
@@ -250,18 +340,71 @@ class AgentTracing:
     async def run(
         self,
         graph: Any,
-        services: ServiceContainer,
+        services: Any,
         context: RequestContext,
         given: Any,
         *,
         respond: GraphResponse,
     ) -> dict[str, Any]:
+        """Observe one turn of an agent that holds a service container.
+
+        Deprecated convenience: the container supplies the tool registry and the
+        invocation arguments, and ``respond`` receives it between the graph and
+        the request context. New agents call :meth:`observe` with those two
+        collaborators and a three-argument response function instead.
+
+        Args:
+            graph: The compiled graph; tool callbacks are added to a copy.
+            services: The agent's service container, passed through to ``respond``.
+            context: The authenticated request.
+            given: The agent's input.
+            respond: The agent's response function.
+
+        Raises:
+            ConfigurationError: If ``services`` has no registry or invocation.
+        """
+        registry, invocation = _turn_dependencies(services)
+
+        async def respond_with_services(
+            observed: Any, turn_context: RequestContext, turn_input: Any
+        ) -> dict[str, Any]:
+            return await respond(observed, services, turn_context, turn_input)
+
+        return await self.observe(
+            graph,
+            context,
+            given,
+            respond=respond_with_services,
+            registry=registry,
+            invocation=invocation,
+        )
+
+    async def observe(
+        self,
+        graph: Any,
+        context: RequestContext,
+        given: Any,
+        *,
+        respond: TurnResponse,
+        registry: RegistrySource,
+        invocation: InvocationArguments,
+    ) -> dict[str, Any]:
         """Run the agent's response function once and add optional trace metadata.
 
-        ``respond`` receives a graph with tool callbacks, the container, request
-        context and input. It returns the agent's existing output dictionary.
-        An ``answer`` field is used as root output when present; other output
-        shapes are recorded as a whole. Graph state and business nodes stay unchanged.
+        ``respond`` receives a graph with tool callbacks, the request context and
+        the input. It returns the agent's existing output dictionary. An
+        ``answer`` field is used as root output when present; other output shapes
+        are recorded as a whole. Graph state and business nodes stay unchanged.
+
+        Args:
+            graph: The compiled graph; tool callbacks are added to a copy.
+            context: The authenticated request.
+            given: The agent's input.
+            respond: The agent's response function.
+            registry: Where registered MCP servers and tools come from, so tool
+                spans can name their server.
+            invocation: Returns the ``ainvoke`` arguments for a request; its
+                ``config`` locates the request's checkpoints.
         """
         session = hashlib.sha256(
             json.dumps(
@@ -295,7 +438,7 @@ class AgentTracing:
                 attributes,
                 {
                     model_safe_name(tool.name): (server.id, tool.name)
-                    for server in services.registry.tools.entries()
+                    for server in registry.tools.entries()
                     for tool in server.tools
                 },
             )
@@ -305,7 +448,7 @@ class AgentTracing:
                     _content(self.schema, root, "input", given)
                 # LangGraph merges these with the graph's existing callbacks.
                 observed_graph = graph.with_config(callbacks=[self.tools])
-                output = await respond(observed_graph, services, context, given)
+                output = await respond(observed_graph, context, given)
                 if self.settings.capture_content:
                     _content(self.schema, root, "output", output.get("answer", output))
                 artifacts = output.get("artifacts")
@@ -320,7 +463,7 @@ class AgentTracing:
                         ]
                     ),
                 )
-                await self._checkpoints(graph, services, context, root)
+                await self._checkpoints(graph, invocation, context, root)
                 output = dict(output)
                 output["trace"] = link
                 return output
@@ -330,7 +473,7 @@ class AgentTracing:
                 if isinstance(error, Exception):
                     # Failed nodes still leave useful input/router checkpoints.
                     # Cancellation must propagate without another diagnostic read.
-                    await self._checkpoints(graph, services, context, root)
+                    await self._checkpoints(graph, invocation, context, root)
                 raise
             finally:
                 self.schema.metadata(root, "model_calls", turn.model_calls)
@@ -342,7 +485,7 @@ class AgentTracing:
                 _current.reset(token)
 
     async def _checkpoints(
-        self, graph: Any, services: ServiceContainer, context: RequestContext, root: Span
+        self, graph: Any, invocation: InvocationArguments, context: RequestContext, root: Span
     ) -> None:
         """Bound optional history reads; cancellation of the request still propagates."""
         try:
@@ -352,7 +495,7 @@ class AgentTracing:
             async with asyncio.timeout(self.checkpoint_timeout_seconds):
                 with bind_request_context(context):
                     history = graph.aget_state_history(
-                        services.invocation(context)["config"],
+                        invocation(context)["config"],
                         filter={"agentlib_request_id": context.request_id},
                         limit=65,
                     )

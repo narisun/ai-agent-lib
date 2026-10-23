@@ -21,6 +21,6 @@ def load_prompt(agent: str, prompt_type: str, version: int) -> str:
 
 
 # Pin each resource explicitly. A new file does not silently change a running agent.
-COMMON = load_prompt("rmprep", "common", 5)
+COMMON = load_prompt("rmprep", "common", 6)
 MEMO_PROMPT = COMMON + load_prompt("memoagent", "system", 2)
 QNA_PROMPT = COMMON + load_prompt("qnaagent", "system", 3)

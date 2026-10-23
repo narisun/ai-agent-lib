@@ -3,25 +3,29 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
 from collections.abc import Sequence
 
 from ai_agent_lib_core import ServiceConfig, ServiceContainer
-from ai_agent_lib_core.config import log_resolution_warnings, service_resolver
 from ai_agent_lib_core.contracts import DeploymentEnv
-from ai_agent_lib_core.integrations.http import ServiceLifecycle, add_health_routes, serve
-from ai_agent_lib_core.integrations.mcp import verify_registration
-from ai_agent_lib_core.observability import (
-    configure_logging,
-    report_error,
-    shows_details,
-    start_telemetry,
+from ai_agent_lib_core.integrations.http import (
+    ServiceLifecycle,
+    add_health_routes,
+    run_service,
+    serve,
 )
+from ai_agent_lib_core.integrations.mcp import verify_registration
 
 from {{ package }}.server import APPLICATION, SERVER_ID, build_server
 from {{ package }}.settings import ENV_FILE
 
-__all__ = ["main"]
+__all__ = ["PROFILES", "main"]
+
+# How the server listens: the library's own contract, or a hosting platform's.
+# AgentCore Runtime reaches an MCP server at 0.0.0.0:8000/mcp.
+PROFILES: dict[str, tuple[str, int]] = {
+    "standard": ("127.0.0.1", {{ port }}),
+    "agentcore": ("0.0.0.0", 8000),  # the platform reaches the container at any address
+}
 
 
 async def _serve(config: ServiceConfig, host: str, port: int) -> None:
@@ -36,6 +40,10 @@ async def _serve(config: ServiceConfig, host: str, port: int) -> None:
             local = services.config.deployment_env is DeploymentEnv.LOCAL
             await verify_registration(server, entry, require_pins=not local)
         app = server.streamable_http_app(stateless_http=True, json_response=True, host=host)
+        # An identity provider that trusts the hosting platform's perimeter gets a
+        # door that refuses requests the perimeter did not send; any other
+        # identity provider leaves the app unchanged.
+        app = services.mcp_door(app)
         # serve() runs services.validate() once it is listening, and on SIGTERM
         # lets the calls in flight finish before it returns.
         await serve(app, lifecycle, host=host, port=port)
@@ -44,30 +52,28 @@ async def _serve(config: ServiceConfig, host: str, port: int) -> None:
 def main(argv: Sequence[str] | None = None) -> int:
     """Serve until stopped. SIGTERM lets calls in flight finish first."""
     parser = argparse.ArgumentParser(prog="{{ name }}", description=__doc__)
-    parser.add_argument("--host", default="127.0.0.1", help="address to listen on")
-    parser.add_argument("--port", type=int, default={{ port }}, help="port to listen on")
+    parser.add_argument(
+        "--profile", choices=sorted(PROFILES), default="standard",
+        help="how to listen: standard, or agentcore (0.0.0.0:8000)",
+    )
+    parser.add_argument("--host", help="address to listen on (the profile's by default)")
+    parser.add_argument("--port", type=int, help="port to listen on (the profile's by default)")
     arguments = parser.parse_args(argv)
-    config: ServiceConfig | None = None
-    try:
-        # explain() rather than resolve(): the same configuration, plus the deprecation
-        # warnings, which the service's log shows once logging is set up.
-        resolution = service_resolver(ENV_FILE).explain()
-        config = resolution.config
-        # One line of JSON per event on standard output, set up before the server
-        # is built so that nothing else sets up logging first. On a developer's
-        # machine a line about an error also says what the error said.
-        configure_logging(APPLICATION, details=shows_details(config))
-        log_resolution_warnings(resolution)
-        # Traces and metrics go to the collector when the settings turn them on.
-        stop_telemetry = start_telemetry(APPLICATION, config)
-        try:
-            asyncio.run(_serve(config, arguments.host, arguments.port))
-        finally:
-            stop_telemetry()  # the last spans and metrics are flushed
-    except Exception as error:
-        # What went wrong, what was expected, and the line of this code to look at.
-        return report_error("{{ name }}", error, details=shows_details(config))
-    return 0
+    host, port = PROFILES[arguments.profile]
+    host = arguments.host if arguments.host is not None else host
+    port = arguments.port if arguments.port is not None else port
+    # Configuration, logging (set up before the server is built, so that nothing
+    # else sets up logging first), the deprecation warnings a configuration read
+    # from an old variable spelling earns (told once, in the log), telemetry and
+    # the explanation of a failure are the library's entry-point wiring; this
+    # module only says what to serve.
+    return run_service(
+        APPLICATION,
+        lambda config: _serve(config, host, port),
+        env_file=ENV_FILE,
+        program="{{ name }}",
+    )
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

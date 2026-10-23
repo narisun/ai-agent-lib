@@ -155,7 +155,7 @@ async def test_background_failure_does_not_cancel_other_adapters_cleanup() -> No
     log.clear()
     trigger.set()
     async with asyncio.timeout(2):
-        while not services._closed:
+        while not services.closed:
             await asyncio.sleep(0)
     with pytest.raises(ExceptionGroup) as caught:
         await services.aclose()
@@ -273,7 +273,7 @@ async def test_secondary_background_failure_cannot_interrupt_startup_cleanup() -
         await asyncio.sleep(0)
         try:
             assert not starting.done()
-            assert not services._closed
+            assert not services.closed
         finally:
             release.set()
         with pytest.raises(ExceptionGroup) as caught:

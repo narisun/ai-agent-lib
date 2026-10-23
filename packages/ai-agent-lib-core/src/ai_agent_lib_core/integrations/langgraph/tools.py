@@ -15,6 +15,7 @@ from langchain_core.tools import tool as as_tool
 from langchain_core.utils.pydantic import get_fields
 from pydantic import PrivateAttr
 
+from ai_agent_lib_core.contracts import ConfigurationError, ValidationFailed
 from ai_agent_lib_core.integrations.langgraph.bridge import LoopBridge
 from ai_agent_lib_core.integrations.langgraph.context import current_request_context
 from ai_agent_lib_core.pipeline import (
@@ -25,7 +26,7 @@ from ai_agent_lib_core.pipeline import (
     bind_request_context,
 )
 
-__all__ = ["GovernedTool", "govern_tools"]
+__all__ = ["GovernedTool", "GovernedToolBase", "govern_tools"]
 
 _TOOL_CALL = "tool_call"
 _LOG = logging.getLogger(__name__)
@@ -82,51 +83,20 @@ class _Invocation:
     reply: ToolMessage | None = field(default=None)
 
 
-class GovernedTool(BaseTool):
-    """A tool that sends every call through the tool pipeline.
+class GovernedToolBase(BaseTool):
+    """What every governed tool shares: its entry points run each call through the pipeline.
 
-    It has the same name, description and argument schema as the tool it wraps,
-    so a model and a ``ToolNode`` see no difference. The native features keep
-    working: injected state, store, runtime and tool call ID reach the wrapped
-    tool; a ``Command`` it returns is passed back unchanged; and an artifact
-    returned with ``response_format="content_and_artifact"`` stays on the
-    tool message.
-
-    Policy and guardrails see only the arguments a model supplied. Arguments
-    the framework injects, such as graph state, are not tool input. A
-    ``Command`` is the tool author's own instruction to the graph, so messages
-    inside it are not framed; the audit record says when a result was not.
+    A subclass decides what one call is. Its builder binds ``_handler`` to the
+    pipeline with the subclass's own inner step, and the subclass implements
+    ``_make_call`` (the ``ToolCall`` the pipeline sees), ``_argument_names``
+    (how a single plain input is named) and, if the pipeline's result must be put
+    back on a richer reply, ``_released``.
     """
 
     read_only: bool = False
 
-    _inner: BaseTool = PrivateAttr()
-    _injected: frozenset[str] = PrivateAttr(default=frozenset())
     _handler: Handler[ToolCall, Any] = PrivateAttr()
     _bridge: Callable[[], LoopBridge] = PrivateAttr()
-
-    @classmethod
-    def wrap(
-        cls,
-        inner: BaseTool,
-        *,
-        pipeline: Pipeline[ToolStage, ToolCall, Any],
-        bridge: Callable[[], LoopBridge],
-        read_only: bool = False,
-    ) -> Self:
-        """Return a governed tool that delegates to ``inner``."""
-        governed = cls(
-            name=inner.name,
-            description=inner.description,
-            args_schema=inner.args_schema,
-            return_direct=inner.return_direct,
-            read_only=read_only,
-        )
-        governed._inner = inner
-        governed._injected = _injected_arguments(inner)
-        governed._handler = pipeline.bind(governed._call_inner)
-        governed._bridge = bridge
-        return governed
 
     # ------------------------------------------------------------ entry points
 
@@ -156,7 +126,110 @@ class GovernedTool(BaseTool):
         finally:
             _TOOL_CALL_ID.reset(token)
 
+    # ------------------------------------------------------- subclass's part
+
+    def _make_call(self, arguments: dict[str, Any], config: RunnableConfig) -> ToolCall:
+        """Return the call the pipeline governs, built on the caller's side."""
+        raise NotImplementedError
+
+    def _argument_names(self) -> Sequence[str]:
+        """Return the names a model may write, in the order the schema gives them."""
+        raise NotImplementedError
+
+    def _released(self, call: ToolCall, result: Any) -> Any:  # noqa: ARG002 - a hook
+        """Return what the caller gets once the pipeline released ``result``."""
+        return result
+
     # ------------------------------------------------------------------- calls
+
+    def _parse_input(
+        self,
+        tool_input: str | dict[str, Any],
+        tool_call_id: str | None,  # noqa: ARG002 - the base class names it
+    ) -> str | dict[str, Any]:
+        """Pass the input on as it came: the arguments are validated inside the pipeline.
+
+        LangChain validates here, before ``_arun``. A malformed call would then
+        never reach the pipeline, so no policy decision or audit record would
+        show it. The same schema is applied inside, with the same error.
+        """
+        return dict(tool_input) if isinstance(tool_input, dict) else tool_input
+
+    def _keywords(self, args: tuple[Any, ...], kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Name a single plain input, as LangChain does for a tool with one argument.
+
+        Raises:
+            ValidationFailed: If positional input cannot be named: more than one
+                value, a mix with named ones, or a tool that takes no arguments.
+        """
+        if not args:
+            return kwargs
+        names = list(self._argument_names())
+        if len(args) == 1 and not kwargs and names:
+            return {names[0]: args[0]}
+        raise ValidationFailed(
+            f"tool {self.name!r} takes its arguments by name",
+            expected=(
+                f"a mapping with the keys {', '.join(names)}" if names else "no arguments at all"
+            ),
+            actual=f"{len(args)} positional value{'s' if len(args) != 1 else ''}"
+            + (f" and {len(kwargs)} named" if kwargs else ""),
+            fix="call the tool with a mapping of argument names to values",
+        )
+
+    async def _arun(self, *args: Any, config: RunnableConfig, **kwargs: Any) -> Any:
+        call = self._make_call(self._keywords(args, kwargs), config)
+        return self._released(call, await self._handler(call))
+
+    def _run(self, *args: Any, config: RunnableConfig, **kwargs: Any) -> Any:
+        call = self._make_call(self._keywords(args, kwargs), config)
+        return self._released(call, self._bridge().run(lambda: self._handler(call)))
+
+
+class GovernedTool(GovernedToolBase):
+    """A tool that sends every call through the tool pipeline.
+
+    It has the same name, description and argument schema as the tool it wraps,
+    so a model and a ``ToolNode`` see no difference. The native features keep
+    working: injected state, store, runtime and tool call ID reach the wrapped
+    tool; a ``Command`` it returns is passed back unchanged; and an artifact
+    returned with ``response_format="content_and_artifact"`` stays on the
+    tool message.
+
+    Policy and guardrails see only the arguments a model supplied. Arguments
+    the framework injects, such as graph state, are not tool input. A
+    ``Command`` is the tool author's own instruction to the graph, so messages
+    inside it are not framed; the audit record says when a result was not.
+    """
+
+    _inner: BaseTool = PrivateAttr()
+    _injected: frozenset[str] = PrivateAttr(default=frozenset())
+
+    @classmethod
+    def wrap(
+        cls,
+        inner: BaseTool,
+        *,
+        pipeline: Pipeline[ToolStage, ToolCall, Any],
+        bridge: Callable[[], LoopBridge],
+        read_only: bool = False,
+    ) -> Self:
+        """Return a governed tool that delegates to ``inner``."""
+        governed = cls(
+            name=inner.name,
+            description=inner.description,
+            args_schema=inner.args_schema,
+            return_direct=inner.return_direct,
+            read_only=read_only,
+        )
+        governed._inner = inner
+        governed._injected = _injected_arguments(inner)
+        governed._handler = pipeline.bind(governed._call_inner)
+        governed._bridge = bridge
+        return governed
+
+    def _argument_names(self) -> Sequence[str]:
+        return [name for name in self._inner.args if name not in self._injected]
 
     def _make_call(self, arguments: dict[str, Any], config: RunnableConfig) -> ToolCall:
         # The context is read here, on the caller's side, before any thread hop.
@@ -221,44 +294,13 @@ class GovernedTool(BaseTool):
         # A Command or another control object of the framework: passed back as it is.
         return reply
 
-    @staticmethod
-    def _released(call: ToolCall, result: Any) -> Any:
+    def _released(self, call: ToolCall, result: Any) -> Any:
         """Put what the pipeline released back on the wrapped tool's own message."""
         invocation = call.payload
         reply = invocation.reply if isinstance(invocation, _Invocation) else None
         if reply is None or not isinstance(result, str | list):
             return result
         return reply.model_copy(update={"content": result})
-
-    def _parse_input(
-        self,
-        tool_input: str | dict[str, Any],
-        tool_call_id: str | None,  # noqa: ARG002 - the base class names it
-    ) -> str | dict[str, Any]:
-        """Pass the input on as it came: the wrapped tool validates it, inside the pipeline.
-
-        LangChain validates here, before ``_arun``. A malformed call would then
-        never reach the pipeline, so no policy decision or audit record would
-        show it. The wrapped tool applies the same schema, with the same error.
-        """
-        return dict(tool_input) if isinstance(tool_input, dict) else tool_input
-
-    def _keywords(self, args: tuple[Any, ...], kwargs: dict[str, Any]) -> dict[str, Any]:
-        """Name a single plain input, as LangChain does for a tool with one argument."""
-        if not args:
-            return kwargs
-        names = [name for name in self._inner.args if name not in self._injected]
-        if len(args) == 1 and not kwargs and names:
-            return {names[0]: args[0]}
-        raise TypeError(f"tool {self.name!r} takes its arguments by name: {', '.join(names)}")
-
-    async def _arun(self, *args: Any, config: RunnableConfig, **kwargs: Any) -> Any:
-        call = self._make_call(self._keywords(args, kwargs), config)
-        return self._released(call, await self._handler(call))
-
-    def _run(self, *args: Any, config: RunnableConfig, **kwargs: Any) -> Any:
-        call = self._make_call(self._keywords(args, kwargs), config)
-        return self._released(call, self._bridge().run(lambda: self._handler(call)))
 
 
 def govern_tools(
@@ -277,17 +319,26 @@ def govern_tools(
         read_only: Names of tools that only read. Only these may be retried.
 
     Raises:
-        ValueError: If two tools share a name, a ``read_only`` name is unknown,
-            or a tool is already governed.
+        ConfigurationError: If two tools share a name, a ``read_only`` name is
+            unknown, or a tool is already governed.
     """
     governed: list[BaseTool] = []
     names: set[str] = set()
     for item in tools:
-        if isinstance(item, GovernedTool):
-            raise ValueError(f"tool {item.name!r} is already governed")
+        if isinstance(item, GovernedToolBase):
+            raise ConfigurationError(
+                f"tool {item.name!r} is already governed",
+                expected="plain tools or functions, each governed once",
+                actual="a tool that services.tools() already wrapped",
+                fix="pass the original tool or function, not the governed one",
+            )
         inner = item if isinstance(item, BaseTool) else as_tool(item)
         if inner.name in names:
-            raise ValueError(f"two tools are named {inner.name!r}")
+            raise ConfigurationError(
+                f"two tools are named {inner.name!r}",
+                expected="a distinct name for every tool",
+                fix="rename one of them; the model tells tools apart by name only",
+            )
         names.add(inner.name)
         governed.append(
             GovernedTool.wrap(
@@ -296,5 +347,10 @@ def govern_tools(
         )
     unknown = sorted(set(read_only) - names)
     if unknown:
-        raise ValueError(f"read_only names tools that were not given: {unknown}")
+        raise ConfigurationError(
+            f"read_only names tools that were not given: {unknown}",
+            expected="only names of the tools passed in the same call",
+            actual=f"the names {', '.join(sorted(names)) or 'none'} were given",
+            fix="name the read-only tools exactly as they are named in the list",
+        )
     return governed

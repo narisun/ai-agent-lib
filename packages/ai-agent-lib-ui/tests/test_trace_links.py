@@ -100,6 +100,7 @@ def test_phoenix_trace_link_is_correlated_and_named(host: str) -> None:
     answer = QuestionAnswerAdapter(manifest()).response(VIEW, TURN, json.dumps(value).encode())
     assert answer.trace is not None
     assert answer.trace.url == url
+    assert answer.trace.label == "Agent Lab"
     assert answer.trace.model_dump()["provider"] == "phoenix"
 
 
@@ -259,6 +260,18 @@ def test_stored_run_keeps_a_valid_phoenix_trace() -> None:
 
     restored = RunRecord.model_validate_json(stored_run(phoenix(URL)))
     assert restored.trace == TraceLink(provider="phoenix", trace_id=TRACE_ID, url=URL)
+    assert RunRecord.model_validate_json(restored.model_dump_json()) == restored
+
+
+def test_stored_run_keeps_a_valid_cloudwatch_trace() -> None:
+    """A row saved for an agent on AgentCore Runtime reloads with its console link."""
+    from ai_agent_lib_ui.contracts.conversations import RunRecord
+    from ai_agent_lib_ui.contracts.traces import console_link
+
+    link = console_link("eu-west-1", "session-" + TRACE_ID)
+    restored = RunRecord.model_validate_json(stored_run(link.model_dump()))
+    assert restored.trace == link
+    assert restored.trace.label == "CloudWatch"
     assert RunRecord.model_validate_json(restored.model_dump_json()) == restored
 
 

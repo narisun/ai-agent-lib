@@ -1,0 +1,10 @@
+# Oldest framework versions supported together with the anthropic extra. The consumer gate
+# uses this file for the generated-anthropic profile and framework-minimum.txt for the rest.
+# Core allows langchain-core 1.4, but langchain-anthropic 1.7.5, the oldest the extra allows,
+# itself needs langchain-core 1.6.6, so with that extra installed the oldest set is this one.
+langchain-core==1.6.6
+langgraph==1.2.0
+langgraph-checkpoint-sqlite==3.1.0
+mcp==2.3.0
+langchain-anthropic==1.7.5
+langchain-aws==1.0.0

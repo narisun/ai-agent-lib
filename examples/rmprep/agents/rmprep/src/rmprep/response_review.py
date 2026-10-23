@@ -56,6 +56,37 @@ _MCP_TOOLS = {
     for separator in (".", "_")
     for name in ("get_memo_evidence", "get_client_records", "get_reference_data")
 }
+# These target observed waiver mistakes, not arbitrary legal or causal reasoning.
+# In particular, a hedge such as "may" does not establish an absent blocker.
+_WAIVER_ASSERTION = re.compile(
+    r"\bwaiver(?: document)?\s+(?:"
+    r"(?:has|had)\s+(?:not\s+)?(?:yet\s+)?been\s+|"
+    r"(?:is|was|remains)\s+(?:not\s+)?(?:yet\s+)?|"
+    r"(?:may|might|must)\s+(?:not\s+)?(?:have been|be)\s+|(?:not\s+)?"
+    r")(?:executed|signed|active|in force|unexecuted|unsigned)\b|"
+    r"\bwaiver execution\s+(?:(?:is|was|remains)\s+)?(?:pending|complete|confirmed)\b",
+    re.IGNORECASE,
+)
+_WAIVER_STATUS_INFERENCE = re.compile(
+    r"\b(?:open|closed|overdue|pending|status|requirement|expiry|received_date|cure plan)\b"
+    r".{0,160}\b(?:suggests?|indicates?|implies?|means?|proves?|confirms?|establishes?)\b"
+    r".{0,100}(?:\b(?:execut\w*|sign\w*)\b|\b(?:this|it)\s+has\s+"
+    r"(?:not\s+)?(?:yet\s+)?(?:occurred|happened)\b)",
+    re.IGNORECASE,
+)
+_WAIVER_BLOCKER = re.compile(
+    r"\b(?:block(?:s|ed|ing)?|delay(?:s|ed|ing)?|prevent(?:s|ed|ing)?|"
+    r"imped(?:e|es|ed|ing)|holds? up|holding up|depends? on|contingent on|because|due to)\b|"
+    r"\b(?:blockers?|dependencies)\s+(?:is|are|include)\b",
+    re.IGNORECASE,
+)
+_WAIVER_UNKNOWN = re.compile(
+    r"\b(?:not (?:established|known|confirmed|determined|supplied|provided)|unknown|unverified|"
+    r"no (?:proof|evidence)|cannot (?:establish|infer|determine|conclude)|"
+    r"(?:does|do) not (?:establish|prove|show|confirm|indicate|mean|imply|support|infer))\b|"
+    r"\bneither\b.{0,100}\bestablish\w* whether\b",
+    re.IGNORECASE,
+)
 
 
 def text_content(message: AIMessage) -> str:
@@ -268,7 +299,86 @@ def response_issues(reply: AIMessage, messages: Sequence[AnyMessage], limit: int
             "keep the known financial-fact periods separate from the delivery requirement."
         )
     issues.extend(_implementation_issues(text, messages))
+    issues.extend(_waiver_issues(text, messages))
     return issues
+
+
+def _waiver_issues(text: str, messages: Sequence[AnyMessage]) -> list[str]:
+    """Keep unknown execution unknown, including in saved pre-fix evidence.
+
+    Only recognized MCP limits activate this check. Inspect clauses separately:
+    a question or caveat must not excuse a later unsupported assertion. These
+    patterns cover known failures; the prompt and business review still matter.
+    """
+    unknown = False
+    for message in messages:
+        payload = tool_payload(message)
+        pages = payload.get("sections", {}).values() if "sections" in payload else [payload]
+        unknown |= any(
+            page.get("evidence_limits", {}).get("waiver_execution")
+            == "not_established_by_this_source"
+            for page in pages
+        )
+    if not unknown:
+        return []
+    question = next(
+        (
+            str(message.content)
+            for message in reversed(messages)
+            if isinstance(message, HumanMessage)
+        ),
+        "",
+    )
+    waiver_context = bool(re.search(r"\bwaiver\b", text + " " + question, re.IGNORECASE))
+    clauses: list[str] = []
+    negated_list = False
+    for line in _REFERENCE.sub("", text).splitlines():
+        if not line.strip():
+            continue
+        # "The records do not prove: - that the waiver is unsigned" is a
+        # denial, not an assertion. Scope this exception to the following list;
+        # a separate paragraph or heading must be checked on its own.
+        if negated_list and re.match(r"^\s*(?:[-+*]|\d+[.)])\s+", line):
+            continue
+        line = re.sub(r"[*`|]", " ", line)
+        negated_list = bool(
+            re.search(
+                r"\b(?:does|do) not (?:establish|prove|show|confirm|indicate|mean|imply|support)\s*:\s*$",
+                line,
+                re.IGNORECASE,
+            )
+        )
+        clauses.extend(re.split(r"(?<=[.!?])\s+|;|,?\s+\b(?:but|however)\b\s+|,\s+yet\s+", line))
+    for clause in clauses:
+        clause = " ".join(clause.split())
+        if _WAIVER_UNKNOWN.search(clause):
+            continue
+        if re.search(r"\b(?:ask|check|verify|confirm)\s+whether\b|^if\b", clause, re.IGNORECASE):
+            continue
+        if re.search(r"\b(?:if|whether)\s+(?:(?:the|a)\s+)?waiver\b", clause, re.IGNORECASE):
+            continue
+        if clause.endswith("?") and re.match(
+            r"^(?:\d+[.)]\s*)?(?:was|is|are|has|have|did|does|do|could|can|would)\b",
+            clause,
+            re.IGNORECASE,
+        ):
+            continue
+        assertion = _WAIVER_ASSERTION.search(clause)
+        inference = waiver_context and _WAIVER_STATUS_INFERENCE.search(clause)
+        blocker = (
+            waiver_context
+            and re.search(r"\b(?:waiver|execution)\b", clause, re.IGNORECASE)
+            and _WAIVER_BLOCKER.search(clause)
+        )
+        if assertion or inference or blocker:
+            return [
+                "Waiver execution and its blockers are not established by these exception records. "
+                "Report recorded status, requirement, dates and cure plan only. Do not infer "
+                "execution OR non-execution from them, or a link between overdue statements and "
+                "execution, even with 'may' or 'suggests'. State that execution is unknown; "
+                "ask whether a signed document exists and whether any blocker is documented."
+            ]
+    return []
 
 
 def _implementation_issues(text: str, messages: Sequence[AnyMessage]) -> list[str]:

@@ -291,11 +291,13 @@ def opa_server(
     if not bundle.is_dir():
         raise CliError(f"the platform's Rego bundle was not found at {bundle}; give --bundle")
     url = f"http://127.0.0.1:{_free_port()}"
+    # OPA's stderr is kept: when it exits early, its last lines say why (a Rego
+    # error, a bad bundle path, a port in use). Its stdout is of no use here.
     process = subprocess.Popen(  # noqa: S603 - a fixed command line, no shell
         [binary, "run", "--server", "--addr", url.removeprefix("http://"),
          "--log-level", "error", "-b", str(bundle), str(policies)],
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
     )  # fmt: skip
     try:
         deadline = time.monotonic() + wait_seconds
@@ -305,8 +307,18 @@ def opa_server(
                     break
             except httpx.HTTPError:
                 pass
-            if process.poll() is not None or time.monotonic() > deadline:
-                raise CliError("OPA did not start with the bundle and the rules of this workspace")
+            if process.poll() is not None:
+                raise CliError(
+                    "OPA did not start with the bundle and the rules of this workspace",
+                    actual=f"opa exited with code {process.returncode}: {_stderr_tail(process)}",
+                    fix="run the printed opa command by hand to see its full output",
+                )
+            if time.monotonic() > deadline:
+                raise CliError(
+                    "OPA did not start with the bundle and the rules of this workspace",
+                    actual=f"no healthy answer within {wait_seconds:g} seconds",
+                    fix="check that nothing else listens on the chosen port, and try again",
+                )
             time.sleep(0.05)
         yield OpaPolicyDecisionPoint(OpaPolicyOptions(url=url), UuidGenerator())
     finally:
@@ -315,3 +327,13 @@ def opa_server(
             process.wait(timeout=10)
         except subprocess.TimeoutExpired:
             process.kill()
+        if process.stderr is not None:
+            process.stderr.close()
+
+
+def _stderr_tail(process: subprocess.Popen[bytes], lines: int = 5) -> str:
+    """Return the last lines OPA wrote to stderr, once it has exited."""
+    if process.stderr is None:
+        return "no output"
+    text = process.stderr.read().decode("utf-8", errors="replace").strip()
+    return " | ".join(text.splitlines()[-lines:]) or "no output"

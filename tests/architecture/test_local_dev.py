@@ -15,6 +15,7 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
+from architecture.launchers import interpreter_first_environment
 from tools import local_dev, local_processes, package_runtime
 from tools.local_environment import agent_environment
 from tools.local_processes import RunningService, Service
@@ -339,6 +340,7 @@ def test_shutdown_kills_unresponsive_child_and_continues(tmp_path: Path) -> None
     stopped.send_signal.assert_not_called()
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(sys.platform != "win32", reason="Command Prompt batch entry points")
 @pytest.mark.parametrize("name", ["start-local.bat", "setup-local.bat"])
 def test_batch_help_runs_from_another_directory(tmp_path: Path, name: str) -> None:
@@ -361,6 +363,7 @@ def test_batch_help_runs_from_another_directory(tmp_path: Path, name: str) -> No
         capture_output=True,
         text=True,
         check=False,
+        env=interpreter_first_environment(),
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "--smoke-test" in result.stdout

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -32,4 +34,17 @@ def test_each_shell_pair_calls_the_same_tool(bat: str, sh: str) -> None:
 
 @pytest.mark.parametrize(("bat", "sh"), PAIRS)
 def test_the_posix_wrapper_is_executable(bat: str, sh: str) -> None:
-    assert (ROOT / sh).stat().st_mode & 0o111, f"{sh} is not executable"
+    if sys.platform == "win32":
+        # Windows keeps no executable bit on disk; git records the one POSIX users get.
+        listing = subprocess.run(  # noqa: S603 - git, fixed arguments
+            ["git", "ls-files", "--stage", "--", sh],  # noqa: S607
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout
+        if not listing:
+            pytest.skip("not a git checkout, so there is no recorded file mode to read")
+        assert listing.startswith("100755"), f"{sh} is not executable in git"
+    else:
+        assert (ROOT / sh).stat().st_mode & 0o111, f"{sh} is not executable"

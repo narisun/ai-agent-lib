@@ -32,6 +32,7 @@ from configuration_examples import configuration_examples
 
 from ai_agent_lib_cli.app import cli
 from ai_agent_lib_cli.deploy import Target, starter_settings
+from ai_agent_lib_cli.deploy import agentcore as agentcore_target
 from ai_agent_lib_cli.envfiles import variable_names
 from ai_agent_lib_cli.render import TemplateRenderer
 from ai_agent_lib_cli.workspace import LibrarySource
@@ -678,6 +679,49 @@ def permissions() -> str:
     return _table(("Adapter", "Actions", "Resources", "Why"), rows, "compact")
 
 
+# ---------------------------------------------------------------- AgentCore
+
+
+def agentcore_settings() -> str:
+    """Every ``AGENTCORE_`` variable the deploy target reads, from the target's own table.
+
+    The table lives beside the reader in ``deploy/agentcore.py``; this checks
+    that it names exactly the variables the module reads, so the guide cannot
+    list a variable the target ignores or miss one it reads.
+    """
+    listed = [variable.name for variable in agentcore_target.AGENTCORE_VARIABLES]
+    read = {
+        value
+        for name, value in vars(agentcore_target).items()
+        if name.startswith("V_") and isinstance(value, str)
+    }
+    if set(listed) != read or len(listed) != len(set(listed)):
+        raise ValueError(
+            "AGENTCORE_VARIABLES disagrees with the V_ names of deploy/agentcore.py: "
+            f"listed {sorted(listed)}, read {sorted(read)}"
+        )
+    rows = [
+        [
+            f'<span class="var" id="var-{variable.name.lower()}">{_e(variable.name)}</span>',
+            _markdown(variable.values),
+            (
+                '<span class="muted">not set</span>'
+                if variable.default == "not set"
+                else _code(variable.default)
+            ),
+            _markdown(variable.meaning),
+        ]
+        for variable in agentcore_target.AGENTCORE_VARIABLES
+    ]
+    prefix = agentcore_target.AGENTCORE_PREFIX
+    note = (
+        f"<p>The protocol is not a variable (there is no {_code(prefix + 'PROTOCOL')}): it "
+        "follows the service's kind, HTTP for an agent and MCP for an MCP server, as does the "
+        f"port. Every {_code(prefix)} variable stays out of the container's environment.</p>"
+    )
+    return _table(("Variable", "Values", "Default", "Meaning"), rows, "compact") + "\n" + note
+
+
 # --------------------------------------------------------------- public API
 
 API_MODULES: tuple[str, ...] = (
@@ -825,6 +869,7 @@ _GENERATORS: Mapping[str, Callable[[], str]] = {
     "cli": cli_reference,
     "extras": extras,
     "permissions": permissions,
+    "agentcore-settings": agentcore_settings,
     "public-api": public_api,
     "verified-anthropic": verified_anthropic,
 }

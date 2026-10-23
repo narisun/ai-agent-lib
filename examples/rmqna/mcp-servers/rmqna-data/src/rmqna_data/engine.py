@@ -382,10 +382,14 @@ def _the_one_select(cursor: duckdb.DuckDBPyConnection, sql: str) -> duckdb.State
     the statement DuckDB parsed, not the text.
     """
     statements = cursor.extract_statements(sql)
-    if len(statements) != 1:
+    # DuckDB 1.x lists the statements a statement-form PIVOT expands into; 2.0 lists one
+    # statement of type MULTI for them. Both are more than one statement.
+    expands = len(statements) == 1 and statements[0].type.name == "MULTI"
+    if len(statements) != 1 or expands:
+        count = "several" if expands else str(len(statements))
         raise SqlRefused(
             "multiple_statements",
-            f"Send one statement per call; the engine reads this input as {len(statements)}.",
+            f"Send one statement per call; the engine reads this input as {count}.",
         )
     if statements[0].type != duckdb.StatementType.SELECT:
         raise SqlRefused(

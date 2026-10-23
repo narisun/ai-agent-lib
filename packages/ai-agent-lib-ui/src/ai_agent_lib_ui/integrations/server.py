@@ -10,17 +10,18 @@ from typing import Annotated
 from urllib.parse import urlencode
 from uuid import uuid4
 
-from fastapi import FastAPI, Form, Query, Request
+from fastapi import FastAPI, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ai_agent_lib_ui.application.chat import view_for
 from ai_agent_lib_ui.contracts.queries import ContractError, ErrorCode, ErrorResponse, PageRequest
+from ai_agent_lib_ui.integrations.answer_format import outcome_text
 from ai_agent_lib_ui.integrations.documents import register_documents
 from ai_agent_lib_ui.integrations.inspection import register_inspector
 from ai_agent_lib_ui.integrations.logs import register_logs
 from ai_agent_lib_ui.integrations.navigation import login_destination
-from ai_agent_lib_ui.integrations.runtime import Runtime
+from ai_agent_lib_ui.integrations.runtime import Runtime, install_runtime
 from ai_agent_lib_ui.integrations.security import SessionBoundary, current_principal
 
 
@@ -98,13 +99,50 @@ class NewTurn(BaseModel):
     idempotency_key: Annotated[str, Field(min_length=1, max_length=200)]
 
 
+# Every contract error names its HTTP status here; a missing entry is a test failure,
+# not a silent 409.
+_HTTP_STATUS: dict[ErrorCode, int] = {
+    ErrorCode.NOT_FOUND: 404,
+    ErrorCode.INVALID_INPUT: 400,
+    ErrorCode.UNSUPPORTED_SCHEMA: 422,
+    ErrorCode.UNSUPPORTED_ADAPTER: 422,
+    ErrorCode.STALE_BINDING: 409,
+    ErrorCode.DESTINATION_DENIED: 403,
+    ErrorCode.CONFLICT: 409,
+    ErrorCode.UNAVAILABLE: 503,
+    ErrorCode.INVALID_RESPONSE: 502,
+}
+
+
+def status_for(code: ErrorCode) -> int:
+    """Return the HTTP status that reports ``code`` to the browser."""
+    return _HTTP_STATUS[code]
+
+
 def create_app(resources: Runtime) -> FastAPI:
-    """Build routes after writable shell configuration has been prepared."""
+    """Build the parent routes, then mount the Chainlit chat shell under ``/chat``.
+
+    Chainlit registers process-wide state when mounted, so a process serves one
+    application; ``__main__`` additionally holds the state folder's file lock.
+    """
     from chainlit.utils import mount_chainlit
 
     from ai_agent_lib_ui.integrations.chainlit_compat import use_shared_profile_config
 
     use_shared_profile_config()
+    app = parent_app(resources)
+    # callbacks.py is executed by file path and can only reach the Runtime this way.
+    install_runtime(resources)
+    mount_chainlit(app, target=str(Path(__file__).with_name("callbacks.py")), path="/chat")
+    return app
+
+
+def parent_app(resources: Runtime) -> FastAPI:
+    """Build the framework-free parent application: session boundary, pages and API.
+
+    Everything here is plain FastAPI and runs in process for tests; only
+    ``create_app`` imports Chainlit.
+    """
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -124,9 +162,8 @@ def create_app(resources: Runtime) -> FastAPI:
 
     @app.exception_handler(ContractError)
     async def contract_error(_request: Request, error: ContractError) -> JSONResponse:
-        status = {ErrorCode.NOT_FOUND: 404, ErrorCode.INVALID_INPUT: 400}.get(error.code, 409)
         response = ErrorResponse(code=error.code, request_id=str(uuid4()))
-        return JSONResponse(response.model_dump(mode="json"), status_code=status)
+        return JSONResponse(response.model_dump(mode="json"), status_code=status_for(error.code))
 
     @app.get("/healthz")
     async def health() -> dict[str, str]:
@@ -156,10 +193,8 @@ def create_app(resources: Runtime) -> FastAPI:
         return_to: Annotated[str, Form(alias="next", max_length=2048)] = "/chat/",
     ) -> RedirectResponse:
         if not hmac.compare_digest(code, resources.access_code):
-            from fastapi import HTTPException
-
             raise HTTPException(401, "Access code did not match")
-        token = resources.store.new_session(resources.identity)
+        token = await resources.store.new_session(resources.identity)
         response = RedirectResponse(login_destination(return_to), status_code=303)
         response.set_cookie(
             "agentlib_session", token, httponly=True, samesite="strict", max_age=3600
@@ -180,15 +215,13 @@ def create_app(resources: Runtime) -> FastAPI:
     register_inspector(app, resources, page)
     register_documents(app, resources)
     register_logs(app, resources, page)
-
-    mount_chainlit(app, target=str(Path(__file__).with_name("callbacks.py")), path="/chat")
     return app
 
 
 def _catalog_page(app: FastAPI, resources: Runtime) -> None:
     @app.get("/catalog")
     async def catalog_page() -> HTMLResponse:
-        principal = current_principal()
+        principal = await current_principal(resources)
         agents = await resources.catalog.agents(principal, PageRequest(limit=200))
         mcps = await resources.catalog.mcps(principal, PageRequest(limit=200))
         body = (
@@ -220,16 +253,14 @@ def _catalog_page(app: FastAPI, resources: Runtime) -> None:
 
     @app.post("/catalog/start")
     async def start_chat(agent_id: Annotated[str, Form(max_length=200)]) -> RedirectResponse:
-        conversation = await resources.chat.create(current_principal(), agent_id)
+        conversation = await resources.chat.create(await current_principal(resources), agent_id)
         return RedirectResponse(f"/chat/thread/{conversation.thread.thread_id}", status_code=303)
 
 
 def _conversation_pages(app: FastAPI, resources: Runtime) -> None:
     @app.get("/conversations/{thread_id}/history")
     async def older_history(thread_id: str, cursor: str | None = None) -> HTMLResponse:
-        from ai_agent_lib_ui.integrations.data_layer import outcome_text
-
-        principal = current_principal()
+        principal = await current_principal(resources)
         conversation = await resources.store.get(principal, thread_id)
         history = await resources.store.history_page(
             view_for(principal, conversation.thread.scope.application),
@@ -256,7 +287,10 @@ def _conversation_pages(app: FastAPI, resources: Runtime) -> None:
         search: str = "", archived: bool = False, cursor: str | None = None
     ) -> HTMLResponse:
         result = await resources.store.list_owned(
-            current_principal(), PageRequest(cursor=cursor), search=search, archived=archived
+            await current_principal(resources),
+            PageRequest(cursor=cursor),
+            search=search,
+            archived=archived,
         )
         body = (
             "<p>Rename, archive or restore your conversations here. "
@@ -295,7 +329,7 @@ def _conversation_pages(app: FastAPI, resources: Runtime) -> None:
     async def change_thread(
         thread_id: str, title: Annotated[str, Form(max_length=256)], action: Annotated[str, Form()]
     ) -> RedirectResponse:
-        principal = current_principal()
+        principal = await current_principal(resources)
         conversation = await resources.store.get(principal, thread_id)
         if action not in {"rename", "archive", "restore"}:
             raise ContractError(ErrorCode.INVALID_INPUT)
@@ -311,7 +345,7 @@ def _conversation_pages(app: FastAPI, resources: Runtime) -> None:
 def _catalog_api(app: FastAPI, resources: Runtime) -> None:
     @app.get("/api/catalog")
     async def catalog_api() -> dict[str, object]:
-        principal = current_principal()
+        principal = await current_principal(resources)
         agents = await resources.catalog.agents(principal, PageRequest(limit=200))
         mcps = await resources.catalog.mcps(principal, PageRequest(limit=200))
         return {
@@ -326,16 +360,19 @@ def _thread_api(app: FastAPI, resources: Runtime) -> None:
         search: str = "", archived: bool = False, cursor: str | None = None
     ) -> object:
         return await resources.store.list_owned(
-            current_principal(), PageRequest(cursor=cursor), search=search, archived=archived
+            await current_principal(resources),
+            PageRequest(cursor=cursor),
+            search=search,
+            archived=archived,
         )
 
     @app.post("/api/threads")
     async def create_thread(body: NewThread) -> object:
-        return await resources.chat.create(current_principal(), body.agent_id)
+        return await resources.chat.create(await current_principal(resources), body.agent_id)
 
     @app.get("/api/threads/{thread_id}")
     async def thread_api(thread_id: str, cursor: str | None = None) -> object:
-        principal = current_principal()
+        principal = await current_principal(resources)
         conversation = await resources.store.get(principal, thread_id)
         view = view_for(principal, conversation.thread.scope.application)
         history = await resources.store.history_page(view, thread_id, PageRequest(cursor=cursor))
@@ -348,5 +385,5 @@ def _thread_api(app: FastAPI, resources: Runtime) -> None:
     @app.post("/api/threads/{thread_id}/messages")
     async def message_api(thread_id: str, body: NewTurn) -> object:
         return await resources.chat.submit(
-            current_principal(), thread_id, body.idempotency_key, body.question
+            await current_principal(resources), thread_id, body.idempotency_key, body.question
         )

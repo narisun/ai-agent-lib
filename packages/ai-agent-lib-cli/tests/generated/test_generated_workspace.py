@@ -24,6 +24,8 @@ from ai_agent_lib_cli.read_redshift import CatalogTableLike, RedshiftRequest
 from ai_agent_lib_cli.shared import read_servers
 from ai_agent_lib_cli.toolbox import Toolbox
 
+pytestmark = pytest.mark.slow  # scaffolds workspaces and runs ruff and pytest in them
+
 COMMANDS = (
     ("new", "mcp", "hello-mcp"),
     ("new", "agent", "hello-agent", "--mcp", "hello"),

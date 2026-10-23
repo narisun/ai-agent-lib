@@ -1,0 +1,63 @@
+variable "region" {
+  description = "The region to run in."
+  type        = string
+}
+
+variable "image" {
+  description = "The ARM64 image of {{ name }}, built from deploy/{{ name }}/Dockerfile, pushed to the repository Terraform creates and pinned by digest. Needed when the settings deploy a container."
+  type        = string
+  default     = null
+}
+
+variable "code_zip" {
+  description = "The zip build_zip.py wrote, relative to this folder. Needed when the settings deploy code."
+  type        = string
+  default     = "{{ name }}.zip"
+}
+
+variable "code_bucket" {
+  description = "The name of the bucket Terraform creates for the code artifact, or null for one named after the service and the account."
+  type        = string
+  default     = null
+}
+
+variable "mcp_targets" {
+  description = "The MCP servers a created gateway fronts: each target's name and the URL of its MCP endpoint (an AgentCore runtime's invocation URL, or any reachable MCP server)."
+  type        = map(string)
+  default     = {}
+}
+
+variable "memory_expiry_days" {
+  description = "How long a created memory keeps an event, in days (7 to 365)."
+  type        = number
+  default     = 90
+
+  validation {
+    condition     = var.memory_expiry_days >= 7 && var.memory_expiry_days <= 365
+    error_message = "memory_expiry_days must be from 7 to 365."
+  }
+}
+
+variable "memory_kms_key_arn" {
+  description = "A KMS key to encrypt a created memory with, or null for the service's own key."
+  type        = string
+  default     = null
+}
+
+variable "log_retention_days" {
+  description = "How long the runtime's logs are kept."
+  type        = number
+  default     = 30
+}
+
+variable "log_kms_key_arn" {
+  description = "A KMS key to encrypt the logs with, or null for the CloudWatch default."
+  type        = string
+  default     = null
+}
+
+variable "tags" {
+  description = "Tags for every resource."
+  type        = map(string)
+  default     = {}
+}

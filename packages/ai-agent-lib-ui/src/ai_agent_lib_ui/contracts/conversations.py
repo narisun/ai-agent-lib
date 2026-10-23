@@ -16,6 +16,11 @@ from ai_agent_lib_ui.contracts.queries import Availability, ContractError, Error
 from ai_agent_lib_ui.contracts.traces import TraceLink, tolerant_trace
 
 RunState = Literal["accepted", "running", "completed", "failed", "unknown"]
+# The agent's own terminal refusals, plus the one AgentCore Runtime reports for it:
+# ``runtime_client_error`` means the agent's container answered with an error.
+FailureCode = Literal[
+    "invalid", "denied", "unauthorized", "budget_exceeded", "paused", "runtime_client_error"
+]
 
 
 class ThreadRef(DiagnosticValue):
@@ -68,9 +73,7 @@ class RunRecord(RequestRecord):
     usage: TokenUsage = Field(default_factory=TokenUsage)
     model_calls: Annotated[int, Field(strict=True, ge=0)] | None = None
     trace: TraceLink | None = None
-    failure_code: (
-        Literal["invalid", "denied", "unauthorized", "budget_exceeded", "paused"] | None
-    ) = None
+    failure_code: FailureCode | None = None
     registry_revision: Identifier | None = None
 
     @field_validator("trace", mode="before")

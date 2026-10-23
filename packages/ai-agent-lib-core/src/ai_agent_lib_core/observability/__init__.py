@@ -16,6 +16,7 @@ from ai_agent_lib_core.observability.logs import (
 )
 from ai_agent_lib_core.observability.model_trace import JsonlModelTraceSink
 from ai_agent_lib_core.observability.otel import (
+    ambient_provider_installed,
     build_providers,
     configure_telemetry,
     start_telemetry,
@@ -26,6 +27,7 @@ __all__ = [
     "Diagnostics",
     "JsonLogFormatter",
     "JsonlModelTraceSink",
+    "ambient_provider_installed",
     "bind_diagnostic_links",
     "build_providers",
     "configure_logging",

@@ -501,3 +501,72 @@ def test_run_agent_gives_one_tracing_adapter_to_the_container_and_the_app(
     assert container_args[0]["model_trace"] is adapter
     assert app_args[0]["tracing"] is adapter
     assert served == ["the-app"]
+
+
+# ------------------------------------------------------------------ --profile
+
+
+def test_the_agentcore_profile_listens_where_the_runtime_reaches_the_container(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``--profile agentcore`` means 0.0.0.0:8080 and the runtime's routes; flags still win."""
+    captured: list[tuple[bool, str, int]] = []
+
+    async def fake_serve(
+        service: AgentService, config: ServiceConfig, host: str, port: int
+    ) -> None:
+        captured.append((service.agentcore, host, port))
+
+    monkeypatch.setattr(composition, "_serve", fake_serve)
+    env_file = tmp_path / "service.env"
+    env_file.write_text("", encoding="utf-8")
+    service = AgentService(
+        application="probe",
+        build_graph=_build_graph,
+        respond=_respond,
+        env_file=env_file,
+        default_port=8123,
+    )
+
+    assert run_agent(service, []) == 0
+    assert run_agent(service, ["--profile", "agentcore"]) == 0
+    assert run_agent(service, ["--profile", "agentcore", "--port", "9000"]) == 0
+    assert run_agent(service, ["--host", "10.0.0.5"]) == 0
+
+    assert captured == [
+        (False, "127.0.0.1", 8123),
+        (True, "0.0.0.0", 8080),  # noqa: S104 - the platform reaches the container this way
+        (True, "0.0.0.0", 9000),  # noqa: S104
+        (False, "10.0.0.5", 8123),
+    ]
+    assert service.agentcore is False  # the caller's service is left as it was
+
+
+async def test_an_agentcore_service_serves_the_runtime_contract_beside_its_own() -> None:
+    service = AgentService(
+        application="probe", build_graph=_build_graph, respond=_respond, agentcore=True
+    )
+    running = _Running(service)
+    await running.build()
+
+    async with running.client() as client:
+        assert (await client.get("/ping")).status_code == 503
+        await running.lifecycle.start()
+        assert (await client.get("/ping")).json() == {"status": "Healthy"}
+        reply = await client.post(
+            "/invocations",
+            json={"input": {"question": "hi"}},
+            headers={
+                "authorization": "Bearer token",
+                "x-amzn-bedrock-agentcore-runtime-session-id": "s" * 33,
+            },
+        )
+        assert reply.status_code == 200, reply.text
+        assert reply.json()["output"] == {"answer": "HI"}
+        assert (await client.get("/healthz")).status_code == 200
+
+    # The standard composition has none of the runtime's routes.
+    plain = _Running(AgentService(application="probe", build_graph=_build_graph, respond=_respond))
+    await plain.build()
+    async with plain.client() as client:
+        assert (await client.get("/ping")).status_code == 404

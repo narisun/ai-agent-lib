@@ -5,6 +5,11 @@ built, how it responds — and ``run_agent`` owns the rest: configuration,
 logging, telemetry, optional agent tracing (Phoenix), container lifecycle, serving
 and teardown. ``agent_app`` and ``serve`` remain available for services that
 compose by hand.
+
+``--profile`` says how the service listens: ``standard`` is the library's own
+contract on the loopback address; ``agentcore`` serves AgentCore Runtime's
+contract too (``POST /invocations`` and ``GET /ping``) on ``0.0.0.0:8080``,
+where the platform reaches the container.
 """
 
 from __future__ import annotations
@@ -26,6 +31,7 @@ from ai_agent_lib_core.contracts import (
 )
 from ai_agent_lib_core.di import ServiceContainer
 from ai_agent_lib_core.integrations.http.agent import agent_app
+from ai_agent_lib_core.integrations.http.agentcore import agentcore_app
 from ai_agent_lib_core.integrations.http.lifecycle import ServiceLifecycle
 from ai_agent_lib_core.integrations.http.outcomes import OutcomeJournal
 from ai_agent_lib_core.integrations.http.serving import serve
@@ -41,7 +47,18 @@ if TYPE_CHECKING:
     # graph, which the import contracts forbid outside integrations.langgraph.
     from ai_agent_lib_core.integrations.langgraph import AgentTracing
 
-__all__ = ["AgentService", "build_agent_app", "read_question", "run_agent"]
+__all__ = ["PROFILES", "AgentService", "build_agent_app", "read_question", "run_agent"]
+
+PROFILES: Mapping[str, tuple[str, int | None]] = {
+    "standard": ("127.0.0.1", None),
+    "agentcore": ("0.0.0.0", 8080),  # noqa: S104 - the platform reaches the container this way
+}
+"""Where a service listens under each ``--profile``: its host, and its port.
+
+A ``None`` port is the service's own ``default_port``. AgentCore Runtime
+invokes ``POST /invocations`` and asks ``GET /ping`` on port 8080 at any
+address of the container.
+"""
 
 Respond = Callable[[Any, ServiceContainer, RequestContext, str], Awaitable[dict[str, Any]]]
 """Answers one question with the compiled graph.
@@ -113,6 +130,10 @@ class AgentService:
         outcomes: Builds the service's outcome journal from the resolved
             configuration; return None for no journal. Called once per
             serve, so the choice can depend on the deployment environment.
+        agentcore: Also serve AgentCore Runtime's contract, ``POST
+            /invocations`` and ``GET /ping``, beside the library's own routes
+            (``agentcore_app`` instead of ``agent_app``). ``run_agent`` sets it
+            for ``--profile agentcore``.
     """
 
     application: str
@@ -126,6 +147,7 @@ class AgentService:
     app_extras: Callable[[ServiceContainer, Callable[[], Any]], Mapping[str, Any]] | None = None
     env_file: Path | None = None
     outcomes: Callable[[ServiceConfig], OutcomeJournal | None] | None = None
+    agentcore: bool = False
 
 
 async def build_agent_app(
@@ -185,7 +207,8 @@ async def build_agent_app(
 
     extras = dict(service.app_extras(services, prepared_graph)) if service.app_extras else {}
 
-    return agent_app(
+    build = agentcore_app if service.agentcore else agent_app
+    return build(
         services,
         run,
         application=service.application,
@@ -238,9 +261,25 @@ def run_agent(service: AgentService, argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog=f"{service.application}-serve", description=run_agent.__doc__
     )
-    parser.add_argument("--host", default="127.0.0.1", help="address to listen on")
-    parser.add_argument("--port", type=int, default=service.default_port, help="port")
+    parser.add_argument(
+        "--profile",
+        choices=sorted(PROFILES),
+        default="standard",
+        help="how to listen: standard, or agentcore (0.0.0.0:8080, /invocations and /ping)",
+    )
+    parser.add_argument("--host", help="address to listen on (the profile's by default)")
+    parser.add_argument(
+        "--port", type=int, help=f"port to listen on (the profile's, or {service.default_port})"
+    )
     arguments = parser.parse_args(argv)
+    host, port = PROFILES[arguments.profile]
+    host = arguments.host if arguments.host is not None else host
+    if arguments.port is not None:
+        port = arguments.port
+    elif port is None:
+        port = service.default_port
+    if arguments.profile == "agentcore":
+        service = dataclasses.replace(service, agentcore=True)
     config: ServiceConfig | None = None
     try:
         # explain() rather than resolve(): the same configuration, plus the deprecation
@@ -255,7 +294,7 @@ def run_agent(service: AgentService, argv: Sequence[str] | None = None) -> int:
         log_resolution_warnings(resolution)
         stop_telemetry = start_telemetry(service.application, config)
         try:
-            asyncio.run(_serve(service, config, arguments.host, arguments.port))
+            asyncio.run(_serve(service, config, host, port))
         finally:
             stop_telemetry()
     except Exception as error:  # noqa: BLE001 - every failure is explained, then the exit code

@@ -21,7 +21,7 @@ import sys
 from datetime import UTC, datetime
 from typing import IO, Any
 
-from ai_agent_lib_core.contracts.redaction import REDACTED, redact
+from ai_agent_lib_core.contracts.redaction import REDACTED, query_parameters, redact
 from ai_agent_lib_core.observability.errors import error_fields
 from ai_agent_lib_core.pipeline.context import bound_request_context
 
@@ -102,8 +102,6 @@ class JsonLogFormatter(logging.Formatter):
             if key in {_DETAIL, "parameters"} and not self._details:
                 continue
             if key == "parameters" and isinstance(value, dict):
-                from ai_agent_lib_core.observability.query_logs import query_parameters
-
                 line.setdefault(key, query_parameters(value))
                 continue
             line.setdefault(key, _scalar(value) if key != _DETAIL else _detail(value))

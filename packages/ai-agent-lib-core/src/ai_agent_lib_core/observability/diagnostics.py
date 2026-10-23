@@ -84,11 +84,14 @@ class Diagnostics:
         try:
             async with asyncio.timeout(self._write_timeout_seconds):
                 await self._sink.write(event)
-        except Exception:  # noqa: BLE001 - diagnostics must not replace the business result
+        except Exception as error:  # noqa: BLE001 - diagnostics must not replace the business result
             active = self._active(context)
             if active is not None:
                 active.complete = False
-            _LOG.warning("diagnostics.write_failed")
+            _LOG.warning(
+                "diagnostics.write_failed",
+                extra={"error_type": type(error).__name__, "request_id": context.request_id},
+            )
 
     def begin_attempt(self, context: RequestContext, ref: AttemptRef) -> None:
         """Register an expected attempt before dispatch, even if its record is lost."""
@@ -146,10 +149,13 @@ class Diagnostics:
                 ),
             )
             await self._write(event, context)
-        except Exception:  # noqa: BLE001 - invalid provider metadata cannot break chat
+        except Exception as error:  # noqa: BLE001 - invalid provider metadata cannot break chat
             if active is not None:
                 active.complete = False
-            _LOG.warning("diagnostics.invalid_metadata")
+            _LOG.warning(
+                "diagnostics.invalid_metadata",
+                extra={"error_type": type(error).__name__, "request_id": context.request_id},
+            )
 
     async def decide(
         self,
@@ -173,11 +179,14 @@ class Diagnostics:
                 reason_code=reason_code,
             )
             await self._write(event, context)
-        except Exception:  # noqa: BLE001 - invalid optional metadata cannot replace chat
+        except Exception as error:  # noqa: BLE001 - invalid optional metadata cannot replace chat
             active = self._active(context)
             if active is not None:
                 active.complete = False
-            _LOG.warning("diagnostics.invalid_metadata")
+            _LOG.warning(
+                "diagnostics.invalid_metadata",
+                extra={"error_type": type(error).__name__, "request_id": context.request_id},
+            )
 
     @asynccontextmanager
     async def operation(self, context: RequestContext) -> AsyncIterator[None]:
@@ -219,7 +228,10 @@ class Diagnostics:
                     ),
                     context,
                 )
-            except Exception:  # noqa: BLE001 - invalid optional metadata cannot replace chat
-                _LOG.warning("diagnostics.invalid_metadata")
+            except Exception as error:  # noqa: BLE001 - invalid optional metadata cannot replace chat
+                _LOG.warning(
+                    "diagnostics.invalid_metadata",
+                    extra={"error_type": type(error).__name__, "request_id": context.request_id},
+                )
             finally:
                 _ACTIVE.reset(token)

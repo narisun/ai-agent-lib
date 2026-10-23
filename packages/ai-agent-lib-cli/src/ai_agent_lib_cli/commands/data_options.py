@@ -8,7 +8,6 @@ from typing import Any
 
 import click
 
-from ai_agent_lib_cli.errors import CliError
 from ai_agent_lib_cli.read_redshift import RedshiftRequest
 from ai_agent_lib_cli.readers import Proposal, from_csv, from_openapi, from_redshift
 from ai_agent_lib_cli.toolbox import Toolbox
@@ -57,7 +56,8 @@ def proposal_for(tools: Toolbox, default_source: str, given: Mapping[str, Any]) 
     """Run the reader the data options name, if they name one."""
     chosen = [key for key in _READERS if given[key] is not None]
     if len(chosen) > 1:
-        raise CliError(f"give only one of {', '.join(_READERS.values())}")
+        # A wrong combination of options is a usage error, like a wrong option name.
+        raise click.UsageError(f"give only one of {', '.join(_READERS.values())}")
     source = given["source"] or default_source
     only, per_table = given["only"], given["per_table"]
     reader = chosen[0] if chosen else None
@@ -67,7 +67,7 @@ def proposal_for(tools: Toolbox, default_source: str, given: Mapping[str, Any]) 
     if reader is None:
         stray += [key for key in ("source", "only") if given[key]]
     if stray:
-        raise CliError(
+        raise click.UsageError(
             "these options belong to a data option such as --from-csv, which was not given: "
             + ", ".join(_OPTION_NAMES.get(key, f"--{key.replace('_', '-')}") for key in stray)
         )
@@ -81,7 +81,7 @@ def proposal_for(tools: Toolbox, default_source: str, given: Mapping[str, Any]) 
         )
     if reader == "redshift_schema":
         if not given["database"]:
-            raise CliError("--from-redshift needs --database, and --workgroup or --cluster")
+            raise click.UsageError("--from-redshift needs --database, and --workgroup or --cluster")
         request = RedshiftRequest(
             schema=given["redshift_schema"],
             database=given["database"],

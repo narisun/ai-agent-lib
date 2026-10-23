@@ -5,6 +5,7 @@ The names here are for an MCP server. The agent side is reached through
 server does not have to load.
 """
 
+from ai_agent_lib_core.integrations.mcp.door import HEALTH_PATHS, PerimeterDoor, perimeter_refused
 from ai_agent_lib_core.integrations.mcp.server import (
     DoorTokenVerifier,
     GovernedToolsMiddleware,
@@ -22,14 +23,17 @@ from ai_agent_lib_core.integrations.mcp.wire import (
 )
 
 __all__ = [
+    "HEALTH_PATHS",
     "META_AUTHORIZATION",
     "META_CLASSIFICATION_CEILING",
     "META_REQUEST_ID",
     "META_THREAD_ID",
     "DoorTokenVerifier",
     "GovernedToolsMiddleware",
+    "PerimeterDoor",
     "is_error_result",
     "mcp_result_text",
+    "perimeter_refused",
     "resource_server_settings",
     "tool_fingerprints",
     "verify_registration",

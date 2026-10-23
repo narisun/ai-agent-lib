@@ -1,7 +1,10 @@
-"""Opt-in smoke test against the live Anthropic API.
+"""Manual smoke test against the live Anthropic API.
 
-Run it with a real key and model ID in the environment::
+CI never runs it: the integration job has no Anthropic key, so there the test
+is skipped on purpose. Run it by hand with a real key and model ID in the
+environment before a release that changes the Anthropic adapter::
 
+    export ANTHROPIC_API_KEY=... EAP_MODEL_ID=...
     python -m pytest -m integration packages/ai-agent-lib-core/tests/integration
 """
 

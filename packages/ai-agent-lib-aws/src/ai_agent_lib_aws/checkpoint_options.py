@@ -1,13 +1,18 @@
-"""PostgreSQL configuration schemas, available without the optional database driver."""
+"""Checkpoint store configuration schemas, available without the optional drivers.
+
+The ``postgres`` store needs a database driver and the ``agentcore_memory``
+store needs the AgentCore checkpointer; both are extras. Their options live
+here so that the access rules can read them in any installation.
+"""
 
 from pathlib import Path
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import Field, model_validator
 
 from ai_agent_lib_core.contracts import OptionsModel
 
-__all__ = ["PostgresCheckpointOptions"]
+__all__ = ["AgentCoreMemoryCheckpointOptions", "PostgresCheckpointOptions"]
 
 
 class PostgresCheckpointOptions(OptionsModel):
@@ -42,3 +47,20 @@ class PostgresCheckpointOptions(OptionsModel):
         if self.pool_min_size > self.pool_max_size:
             raise ValueError("pool_min_size cannot be larger than pool_max_size")
         return self
+
+
+class AgentCoreMemoryCheckpointOptions(OptionsModel):
+    """Options of the ``agentcore_memory`` checkpoint store.
+
+    Attributes:
+        memory_id: The ID of the AgentCore Memory resource, as the console
+            shows it: a name and a ten-character suffix, not the ARN.
+        max_results: How many events one page of a read holds.
+        checkpoint_format: ``legacy`` stores a checkpoint as a series of
+            events; ``snapshot`` stores whole checkpoints, which bounds a read.
+            Every service that shares a memory must use the same format.
+    """
+
+    memory_id: str = Field(pattern=r"^[a-zA-Z][a-zA-Z0-9_-]{0,110}$")
+    max_results: int = Field(default=100, ge=1, le=100)
+    checkpoint_format: Literal["legacy", "snapshot"] = "legacy"

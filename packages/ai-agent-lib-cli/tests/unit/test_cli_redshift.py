@@ -225,11 +225,11 @@ def test_the_redshift_options_are_checked_before_anything_is_read(
     workspace: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     capsys.readouterr()
-    assert run("new", "mcp", "s-mcp", "--from-redshift", "sales", "--workspace", workspace) == 1
+    assert run("new", "mcp", "s-mcp", "--from-redshift", "sales", "--workspace", workspace) == 2
     assert "--from-redshift needs --database" in capsys.readouterr().err
     assert (
         run("new", "mcp", "s-mcp", "--workgroup", "eap", "--table", "t", "--workspace", workspace)
-        == 1
+        == 2
     )
     assert "which was not given: --workgroup, --table" in capsys.readouterr().err
     assert not (workspace / "mcp-servers/s-mcp").exists()

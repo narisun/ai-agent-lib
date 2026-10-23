@@ -14,6 +14,7 @@ from langgraph.graph import END, START, StateGraph
 
 from ai_agent_lib_core.contracts import (
     ConfigurationError,
+    NotStartedError,
     PolicyDenied,
     Principal,
     ProviderSelection,
@@ -154,7 +155,7 @@ async def test_sqlite_state_survives_a_restart_and_never_holds_the_context(
 async def test_sqlite_backend_must_be_started_and_reports_a_bad_path(tmp_path: Path) -> None:
     backend = SqliteCheckpointBackend(SqliteCheckpointOptions(path=tmp_path / "db.sqlite"))
     assert backend.path == tmp_path / "db.sqlite"
-    with pytest.raises(RuntimeError, match="not started"):
+    with pytest.raises(NotStartedError, match="not started"):
         _ = backend.checkpointer
 
     blocked = tmp_path / "blocked"

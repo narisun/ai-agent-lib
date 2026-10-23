@@ -132,9 +132,19 @@ class ChatService:
             fresh = await self.catalog.resolve(view.principal, view.scope.application)
             if not same_agent_binding(conversation.binding, fresh):
                 raise ContractError(ErrorCode.STALE_BINDING)
-        except Exception:  # noqa: BLE001 - a provider failure before dispatch is terminal
+        except Exception as error:  # noqa: BLE001 - a provider failure before dispatch is terminal
             # No HTTP dispatch has happened. The admitted question has a known
             # failed outcome and will never be replayed by its idempotency key.
+            # The error's type is logged, never its text: it may hold configuration.
+            logger.warning(
+                "catalog resolution failed before dispatch; the run is marked failed",
+                extra={
+                    "error_type": type(error).__name__,
+                    "agent_id": view.scope.application,
+                    "thread_id": run.thread_id,
+                    "request_id": run.request_id,
+                },
+            )
             failed = run.model_copy(
                 update={
                     "state": "failed",

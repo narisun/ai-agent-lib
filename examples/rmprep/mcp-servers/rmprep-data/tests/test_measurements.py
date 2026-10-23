@@ -26,6 +26,12 @@ def test_expiry_received_date_or_status_does_not_establish_waiver_execution(stat
     }
     result = enrich_page(page("credit_exceptions", record), START, END)
     assert result["evidence_limits"]["waiver_execution"] == "not_established_by_this_source"
+    assert result["evidence_limits"]["waiver_non_execution"] == (
+        "not_established_by_status_requirement_or_missing_receipt"
+    )
+    assert result["evidence_limits"]["waiver_execution_blockers"] == (
+        "not_supplied_no_causal_link_to_other_exceptions"
+    )
     assert result["evidence_limits"]["syndicate_approval_conditions"] == "not_supplied"
     assert record["days_overdue"] == (26 if status == "Open" else None)
 

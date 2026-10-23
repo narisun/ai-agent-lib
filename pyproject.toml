@@ -16,8 +16,9 @@ dev = [
     "mcp>=2.3",
     "mypy>=1.11",
     "opentelemetry-sdk>=1.28",
-    # A real PostgreSQL for the checkpoint store's integration tests. No wheel for Linux on ARM.
-    "pgserver>=0.1.4; sys_platform != 'linux' or platform_machine == 'x86_64'",
+    # A real PostgreSQL for the checkpoint store's integration tests. No wheel for Linux on ARM,
+    # and none for Python 3.13 or newer yet; the tests skip when it is absent.
+    "pgserver>=0.1.4; (sys_platform != 'linux' or platform_machine == 'x86_64') and python_version < '3.13'",
     "pytest>=8.2",
     "pytest-asyncio>=1.4",
     "pytest-cov>=5.0",
@@ -88,6 +89,11 @@ max-complexity = 12
 [[tool.mypy.overrides]]
 # The AWS SDK ships no type information. Adapters take a client typed by a small protocol.
 module = ["boto3.*", "botocore.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# The AgentCore checkpointer ships no type information.
+module = ["langgraph_checkpoint_aws", "langgraph_checkpoint_aws.*"]
 ignore_missing_imports = true
 
 [tool.mypy]
@@ -167,6 +173,7 @@ filterwarnings = [
 markers = [
     "container: needs a container runtime",
     "integration: needs something outside the process, such as an opa binary or an AWS account",
+    "slow: spawns other processes or depends on the real clock; deselect with -m 'not slow'",
     "eval: runs a real model against a dataset; see evals/ in each agent",
 ]
 
@@ -213,6 +220,13 @@ forbidden_modules = [
     "ai_agent_lib_core.kit",
     "ai_agent_lib_core.testing",
 ]
+
+[[tool.importlinter.contracts]]
+# observability formats what the pipeline records; the pipeline must not depend on it.
+name = "pipeline stays below observability"
+type = "forbidden"
+source_modules = ["ai_agent_lib_core.pipeline"]
+forbidden_modules = ["ai_agent_lib_core.observability"]
 
 [[tool.importlinter.contracts]]
 name = "only integrations.langgraph imports langgraph"
@@ -298,11 +312,14 @@ forbidden_modules = [
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
-name = "in the AWS package only the checkpoint store imports langgraph"
+name = "in the AWS package only the checkpoint stores import langgraph"
 type = "forbidden"
 source_modules = ["ai_agent_lib_aws"]
 forbidden_modules = ["langgraph"]
-ignore_imports = ["ai_agent_lib_aws.checkpoint_postgres -> langgraph"]
+ignore_imports = [
+    "ai_agent_lib_aws.checkpoint_postgres -> langgraph",
+    "ai_agent_lib_aws.checkpoint_agentcore_memory -> langgraph",
+]
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]

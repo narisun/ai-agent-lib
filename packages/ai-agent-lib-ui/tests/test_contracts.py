@@ -16,11 +16,9 @@ from ai_agent_lib_ui.contracts.catalog import PresentationManifest
 from ai_agent_lib_ui.contracts.conversations import TurnAdmission, require_transition
 from ai_agent_lib_ui.contracts.queries import (
     Availability,
-    ContentPreview,
     ContractError,
     ErrorCode,
     PageRequest,
-    QueryBinding,
     ViewContext,
 )
 
@@ -135,9 +133,6 @@ def test_scope_changes_never_reuse_thread_or_cursor(field: str) -> None:
     other = replace(SCOPE, **{field: "other"})
     with pytest.raises(ContractError, match="not_found"):
         QuestionAnswerAdapter(manifest()).request(VIEW, TURN.model_copy(update={"scope": other}))
-    query = QueryBinding(scope=SCOPE, resource="diagnostics", thread_id="thread-1")
-    assert not query.matches(query.model_copy(update={"scope": other}))
-    assert not query.matches(query.model_copy(update={"filters": (("event", "model.request"),)}))
 
 
 def test_scope_requires_the_authenticated_owner() -> None:
@@ -216,8 +211,6 @@ def test_bounds_and_explicit_unknown_state() -> None:
     assert PageRequest().limit == 50
     with pytest.raises(ValidationError):
         PageRequest(limit=201)
-    with pytest.raises(ValidationError):
-        ContentPreview(text="日" * 22_000, truncated=False)
     with pytest.raises(ContractError, match="conflict"):
         require_transition("unknown", "running")
     with pytest.raises(ContractError, match="conflict"):

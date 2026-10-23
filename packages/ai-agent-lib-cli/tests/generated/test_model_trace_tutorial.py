@@ -22,6 +22,8 @@ from ai_agent_lib_cli.testing import as_written, toolbox_for_tests
 from ai_agent_lib_core.contracts import ModelSection
 from ai_agent_lib_core.testing import load_test_config
 
+pytestmark = pytest.mark.slow  # runs the generated tutorial scripts in subprocesses
+
 REPO = Path(__file__).resolve().parents[4]
 
 
@@ -102,10 +104,9 @@ def test_new_workspace_includes_the_captured_run_and_readable_samples(tmp_path: 
     assert {event["thread_id"] for event in events} == {"conversation-1"}
     assert {event["request_id"] for event in events} == {"request-1", "request-2"}
     for sample in samples.iterdir():
-        assert (
-            sample.read_bytes()
-            == (REPO / "docs/samples/verified-anthropic" / sample.name).read_bytes()
-        )
+        # The samples are stored with LF; a Windows checkout may turn them into CRLF.
+        shipped = (REPO / "docs/samples/verified-anthropic" / sample.name).read_bytes()
+        assert sample.read_bytes() == shipped.replace(b"\r\n", b"\n")
     result = subprocess.run(  # noqa: S603 - the generated reader uses only the standard library
         [sys.executable, "examples/read_trace.py", str(trace), "--last", "2"],
         cwd=workspace,

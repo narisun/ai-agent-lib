@@ -20,7 +20,7 @@ from typing import Any, Self, TypeVar
 
 from langchain_core.tools import BaseTool
 
-from ai_agent_lib_core.contracts import RequestContext, ServiceConfig
+from ai_agent_lib_core.contracts import PresentedCredentials, RequestContext, ServiceConfig
 from ai_agent_lib_core.di.container import ServiceContainer
 from ai_agent_lib_core.di.providers import ServiceProviders
 
@@ -72,13 +72,19 @@ class SyncServices:
 
         return asyncio.run_coroutine_threadsafe(on_loop(), self._loop).result()
 
-    def authenticate(self, credential: str | None, **arguments: Any) -> RequestContext:
+    def authenticate(
+        self, credential: str | PresentedCredentials | None, **arguments: Any
+    ) -> RequestContext:
         """Verify a caller's credential, as :meth:`ServiceContainer.authenticate` does."""
         return self.run(lambda: self.container.authenticate(credential, **arguments))
 
     def mcp_tools(self, server: str) -> list[BaseTool]:
         """Return the governed tools of a registered MCP server."""
         return self.run(lambda: self.container.mcp_tools(server))
+
+    def registered_mcp_tools(self, application: str) -> list[BaseTool]:
+        """Return the governed tools of every MCP server the registry lists for an agent."""
+        return self.run(lambda: self.container.registered_mcp_tools(application))
 
     def invoke(self, graph: Any, given: Any, context: RequestContext) -> Any:
         """Run a compiled graph for one request on behalf of ``context`` and return its result."""

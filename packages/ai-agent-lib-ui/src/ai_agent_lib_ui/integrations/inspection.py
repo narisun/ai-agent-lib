@@ -77,7 +77,7 @@ def register_inspector(
 
     @app.get("/conversations/{thread_id}/turns/{run_id}/inspect")
     async def inspect_turn(thread_id: str, run_id: str) -> HTMLResponse:
-        principal = current_principal()
+        principal = await current_principal(resources)
         conversation = await resources.store.get(principal, thread_id)
         view = view_for(principal, conversation.thread.scope.application)
         for permission in (Permission.DIAGNOSTIC_METADATA, Permission.DIAGNOSTIC_CONTENT):

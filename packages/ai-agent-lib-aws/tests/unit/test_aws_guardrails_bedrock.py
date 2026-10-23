@@ -23,6 +23,7 @@ from ai_agent_lib_core.contracts import (
     Section,
     ServiceConfig,
     TransientError,
+    UpstreamError,
 )
 from ai_agent_lib_core.di import ServiceContainer
 from ai_agent_lib_core.testing import Fakes
@@ -192,8 +193,8 @@ async def test_only_the_chosen_points_are_sent_and_the_limits_still_apply() -> N
         (client_error("ServiceUnavailableException", "ApplyGuardrail", status=503), TransientError),
         (aws.ReadTimeoutError(endpoint_url="https://bedrock-runtime"), TransientError),
         (client_error("AccessDeniedException", "ApplyGuardrail", status=403), ConfigurationError),
-        (client_error("ValidationException", "ApplyGuardrail"), AgentLibError),
-        (client_error("ResourceNotFoundException", "ApplyGuardrail", status=404), AgentLibError),
+        (client_error("ValidationException", "ApplyGuardrail"), UpstreamError),
+        (client_error("ResourceNotFoundException", "ApplyGuardrail", status=404), UpstreamError),
         (aws.ParamValidationError(report="bad"), AgentLibError),
     ],
 )
@@ -212,7 +213,7 @@ async def test_a_check_without_an_answer_raises(
 async def test_a_reply_without_a_verdict_raises(reply: dict[str, Any]) -> None:
     check, service = guardrails()
     service.reply = reply
-    with pytest.raises(AgentLibError, match="no verdict"):
+    with pytest.raises(UpstreamError, match="no verdict"):
         await check.check(GuardrailPoint.MODEL_INPUT, "anything", None)
 
 

@@ -1,13 +1,19 @@
 """Reuse the public registry parser and authorize server-pinned local bindings."""
 
 import asyncio
+from collections.abc import Mapping
 from pathlib import Path
 
 from ai_agent_lib_core.contracts import AgentSnapshot, Principal, ToolSnapshot
 from ai_agent_lib_core.kit import RegistryDocument, load_registries
 from ai_agent_lib_ui.application.catalog import bind_agent, same_agent_binding
 from ai_agent_lib_ui.config.settings import Settings
-from ai_agent_lib_ui.contracts.catalog import AgentBinding, McpSummary, PresentationManifest
+from ai_agent_lib_ui.contracts.catalog import (
+    AgentBinding,
+    AgentCoreRuntime,
+    McpSummary,
+    PresentationManifest,
+)
 from ai_agent_lib_ui.contracts.queries import (
     ContractError,
     ErrorCode,
@@ -37,14 +43,22 @@ def pin_bindings(
     allowed_urls: frozenset[str],
     *,
     artifact_agent_ids: frozenset[str] = frozenset(),
+    runtimes: Mapping[str, AgentCoreRuntime] | None = None,
 ) -> tuple[AgentBinding, ...]:
-    """Explicit operator selection establishes supported question-answer bindings."""
+    """Explicit operator selection establishes supported question-answer bindings.
+
+    ``runtimes`` names the selected agents hosted on AgentCore Runtime; their
+    binding URL is derived from the ARN, so the registry entry may omit ``url``.
+    """
     result: list[AgentBinding] = []
+    runtimes = runtimes or {}
+    if set(runtimes) - set(agent_ids):
+        raise ValueError("every --agentcore-runtime agent must also be selected with --agent")
     for agent_id in agent_ids:
         entry = agents.get(agent_id)
         if entry is None:
             raise ValueError(f"agent {agent_id!r} is absent from the registry")
-        if not entry.url:
+        if not entry.url and agent_id not in runtimes:
             raise ValueError(f"add a loopback url to registry agent {agent_id!r}")
         manifest = PresentationManifest(
             agent_id=entry.id,
@@ -61,6 +75,7 @@ def pin_bindings(
                 registry_revision=agents.revision,
                 allowed_urls=allowed_urls,
                 local=True,
+                runtime=runtimes.get(agent_id),
             )
         )
     return tuple(result)
@@ -127,6 +142,7 @@ class FileCatalog:
             registry_revision=agents.revision,
             allowed_urls=self.settings.allowed_urls,
             local=True,
+            runtime=pinned.runtime,
         )
         if not same_agent_binding(pinned, current):
             raise ContractError(ErrorCode.STALE_BINDING)

@@ -16,14 +16,14 @@ from ai_agent_lib_ui.adapters.sqlite import SqliteThreads
 from ai_agent_lib_ui.application.chat import ChatService
 from ai_agent_lib_ui.config.settings import LocalIdentity, Settings
 from ai_agent_lib_ui.contracts.conversations import RunRecord
-from ai_agent_lib_ui.integrations import runtime as runtime_module
+from ai_agent_lib_ui.integrations.answer_format import answer_id
 from ai_agent_lib_ui.integrations.runtime import Runtime
 from ai_agent_lib_ui.integrations.security import session_token
 
 # chainlit's import chain (via literalai/traceloop) raises a pydantic deprecation
-# warning that this project's `filterwarnings = ["error"]` turns fatal. test_chat.py
-# avoids it by importing chainlit-dependent names only inside test/fixture bodies,
-# under this file-wide filter, rather than at module scope during collection.
+# warning that this project's `filterwarnings = ["error"]` turns fatal. The chat
+# tests avoid it by importing chainlit-dependent names only inside test/fixture
+# bodies, under this file-wide filter, rather than at module scope during collection.
 if TYPE_CHECKING:
     from chainlit.types import Feedback
 
@@ -83,7 +83,7 @@ async def environment(tmp_path: Path) -> AsyncIterator[Environment]:
     """One composed runtime with a single completed run, as `data_layer` sees it."""
     from chainlit.types import Feedback
 
-    from ai_agent_lib_ui.integrations.data_layer import DataLayer, answer_id
+    from ai_agent_lib_ui.integrations.data_layer import DataLayer
 
     settings = settings_at(tmp_path)
     access = LocalAccess(settings)
@@ -107,9 +107,7 @@ async def environment(tmp_path: Path) -> AsyncIterator[Environment]:
             "test-access-code",
             JsonlFeedbackLog(feedback_path),
         )
-        token = store.new_session(resources.identity)
-        previous_runtime = runtime_module._runtime
-        runtime_module._runtime = resources
+        token = await store.new_session(resources.identity)
         reset_session = session_token.set(token)
 
         def feedback_for(
@@ -123,11 +121,10 @@ async def environment(tmp_path: Path) -> AsyncIterator[Environment]:
             )
 
         try:
-            yield DataLayer(), run, thread_id, feedback_path, feedback_for
+            yield DataLayer(resources), run, thread_id, feedback_path, feedback_for
         finally:
             session_token.reset(reset_session)
-            runtime_module._runtime = previous_runtime
-        await service.close()
+            await service.close()
 
 
 async def test_feedback_on_an_accepted_answer_is_recorded(environment: Environment) -> None:

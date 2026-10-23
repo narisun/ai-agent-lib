@@ -239,6 +239,22 @@ async def test_only_registered_tools_are_offered_to_the_model() -> None:
     assert tool.read_only is True
 
 
+async def test_an_agent_gets_the_tools_of_every_server_its_registry_entry_lists() -> None:
+    async with World() as world:
+        # The registry lists "accounts" for "accounts-agent" and nothing for anyone else.
+        unregistered = await world.agent_services.registered_mcp_tools("nobody-agent")
+        registered = await world.agent_services.registered_mcp_tools(AGENT.id)
+        per_server = [
+            tool
+            for server in AGENT.mcp_servers
+            for tool in await world.agent_services.mcp_tools(server)
+        ]
+    assert unregistered == []
+    assert [tool.name for tool in registered] == [tool.name for tool in per_server]
+    assert [tool.name for tool in registered] == ["accounts_lookup"]
+    assert all(isinstance(tool, GovernedMcpTool) for tool in registered)
+
+
 # ------------------------------------------------------------ registry checks
 
 
@@ -341,6 +357,36 @@ async def test_arguments_are_checked_against_the_schema_before_anything_is_sent(
                 with pytest.raises(ValidationFailed, match="do not match its input schema"):
                     await tool.ainvoke(bad)
         assert len(world.connector.connections) == connections
+    assert world.ran == []
+
+
+async def test_a_plain_string_input_is_named_like_langchain_does_or_refused_as_invalid() -> None:
+    # A single plain value goes to the first argument, as LangChain does for a tool
+    # with one argument; there is no wrapped tool here, so this is the MCP tool's own.
+    async with World() as world:
+        tool = await world.lookup_tool()
+        with bind_request_context(CONTEXT):
+            result = await tool.ainvoke("west")
+    rows = '{"rows": [["5520", "Eve", "west", "12004.55"], ["5521", "Fay", "west", "1.0"]]}'
+    assert result == frame_untrusted("accounts.lookup", rows)
+
+    # A tool without arguments cannot name the value: that is the caller's mistake,
+    # reported as such, not a crash inside the tool.
+    no_arguments = ServerEntry(
+        id="accounts",
+        owner="treasury",
+        url="http://localhost:8001/mcp",
+        audience="accounts-mcp",
+        tools=(ToolEntry(name="accounts.broken", version="1.0.0"),),
+    )
+    async with World(server_entry=no_arguments) as world:
+        (no_argument_tool,) = await world.agent_services.mcp_tools("accounts")
+        with (
+            bind_request_context(CONTEXT),
+            pytest.raises(ValidationFailed, match="takes its arguments by name") as caught,
+        ):
+            await no_argument_tool.ainvoke("anything")
+    assert caught.value.expected == "no arguments at all"
     assert world.ran == []
 
 

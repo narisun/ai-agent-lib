@@ -56,6 +56,7 @@ from ai_agent_lib_core.contracts import (
     Clock,
     ConfigurationError,
     CredentialsExpiredError,
+    NotStartedError,
     Obligations,
     OptionsModel,
     ParameterType,
@@ -410,7 +411,9 @@ class RestDataSource:
             try:
                 endpoint = _load_endpoint(path)
             except ConfigurationError as exc:
-                raise ConfigurationError(f"data source {self._name!r}: {exc}") from None
+                # Keep the facts and the file note; add which source was loading it.
+                exc.add_note(f"while starting data source {self._name!r}")
+                raise
             endpoints[endpoint.description.name] = endpoint
         self._client = httpx.AsyncClient(
             verify=tls_verification(f"data source {self._name!r}", self._options.ca_file),
@@ -629,7 +632,7 @@ class RestDataSource:
             ConfigurationError: If it is not ready.
         """
         if self._client is None or self._endpoints is None:
-            raise ConfigurationError(f"data source {self._name!r} is not started")
+            raise NotStartedError(f"data source {self._name!r}")
         if not self._endpoints:
             raise ConfigurationError(f"data source {self._name!r} has no queries")
 
@@ -641,5 +644,5 @@ class RestDataSource:
 
     def _started(self) -> tuple[Mapping[str, _Endpoint], httpx.AsyncClient]:
         if self._endpoints is None or self._client is None:
-            raise RuntimeError(f"data source {self._name!r} is not started")
+            raise NotStartedError(f"data source {self._name!r}")
         return self._endpoints, self._client

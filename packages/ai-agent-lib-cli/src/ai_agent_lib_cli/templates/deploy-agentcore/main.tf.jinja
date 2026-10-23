@@ -1,0 +1,446 @@
+# {{ name }} on Amazon Bedrock AgentCore Runtime. agentlib wrote this file once; it is yours to change.
+# settings.tf and permissions.tf are rewritten by every 'agentlib deploy {{ name }} --target agentcore'.
+#
+# The runtime runs one session per microVM from the artifact (an ARM64 image in the
+# ECR repository created here, or a zip in the S3 bucket created here), as the
+# execution role below. That role holds what the service's adapters declared they
+# need (permissions.tf) plus what the platform itself needs: the artifact, its logs,
+# the traces and metrics ADOT sends, and its workload identity.
+
+terraform {
+  required_version = ">= 1.5"
+
+  required_providers {
+    aws = {
+      source = "hashicorp/aws"
+      # The bedrockagentcore resources arrived in the 6.x series of the provider.
+      version = ">= 6.20"
+    }
+  }
+}
+
+provider "aws" {
+  region = var.region
+}
+
+data "aws_caller_identity" "deployment" {}
+
+locals {
+  account = data.aws_caller_identity.deployment.account_id
+  # A runtime's name allows letters, digits and underscores only.
+  runtime_name = replace("{{ name }}", "-", "_")
+  container    = local.artifact == "container"
+  code         = local.artifact == "code"
+  jwt          = local.auth == "jwt"
+  make_gateway = local.gateway == "create"
+
+  agentcore_arn = "arn:aws:bedrock-agentcore:${var.region}:${local.account}"
+  logs_arn      = "arn:aws:logs:${var.region}:${local.account}:log-group:/aws/bedrock-agentcore/runtimes/*"
+
+  # When Terraform creates the memory, the ID it gets replaces the placeholder in
+  # the checkpoint options of the runtime's environment (settings.tf says which
+  # variable holds them). Otherwise the environment is passed as it is.
+  environment_variables = (
+    local.memory_option_variable == null
+    ? local.environment
+    : merge(local.environment, {
+      (local.memory_option_variable) = jsonencode(merge(
+        jsondecode(lookup(local.environment, local.memory_option_variable, "{}")),
+        { memory_id = aws_bedrockagentcore_memory.this[0].id },
+      ))
+    })
+  )
+}
+
+# A container deployment needs the image that was pushed to the repository below.
+resource "terraform_data" "image_given" {
+  count = local.container ? 1 : 0
+
+  lifecycle {
+    precondition {
+      condition     = var.image != null
+      error_message = "The settings deploy a container: set image to the ARM64 image pushed to the repository, pinned by digest."
+    }
+  }
+}
+
+# ------------------------------------------------------------------ the artifact
+
+resource "aws_ecr_repository" "this" {
+  count = local.container ? 1 : 0
+
+  name                 = "{{ name }}"
+  image_tag_mutability = "IMMUTABLE"
+  force_delete         = false
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = var.tags
+}
+
+resource "aws_s3_bucket" "code" {
+  count = local.code ? 1 : 0
+
+  bucket = var.code_bucket != null ? var.code_bucket : "{{ name }}-agentcore-code-${local.account}"
+  tags   = var.tags
+}
+
+resource "aws_s3_bucket_versioning" "code" {
+  count = local.code ? 1 : 0
+
+  bucket = aws_s3_bucket.code[0].id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "code" {
+  count = local.code ? 1 : 0
+
+  bucket                  = aws_s3_bucket.code[0].id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# The zip build_zip.py wrote. A new build changes the hash, so the runtime is updated.
+resource "aws_s3_object" "code" {
+  count = local.code ? 1 : 0
+
+  bucket      = aws_s3_bucket.code[0].id
+  key         = "{{ name }}.zip"
+  source      = var.code_zip
+  source_hash = filemd5(var.code_zip)
+  tags        = var.tags
+
+  depends_on = [aws_s3_bucket_versioning.code]
+}
+
+# ------------------------------------------------------------------ the role
+
+data "aws_iam_policy_document" "assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["bedrock-agentcore.amazonaws.com"]
+    }
+    # Only this account's runtimes may take the role.
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [local.account]
+    }
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["${local.agentcore_arn}:*"]
+    }
+  }
+}
+
+resource "aws_iam_role" "runtime" {
+  name               = "{{ name }}-agentcore"
+  assume_role_policy = data.aws_iam_policy_document.assume.json
+  tags               = var.tags
+}
+
+# What the service's adapters declared they need, and why (permissions.tf).
+resource "aws_iam_role_policy" "adapters" {
+  count = local.task_policy_json == null ? 0 : 1
+
+  name   = "adapters"
+  role   = aws_iam_role.runtime.id
+  policy = local.task_policy_json
+}
+
+# What the platform needs to run the service: nothing the service's code uses.
+data "aws_iam_policy_document" "platform" {
+  dynamic "statement" {
+    for_each = local.container ? [1] : []
+    content {
+      sid       = "PullTheImage"
+      actions   = ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"]
+      resources = [aws_ecr_repository.this[0].arn]
+    }
+  }
+  dynamic "statement" {
+    for_each = local.container ? [1] : []
+    content {
+      sid       = "SignInToEcr"
+      actions   = ["ecr:GetAuthorizationToken"]
+      resources = ["*"]
+    }
+  }
+  dynamic "statement" {
+    for_each = local.code ? [1] : []
+    content {
+      sid       = "ReadTheCode"
+      actions   = ["s3:GetObject", "s3:GetObjectVersion"]
+      resources = ["${aws_s3_bucket.code[0].arn}/*"]
+    }
+  }
+  statement {
+    sid       = "ManageItsLogGroup"
+    actions   = ["logs:CreateLogGroup", "logs:DescribeLogStreams"]
+    resources = [local.logs_arn]
+  }
+  statement {
+    sid       = "WriteItsLogs"
+    actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = ["${local.logs_arn}:log-stream:*"]
+  }
+  statement {
+    sid       = "FindLogGroups"
+    actions   = ["logs:DescribeLogGroups"]
+    resources = ["arn:aws:logs:${var.region}:${local.account}:log-group:*"]
+  }
+  statement {
+    sid       = "SendTraces"
+    actions   = ["xray:PutTraceSegments", "xray:PutTelemetryRecords", "xray:GetSamplingRules", "xray:GetSamplingTargets"]
+    resources = ["*"]
+  }
+  statement {
+    sid       = "SendMetrics"
+    actions   = ["cloudwatch:PutMetricData"]
+    resources = ["*"]
+    condition {
+      test     = "StringEquals"
+      variable = "cloudwatch:namespace"
+      values   = ["bedrock-agentcore"]
+    }
+  }
+  statement {
+    sid = "ItsWorkloadIdentity"
+    actions = [
+      "bedrock-agentcore:GetWorkloadAccessToken",
+      "bedrock-agentcore:GetWorkloadAccessTokenForJWT",
+      "bedrock-agentcore:GetWorkloadAccessTokenForUserId",
+    ]
+    resources = [
+      "${local.agentcore_arn}:workload-identity-directory/default",
+      "${local.agentcore_arn}:workload-identity-directory/default/workload-identity/${local.runtime_name}-*",
+    ]
+  }
+  # The memory Terraform creates: permissions.tf names the placeholder ID instead.
+  dynamic "statement" {
+    for_each = local.create_memory ? [1] : []
+    content {
+      sid = "TheCreatedMemory"
+      actions = [
+        "bedrock-agentcore:CreateEvent",
+        "bedrock-agentcore:ListEvents",
+        "bedrock-agentcore:GetEvent",
+        "bedrock-agentcore:DeleteEvent",
+        "bedrock-agentcore:ListSessions",
+      ]
+      resources = [aws_bedrockagentcore_memory.this[0].arn]
+    }
+  }
+}
+
+resource "aws_iam_role_policy" "platform" {
+  name   = "platform"
+  role   = aws_iam_role.runtime.id
+  policy = data.aws_iam_policy_document.platform.json
+}
+
+# ------------------------------------------------------------------ memory
+
+resource "aws_bedrockagentcore_memory" "this" {
+  count = local.create_memory ? 1 : 0
+
+  name                  = "${local.runtime_name}_memory"
+  description           = "The conversations of {{ name }}."
+  event_expiry_duration = var.memory_expiry_days
+  encryption_key_arn    = var.memory_kms_key_arn
+  tags                  = var.tags
+}
+
+# ------------------------------------------------------------------ the runtime
+
+resource "aws_bedrockagentcore_agent_runtime" "this" {
+  agent_runtime_name = local.runtime_name
+  description        = "{{ name }}, deployed by agentlib from {{ folder }}/deploy.env."
+  role_arn           = aws_iam_role.runtime.arn
+
+  agent_runtime_artifact {
+    dynamic "container_configuration" {
+      for_each = local.container ? [1] : []
+      content {
+        container_uri = var.image
+      }
+    }
+    dynamic "code_configuration" {
+      for_each = local.code ? [1] : []
+      content {
+        code {
+          s3 {
+            bucket     = aws_s3_object.code[0].bucket
+            prefix     = aws_s3_object.code[0].key
+            version_id = aws_s3_object.code[0].version_id
+          }
+        }
+        # main.py, written by build_zip.py, starts the service with its agentcore profile.
+        entry_point = ["opentelemetry-instrument", "main.py"]
+        runtime     = "PYTHON_{{ python | replace('.', '_') }}"
+      }
+    }
+  }
+
+  network_configuration {
+    network_mode = local.network_mode
+    dynamic "network_mode_config" {
+      for_each = local.network_mode == "VPC" ? [1] : []
+      content {
+        subnets         = local.subnets
+        security_groups = local.security_groups
+      }
+    }
+  }
+
+  # HTTP for an agent (POST /invocations, GET /ping), MCP for an MCP server (/mcp).
+  protocol_configuration {
+    server_protocol = local.protocol
+  }
+
+  # With jwt, the runtime checks each bearer token against the issuer's discovery
+  # document. Without this block callers sign their requests (IAM, SigV4).
+  dynamic "authorizer_configuration" {
+    for_each = local.jwt ? [1] : []
+    content {
+      custom_jwt_authorizer {
+        discovery_url    = local.discovery_url
+        allowed_clients  = length(local.allowed_clients) > 0 ? local.allowed_clients : null
+        allowed_audience = length(local.allowed_audience) > 0 ? local.allowed_audience : null
+        allowed_scopes   = length(local.allowed_scopes) > 0 ? local.allowed_scopes : null
+      }
+    }
+  }
+
+  # The service's identity adapter reads the token the caller presented.
+  dynamic "request_header_configuration" {
+    for_each = local.jwt ? [1] : []
+    content {
+      request_header_allowlist = ["Authorization"]
+    }
+  }
+
+  lifecycle_configuration {
+    idle_runtime_session_timeout = local.idle_timeout_seconds
+    max_lifetime                 = local.max_lifetime_seconds
+  }
+
+  environment_variables = local.environment_variables
+  tags                  = var.tags
+
+  depends_on = [aws_iam_role_policy.platform, aws_iam_role_policy.adapters]
+}
+
+# The runtime writes its logs here. Created after the runtime, so that the
+# retention and the key are yours; the name is the platform's.
+resource "aws_cloudwatch_log_group" "runtime" {
+  name              = "/aws/bedrock-agentcore/runtimes/${aws_bedrockagentcore_agent_runtime.this.agent_runtime_id}-DEFAULT"
+  retention_in_days = var.log_retention_days
+  kms_key_id        = var.log_kms_key_arn
+  tags              = var.tags
+}
+
+# ------------------------------------------------------------------ gateway
+
+# The gateway fronts the workspace's MCP servers as one MCP server, with the same
+# inbound authentication as the runtime, and calls each target as this role.
+data "aws_iam_policy_document" "gateway_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["bedrock-agentcore.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [local.account]
+    }
+  }
+}
+
+resource "aws_iam_role" "gateway" {
+  count = local.make_gateway ? 1 : 0
+
+  name               = "{{ name }}-agentcore-gateway"
+  assume_role_policy = data.aws_iam_policy_document.gateway_assume.json
+  tags               = var.tags
+}
+
+data "aws_iam_policy_document" "gateway" {
+  statement {
+    sid       = "InvokeTheTargets"
+    actions   = ["bedrock-agentcore:InvokeAgentRuntime"]
+    resources = ["${local.agentcore_arn}:runtime/*"]
+  }
+}
+
+resource "aws_iam_role_policy" "gateway" {
+  count = local.make_gateway ? 1 : 0
+
+  name   = "targets"
+  role   = aws_iam_role.gateway[0].id
+  policy = data.aws_iam_policy_document.gateway.json
+}
+
+resource "aws_bedrockagentcore_gateway" "this" {
+  count = local.make_gateway ? 1 : 0
+
+  name            = "{{ name }}-gateway"
+  description     = "The MCP servers {{ name }} reaches, as one MCP server."
+  role_arn        = aws_iam_role.gateway[0].arn
+  authorizer_type = local.jwt ? "CUSTOM_JWT" : "AWS_IAM"
+  protocol_type   = "MCP"
+
+  dynamic "authorizer_configuration" {
+    for_each = local.jwt ? [1] : []
+    content {
+      custom_jwt_authorizer {
+        discovery_url    = local.discovery_url
+        allowed_clients  = length(local.allowed_clients) > 0 ? local.allowed_clients : null
+        allowed_audience = length(local.allowed_audience) > 0 ? local.allowed_audience : null
+      }
+    }
+  }
+
+  protocol_configuration {
+    mcp {
+      supported_versions = ["2025-03-26"]
+    }
+  }
+
+  tags = var.tags
+}
+
+# One target per MCP server, by the name and endpoint given in mcp_targets.
+resource "aws_bedrockagentcore_gateway_target" "mcp" {
+  for_each = local.make_gateway ? var.mcp_targets : {}
+
+  gateway_identifier = aws_bedrockagentcore_gateway.this[0].gateway_id
+  name               = each.key
+  description        = "The MCP server ${each.key}."
+
+  credential_provider_configuration {
+    gateway_iam_role {
+      service = "bedrock-agentcore"
+    }
+  }
+
+  target_configuration {
+    mcp {
+      mcp_server {
+        endpoint = each.value
+      }
+    }
+  }
+}

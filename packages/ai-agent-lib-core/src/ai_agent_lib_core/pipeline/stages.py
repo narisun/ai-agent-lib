@@ -31,7 +31,7 @@ class ModelStage(enum.IntEnum):
     BUDGET = 10  # execution pause check, reservation before and settlement after
     IDENTITY = 20
     POLICY = 30
-    CONTEXT = 40
+    CONTEXT = 40  # reserved: no interceptor fills it yet
     INPUT_GUARDRAILS = 50
     STRUCTURED_OUTPUT = 60  # validates on the way back
     OUTPUT_GUARDRAILS = 70  # checks on the way back, before structured output
@@ -46,10 +46,10 @@ class ToolStage(enum.IntEnum):
     BUDGET = 10  # execution pause check and reservation
     REGISTRY = 20
     POLICY = 30
-    APPROVAL = 40
+    APPROVAL = 40  # reserved: a human approval step, no interceptor yet
     INPUT_GUARDRAILS = 50
-    IDEMPOTENCY = 60
-    JUDGE = 70  # judges on the way back, last
+    IDEMPOTENCY = 60  # reserved: for write tools, which this release has none of
+    JUDGE = 70  # reserved: judges on the way back, last; no interceptor yet
     FRAMING = 80  # frames the result as untrusted on the way back
     RESULT_GUARDRAILS = 90  # checks the result on the way back, first
     RESILIENCE = 100  # deadline, and retries for read-only tools
@@ -61,7 +61,7 @@ class DataStage(enum.IntEnum):
     AUDIT = 0
     DEADLINE = 5  # the whole query within the caller's deadline
     POLICY = 30  # the decision, and the obligations the data layer must apply
-    RESILIENCE = 100
+    RESILIENCE = 100  # retries within the tool limits; a named query only reads
 
 
 StageT = TypeVar("StageT", bound=enum.IntEnum)
@@ -92,6 +92,14 @@ class Pipeline(Generic[StageT, RequestT, ResponseT]):
     def stages(self) -> tuple[StageT, ...]:
         """The filled stages, in the order they run."""
         return tuple(self._stages)
+
+    def interceptor(self, stage: StageT) -> Interceptor[RequestT, ResponseT]:
+        """Return the interceptor that fills ``stage``.
+
+        Raises:
+            KeyError: If the stage is not filled.
+        """
+        return self._stages[stage]
 
     def bind(self, terminal: Handler[RequestT, ResponseT]) -> Handler[RequestT, ResponseT]:
         """Return a handler that runs every stage around ``terminal``."""

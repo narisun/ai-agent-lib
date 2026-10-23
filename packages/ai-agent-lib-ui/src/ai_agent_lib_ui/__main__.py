@@ -4,12 +4,22 @@ import argparse
 import asyncio
 import json
 import sys
+import traceback
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ai_agent_lib_ui.contracts.catalog import AgentCoreRuntime
 
 
 def arguments() -> argparse.Namespace:
     """Parse commands without importing optional runtime dependencies."""
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="also print the error's type and traceback to stderr when a command fails",
+    )
     commands = parser.add_subparsers(dest="command", required=True)
     for name in ("init", "check", "serve"):
         command = commands.add_parser(name)
@@ -25,14 +35,33 @@ def arguments() -> argparse.Namespace:
             command.add_argument(
                 "--allow-url",
                 action="append",
-                required=True,
+                default=None,
                 help="exact loopback registry URL; repeat for more endpoints",
+            )
+            command.add_argument(
+                "--agentcore-runtime",
+                action="append",
+                default=None,
+                metavar="AGENT=ARN",
+                help="reach a selected agent through AgentCore Runtime at this ARN; repeatable",
+            )
+            command.add_argument(
+                "--agentcore-auth",
+                choices=("iam", "bearer"),
+                default="iam",
+                help="how every runtime request is authenticated: SigV4 or a bearer token file",
+            )
+            command.add_argument(
+                "--agentcore-token-file",
+                type=Path,
+                default=None,
+                help="file whose first line is the bearer token; needed for bearer auth",
             )
             command.add_argument("--port", type=int, default=8765)
             command.add_argument(
                 "--artifacts-agent",
                 action="append",
-                default=[],
+                default=None,
                 help="selected agent that returns versioned inline documents; repeat as needed",
             )
             command.add_argument(
@@ -55,7 +84,7 @@ def main() -> int:
         )
         from ai_agent_lib_ui.config.settings import Settings, agent_environment
         from ai_agent_lib_ui.config.shell import prepare_shell
-        from ai_agent_lib_ui.contracts.queries import ContractError, PageRequest
+        from ai_agent_lib_ui.contracts.queries import PageRequest
         from ai_agent_lib_ui.integrations.runtime import compose
 
         path = args.config.resolve()
@@ -66,8 +95,15 @@ def main() -> int:
                 )
             agents_path, tools_path, identity = agent_environment(args.env_file.resolve())
             agents, _ = read_registries(agents_path, tools_path)
-            allowed = frozenset(args.allow_url)
-            if not set(args.artifacts_agent) <= set(args.agent):
+            runtimes = _runtimes(args)
+            # Pinning an ARN is the explicit approval of its derived service URL.
+            allowed = frozenset(args.allow_url or ()) | {
+                runtime.invocation_url for runtime in runtimes.values()
+            }
+            if not allowed:
+                raise ValueError("give --allow-url for each agent URL or --agentcore-runtime")
+            artifact_agents = args.artifacts_agent or []
+            if not set(artifact_agents) <= set(args.agent):
                 raise ValueError("--artifacts-agent must also be selected with --agent")
             settings = Settings(
                 agents_path=agents_path,
@@ -77,7 +113,8 @@ def main() -> int:
                     agents,
                     tuple(args.agent),
                     allowed,
-                    artifact_agent_ids=frozenset(args.artifacts_agent),
+                    artifact_agent_ids=frozenset(artifact_agents),
+                    runtimes=runtimes,
                 ),
                 allowed_urls=allowed,
                 port=args.port,
@@ -117,33 +154,68 @@ def main() -> int:
                 "another UI server owns this state folder; stop it before restarting"
             ) from None
         return 0
-    except ImportError:
+    except ImportError as error:
+        # Name the module that is missing: the hint is wrong when the UI is
+        # installed and some other import failed.
+        missing = f" (missing: {error.name})" if error.name else ""
         print(
-            'Install the UI in its own environment: python -m pip install "ai-agent-lib-ui[chat]"',
+            "Install the UI in its own environment: "
+            f'python -m pip install "ai-agent-lib-ui[chat]"{missing}',
             file=sys.stderr,
         )
+        if args.verbose:
+            traceback.print_exc()
     except Exception as error:  # noqa: BLE001 - CLI boundary must not print secrets
-        # Pydantic/provider errors may contain configuration inputs. Do not print
-        # their repr or a traceback, which can accidentally disclose .env content.
-        from pydantic import ValidationError
-
-        from ai_agent_lib_core.contracts import ConfigurationError
-        from ai_agent_lib_ui.contracts.queries import ContractError
-
-        if isinstance(error, ContractError):
-            message = error.code.value + "; check registry IDs, urls and configuration pins"
-        elif isinstance(error, (ValidationError, ConfigurationError, json.JSONDecodeError)):
-            message = "invalid settings or registry; check the documented field names and values"
-        elif isinstance(error, OSError):
-            message = (
-                "a required file could not be read or written; check paths and folder permissions"
-            )
-        elif isinstance(error, ValueError):
-            message = str(error)
-        else:
-            message = "UI startup failed; verify the separate UI environment and configuration"
-        print("UI error: " + message, file=sys.stderr)
+        print(f"UI error: {_safe_message(error)} ({type(error).__name__})", file=sys.stderr)
+        if args.verbose:
+            # Opt-in only: a traceback can repeat configuration values.
+            traceback.print_exc()
     return 2
+
+
+def _runtimes(args: argparse.Namespace) -> "dict[str, AgentCoreRuntime]":
+    """Map each ``--agentcore-runtime AGENT=ARN`` to a validated runtime description."""
+    from ai_agent_lib_ui.contracts.catalog import AgentCoreRuntime
+
+    result: dict[str, AgentCoreRuntime] = {}
+    for item in args.agentcore_runtime or ():
+        agent_id, separator, arn = item.partition("=")
+        if not separator or not agent_id or agent_id not in args.agent:
+            raise ValueError("--agentcore-runtime takes AGENT=ARN for an agent given with --agent")
+        if agent_id in result:
+            raise ValueError(f"--agentcore-runtime names agent {agent_id!r} twice")
+        token_file = args.agentcore_token_file
+        if (args.agentcore_auth == "bearer") != (token_file is not None):
+            raise ValueError("--agentcore-token-file goes with --agentcore-auth bearer only")
+        result[agent_id] = AgentCoreRuntime(
+            arn=arn,
+            auth=args.agentcore_auth,
+            token_file=token_file.resolve() if token_file is not None else None,
+        )
+    return result
+
+
+def _safe_message(error: Exception) -> str:
+    """Describe a startup failure without its text, which may repeat .env content.
+
+    Pydantic and provider errors quote the values they rejected, so only the
+    kind of failure and where to look are printed. A ValueError is one of this
+    module's own messages, written to be shown.
+    """
+    from pydantic import ValidationError
+
+    from ai_agent_lib_core.contracts import ConfigurationError
+    from ai_agent_lib_ui.contracts.queries import ContractError
+
+    if isinstance(error, ContractError):
+        return error.code.value + "; check registry IDs, urls and configuration pins"
+    if isinstance(error, (ValidationError, ConfigurationError, json.JSONDecodeError)):
+        return "invalid settings or registry; check the documented field names and values"
+    if isinstance(error, OSError):
+        return "a required file could not be read or written; check paths and folder permissions"
+    if isinstance(error, ValueError):
+        return str(error)
+    return "UI startup failed; verify the separate UI environment and configuration"
 
 
 if __name__ == "__main__":

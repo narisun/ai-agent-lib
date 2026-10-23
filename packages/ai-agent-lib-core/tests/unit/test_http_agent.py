@@ -6,6 +6,8 @@ from typing import Any
 
 import httpx
 import pytest
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
 
 from ai_agent_lib_core.contracts import (
     AgentLibError,
@@ -14,16 +16,24 @@ from ai_agent_lib_core.contracts import (
     ExecutionPaused,
     IntegrityError,
     PolicyDenied,
+    PresentedCredentials,
     Principal,
     RequestContext,
     TransientError,
     ValidationFailed,
 )
 from ai_agent_lib_core.integrations.http import ServiceLifecycle, agent_app
+from ai_agent_lib_core.integrations.http.invoke import TERMINAL_ERRORS
+from ai_agent_lib_core.integrations.http.prelude import Admitted, Lookup, RequestPrelude, status_of
 from ai_agent_lib_core.testing import SequentialIds
 
 APPLICATION = "accounts-agent"
 TOKENS = {"ann-token": "ann", "bo-token": "bo"}
+
+
+def bearer_of(credential: str | PresentedCredentials | None) -> str | None:
+    """The token a fake sees: the entry point presents everything, a test may pass the token."""
+    return credential.bearer if isinstance(credential, PresentedCredentials) else credential
 
 
 class Services:
@@ -36,14 +46,21 @@ class Services:
 
     async def authenticate(
         self,
-        credential: str | None,
+        credential: str | PresentedCredentials | None,
         *,
         application: str,
         thread_id: str,
         request_id: str | None = None,
     ) -> RequestContext:
+        presented = credential if isinstance(credential, PresentedCredentials) else None
+        credential = presented.bearer if presented is not None else credential
         self.asked.append(
-            {"credential": credential, "application": application, "request_id": request_id}
+            {
+                "credential": credential,
+                "application": application,
+                "request_id": request_id,
+                "headers": dict(presented.headers) if presented is not None else None,
+            }
         )
         if self.fail_with is not None:
             raise self.fail_with
@@ -376,10 +393,10 @@ class _StreamServices:
     ids = SequentialIds()
 
     async def authenticate(
-        self, credential: str | None, *, application: str, thread_id: str,
+        self, credential: str | PresentedCredentials | None, *, application: str, thread_id: str,
         request_id: str | None = None,
     ) -> RequestContext:  # fmt: skip
-        if credential != "good":
+        if bearer_of(credential) != "good":
             raise PolicyDenied("unknown caller", reason_code="invalid_token")
         return RequestContext(
             principal=Principal(subject="ann", tenant="t-1"),
@@ -387,3 +404,156 @@ class _StreamServices:
             request_id=request_id or "r-1",
             thread_id=thread_id,
         )
+
+
+# ------------------------------------------------------------------ the shared prelude
+
+
+def _request(
+    body: bytes = b'{"input": "hi"}',
+    *,
+    headers: dict[str, str] | None = None,
+    query: str = "",
+    path_params: dict[str, str] | None = None,
+) -> Request:
+    """A bare Starlette request, as both routes hand it to the prelude."""
+    sent = {"content-type": "application/json", **(headers or {})}
+
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/invoke",
+        "headers": [(k.encode(), v.encode()) for k, v in sent.items()],
+        "query_string": query.encode(),
+        "path_params": path_params or {},
+    }
+    return Request(scope, receive)
+
+
+async def _json(response: Response) -> dict[str, Any]:
+    import json as _json
+
+    assert isinstance(response, JSONResponse)
+    return dict(_json.loads(bytes(response.body)))
+
+
+class _Prelude:
+    def __init__(self, *, accepting: bool = True) -> None:
+        self.services = Services()
+        self.lifecycle = ServiceLifecycle(_no_check)
+        self.accepting = accepting
+        self.prelude = RequestPrelude(
+            self.services, application=APPLICATION, lifecycle=self.lifecycle, max_body_bytes=64
+        )
+
+    async def start(self) -> _Prelude:
+        if self.accepting:
+            await self.lifecycle.start()
+        return self
+
+
+async def test_the_prelude_admits_a_well_formed_request_from_a_known_caller() -> None:
+    kit = await _Prelude().start()
+    admitted = await kit.prelude.admit(
+        _request(
+            b'{"input": {"q": 1}, "thread_id": "th-1"}',
+            headers={"authorization": "Bearer ann-token", "accept": "text/event-stream"},
+        )
+    )
+    assert isinstance(admitted, Admitted)
+    assert (admitted.context.principal.subject, admitted.context.thread_id) == ("ann", "th-1")
+    assert admitted.given == {"q": 1}
+    assert admitted.accepts_events is True
+
+
+@pytest.mark.parametrize(
+    ("body", "status"),
+    [
+        (b"not json", 400),
+        (b'{"thread_id": "t"}', 400),
+        (b'{"input": 1, "thread_id": "has spaces"}', 400),
+        (b'{"input": 1, "thread_id": "ends-in-newline\n"}', 400),
+        (b'{"input": "' + b"x" * 100 + b'"}', 413),
+    ],
+)
+async def test_the_prelude_refuses_a_bad_body_before_anyone_is_asked(
+    body: bytes, status: int
+) -> None:
+    kit = await _Prelude().start()
+    refused = await kit.prelude.admit(_request(body, headers={"authorization": "Bearer ann-token"}))
+    assert isinstance(refused, Response)
+    assert refused.status_code == status
+    assert kit.services.asked == []
+
+
+@pytest.mark.parametrize(
+    ("headers", "reason"),
+    [
+        ({"authorization": "Basic YW5uOnB3"}, "malformed_authorization"),
+        ({"authorization": "Bearer two tokens"}, "malformed_authorization"),
+        ({"authorization": "Bearer stranger"}, "invalid_token"),
+        ({}, "missing_credential"),
+    ],
+)
+async def test_the_prelude_refuses_a_malformed_or_unknown_credential(
+    headers: dict[str, str], reason: str
+) -> None:
+    kit = await _Prelude().start()
+    refused = await kit.prelude.admit(_request(headers=headers))
+    assert isinstance(refused, Response)
+    assert refused.status_code == 401
+    assert await _json(refused) == {"error": "unauthorized", "reason": reason}
+    assert refused.headers["www-authenticate"] == 'Bearer error="invalid_token"'
+
+
+async def test_the_prelude_refuses_everyone_while_the_service_is_not_accepting() -> None:
+    kit = await _Prelude(accepting=False).start()
+    refused = await kit.prelude.admit(_request(headers={"authorization": "Bearer ann-token"}))
+    assert isinstance(refused, Response)
+    assert (refused.status_code, refused.headers["retry-after"]) == (503, "1")
+    assert kit.services.asked == []
+
+
+@pytest.mark.parametrize(
+    ("query", "request_id", "status"),
+    [
+        ("thread_id=th-1", "r-1", 200),
+        ("", "r-1", 400),
+        ("thread_id=has%20spaces", "r-1", 400),
+        ("thread_id=th-1", "bad id", 400),
+    ],
+)
+async def test_the_prelude_checks_both_ids_of_a_lookup_before_signing_in(
+    query: str, request_id: str, status: int
+) -> None:
+    kit = await _Prelude().start()
+    found = await kit.prelude.lookup(
+        _request(
+            b"",
+            headers={"authorization": "Bearer ann-token"},
+            query=query,
+            path_params={"request_id": request_id},
+        )
+    )
+    if status == 200:
+        assert isinstance(found, Lookup)
+        assert (found.context.thread_id, found.request_id) == ("th-1", "r-1")
+    else:
+        assert isinstance(found, Response)
+        assert found.status_code == status
+        assert kit.services.asked == []
+
+
+def test_the_journal_keeps_only_refusals_the_caller_would_get_again() -> None:
+    refusals = [
+        PolicyDenied("no", reason_code="not_permitted"),
+        ValidationFailed("wrong"),
+        BudgetExceeded("spent"),
+        ExecutionPaused("waits"),
+    ]
+    assert {status_of(error)[1] for error in refusals} == TERMINAL_ERRORS
+    for passing in (TransientError("later"), IntegrityError("lost")):
+        assert status_of(passing)[1] not in TERMINAL_ERRORS

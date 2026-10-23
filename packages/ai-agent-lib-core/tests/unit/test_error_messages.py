@@ -116,4 +116,4 @@ def test_telemetry_has_a_switch_of_its_own() -> None:
     assert isinstance(ServiceContainer(off).telemetry, NullTelemetry)
     with pytest.raises(ConfigurationError) as caught:
         ConfigResolver(MappingConfigSource({"AC2_TELEMETRY": "otel"})).resolve()
-    assert caught.value.expected == "one of: off, opentelemetry"
+    assert caught.value.expected == "one of: off, opentelemetry, ambient"

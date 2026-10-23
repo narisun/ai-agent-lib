@@ -1,51 +1,40 @@
-"""agentlib deploy: write what runs a service on ECS Fargate, from its settings."""
+"""agentlib deploy: write what runs a service on Fargate or AgentCore Runtime, from its settings."""
 
 from __future__ import annotations
 
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 import click
 
 from ai_agent_lib_cli.commands.common import print_report, workspace_option, workspace_root
 from ai_agent_lib_cli.deploy import (
-    AWS_DISTRIBUTION,
-    MODULE_FOLDER,
-    OPA_FOLDER,
-    depends_on_aws,
-    deployment_files,
-    maintained_files,
+    AGENTCORE,
+    FARGATE,
+    PLATFORMS,
+    next_steps,
     plan_deployment,
     plan_lines,
-    starter_settings,
+    read_bundle,
     target_of,
+    write_deployment,
+    write_starter,
 )
 from ai_agent_lib_cli.errors import CliError
-from ai_agent_lib_cli.render import write_files
-from ai_agent_lib_cli.workspace import WorkspaceAnswers, load_answers
+from ai_agent_lib_cli.workspace import load_answers
 
 __all__ = ["deploy"]
 
 
-def _bundle(answers: WorkspaceAnswers, given: Path | None) -> dict[PurePosixPath, str]:
-    """Return the platform's Rego bundle, without its tests, by path inside it."""
-    checkout = Path(answers.library.path) if answers.library.path else None
-    folder = given or (checkout / "policies" / "bundle" if checkout else None)
-    if folder is None or not folder.is_dir():
-        raise CliError(
-            "the platform's Rego bundle was not found",
-            expected="the bundle the OPA sidecar decides with",
-            actual=f"no folder at {folder}" if folder else "a workspace with no library checkout",
-            fix="give its folder with --bundle",
-        )
-    return {
-        PurePosixPath(path.relative_to(folder).as_posix()): path.read_text(encoding="utf-8")
-        for path in sorted(folder.rglob("*"))
-        if path.is_file() and not path.name.endswith("_test.rego")
-    }
-
-
 @click.command()
 @click.argument("service")
+@click.option(
+    "--target",
+    "platform",
+    type=click.Choice(PLATFORMS),
+    default=FARGATE,
+    show_default=True,
+    help="Where the service runs: an ECS service on Fargate, or an AgentCore Runtime.",
+)
 @click.option(
     "--plan", "plan_only", is_flag=True, help="Show what would be deployed and why; write nothing."
 )
@@ -56,8 +45,10 @@ def _bundle(answers: WorkspaceAnswers, given: Path | None) -> dict[PurePosixPath
     help="The platform's Rego bundle, for the OPA sidecar. Default: the library checkout's.",
 )
 @workspace_option
-def deploy(service: str, plan_only: bool, bundle: Path | None, workspace: Path | None) -> None:
-    """Write the Terraform and Dockerfiles that run SERVICE on ECS Fargate.
+def deploy(
+    service: str, platform: str, plan_only: bool, bundle: Path | None, workspace: Path | None
+) -> None:
+    """Write the Terraform and Dockerfiles that run SERVICE on ECS Fargate or AgentCore Runtime.
 
     The settings come from deploy.env in the service's folder; the first run
     writes one with example values. Every permission comes from the adapter
@@ -66,21 +57,12 @@ def deploy(service: str, plan_only: bool, bundle: Path | None, workspace: Path |
     """
     root = workspace_root(workspace)
     answers = load_answers(root)
-    target = target_of(answers, service)
+    target = target_of(answers, service, platform)
     if not plan_only and not root.joinpath(*target.settings.parts).is_file():
-        report = write_files(root, {target.settings: starter_settings(target)})
-        print_report(report, root)
+        print_report(write_starter(root, target), root)
         click.echo("\nNext:")
-        if not depends_on_aws(root, target):
-            pyproject = f"{target.folder}/pyproject.toml"
-            # The starting settings select Bedrock and Postgres for an agent.
-            extras = "[bedrock,postgres]" if target.kind == "agent" else ""
-            click.echo(
-                f'  add "{AWS_DISTRIBUTION}{extras}" to the dependencies in {pyproject}, '
-                "then run 'python -m ai_agent_lib_cli install'"
-            )
-        click.echo(f"  fill in {target.settings}: its values are examples")
-        click.echo(f"  run 'agentlib deploy {service} --plan'")
+        for step in next_steps(root, target):
+            click.echo(f"  {step}")
         return
 
     plan = plan_deployment(root, answers, target)
@@ -95,24 +77,20 @@ def deploy(service: str, plan_only: bool, bundle: Path | None, workspace: Path |
     if plan_only:
         return
 
-    files = deployment_files(plan, _bundle(answers, bundle) if plan.opa else {})
-    ours = maintained_files(target) | {
-        path
-        for path in files
-        if path.is_relative_to(MODULE_FOLDER) or path.is_relative_to(OPA_FOLDER)
-    }
-    # A file written once is the developer's from then on: it is never overwritten.
-    kept = sorted(
-        path for path in files if path not in ours and root.joinpath(*path.parts).is_file()
-    )
-    report = write_files(
-        root, {path: text for path, text in files.items() if path not in kept}, replace=ours
-    )
+    report = write_deployment(root, plan, read_bundle(answers, bundle) if plan.opa else {})
     click.echo("")
-    print_report(report, root)
-    for path in kept:
+    print_report(report.written, root)
+    for path in report.kept:
         click.echo(f"  kept     {path.as_posix()} (yours)")
-    folder = f"deploy/{target.name}"
-    click.echo(
-        f"\nNext: read {folder}/README.md, build the images, then run terraform in {folder}."
-    )
+    folder = target.deployment.as_posix()
+    if target.platform == AGENTCORE:
+        artifact = (
+            "build the zip"
+            if (plan.agentcore and plan.agentcore.artifact == "code")
+            else ("build and push the ARM64 image")
+        )
+        click.echo(f"\nNext: read {folder}/README.md, {artifact}, then run terraform in {folder}.")
+    else:
+        click.echo(
+            f"\nNext: read {folder}/README.md, build the images, then run terraform in {folder}."
+        )

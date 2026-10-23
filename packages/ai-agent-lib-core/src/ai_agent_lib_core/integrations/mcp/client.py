@@ -1,10 +1,22 @@
-"""The agent side: registered MCP tools as governed LangChain tools."""
+"""The agent side: registered MCP tools as governed LangChain tools.
+
+A server may list its tools under a prefix the registry does not use, for
+example ``target___tool`` for a tool reached through an AgentCore gateway.
+The prefix is the server entry's ``tool_prefix``: ``load_mcp_tools`` looks a
+registered tool up in the server's listing under the prefixed name, and the
+governed tool calls the server with that name, while the tool's own name, the
+registry check and the policy keep the registered name. Nothing is stripped
+anywhere else. ``verify_registration`` runs on the server itself, where the
+names carry no prefix, and a schema pin fingerprints the input schema, not
+the name, so a prefixed listing pins exactly as an unprefixed one does.
+"""
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Callable, Mapping
+from collections.abc import AsyncIterator, Callable, Generator, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
-from typing import Any, Protocol
+from contextvars import ContextVar
+from typing import Any, Protocol, runtime_checkable
 
 import httpx2
 from jsonschema import Draft202012Validator
@@ -20,6 +32,7 @@ from pydantic import PrivateAttr, SecretStr
 from ai_agent_lib_core.contracts import (
     AgentLibError,
     IntegrityError,
+    NotStartedError,
     PolicyDenied,
     RequestContext,
     ServerEntry,
@@ -33,7 +46,7 @@ from ai_agent_lib_core.contracts import (
 from ai_agent_lib_core.contracts.structured import model_safe_name, schema_mismatch
 from ai_agent_lib_core.integrations.langgraph.bridge import LoopBridge
 from ai_agent_lib_core.integrations.langgraph.context import current_request_context
-from ai_agent_lib_core.integrations.langgraph.tools import GovernedTool
+from ai_agent_lib_core.integrations.langgraph.tools import GovernedToolBase
 from ai_agent_lib_core.integrations.mcp.wire import (
     META_CLASSIFICATION_CEILING,
     META_REQUEST_ID,
@@ -43,7 +56,13 @@ from ai_agent_lib_core.integrations.mcp.wire import (
 )
 from ai_agent_lib_core.pipeline import Pipeline, ToolCall, ToolStage
 
-__all__ = ["GovernedMcpTool", "HttpMcpConnector", "McpConnector", "load_mcp_tools"]
+__all__ = [
+    "GovernedMcpTool",
+    "HttpMcpConnector",
+    "McpConnector",
+    "SupportsErrorClassification",
+    "load_mcp_tools",
+]
 
 _MAX_REPORTED = 5
 _MAX_PAGES = 100
@@ -63,40 +82,135 @@ class McpConnector(Protocol):
         ...
 
 
+@runtime_checkable
+class SupportsErrorClassification(Protocol):
+    """Optional: a connector that knows what its transport's errors mean.
+
+    A platform in front of a server answers in its own vocabulary, for example
+    JSON-RPC error codes for a refused token or a throttled call. The connector
+    for that platform maps them; the agent side asks it first and falls back
+    to its own mapping for anything it leaves alone.
+    """
+
+    def classify(self, error: BaseException, *, where: str) -> AgentLibError | None:
+        """Return the library error for ``error``, or ``None`` to leave it to the caller.
+
+        Args:
+            error: The error the connection raised, with exception groups opened.
+            where: Names the server and tool for the message. The server's own
+                text never goes into the message; it may go into ``detail``.
+        """
+        ...
+
+
+def _classified(
+    connector: McpConnector, error: BaseException, *, where: str
+) -> AgentLibError | None:
+    """Ask the connector what ``error`` means, when it can say."""
+    if isinstance(connector, SupportsErrorClassification):
+        return connector.classify(error, where=where)
+    return None
+
+
+_REFUSED_STATUS = frozenset({401, 403})
+
+# The token of the call in progress. ``HttpMcpConnector.connect`` binds it for the
+# enclosed block; the SDK's transport tasks, started inside that block, inherit it.
+_CALL_TOKEN: ContextVar[SecretStr | None] = ContextVar("agentlib_mcp_call_token", default=None)
+
+
+class _TokenOfTheCall(httpx2.Auth):
+    """Puts the token bound for the current call on each request of the shared client."""
+
+    requires_request_body = False
+    requires_response_body = False
+
+    def auth_flow(
+        self, request: httpx2.Request
+    ) -> Generator[httpx2.Request, httpx2.Response, None]:
+        token = _CALL_TOKEN.get()
+        if token is not None:
+            request.headers["Authorization"] = f"Bearer {token.get_secret_value()}"
+        yield request
+
+
+async def _refuse_at_the_door(response: httpx2.Response) -> None:
+    """Raise for a 401 or a 403, which the MCP SDK would otherwise fold into a generic error.
+
+    The SDK answers any 4xx or 5xx with an ``MCPError`` that no longer says which
+    status it was. Raised here, on the HTTP client, the status is kept, so the
+    caller can tell a refused token from a server that cannot be reached.
+    """
+    if response.status_code in _REFUSED_STATUS:
+        response.raise_for_status()
+
+
 class HttpMcpConnector:
     """Connects over Streamable HTTP, with the token in the ``Authorization`` header.
 
+    What is reused: one ``httpx2.AsyncClient``, with its connection pool, TLS
+    sessions and timeouts, lives as long as the connector and serves every call
+    to every server. The container closes it through ``aclose``.
+
+    What is per call: the MCP session. The SDK's ``Client`` opens one over the
+    shared HTTP client, runs the initialize handshake, makes the call and ends
+    the session when the block closes; the SDK offers no session that outlives
+    its context. The caller's token is per call as well, since each request is
+    made for a different caller: ``connect`` binds it for the enclosed block and
+    an ``httpx2.Auth`` puts it on each request. It is never stored on the shared
+    client's default headers.
+
     Args:
-        timeout_seconds: How long one HTTP exchange may take.
+        timeout_seconds: How long one HTTP exchange may take; ``None`` for no
+            limit. The composition root passes the configured tool call limit.
+        transport: The HTTP transport, for a test; by default the real one.
     """
 
-    def __init__(self, *, timeout_seconds: float = 30.0) -> None:
-        self._timeout = timeout_seconds
+    def __init__(
+        self,
+        *,
+        timeout_seconds: float | None,
+        transport: httpx2.AsyncBaseTransport | None = None,
+    ) -> None:
+        self._timeout_seconds = timeout_seconds
+        self._closed = False
+        self._http = httpx2.AsyncClient(
+            auth=_TokenOfTheCall(),
+            event_hooks={"response": [_refuse_at_the_door]},
+            timeout=httpx2.Timeout(timeout_seconds),
+            follow_redirects=False,
+            # The environment is read by the configuration layer only.
+            trust_env=False,
+            transport=transport,
+        )
+
+    @property
+    def timeout_seconds(self) -> float | None:
+        """How long one HTTP exchange may take; ``None`` for no limit."""
+        return self._timeout_seconds
 
     @asynccontextmanager
     async def connect(self, server: ServerEntry, token: SecretStr | None) -> AsyncIterator[Client]:
-        """Open one HTTP client and one MCP session for the enclosed block."""
-        headers = {}
-        if token is not None:
-            headers["Authorization"] = f"Bearer {token.get_secret_value()}"
-        async with (
-            httpx2.AsyncClient(
-                headers=headers,
-                timeout=self._timeout,
-                follow_redirects=False,
-                # The environment is read by the configuration layer only.
-                trust_env=False,
-            ) as http,
-            Client(streamable_http_client(server.url, http_client=http)) as client,
-        ):
-            yield client
+        """Open one MCP session over the shared HTTP client for the enclosed block."""
+        if self._closed:
+            raise NotStartedError(f"the HTTP connector for MCP server {server.id!r}")
+        bound = _CALL_TOKEN.set(token)
+        try:
+            async with Client(streamable_http_client(server.url, http_client=self._http)) as client:
+                yield client
+        finally:
+            _CALL_TOKEN.reset(bound)
 
     def credential_meta(self, token: SecretStr | None) -> Mapping[str, str]:  # noqa: ARG002
         """Return nothing: over HTTP the token is in a header."""
         return {}
 
-
-_REFUSED_STATUS = frozenset({401, 403})
+    async def aclose(self) -> None:
+        """Close the shared HTTP client. Safe to call more than once."""
+        if self._closed:
+            return
+        self._closed = True
+        await self._http.aclose()
 
 
 def _refused_at_the_door(error: BaseException) -> bool:
@@ -113,20 +227,25 @@ def _unwrap(error: BaseException) -> BaseException:
     return error
 
 
-class GovernedMcpTool(GovernedTool):
+class GovernedMcpTool(GovernedToolBase):
     """A registered MCP tool, called through the agent's tool pipeline.
 
     To a model and to a ``ToolNode`` it is an ordinary tool. Each call is
     checked against the registries and the policy, the caller's identity is
     exchanged for a token bound to the server, and the result comes back
     framed as untrusted data.
+
+    There is no wrapped LangChain tool here: the arguments are the MCP tool's
+    input schema, and the call goes to the server.
     """
 
     _server: ServerEntry = PrivateAttr()
+    _registered_name: str = PrivateAttr()
     _mcp_name: str = PrivateAttr()
     _connector: McpConnector = PrivateAttr()
     _exchanger: TokenExchanger | None = PrivateAttr(default=None)
     _validator: Draft202012Validator = PrivateAttr()
+    _input_schema: dict[str, Any] = PrivateAttr(default_factory=dict)
 
     @classmethod
     def build(
@@ -154,18 +273,25 @@ class GovernedMcpTool(GovernedTool):
             read_only=entry.read_only,
         )
         tool._server = server
-        tool._mcp_name = entry.name
+        tool._registered_name = entry.name
+        # The server lists the tool under the prefix; the registry and the policy do not.
+        tool._mcp_name = server.tool_prefix + entry.name
         tool._connector = connector
         tool._exchanger = exchanger
         tool._validator = Draft202012Validator(offered.input_schema)
+        tool._input_schema = dict(offered.input_schema)
         tool._handler = pipeline.bind(tool._call_inner)
         tool._bridge = bridge
         return tool
 
+    def _argument_names(self) -> Sequence[str]:
+        properties = self._input_schema.get("properties")
+        return list(properties) if isinstance(properties, Mapping) else []
+
     def _make_call(self, arguments: dict[str, Any], config: RunnableConfig) -> ToolCall:
         return ToolCall(
             context=current_request_context(),
-            tool=self._mcp_name,
+            tool=self._registered_name,
             arguments=arguments,
             read_only=self.read_only,
             payload=config,
@@ -180,7 +306,7 @@ class GovernedMcpTool(GovernedTool):
         mismatch = schema_mismatch(self._validator, arguments)
         if mismatch is not None:
             raise ValidationFailed(
-                f"the arguments for tool {self._mcp_name!r} do not match its input schema",
+                f"the arguments for tool {self._registered_name!r} do not match its input schema",
                 expected=mismatch.expected,
                 actual=mismatch.actual,
                 detail=mismatch.detail,
@@ -199,12 +325,18 @@ class GovernedMcpTool(GovernedTool):
         }
         # W3C trace context, so the server's spans join this request's trace.
         propagate.inject(meta)
-        where = f"MCP server {self._server.id!r}, tool {self._mcp_name!r}"
+        where = f"MCP server {self._server.id!r}, tool {self._registered_name!r}"
         try:
             async with self._connector.connect(self._server, token) as client:
                 result = await client.call_tool(self._mcp_name, arguments, meta=meta)  # type: ignore[arg-type]
         except BaseException as raised:
             error = _unwrap(raised)
+            # The connector knows its platform's vocabulary; it is asked first.
+            classified = _classified(self._connector, error, where=where)
+            if isinstance(classified, PolicyDenied):
+                raise classified from None
+            if classified is not None:
+                raise classified from error
             if isinstance(error, MCPError):
                 # The server's own text can repeat what the caller sent, so it is
                 # kept for a developer's machine only, never in the message or facts.
@@ -288,6 +420,12 @@ async def load_mcp_tools(
             offered = await _list_tools(client)
     except BaseException as raised:
         error = _unwrap(raised)
+        # The connector knows its platform's vocabulary; it is asked first.
+        classified = _classified(connector, error, where=f"MCP server {server.id!r}, listing tools")
+        if isinstance(classified, PolicyDenied):
+            raise classified from None
+        if classified is not None:
+            raise classified from error
         if _refused_at_the_door(error):
             raise PolicyDenied(
                 f"MCP server {server.id!r} did not accept this agent's own token",
@@ -311,11 +449,13 @@ async def load_mcp_tools(
     tools: list[BaseTool] = []
     names: set[str] = set()
     for entry in server.tools:
-        live = offered.get(entry.name)
+        # Under the prefix only: an unprefixed offering of the same name is not the tool.
+        live = offered.get(server.tool_prefix + entry.name)
         if live is None:
+            listed = f" as {server.tool_prefix + entry.name!r}" if server.tool_prefix else ""
             raise IntegrityError(
                 f"tool {entry.name!r} is registered for MCP server {server.id!r}, "
-                "but the server does not offer it"
+                f"but the server does not offer it{listed}"
             )
         if entry.schema_sha256 is None:
             if require_pins:

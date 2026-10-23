@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import socket
 import subprocess
 import sys
@@ -14,6 +13,7 @@ from typing import Any
 from unittest.mock import Mock
 
 import pytest
+from architecture.launchers import interpreter_first_environment
 from tools import local_processes, stop_local
 from tools.local_control import RunControl, active, status
 from tools.local_processes import Service
@@ -165,12 +165,13 @@ def test_shutdown_requires_confirmed_normal_exit(
     running = local_processes.RunningService(
         Service("ui", (), tmp_path, 8765), child, tmp_path / "ui.log"
     )
-    interrupt_codes = {130, 3221225786, -1073741510} if os.name == "nt" else {130, -2}
+    interrupt_codes = {130, 3221225786, -1073741510} if sys.platform == "win32" else {130, -2}
     expected = exit_code == 0 or (not already_exited and exit_code in interrupt_codes)
     assert local_processes.stop_children([running]) is expected
     child.kill.assert_not_called()
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("uvicorn_server", [False, True])
 def test_real_supervisor_stops_in_reverse_order_and_preserves_saved_files(
     tmp_path: Path,
@@ -251,7 +252,7 @@ finally:
         f"serve(services, Path({str(logs)!r}))\n"
     )
     options: dict[str, Any] = {}
-    if os.name == "nt":
+    if sys.platform == "win32":
         startup = subprocess.STARTUPINFO()
         startup.dwFlags = subprocess.STARTF_USESHOWWINDOW
         startup.wShowWindow = 0
@@ -284,6 +285,7 @@ finally:
             assert listener.connect_ex(("127.0.0.1", port)) != 0
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(sys.platform != "win32", reason="Command Prompt batch entry point")
 def test_stop_batch_runs_from_another_directory_with_spaces(tmp_path: Path) -> None:
     root = tmp_path / "checkout with spaces"
@@ -305,6 +307,7 @@ def test_stop_batch_runs_from_another_directory_with_spaces(tmp_path: Path) -> N
             text=True,
             check=False,
             timeout=15,
+            env=interpreter_first_environment(),
         )
         assert result.returncode == 0, result.stdout + result.stderr
         assert ("usage:" if argument else "No managed local launchers") in result.stdout

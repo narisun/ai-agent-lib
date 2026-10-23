@@ -372,3 +372,42 @@ async def test_streaming_keeps_blocking_checks_and_size_limits(
             await services.model().ainvoke([HumanMessage("synthetic")])
     assert "".join(seen) == expected
     assert output_preview_check() is None
+
+
+async def test_live_stream_logs_an_unexpected_failure_and_sends_internal(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    fakes = Fakes(identity=FakeIdentityVerifier({"test-token": CONTEXT.principal}))
+    async with fakes.container() as services:
+
+        async def run(context: RequestContext, given: Any) -> dict[str, str]:
+            raise KeyError("private key name")
+
+        async def ready() -> None:
+            pass
+
+        lifecycle = ServiceLifecycle(ready)
+        await lifecycle.start()
+        app = agent_app(services, run, application="demo", lifecycle=lifecycle, live_updates=True)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            with caplog.at_level("ERROR"):
+                response = await client.post(
+                    "/invoke",
+                    json={"input": {}, "thread_id": "thread"},
+                    headers={
+                        "accept": "text/event-stream",
+                        "x-request-id": "request",
+                        "authorization": "Bearer test-token",
+                    },
+                )
+    frames = [part for part in response.text.split("\n\n") if part.startswith("event:")]
+    assert frames[-1].startswith("event: error")
+    terminal = json.loads(frames[-1].split("data: ")[1])
+    assert terminal["error"] == "internal"
+    assert "private key name" not in response.text
+    # The run's own handler logs a bug once; the stream must not swallow it silently either.
+    failures = [record for record in caplog.records if record.levelname == "ERROR"]
+    assert failures, "an unexpected failure must reach the log"
+    assert all(getattr(record, "request_id", None) == "request" for record in failures)

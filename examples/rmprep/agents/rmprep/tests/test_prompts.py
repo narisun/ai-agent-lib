@@ -15,7 +15,7 @@ def test_prompt_versions_are_explicit_package_resources(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    assert load_prompt("rmprep", "common", 5) == COMMON
+    assert load_prompt("rmprep", "common", 6) == COMMON
     assert "Markdown heading/list markers and divider-only lines do not count" in COMMON
     assert COMMON + load_prompt("memoagent", "system", 2) == MEMO_PROMPT
     assert COMMON + load_prompt("qnaagent", "system", 3) == QNA_PROMPT

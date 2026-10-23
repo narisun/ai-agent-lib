@@ -8,5 +8,6 @@ section 19 of the [target specification](../Specification.md).
 - [0002: Pip workflow and generation](0002-pip-and-generation.md)
 - [0003: Release contract](0003-release-contract.md)
 - [0004: Tracing configuration ownership](0004-tracing-configuration.md)
+- [0005: AgentCore deployment target](0005-agentcore-target.md)
 
 The [release matrix](../release-scope.md) maps these decisions to code and tests.

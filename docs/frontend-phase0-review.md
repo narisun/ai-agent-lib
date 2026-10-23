@@ -10,8 +10,9 @@ available in git history.
 **Conditional go for Chainlit as the chat shell.** The required chat, history,
 memo, metrics, and inspector integration works through supported hooks. The
 sample does not modify installed Chainlit code or create a second transcript
-database. Keep it isolated until the remaining enterprise checks below are closed.
-The production package remains unimplemented.
+database. The production package, `packages/ai-agent-lib-ui`, has since shipped
+on this design; this document is kept as the evidence behind that decision, and
+the remaining enterprise checks below are tracked separately.
 
 Three findings affect the planned implementation:
 

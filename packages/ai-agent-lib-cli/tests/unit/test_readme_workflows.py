@@ -24,6 +24,7 @@ def workspace(library: LibrarySource) -> WorkspaceAnswers:
     return WorkspaceAnswers(name="demo", owner="learners", library=library)
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("source", ["path", "index"])
 def test_cmd_setup_uses_approved_python_from_a_workspace_with_spaces(
     source: str, tmp_path: Path
@@ -62,6 +63,7 @@ def test_cmd_setup_uses_approved_python_from_a_workspace_with_spaces(
     assert not list(checkout.rglob("pyvenv.cfg"))
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("source", ["path", "index"])
 def test_ci_setup_gate_matches_the_library_source(source: str, tmp_path: Path) -> None:
     library = (

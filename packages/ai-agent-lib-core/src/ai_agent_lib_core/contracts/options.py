@@ -64,7 +64,19 @@ class TelemetryMode(enum.StrEnum):
     """Whether a service sends operational traces and metrics."""
 
     OFF = "off"
+    """Nothing is sent; the library's spans and metrics go to no-op providers."""
+
     OPENTELEMETRY = "opentelemetry"
+    """The service installs OpenTelemetry providers that export to a collector."""
+
+    AMBIENT = "ambient"
+    """Use the providers the host installed; install nothing.
+
+    For a process started under ``opentelemetry-instrument`` (the ADOT
+    distribution on AgentCore Runtime, for one), which installs the global
+    tracer and meter providers before the service's own code runs. The
+    service refuses to start if no such provider is found.
+    """
 
 
 class Section(enum.StrEnum):
@@ -482,12 +494,20 @@ class ServiceConfig:
         """Return the adapter selection for ``name``.
 
         Raises:
-            ConfigurationError: If the section has no selection.
+            ConfigurationError: If ``name`` is not a section, or the section has no selection.
         """
         try:
-            return self.sections[Section(name)]
+            section = Section(name)
+        except ValueError:
+            raise ConfigurationError(
+                f"{shown_value(name)} is not a configuration section",
+                expected="one of " + ", ".join(member.value for member in Section),
+                actual=shown_value(name),
+            ) from None
+        try:
+            return self.sections[section]
         except KeyError:
-            raise ConfigurationError(f"section {name!r} is not configured") from None
+            raise ConfigurationError(f"section {section.value!r} is not configured") from None
 
     def with_section(self, name: Section, selection: ProviderSelection) -> ServiceConfig:
         """Return a copy with one section replaced."""

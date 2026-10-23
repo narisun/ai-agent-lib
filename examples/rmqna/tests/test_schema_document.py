@@ -30,6 +30,16 @@ COMMITTED = ROOT / "agents" / "rmqna" / "src" / "rmqna" / "prompts" / "schema_v1
 NOT_CONTENT = {"data_model", "rm_scenarios"}
 
 
+def _rows(sql: str) -> list[tuple[Any, ...]]:
+    """Run one query and return its rows.
+
+    A connection's ``execute().fetchall()`` is the same on DuckDB 1.x and 2.0. 2.0 removed
+    ``fetchone()`` from relations and types ``duckdb.sql()`` as optional.
+    """
+    with duckdb.connect() as connection:
+        return connection.execute(sql).fetchall()
+
+
 def _build_schema() -> ModuleType:
     spec = importlib.util.spec_from_file_location(
         "rmqna_build_schema", ROOT / "tools" / "build_schema.py"
@@ -145,10 +155,10 @@ def test_low_cardinality_columns_list_all_values() -> None:
     # A stage lists exactly the canonical names xref holds for its vocabulary.
     stages = {
         row[0]
-        for row in duckdb.sql(
+        for row in _rows(
             f"SELECT xref_name FROM read_csv('{DATA / 'xref.csv'}') "
             "WHERE xref_type = 'opportunity_stage'"
-        ).fetchall()
+        )
     }
     assert set(_distinct("opportunities", "stage")) == stages
     stage_line = _column_line(document, "opportunities", "stage")
@@ -252,23 +262,19 @@ def test_the_risk_rating_convention_names_a_join_that_does_not_fan_out() -> None
 
     # xref keeps a row per accepted spelling, so the plain join multiplies a client's rows;
     # with the numeric-row filter the convention names, each client matches exactly once.
-    clients = duckdb.sql(
-        f"SELECT count(*) FROM read_csv('{DATA / 'credit_metrics.csv'}')"
-    ).fetchone()
-    assert clients is not None
+    ((clients,),) = _rows(f"SELECT count(*) FROM read_csv('{DATA / 'credit_metrics.csv'}')")
 
     def joined(extra: str) -> tuple[int, int]:
-        row = duckdb.sql(
+        ((rows, distinct),) = _rows(
             f"SELECT count(*), count(DISTINCT m.uen) "
             f"FROM read_csv('{DATA / 'credit_metrics.csv'}') m "
             f"JOIN read_csv('{DATA / 'xref.csv'}') x "
             f"ON x.xref_type = 'risk_rating' AND x.xref_name = m.risk_rating{extra}"
-        ).fetchone()
-        assert row is not None
-        return row
+        )
+        return int(rows), int(distinct)
 
-    assert joined("")[0] > clients[0]
-    assert joined(" AND TRY_CAST(x.xref_value AS INT) IS NOT NULL") == (clients[0], clients[0])
+    assert joined("")[0] > clients
+    assert joined(" AND TRY_CAST(x.xref_value AS INT) IS NOT NULL") == (clients, clients)
 
 
 def test_a_table_without_notes_fails_the_build(tmp_path: Path) -> None:

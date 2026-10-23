@@ -10,7 +10,10 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="Windows console process groups")
+pytestmark = [
+    pytest.mark.slow,
+    pytest.mark.skipif(sys.platform != "win32", reason="Windows console process groups"),
+]
 
 
 def test_ctrl_break_returns_from_serve_and_restores_handler(tmp_path: Path) -> None:
@@ -44,7 +47,8 @@ asyncio.run(main())
             cwd=tmp_path,
             stdout=output,
             stderr=subprocess.STDOUT,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+            # Windows only: the module mark skips elsewhere, and mypy on Linux has no such name.
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,  # type: ignore[attr-defined,unused-ignore]
         )
     try:
         deadline = time.monotonic() + 15
@@ -52,7 +56,7 @@ asyncio.run(main())
             assert process.poll() is None, log.read_text(encoding="utf-8")
             assert time.monotonic() < deadline, "service did not reach startup"
             time.sleep(0.05)
-        process.send_signal(signal.CTRL_BREAK_EVENT)
+        process.send_signal(signal.CTRL_BREAK_EVENT)  # type: ignore[attr-defined,unused-ignore]
         # A keyboard stop skips the 30-second drain but still exits through finally.
         assert process.wait(timeout=10) == 0, log.read_text(encoding="utf-8")
         assert (tmp_path / "closed").read_text(encoding="utf-8") == "resources released"

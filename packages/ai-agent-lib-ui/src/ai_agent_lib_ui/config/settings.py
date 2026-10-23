@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ai_agent_lib_core.contracts import Principal
-from ai_agent_lib_ui.application.catalog import validate_destination
+from ai_agent_lib_ui.application.catalog import validate_destination, validate_runtime_destination
 from ai_agent_lib_ui.contracts.catalog import AgentBinding
 
 
@@ -60,6 +60,13 @@ class Settings(BaseModel):
         if not ids or len(ids) != len(set(ids)):
             raise ValueError("configure at least one agent, with unique IDs")
         for binding in self.bindings:
+            if binding.runtime is not None:
+                # An AgentCore runtime is the one non-loopback destination: HTTPS to
+                # the derived service URL, still pinned through the explicit allowlist.
+                validate_runtime_destination(
+                    binding.base_url, binding.runtime, allowed_urls=self.allowed_urls
+                )
+                continue
             validate_destination(binding.base_url, allowed_urls=self.allowed_urls, local=True)
             if urlsplit(binding.base_url).hostname not in {"127.0.0.1", "::1"}:
                 raise ValueError("static local identity requires loopback agent URLs")
@@ -130,11 +137,11 @@ def agent_environment(path: Path) -> tuple[Path, Path, LocalIdentity]:
         raise ValueError("the --env-file must name an existing agent .env file")
     values = dotenv_values(path, interpolate=False)
     if _setting(values, "PROFILE", "local") != "local":
-        raise ValueError("Phase 2 requires AC2_PROFILE=local")
+        raise ValueError("the local UI requires AC2_PROFILE=local")
     if _setting(values, "REGISTRY_PROVIDER", "file") != "file":
-        raise ValueError("Phase 2 supports AC2_REGISTRY_PROVIDER=file")
+        raise ValueError("the local UI supports AC2_REGISTRY_PROVIDER=file")
     if _setting(values, "IDENTITY_PROVIDER", "static") != "static":
-        raise ValueError("Phase 2 supports AC2_IDENTITY_PROVIDER=static on loopback")
+        raise ValueError("the local UI supports AC2_IDENTITY_PROVIDER=static on loopback")
     registry = json.loads(_setting(values, "REGISTRY_OPTIONS") or "{}")
     if not isinstance(registry, dict) or set(registry) - {"agents_path", "tools_path"}:
         raise ValueError("use file registry options: agents_path and tools_path")

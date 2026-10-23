@@ -1,12 +1,16 @@
-"""Present structured data citations separately from the agent's answer text.
+"""Present saved turns and their data citations without any browser framework.
 
 This is a display projection, never a rewrite of the stored answer or evidence.
 Only table[key=value;...] citations are collected. Ordinary Markdown links and
-code examples keep their original meaning, and raw HTML remains disabled.
+code examples keep their original meaning, and raw HTML remains disabled. The
+Chainlit data layer and the plain FastAPI pages share these projections.
 """
 
 import re
 from dataclasses import dataclass
+from uuid import NAMESPACE_URL, uuid5
+
+from ai_agent_lib_ui.contracts.conversations import RunRecord
 
 _REFERENCE_TEXT = r"[a-z][a-z_0-9]*\[[a-z][a-z_0-9]*=[^\[\]\n;]+(?:;[a-z][a-z_0-9]*=[^\[\]\n;]+)*\]"
 _REFERENCE = re.compile(_REFERENCE_TEXT)
@@ -114,3 +118,64 @@ def _describe(reference: str) -> str:
         delimiter = "`" * (1 + max((len(m[0]) for m in re.finditer(r"`+", value)), default=0))
         details.append(f"{label}: {delimiter} {value} {delimiter}")
     return f"**{table.replace('_', ' ').capitalize()}** — " + "; ".join(details)
+
+
+def answer_id(run: RunRecord) -> str:
+    """Keep the accepted message ID stable across sends, refreshes and restarts."""
+    return str(uuid5(NAMESPACE_URL, "agentlib:answer:" + run.run_id))
+
+
+def outcome_text(run: RunRecord) -> str:
+    """Show the answer, usage and trace link; keep evidence in the saved outcome."""
+    usage = run.usage
+    incoming = f"{usage.input_tokens:,}" if usage.input_tokens is not None else "unavailable"
+    outgoing = f"{usage.output_tokens:,}" if usage.output_tokens is not None else "unavailable"
+    elapsed = f"{run.elapsed_ms / 1000:.2f} s" if run.elapsed_ms is not None else "unavailable"
+    metrics = f"Input tokens: {incoming} · Output tokens: {outgoing} · Time: {elapsed}"
+    if usage.cache_read_tokens is not None and usage.input_tokens:
+        metrics += f" · Cache hit: {usage.cache_read_tokens / usage.input_tokens:.1%}"
+    if usage.cache_read_tokens is not None:
+        metrics += f" · Cache read: {usage.cache_read_tokens:,}"
+    if usage.cache_write_tokens is not None:
+        metrics += f" · Cache write: {usage.cache_write_tokens:,}"
+    if usage.kind in {"simulated", "estimated"}:
+        metrics += f" · {usage.kind.capitalize()} usage"
+    if run.trace is not None:
+        metrics += f"\n\n[Open trace in {run.trace.label}]({run.trace.url})"
+    return _outcome(run) + "\n\n---\n\n" + metrics
+
+
+def _outcome(run: RunRecord) -> str:
+    """Explain incomplete outcomes without presenting a draft as an accepted answer."""
+    if run.state == "completed":
+        body = present_answer(run.answer or "").body
+        if run.artifact_warning == "invalid_artifacts":
+            body += (
+                "\n\nThe answer was saved, but the agent returned an invalid document. "
+                "Check the agent logs before requesting another memo."
+            )
+        return body
+    if run.state == "failed":
+        if run.failure_code == "invalid":
+            return (
+                "The agent could not accept this request or produce a response that passed "
+                "its checks. You can send a new question in this thread."
+            )
+        if run.failure_code == "runtime_client_error":
+            return (
+                "The agent's container returned an error through AgentCore Runtime. "
+                "Check its CloudWatch logs for the cause. You can send a new question in "
+                "this thread."
+            )
+        return (
+            "This request failed. Check the agent logs for the cause. "
+            "You can send a new question in this thread."
+        )
+    if run.state == "unknown":
+        return (
+            "The request outcome is unknown. It may have reached the agent. "
+            "This thread is held to prevent duplicate work. Reopen it to check the agent's "
+            "saved outcome. Reopening never resends the question. If the agent has no "
+            "confirmed outcome, the thread stays held; check the agent logs."
+        )
+    return "The request is still running. Reopen this thread to see its saved outcome."

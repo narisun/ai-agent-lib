@@ -265,20 +265,25 @@ async def test_a_looping_graph_is_stopped_by_the_budget_and_audited_as_denied() 
 
 
 class SlowOutputCheck(FakeGuardrails):
-    """Takes longer over the reply than the request has left."""
+    """Takes longer over the reply than the request has left, on the injected clock."""
+
+    def __init__(self, clock: FrozenClock, seconds: float) -> None:
+        super().__init__()
+        self._clock = clock
+        self._seconds = seconds
 
     async def check(self, point: GuardrailPoint, text: str, context: Any) -> Any:
         if point is GuardrailPoint.MODEL_OUTPUT:
-            await asyncio.sleep(0.12)
+            self._clock.advance(self._seconds)
         return await super().check(point, text, context)
 
 
 async def test_f3_a_slow_output_check_cannot_release_a_late_answer() -> None:
-    clock = SystemClock()
+    clock = FrozenClock()
     fakes = Fakes(
         model=FakeChatModelProvider(["late answer"]),
-        guardrails=SlowOutputCheck(),
-        clock=clock,  # type: ignore[arg-type]  # the real clock, on purpose
+        guardrails=SlowOutputCheck(clock, seconds=0.12),
+        clock=clock,
     )
     async with fakes.container() as services:
         model = services.model()
@@ -291,7 +296,24 @@ async def test_f3_a_slow_output_check_cannot_release_a_late_answer() -> None:
     assert (record.outcome.value, record.error_type) == ("denied", "PolicyDenied")
 
 
+async def test_f3_an_attempt_that_returns_after_the_deadline_is_not_a_success() -> None:
+    clock = FrozenClock()
+    stage: ResilienceInterceptor[Any, Any] = ResilienceInterceptor(
+        CallLimits(timeout_seconds=5, retries=2), clock, what="model call", sleep=no_wait
+    )
+
+    async def late(call: object) -> str:
+        clock.advance(0.08)  # the attempt itself ran past the request's deadline
+        return "late"
+
+    with pytest.raises(PolicyDenied) as caught:
+        await stage(model_call(context(deadline=clock.now() + timedelta(milliseconds=30))), late)
+    assert caught.value.reason_code == "deadline_exceeded"
+
+
+@pytest.mark.slow
 async def test_f3_an_attempt_that_blocks_the_loop_past_the_deadline_is_not_a_success() -> None:
+    """The one real-clock check: a call that never yields cannot be cancelled, only refused."""
     clock = SystemClock()
     stage: ResilienceInterceptor[Any, Any] = ResilienceInterceptor(
         CallLimits(timeout_seconds=5, retries=2), clock, what="model call", sleep=no_wait

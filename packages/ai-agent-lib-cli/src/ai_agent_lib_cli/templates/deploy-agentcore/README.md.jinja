@@ -1,0 +1,154 @@
+# Deploying {{ name }} to AgentCore Runtime
+
+Use this folder to build the artifact of {{ name }} and configure its Amazon
+Bedrock AgentCore Runtime deployment. The CLI generates these files from
+`{{ folder }}/deploy.env`, whose `AGENTCORE_` block describes the deployment
+itself (inbound authentication, network, artifact, session lifecycle, memory,
+gateway) and never reaches the container.
+
+The runtime runs one session per microVM, as an ARM64 container or a Python
+{{ python }} zip, under ADOT's `opentelemetry-instrument`. Nothing runs beside
+the container: no OPA sidecar, no collector. The service listens as its
+`agentcore` profile says: {{ protocol }} on port {{ port }}.
+
+## Prepare the deployment environment
+
+You need a build machine or CI runner with:
+
+- Python and pip, with access to published library packages on your approved index;
+- for a container artifact, Docker with `buildx` (the image is built for `linux/arm64`);
+- Terraform 1.5 or later and the AWS provider 6.20 or later, which has the
+  `aws_bedrockagentcore_*` resources;
+- AWS credentials with permission to manage the deployment.
+
+Start from the **workspace root** and follow
+[Select Python](../../README.md#select-python) to set `PYTHON`.
+Windows examples use **Command Prompt (cmd.exe)**. In bash/zsh, use `"$PYTHON"`
+where a command shows `"%PYTHON%"`.
+
+## 1. Review settings and generate files
+
+Edit `{{ folder }}/deploy.env`. Review the plan, then regenerate the files:
+
+```bat
+"%PYTHON%" -m ai_agent_lib_cli deploy {{ name }} --target agentcore --plan
+"%PYTHON%" -m ai_agent_lib_cli deploy {{ name }} --target agentcore
+```
+
+The plan shows the runtime (protocol, port, inbound authentication, network,
+artifact, memory, gateway), the selected adapters with the AWS permissions
+each needs, and every problem the platform would have with the settings.
+
+| File | How to maintain it |
+| --- | --- |
+| `settings.tf` | Generated on each run from `deploy.env`; edit the settings file to change it |
+| `permissions.tf` | Generated on each run from the selected adapters' permission requirements |
+| `main.tf`, `variables.tf`, `outputs.tf`, `Dockerfile`, `Dockerfile.dockerignore`, `build_zip.py` | Created once; review and edit them for your deployment |
+
+A named AWS profile cannot be set in `deploy.env`: the runtime signs in as its
+execution role. The plan warns when one is set.
+
+### Switching between Fargate and AgentCore
+
+A service is deployed to one platform at a time and both targets write to
+this folder. The files created once are yours, so a second target would keep
+the first target's `main.tf` beside its own `settings.tf`. To switch, move or
+delete this folder (and `deploy/modules/agentlib-service` if nothing else uses
+it), then run `agentlib deploy {{ name }} --target <platform>` again.
+
+## 2. Lock runtime dependencies
+
+Generate a dependency lock file in a release environment matching the
+runtime's Python ({{ python }}) and operating system (Linux). From the
+workspace root on a Linux host, using bash:
+
+```bash
+python{{ python }} -m venv .venv-release
+PYTHON="$PWD/.venv-release/bin/python"
+"$PYTHON" -m pip install pip-tools
+"$PYTHON" -m piptools compile --generate-hashes --output-file=deploy/{{ name }}/requirements.lock {{ folder }}/pyproject.toml
+```
+
+**Expected result:** `deploy/{{ name }}/requirements.lock` contains pinned
+dependencies and hashes. Review and commit it. The image and the zip install
+`aws-opentelemetry-distro` beside it: the runtime starts the service under its
+`opentelemetry-instrument`.
+
+## 3. Build the artifact
+
+### A container image (`AGENTCORE_ARTIFACT=container`)
+
+Terraform creates the ECR repository, and the runtime needs the image to be
+there when it is created. So apply the repository first, push, then apply the
+rest. From the workspace root:
+
+```bat
+terraform -chdir=deploy/{{ name }} init
+terraform -chdir=deploy/{{ name }} apply -target=aws_ecr_repository.this
+aws ecr get-login-password --region <region> | docker login --username AWS --password-stdin <account>.dkr.ecr.<region>.amazonaws.com
+docker buildx build --platform linux/arm64 -f deploy/{{ name }}/Dockerfile -t <account>.dkr.ecr.<region>.amazonaws.com/{{ name }}:<tag> --push .
+```
+
+Record the pushed image's digest and set `image` to it in `terraform.tfvars`.
+`Dockerfile.dockerignore` limits the build context to runtime assets: the
+service's `src/` and `queries/`, plus shared `registry/` and `policies/`.
+
+### A code zip (`AGENTCORE_ARTIFACT=code`)
+
+```bat
+"%PYTHON%" deploy/{{ name }}/build_zip.py
+```
+
+It installs the lock's wheels for Python {{ python }} on ARM64 Linux, the
+service itself and a `main.py` that starts the service with its `agentcore`
+profile, and writes `deploy/{{ name }}/{{ name }}.zip`. A dependency without
+such a wheel stops the build: it cannot run on the runtime. Terraform uploads
+the zip to the bucket it creates (variable `code_zip`); `--upload --bucket`
+uploads it yourself instead, which needs boto3.
+
+## 4. Review and apply infrastructure
+
+Copy `deploy/{{ name }}/terraform.tfvars.example` to
+`deploy/{{ name }}/terraform.tfvars` and fill it in. From the workspace root:
+
+```bat
+terraform -chdir=deploy/{{ name }} init
+terraform -chdir=deploy/{{ name }} plan
+terraform -chdir=deploy/{{ name }} apply
+```
+
+The outputs give the runtime's ARN and ID, its role, its log group, the
+memory's ID when one is created or named, and the gateway's ID and URL when
+one is created.
+
+### Letting callers in
+
+With `AGENTCORE_AUTH=iam`, a caller signs its requests and needs this
+permission on the runtime's ARN (the `agent_runtime_arn` output):
+
+```json
+{ "Effect": "Allow", "Action": "bedrock-agentcore:InvokeAgentRuntime", "Resource": "<agent_runtime_arn>" }
+```
+
+With `AGENTCORE_AUTH=jwt`, a caller presents a bearer token from the issuer
+in `AGENTCORE_DISCOVERY_URL` for one of the allowed clients or audiences; the
+runtime passes the token on, and the service's identity adapter reads it.
+
+### Memory and gateway
+
+With `AGENTCORE_MEMORY=create`, Terraform creates the memory, puts its ID into
+the checkpoint options of the runtime's environment in place of the
+placeholder in `deploy.env`, and grants the role access to it. Once it exists,
+you may set `AGENTCORE_MEMORY` and the checkpoint option `memory_id` to its ID
+(the `memory_id` output) so that `permissions.tf` names it too.
+
+With `AGENTCORE_GATEWAY=create`, Terraform creates a gateway with the same
+inbound authentication as the runtime and one MCP target per entry of
+`mcp_targets`. The deploy plan does not read the tool registry, so list the
+workspace's MCP servers there yourself. Registering the agent runtime itself
+as a gateway target and pinning the gateway with an allowed-workload
+configuration is not expressed by the Terraform provider at this time; do it
+with the AWS CLI or boto3 (`create_gateway_target`) after the apply.
+
+After deployment, invoke the runtime once and check its log group and the
+GenAI Observability view in CloudWatch.

@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 
 from anyio import CancelScope
@@ -10,6 +11,8 @@ from starlette.responses import Response, StreamingResponse
 from ai_agent_lib_core.contracts import RequestContext
 from ai_agent_lib_core.integrations.http.streaming import ClosingStreamingResponse
 from ai_agent_lib_core.observability.live import LiveRun, bind_live_run
+
+_LOG = logging.getLogger(__name__)
 
 
 def live_response(
@@ -53,6 +56,8 @@ async def _events(
             name = "result" if response.status_code == 200 else "error"
             await queue.put((name, {**body, **identity}))
         except Exception:  # noqa: BLE001 - no exception text belongs in browser events
+            # The browser hears "internal"; the log says what failed and for which request.
+            _LOG.exception("the live run failed unexpectedly", extra={**identity, "route": "live"})
             await queue.put(("error", {**identity, "error": "internal"}))
         finally:
             # A cancelled consumer cancels this task too; do not block putting a sentinel.
