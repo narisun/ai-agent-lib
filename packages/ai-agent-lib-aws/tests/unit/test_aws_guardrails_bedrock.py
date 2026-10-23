@@ -14,7 +14,7 @@ from ai_agent_lib_aws.testing import FakeBedrockGuardrail, client_error, offline
 from ai_agent_lib_core import Principal, RequestContext, bind_request_context
 from ai_agent_lib_core.adapters import FakeChatModelProvider
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     ConfigurationError,
     DeploymentEnv,
     GuardrailPoint,
@@ -195,11 +195,11 @@ async def test_only_the_chosen_points_are_sent_and_the_limits_still_apply() -> N
         (client_error("AccessDeniedException", "ApplyGuardrail", status=403), ConfigurationError),
         (client_error("ValidationException", "ApplyGuardrail"), UpstreamError),
         (client_error("ResourceNotFoundException", "ApplyGuardrail", status=404), UpstreamError),
-        (aws.ParamValidationError(report="bad"), AgentLibError),
+        (aws.ParamValidationError(report="bad"), AgentCraft2Error),
     ],
 )
 async def test_a_check_without_an_answer_raises(
-    failure: BaseException, expected: type[AgentLibError]
+    failure: BaseException, expected: type[AgentCraft2Error]
 ) -> None:
     check, service = guardrails()
     service.fail_with = failure

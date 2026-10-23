@@ -122,6 +122,7 @@ def _describe(reference: str) -> str:
 
 def answer_id(run: RunRecord) -> str:
     """Keep the accepted message ID stable across sends, refreshes and restarts."""
+    # The salt keeps its original spelling: renaming it would change every derived ID.
     return str(uuid5(NAMESPACE_URL, "agentlib:answer:" + run.run_id))
 
 

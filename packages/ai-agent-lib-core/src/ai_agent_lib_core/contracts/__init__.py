@@ -42,7 +42,7 @@ from ai_agent_lib_core.contracts.diagnostics import (
     UsageField,
 )
 from ai_agent_lib_core.contracts.errors import (
-    AgentLibError,
+    AgentCraft2Error,
     BudgetExceeded,
     ConfigurationError,
     CredentialsExpiredError,
@@ -150,6 +150,7 @@ from ai_agent_lib_core.contracts.registry import (
     runtime_invocation_url,
     schema_fingerprint,
 )
+from ai_agent_lib_core.contracts.schema_ids import current_schema, is_schema
 from ai_agent_lib_core.contracts.scope import Scope
 from ai_agent_lib_core.contracts.structured import (
     SchemaMismatch,
@@ -170,8 +171,8 @@ __all__ = [
     "Access",
     "AccessQuery",
     "AccessRule",
+    "AgentCraft2Error",
     "AgentEntry",
-    "AgentLibError",
     "AgentRegistry",
     "AgentSnapshot",
     "AttemptRef",
@@ -271,8 +272,10 @@ __all__ = [
     "ValidationFailed",
     "Verified",
     "causes",
+    "current_schema",
     "describe",
     "generic_fix",
+    "is_schema",
     "kind_of",
     "no_access",
     "options_error",

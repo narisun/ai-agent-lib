@@ -528,7 +528,7 @@ def test_an_agent_missing_from_the_registry_cannot_be_linked(
     assert run("new", "agent", "hello-agent", "--workspace", workspace) == 0
     assert run("new", "mcp", "hello-mcp", "--no-pin", "--workspace", workspace) == 0
     registry = workspace / "registry/agents.yaml"
-    registry.write_text("schema: agentlib.registry/v1\nagents: []\n", encoding="utf-8")
+    registry.write_text("schema: agentcraft2.registry/v1\nagents: []\n", encoding="utf-8")
     capsys.readouterr()
     assert run("link", "hello-agent", "hello", "--workspace", workspace) == 1
     assert "is not in registry/agents.yaml" in capsys.readouterr().err

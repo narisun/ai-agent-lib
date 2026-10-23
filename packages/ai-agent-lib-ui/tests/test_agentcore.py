@@ -175,7 +175,7 @@ def test_pin_bindings_derives_the_url_for_a_runtime_agent_without_a_registry_url
     agents_path.write_text(
         json.dumps(
             {
-                "schema": "agentlib.registry/v1",
+                "schema": "agentcraft2.registry/v1",
                 "agents": [
                     {"id": "memo", "owner": "team", "version": "1", "url": f"{AGENT_URL}/memo"},
                     {"id": "hosted", "owner": "team", "version": "1"},
@@ -183,7 +183,7 @@ def test_pin_bindings_derives_the_url_for_a_runtime_agent_without_a_registry_url
             }
         )
     )
-    tools_path.write_text('{"schema":"agentlib.registry/v1","servers":[]}')
+    tools_path.write_text('{"schema":"agentcraft2.registry/v1","servers":[]}')
     snapshot, _ = read_registries(agents_path, tools_path)
     allowed = frozenset({f"{AGENT_URL}/memo", URL})
     with pytest.raises(ValueError, match="loopback url"):
@@ -532,7 +532,7 @@ def test_init_pins_a_runtime_agent_that_settings_read_and_check_accept(tmp_path:
     (tmp_path / "agents.json").write_text(
         json.dumps(
             {
-                "schema": "agentlib.registry/v1",
+                "schema": "agentcraft2.registry/v1",
                 "agents": [
                     {"id": "memo", "version": "1", "owner": "team", "url": f"{AGENT_URL}/memo"},
                     {"id": "hosted", "version": "1", "owner": "team"},
@@ -540,7 +540,7 @@ def test_init_pins_a_runtime_agent_that_settings_read_and_check_accept(tmp_path:
             }
         )
     )
-    (tmp_path / "tools.json").write_text('{"schema":"agentlib.registry/v1","servers":[]}')
+    (tmp_path / "tools.json").write_text('{"schema":"agentcraft2.registry/v1","servers":[]}')
     (tmp_path / "agent.env").write_text(
         'AC2_REGISTRY_OPTIONS={"agents_path":"agents.json","tools_path":"tools.json"}\n'
     )

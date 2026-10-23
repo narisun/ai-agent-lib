@@ -45,7 +45,7 @@ def data_layer() -> DataLayer:
 async def logout(request: Request, response: Response) -> dict[str, bool]:
     """Revoke the parent session, including future operations on existing sockets."""
     await runtime().store.revoke(session_token.get())
-    response.delete_cookie("agentlib_session")
+    response.delete_cookie("agentcraft2_session")
     return {"success": True}
 
 

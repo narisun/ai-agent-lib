@@ -119,7 +119,7 @@ async def test_the_agent_answers_from_the_server_as_an_analyst(tmp_path: Path) -
     assert schema_document() in system_prompt()
     for prompt in run.prompts:
         instructions = prompt[0]
-        assert instructions.additional_kwargs["agentlib_static_prefix"] is True
+        assert instructions.additional_kwargs["agentcraft2_static_prefix"] is True
         assert isinstance(instructions.content, list)
         assert isinstance(instructions.content[0], dict)
         assert instructions.content[0]["text"] == system_prompt()

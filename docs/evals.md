@@ -144,7 +144,7 @@ python -m ai_agent_lib_cli eval helper
 ```
 
 This writes `agents/helper/.agentcraft2/eval-report.json` — `report.to_json()`,
-with the schema `agentlib.eval-report/v1`, its metadata, every case's scores,
+with the schema `agentcraft2.eval-report/v1`, its metadata, every case's scores,
 and the mean per metric. That file is transient state, not a record to keep
 by hand.
 
@@ -236,7 +236,7 @@ never scores anything itself.
 
 **Feedback.** Agent Lab shows thumbs up/down controls beneath every accepted
 answer (see [sign in and chat](../packages/ai-agent-lib-ui/README.md#4-sign-in-and-chat)).
-Clicking one writes one `agentlib.feedback/v1` line to `feedback.jsonl`, in
+Clicking one writes one `agentcraft2.feedback/v1` line to `feedback.jsonl`, in
 the same `.agentcraft2\ui\` folder as `conversations.sqlite`
 (see [initialize the UI](../packages/ai-agent-lib-ui/README.md#3-initialize-the-ui)).
 A record is never deleted, only appended — feedback is evidence.
@@ -274,7 +274,7 @@ print(f"wrote {count} interactions")
 This is a documented Python entry point, not yet a CLI command — save it as a
 small script and run it with the UI's own Python. It writes every completed
 exchange the principal owns, active and archived conversations alike, as
-`agentlib.interaction/v1` JSONL (`load_interactions` reads it back). Run it
+`agentcraft2.interaction/v1` JSONL (`load_interactions` reads it back). Run it
 after the server has handled some real traffic; `export_interactions` reads
 the UI's existing state, it does not call any agent. Writing the export under
 `STATE` (`.agentcraft2/ui/online/`) keeps it beside the UI's other private

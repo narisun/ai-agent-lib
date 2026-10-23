@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import IO, Any
 
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     DeploymentEnv,
     PolicyDenied,
     ServiceConfig,
@@ -92,10 +92,10 @@ def _notes(error: BaseException) -> list[str]:
 
 
 def _cause_text(cause: BaseException, *, details: bool) -> str:
-    shown = isinstance(cause, AgentLibError) or details
+    shown = isinstance(cause, AgentCraft2Error) or details
     text = describe(cause) if shown else type(cause).__name__
     where = raised_at(cause)
-    return f"{text} (at {where})" if where and not isinstance(cause, AgentLibError) else text
+    return f"{text} (at {where})" if where and not isinstance(cause, AgentCraft2Error) else text
 
 
 def explain(error: BaseException, *, details: bool = True) -> str:
@@ -108,7 +108,7 @@ def explain(error: BaseException, *, details: bool = True) -> str:
             developer's terminal. Pass false where the output is kept with the
             service's logs and may not hold caller content.
     """
-    if isinstance(error, AgentLibError):
+    if isinstance(error, AgentCraft2Error):
         lines = [f"{type(error).__name__}: {redact(error.message)}"]
         lines += [f"  {label}: {redact(value)}" for label, value in error.facts()]
         if details and error.detail:
@@ -137,7 +137,7 @@ def error_fields(error: BaseException, *, details: bool = False) -> dict[str, An
         "error_type": type(error).__name__,
         "error_at": [_place(frame) for frame in _frames(error)[-_MAX_FRAMES:]],
     }
-    if isinstance(error, AgentLibError):
+    if isinstance(error, AgentCraft2Error):
         fields["error"] = shorten(redact(error.message), _MAX_TEXT)
         if isinstance(error, PolicyDenied):
             fields["error_reason"] = error.reason_code
@@ -153,7 +153,7 @@ def error_fields(error: BaseException, *, details: bool = False) -> dict[str, An
     elif details:
         fields["error"] = describe(error, limit=_MAX_TEXT).split(": ", 1)[-1]
     notes = _notes(error)
-    if notes and (isinstance(error, AgentLibError) or details):
+    if notes and (isinstance(error, AgentCraft2Error) or details):
         fields["error_notes"] = notes
     chain = [_cause_text(c, details=details) for c in causes(error)]
     if chain:
@@ -189,7 +189,7 @@ def report_error(
         ``1``, the exit code of a program that failed.
     """
     out = stream if stream is not None else sys.stderr
-    if details and not isinstance(error, AgentLibError):
+    if details and not isinstance(error, AgentCraft2Error):
         out.write("".join(traceback.format_exception(error)))
     out.write(f"{program}: {explain(error, details=details)}\n")
     return 1

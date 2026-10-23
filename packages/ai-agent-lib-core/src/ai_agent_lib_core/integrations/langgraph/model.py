@@ -259,7 +259,7 @@ class GovernedChatModel(BaseChatModel):
 
     @property
     def _llm_type(self) -> str:
-        return "agentlib-governed"
+        return "agentcraft2-governed"
 
     @property
     def _identifying_params(self) -> dict[str, Any]:

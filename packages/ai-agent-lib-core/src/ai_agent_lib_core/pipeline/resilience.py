@@ -12,7 +12,7 @@ from collections.abc import Awaitable, Callable
 from typing import Generic, Protocol, TypeVar
 
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     CallLimits,
     Clock,
     PolicyDenied,
@@ -86,7 +86,7 @@ class ResilienceInterceptor(Generic[CallT, ResponseT]):
         for attempt in range(1, attempts + 1):
             try:
                 response = await self._attempt(request, call_next)
-            except AgentLibError as error:
+            except AgentCraft2Error as error:
                 wait = self._wait(attempt)
                 remaining = self._remaining(request)
                 # No retry that would start, or wait, past the caller's deadline.
@@ -133,7 +133,7 @@ class ResilienceInterceptor(Generic[CallT, ResponseT]):
             raise self._deadline_passed(request)
         return response
 
-    def _deadline_passed(self, request: CallT) -> AgentLibError:
+    def _deadline_passed(self, request: CallT) -> AgentCraft2Error:
         # The caller gave up: trying again cannot help, so this is not retryable.
         return PolicyDenied(
             f"the {self._what} {request.span_name.split(' ', 1)[-1]!r} ran out of the "

@@ -12,7 +12,7 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.runnables import Runnable
 from pydantic import Field, PrivateAttr
 
-from ai_agent_lib_core.contracts import AgentLibError, ModelCapabilities
+from ai_agent_lib_core.contracts import AgentCraft2Error, ModelCapabilities
 
 __all__ = ["FakeChatModel", "FakeChatModelProvider", "ScriptedResponse"]
 
@@ -46,7 +46,7 @@ class FakeChatModel(BaseChatModel):
 
     @property
     def _llm_type(self) -> str:
-        return "agentlib-fake"
+        return "agentcraft2-fake"
 
     @property
     def calls(self) -> list[list[BaseMessage]]:
@@ -134,6 +134,6 @@ class FakeChatModelProvider:
         self.models.append(model)
         return model
 
-    def classify_error(self, error: BaseException) -> AgentLibError | None:
+    def classify_error(self, error: BaseException) -> AgentCraft2Error | None:
         """Pass library errors through unchanged; recognise nothing else."""
-        return error if isinstance(error, AgentLibError) else None
+        return error if isinstance(error, AgentCraft2Error) else None

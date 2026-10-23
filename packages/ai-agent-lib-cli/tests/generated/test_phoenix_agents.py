@@ -90,6 +90,6 @@ async def test_generated_agent_traces_tool_and_same_thread_followup(
         roots = [s for s in spans if s.name == f"{name}.turn"]
         assert len(roots) == 2
         assert len({s.attributes["session.id"] for s in roots if s.attributes}) == 1
-        assert all(s.attributes and "agentlib.checkpoints" in s.attributes for s in roots)
+        assert all(s.attributes and "agentcraft2.checkpoints" in s.attributes for s in roots)
     finally:
         tracing.close()

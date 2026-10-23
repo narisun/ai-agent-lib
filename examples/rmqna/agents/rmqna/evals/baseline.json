@@ -1,5 +1,5 @@
 {
-  "schema": "agentlib.eval-report/v1",
+  "schema": "agentcraft2.eval-report/v1",
   "metadata": {
     "application": "rmqna",
     "model": "anthropic:claude-sonnet-4-5",

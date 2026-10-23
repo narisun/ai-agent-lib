@@ -17,8 +17,8 @@ class PhoenixSchema:
         """Hash identity into the session key and retain request/checkpoint correlation."""
         return {
             "session.id": session,
-            "agentlib.request_id": context.request_id,
-            "agentlib.thread_id": context.thread_id,
+            "agentcraft2.request_id": context.request_id,
+            "agentcraft2.thread_id": context.thread_id,
         }
 
     def kind(self, span: Span, kind: str) -> None:
@@ -29,7 +29,7 @@ class PhoenixSchema:
 
     def metadata(self, span: Span, name: str, value: str | int | bool) -> None:
         """Keep checkpoint IDs and MCP server names searchable as span attributes."""
-        span.set_attribute(f"agentlib.{name}", value)
+        span.set_attribute(f"agentcraft2.{name}", value)
 
     def content(self, span: Span, kind: str, text: str) -> None:
         """Keep complete bounded JSON plus structured chat messages for LLM rendering."""
@@ -77,7 +77,7 @@ class PhoenixSchema:
                 attributes[tool + ".function.arguments"] = json.dumps(call.get("args", {}))
         span.set_attributes(attributes)
         if truncated:
-            span.set_attribute(f"agentlib.{kind}_messages_truncated", True)
+            span.set_attribute(f"agentcraft2.{kind}_messages_truncated", True)
 
     def model(self, span: Span, record: Mapping[str, object]) -> None:
         """Record the provider and model returned by the governed binding."""

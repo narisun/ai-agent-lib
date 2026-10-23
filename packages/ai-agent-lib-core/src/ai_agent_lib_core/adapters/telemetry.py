@@ -65,8 +65,8 @@ class OpenTelemetryTelemetry:
     labelled after the OpenTelemetry GenAI conventions where they apply, for
     example ``chat claude-sonnet`` with ``gen_ai.request.model``. An event
     becomes a span event on the current span and an increment of the
-    ``agentlib.events`` counter. A duration is recorded in the
-    ``agentlib.duration`` histogram, in seconds. No span records an
+    ``agentcraft2.events`` counter. A duration is recorded in the
+    ``agentcraft2.duration`` histogram, in seconds. No span records an
     exception's message.
 
     Args:
@@ -82,10 +82,10 @@ class OpenTelemetryTelemetry:
         self._tracer = trace.get_tracer(_INSTRUMENTATION_NAME, tracer_provider=tracer_provider)
         meter = metrics.get_meter(_INSTRUMENTATION_NAME, meter_provider=meter_provider)
         self._events = meter.create_counter(
-            "agentlib.events", unit="1", description="Governed calls, by event and outcome."
+            "agentcraft2.events", unit="1", description="Governed calls, by event and outcome."
         )
         self._durations = meter.create_histogram(
-            "agentlib.duration", unit="s", description="Duration of governed calls."
+            "agentcraft2.duration", unit="s", description="Duration of governed calls."
         )
 
     @contextmanager

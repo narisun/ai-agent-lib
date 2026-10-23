@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from typing import Annotated, Literal, Protocol, Self
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
+from ai_agent_lib_core.contracts.schema_ids import current_schema
 from ai_agent_lib_core.contracts.scope import Scope
 
 Identifier = Annotated[str, Field(min_length=1, max_length=256, pattern=r"^[A-Za-z0-9_.:-]+$")]
@@ -100,9 +101,9 @@ class RequestRecord(DiagnosticValue):
 class ModelAttempt(RequestRecord):
     """One observed SDK invocation, including failed or later rejected attempts."""
 
-    schema_version: Literal["agentlib.model-usage/v1"] = Field(
-        default="agentlib.model-usage/v1", alias="schema"
-    )
+    schema_version: Annotated[
+        Literal["agentcraft2.model-usage/v1"], BeforeValidator(current_schema)
+    ] = Field(default="agentcraft2.model-usage/v1", alias="schema")
     timestamp: AwareDatetime
     ref: AttemptRef
     model_alias: Identifier
@@ -117,9 +118,9 @@ class ModelAttempt(RequestRecord):
 class OperationDecision(RequestRecord):
     """A model pipeline or application decision, with no discarded draft content."""
 
-    schema_version: Literal["agentlib.operation-decision/v1"] = Field(
-        default="agentlib.operation-decision/v1", alias="schema"
-    )
+    schema_version: Annotated[
+        Literal["agentcraft2.operation-decision/v1"], BeforeValidator(current_schema)
+    ] = Field(default="agentcraft2.operation-decision/v1", alias="schema")
     timestamp: AwareDatetime
     ref: AttemptRef
     stage: Literal["model_pipeline", "application"]
@@ -136,9 +137,9 @@ class OperationSummary(RequestRecord):
     an agent must await all model work before returning its terminal output.
     """
 
-    schema_version: Literal["agentlib.operation-summary/v1"] = Field(
-        default="agentlib.operation-summary/v1", alias="schema"
-    )
+    schema_version: Annotated[
+        Literal["agentcraft2.operation-summary/v1"], BeforeValidator(current_schema)
+    ] = Field(default="agentcraft2.operation-summary/v1", alias="schema")
     timestamp: AwareDatetime
     outcome: Literal["completed", "failed", "unknown"]
     expected_attempts: tuple[AttemptRef, ...]
@@ -174,9 +175,9 @@ class RequestOutcome(RequestRecord):
     Writing a checkpoint does not atomically commit this journal.
     """
 
-    schema_version: Literal["agentlib.request-outcome/v1"] = Field(
-        default="agentlib.request-outcome/v1", alias="schema"
-    )
+    schema_version: Annotated[
+        Literal["agentcraft2.request-outcome/v1"], BeforeValidator(current_schema)
+    ] = Field(default="agentcraft2.request-outcome/v1", alias="schema")
     state: Literal["accepted", "running", "completed", "failed", "unknown"]
     updated_at: AwareDatetime
     checkpoint_ids: tuple[Identifier, ...] = ()

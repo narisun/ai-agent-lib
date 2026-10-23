@@ -16,7 +16,7 @@ from anyio import CancelScope
 from starlette.requests import Request
 from starlette.responses import Response
 
-from ai_agent_lib_core.contracts import AgentLibError, PolicyDenied, RequestContext
+from ai_agent_lib_core.contracts import AgentCraft2Error, PolicyDenied, RequestContext
 from ai_agent_lib_core.integrations.http.admission import ThreadAdmission
 from ai_agent_lib_core.integrations.http.outcomes import OutcomeJournal
 from ai_agent_lib_core.integrations.http.prelude import (
@@ -87,8 +87,8 @@ class StreamRoute:
 
     async def _events(self, context: RequestContext, given: object) -> AsyncIterator[str]:
         attributes = {
-            "agentlib.application": self._application,
-            "agentlib.request_id": context.request_id,
+            "agentcraft2.application": self._application,
+            "agentcraft2.request_id": context.request_id,
         }
         ending: dict[str, object] = {
             "thread_id": context.thread_id,
@@ -108,7 +108,7 @@ class StreamRoute:
                     if close is not None:
                         with CancelScope(shield=True):
                             await close()
-        except AgentLibError as error:
+        except AgentCraft2Error as error:
             _LOG.log(
                 level_of(error),
                 "the run ended with %s",

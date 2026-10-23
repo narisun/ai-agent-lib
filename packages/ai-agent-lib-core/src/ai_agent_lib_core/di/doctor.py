@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from ai_agent_lib_core.contracts import (
     DEFAULT_MODEL_ALIAS,
-    AgentLibError,
+    AgentCraft2Error,
     CheckResult,
     ServiceConfig,
 )
@@ -34,7 +34,7 @@ def _model(services: ServiceContainer) -> CheckResult | None:
     try:
         reference, provider = services.resolve_model(DEFAULT_MODEL_ALIAS)
         provider.create(reference.model_id)
-    except AgentLibError as problem:
+    except AgentCraft2Error as problem:
         return CheckResult.failed(_MODEL, problem)
     return CheckResult(
         _MODEL, ok=True, detail=f"{reference.provider} serves {reference.model_id!r}"
@@ -56,7 +56,7 @@ async def diagnose(
     services = ServiceContainer(config, providers)
     try:
         await services.start()
-    except AgentLibError as problem:
+    except AgentCraft2Error as problem:
         return (CheckResult.failed(_STARTUP, problem),)
     try:
         results = list(await services.check())

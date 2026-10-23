@@ -131,7 +131,8 @@ def test_eval_accept_promotes_the_report_to_the_baseline(
     report = workspace / "agents" / "helper" / ".agentcraft2" / "eval-report.json"
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(
-        '{"schema": "agentlib.eval-report/v1", "means": {"m": 1.0}, "results": [], "metadata": {}}',
+        '{"schema": "agentcraft2.eval-report/v1", "means": {"m": 1.0}, '
+        '"results": [], "metadata": {}}',
         encoding="utf-8",
     )
     assert (
@@ -169,7 +170,8 @@ def _write_eval_report(workspace: Path) -> None:
     report = workspace / "agents" / "helper" / ".agentcraft2" / "eval-report.json"
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(
-        '{"schema": "agentlib.eval-report/v1", "means": {"m": 1.0}, "results": [], "metadata": {}}',
+        '{"schema": "agentcraft2.eval-report/v1", "means": {"m": 1.0}, '
+        '"results": [], "metadata": {}}',
         encoding="utf-8",
     )
 

@@ -13,16 +13,16 @@ __all__ = [
     "mcp_result_text",
 ]
 
-META_REQUEST_ID = "agentlib/request_id"
+META_REQUEST_ID = "agentcraft2/request_id"
 """Request metadata key: the caller's request ID, so both audit logs can be joined."""
 
-META_THREAD_ID = "agentlib/thread_id"
+META_THREAD_ID = "agentcraft2/thread_id"
 """Request metadata key: the caller's conversation or workflow ID."""
 
-META_CLASSIFICATION_CEILING = "agentlib/classification_ceiling"
+META_CLASSIFICATION_CEILING = "agentcraft2/classification_ceiling"
 """Request metadata key: the most sensitive data the caller's request may touch."""
 
-META_AUTHORIZATION = "agentlib/authorization"
+META_AUTHORIZATION = "agentcraft2/authorization"
 """Request metadata key that carries the token when the transport has no headers.
 
 Over HTTP the token travels in the ``Authorization`` header and this key is

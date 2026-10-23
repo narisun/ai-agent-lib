@@ -64,7 +64,7 @@ def prepare_shell(state: Path, settings: Settings) -> tuple[str, str]:
             "CHAINLIT_APP_ROOT": str(shell),
             "CHAINLIT_ENV_FILE": str(empty_environment.resolve()),
             "CHAINLIT_AUTH_SECRET": secret,
-            "CHAINLIT_AUTH_COOKIE_NAME": "agentlib_chat",
+            "CHAINLIT_AUTH_COOKIE_NAME": "agentcraft2_chat",
             "CHAINLIT_COOKIE_SAMESITE": "strict",
         }
     )

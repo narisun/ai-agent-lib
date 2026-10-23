@@ -90,10 +90,10 @@ a wrong answer is traced to a wrong statement. No code is needed, only settings.
 3. Ask a question and open the project `rmqna` in Phoenix. Each question is one trace whose root is
    `rmqna.turn`. Filter the spans by `name == 'rmqna-data.execute_sql'` to see every statement the
    agent sent. On such a span, **Input** is `{"sql": "..."}`, **Output** is the framed result
-   (columns and rows, or `{error_kind, message}`), and `agentlib.mcp_server` is `rmqna-data`. A
+   (columns and rows, or `{error_kind, message}`), and `agentcraft2.mcp_server` is `rmqna-data`. A
    repair reads as two consecutive spans: the first's output is the error, the next one's input is
    the changed statement. The `model` spans before and after hold the same call in their messages.
-   `agentlib.model_calls` and `agentlib.tool_calls` on the root count them.
+   `agentcraft2.model_calls` and `agentcraft2.tool_calls` on the root count them.
 
 Content capture is **all or nothing for the process**. With `AC2_PHOENIX_CAPTURE_CONTENT=false` (the
 default) a trace has names, timings, token counts and ids, and no SQL on any span. With `true` it also

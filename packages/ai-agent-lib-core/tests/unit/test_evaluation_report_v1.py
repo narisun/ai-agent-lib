@@ -19,7 +19,7 @@ async def test_report_json_carries_schema_and_metadata() -> None:
     case = EvalCase(id="a", input={"q": "x"}, expected={"y": 1})
     report = await run_eval(_answer, [case], [exact("y")], metadata={"model": "fake"})
     data = json.loads(report.to_json())
-    assert data["schema"] == "agentlib.eval-report/v1"
+    assert data["schema"] == "agentcraft2.eval-report/v1"
     assert data["metadata"] == {"model": "fake"}
     assert data["means"] == {"y": 1.0}
 

@@ -16,11 +16,11 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 import httpx
 import yaml
-from pydantic import Field, ValidationError
+from pydantic import BeforeValidator, Field, ValidationError
 
 from ai_agent_lib_cli.errors import CliError
 from ai_agent_lib_cli.yaml_lists import extended, yaml_flow, yaml_scalar
@@ -32,7 +32,7 @@ from ai_agent_lib_core.adapters import (
 )
 from ai_agent_lib_core.adapters.system import UuidGenerator
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     Classification,
     OptionsModel,
     PolicyAction,
@@ -41,6 +41,7 @@ from ai_agent_lib_core.contracts import (
     PolicyResource,
     Principal,
     PrincipalKind,
+    current_schema,
     describe,
     options_error,
 )
@@ -58,7 +59,7 @@ __all__ = [
 ]
 
 SAMPLES_FILE = PurePosixPath("tests/policy-samples.yaml")
-SAMPLES_SCHEMA = "agentlib.policy-samples/v1"
+SAMPLES_SCHEMA = "agentcraft2.policy-samples/v1"
 
 _HEADER = f"""\
 # Sample requests for the rules in policies/agentcraft2/rules/data.yaml.
@@ -134,7 +135,9 @@ class Sample(OptionsModel):
 
 
 class _SamplesDocument(OptionsModel):
-    schema_: Literal["agentlib.policy-samples/v1"] = Field(alias="schema")
+    schema_: Annotated[
+        Literal["agentcraft2.policy-samples/v1"], BeforeValidator(current_schema)
+    ] = Field(alias="schema")
     samples: list[Sample] = Field(default_factory=list)
 
 
@@ -249,7 +252,7 @@ def rules_engine(rules: Path) -> RulesPolicyDecisionPoint:
     """
     try:
         return RulesPolicyDecisionPoint(RulesPolicyOptions(path=rules), UuidGenerator())
-    except AgentLibError as problem:
+    except AgentCraft2Error as problem:
         raise CliError.from_error(problem) from None
 
 

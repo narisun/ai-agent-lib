@@ -144,7 +144,7 @@ async def test_the_system_prompt_carries_schema_and_examples() -> None:
     second = fakes.model.models[0].calls[1][0]
     # The instructions are one static block, marked as the reusable prefix a provider caches.
     assert first.type == "system"
-    assert first.additional_kwargs["agentlib_static_prefix"] is True
+    assert first.additional_kwargs["agentcraft2_static_prefix"] is True
     assert isinstance(first.content, list)
     assert len(first.content) == 1
     block = first.content[0]

@@ -67,6 +67,7 @@ class DataLayer(BaseDataLayer):
             query = urlencode({"cursor": history.next_cursor})
             steps.append(
                 {
+                    # The salt keeps its original spelling: renaming it would change the IDs.
                     "id": str(uuid5(NAMESPACE_URL, "agentlib:older:" + thread_id)),
                     "threadId": thread_id,
                     "name": "History",

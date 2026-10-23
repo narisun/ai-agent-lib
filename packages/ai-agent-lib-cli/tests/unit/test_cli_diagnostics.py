@@ -122,7 +122,7 @@ def test_doctor_names_what_is_wrong_and_how_to_fix_it_and_exits_with_one(
 def test_doctor_reports_broken_shared_files_and_unknown_services(
     workspace: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    (workspace / RULES).write_text("schema: agentlib.rules/v1\nrules: [", encoding="utf-8")
+    (workspace / RULES).write_text("schema: agentcraft2.rules/v1\nrules: [", encoding="utf-8")
     capsys.readouterr()
     assert run("doctor", "--no-pins", "--workspace", workspace) == 1
     out = capsys.readouterr().out
@@ -417,9 +417,9 @@ def test_samples_are_appended_once_and_the_developers_are_kept() -> None:
     [
         ("samples: [", "not valid YAML"),
         ("schema: other/v1\nsamples: []\n", "not a samples document"),
-        ("schema: agentlib.policy-samples/v1\nsamples:\n  - name: x\n", "action"),
+        ("schema: agentcraft2.policy-samples/v1\nsamples:\n  - name: x\n", "action"),
         (
-            "schema: agentlib.policy-samples/v1\nsamples:\n"
+            "schema: agentcraft2.policy-samples/v1\nsamples:\n"
             + "  - {name: x, action: tool.call, application: a, resource: r, expect: allow}\n" * 2,
             "used more than once",
         ),

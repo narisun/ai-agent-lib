@@ -55,7 +55,7 @@ def test_providers_carry_the_service_name_and_export_what_the_library_emits() ->
         for scope in resource.scope_metrics
         for metric in scope.metrics
     }
-    assert names == {"agentlib.events", "agentlib.duration"}
+    assert names == {"agentcraft2.events", "agentcraft2.duration"}
     tracers.shutdown()
     meters.shutdown()
 
@@ -134,8 +134,8 @@ async def test_an_agent_request_is_one_span_that_holds_the_governed_calls(
     span = spans.get_finished_spans()[0]
     assert span.name == "agent.invoke"
     assert dict(span.attributes or {}) == {
-        "agentlib.application": "accounts-agent",
-        "agentlib.request_id": "r-9",
+        "agentcraft2.application": "accounts-agent",
+        "agentcraft2.request_id": "r-9",
     }
     assert [event.name for event in span.events] == ["tool.call"]
     assert "private" not in str(span.to_json())
@@ -180,9 +180,9 @@ async def test_a_tool_call_of_a_server_is_one_span_that_holds_its_governed_steps
 
     (span,) = [s for s in spans.get_finished_spans() if s.name == "mcp.tool_call"]
     assert dict(span.attributes or {}) == {
-        "agentlib.application": "notes-mcp",
-        "agentlib.tool": "notes.read",
-        "agentlib.request_id": "r-9",
+        "agentcraft2.application": "notes-mcp",
+        "agentcraft2.tool": "notes.read",
+        "agentcraft2.request_id": "r-9",
     }
     # The governed call is a child span, named and labelled after the GenAI conventions.
     (child,) = [s for s in spans.get_finished_spans() if s.name == "execute_tool notes.read"]
@@ -191,9 +191,9 @@ async def test_a_tool_call_of_a_server_is_one_span_that_holds_its_governed_steps
     assert dict(child.attributes or {}) == {
         "gen_ai.operation.name": "execute_tool",
         "gen_ai.tool.name": "notes.read",
-        "agentlib.read_only": False,
-        "agentlib.mcp_server": "notes",
-        "agentlib.outcome": "success",
+        "agentcraft2.read_only": False,
+        "agentcraft2.mcp_server": "notes",
+        "agentcraft2.outcome": "success",
     }
     assert "tool.call" in [event.name for event in child.events]
     for finished in spans.get_finished_spans():
@@ -243,10 +243,10 @@ async def test_each_governed_call_is_a_span_with_its_outcome_and_usage() -> None
     assert chat.attributes["gen_ai.request.model"] == "fake-model"
     assert chat.attributes["gen_ai.usage.input_tokens"] == 12
     assert chat.attributes["gen_ai.usage.output_tokens"] == 3
-    assert chat.attributes["agentlib.outcome"] == "success"
+    assert chat.attributes["agentcraft2.outcome"] == "success"
     assert denied.name == "execute_tool secret_tool"
-    assert denied.attributes["agentlib.outcome"] == "denied"
-    assert denied.attributes["agentlib.reason_code"] == "no_rule"
+    assert denied.attributes["agentcraft2.outcome"] == "denied"
+    assert denied.attributes["agentcraft2.reason_code"] == "no_rule"
     assert denied.error_type == "PolicyDenied"
     assert "private" not in str([chat, denied])
 

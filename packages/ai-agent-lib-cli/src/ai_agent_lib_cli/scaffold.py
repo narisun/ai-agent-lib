@@ -68,7 +68,7 @@ LOCK_FILE = "agentcraft2.lock"
 """Records what each generated file held when it was written, so that an update
 can tell a file the developer changed from one they did not."""
 
-_LOCK_SCHEMA = "agentlib.lock/v1"
+_LOCK_SCHEMA = "agentcraft2.lock/v1"
 
 # Files the tool maintains. A command may rewrite them; everything else is the developer's.
 _MAINTAINED = frozenset(

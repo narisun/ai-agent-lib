@@ -7,7 +7,7 @@
 #
 # This file is yours. agentcraft2 appends the rules a new service needs and never
 # changes or removes a rule that is here.
-schema: agentlib.rules/v1
+schema: agentcraft2.rules/v1
 rules:
   # The local developer inspector reads only this user's scoped agent turn.
   - id: rmprep-staff-inspect-turns

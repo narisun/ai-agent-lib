@@ -12,7 +12,7 @@ A service keeps its rules in a folder laid out as an OPA bundle:
 ```text
 policies/
   .manifest                  {"revision": "...", "roots": ["agentcraft2/rules"]}
-  agentcraft2/rules/data.yaml   schema: agentlib.rules/v1
+  agentcraft2/rules/data.yaml   schema: agentcraft2.rules/v1
 ```
 
 * In local development the in-process `rules` policy provider reads

@@ -2,9 +2,9 @@
 
 from typing import Annotated, Literal, Self
 
-from pydantic import AwareDatetime, Field, field_validator, model_validator
+from pydantic import AwareDatetime, BeforeValidator, Field, field_validator, model_validator
 
-from ai_agent_lib_core.contracts import Scope
+from ai_agent_lib_core.contracts import Scope, current_schema
 from ai_agent_lib_core.contracts.diagnostics import (
     DiagnosticValue,
     Identifier,
@@ -33,9 +33,9 @@ class ThreadRef(DiagnosticValue):
 class ThreadRecord(ThreadRef):
     """A durable conversation bound to one agent; changing agents starts a thread."""
 
-    schema_version: Literal["agentlib.ui-thread/v1"] = Field(
-        default="agentlib.ui-thread/v1", alias="schema"
-    )
+    schema_version: Annotated[
+        Literal["agentcraft2.ui-thread/v1"], BeforeValidator(current_schema)
+    ] = Field(default="agentcraft2.ui-thread/v1", alias="schema")
     title: Annotated[str, Field(min_length=1, max_length=256)]
     created_at: AwareDatetime
     updated_at: AwareDatetime
@@ -57,8 +57,8 @@ class TurnAdmission(ThreadRef):
 class RunRecord(RequestRecord):
     """Durable UI state; a timeout after dispatch is unknown, not safely retryable."""
 
-    schema_version: Literal["agentlib.ui-run/v1"] = Field(
-        default="agentlib.ui-run/v1", alias="schema"
+    schema_version: Annotated[Literal["agentcraft2.ui-run/v1"], BeforeValidator(current_schema)] = (
+        Field(default="agentcraft2.ui-run/v1", alias="schema")
     )
     run_id: Identifier
     idempotency_key: Identifier

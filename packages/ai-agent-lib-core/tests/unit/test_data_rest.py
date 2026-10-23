@@ -13,7 +13,7 @@ from pydantic import SecretStr
 
 from ai_agent_lib_core.adapters import RestDataSource, RestOptions
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     ConfigurationError,
     CredentialsExpiredError,
     NotStartedError,
@@ -268,17 +268,17 @@ async def test_not_found_is_an_empty_result_only_where_the_definition_says(tmp_p
         (httpx.Response(400, text="bad region 'x'"), ValidationFailed, "HTTP 400"),
         (
             httpx.Response(302, headers={"location": "https://evil.test/"}),
-            AgentLibError,
+            AgentCraft2Error,
             "redirect",
         ),
-        (httpx.Response(200, text="<html>"), AgentLibError, "not JSON"),
-        (ok({"data": "nothing here"}), AgentLibError, "does not hold records"),
-        (ok({"data": {"items": [1, 2]}}), AgentLibError, "does not hold records"),
+        (httpx.Response(200, text="<html>"), AgentCraft2Error, "not JSON"),
+        (ok({"data": "nothing here"}), AgentCraft2Error, "does not hold records"),
+        (ok({"data": {"items": [1, 2]}}), AgentCraft2Error, "does not hold records"),
     ],
     ids=["401", "403", "400", "redirect", "not-json", "wrong-shape", "not-records"],
 )
 async def test_other_replies_map_to_the_error_taxonomy_without_repeating_the_body(
-    tmp_path: Path, reply: httpx.Response, error: type[AgentLibError], text: str
+    tmp_path: Path, reply: httpx.Response, error: type[AgentCraft2Error], text: str
 ) -> None:
     source, seen = await started(tmp_path, replies(reply))
     with pytest.raises(error, match=text) as caught:
@@ -301,7 +301,7 @@ async def test_a_forbidden_reply_carries_a_reason_code(tmp_path: Path) -> None:
 
 async def test_a_response_larger_than_the_limit_is_refused(tmp_path: Path) -> None:
     source, _ = await started(tmp_path, accounts_api, max_response_bytes=64)
-    with pytest.raises(AgentLibError, match="larger than 64 bytes"):
+    with pytest.raises(AgentCraft2Error, match="larger than 64 bytes"):
         await source.query("all_accounts")
     await source.aclose()
 

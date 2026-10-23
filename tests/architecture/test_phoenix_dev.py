@@ -201,7 +201,7 @@ def test_installed_phoenix_collects_traces_without_unused_services(
         "llm.provider": "anthropic",
         "input.value": "Synthetic input",
         "output.value": "Synthetic output",
-        "agentlib.checkpoints": '[{"checkpoint_id":"synthetic-checkpoint"}]',
+        "agentcraft2.checkpoints": '[{"checkpoint_id":"synthetic-checkpoint"}]',
     }.items():
         span.attributes.add(key=key).value.string_value = value
     span.attributes.add(key="llm.token_count.prompt").value.int_value = 10

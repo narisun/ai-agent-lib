@@ -258,7 +258,7 @@ def test_the_registries_round_trip_through_their_files(tmp_path: Path) -> None:
 
 def test_rules_are_appended_once_and_what_is_there_is_never_changed() -> None:
     empty = rules_text(None, [])
-    assert yaml.safe_load(empty) == {"schema": "agentlib.rules/v1", "rules": []}
+    assert yaml.safe_load(empty) == {"schema": "agentcraft2.rules/v1", "rules": []}
     first = rules_text(empty, [RULE], title="hello-agent: its models.")
     assert "  # hello-agent: its models.\n  - id: hello-agent-uses-its-models\n" in first
     assert "    actions: [model.route]\n" in first
@@ -286,8 +286,8 @@ def test_rules_are_appended_once_and_what_is_there_is_never_changed() -> None:
 
 def test_a_rules_file_that_cannot_be_extended_safely_is_left_alone() -> None:
     with pytest.raises(CliError, match="is not valid YAML"):
-        rules_text("schema: agentlib.rules/v1\nrules: [", [RULE])
-    reordered = "rules: []\nschema: agentlib.rules/v1\n"
+        rules_text("schema: agentcraft2.rules/v1\nrules: [", [RULE])
+    reordered = "rules: []\nschema: agentcraft2.rules/v1\n"
     with pytest.raises(CliError, match="add these by hand: hello-agent-uses-its-models"):
         rules_text(reordered, [RULE])
 

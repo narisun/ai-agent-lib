@@ -1,6 +1,6 @@
 # The agent registry: which agents exist and which MCP servers each may call.
 # agentcraft2 rewrites this file when it adds, links or pins a service; comments are not kept.
-schema: agentlib.registry/v1
+schema: agentcraft2.registry/v1
 agents:
 - id: rmqna
   owner: commercial-banking

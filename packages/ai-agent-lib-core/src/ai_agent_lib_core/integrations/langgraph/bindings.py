@@ -32,6 +32,7 @@ from ai_agent_lib_core.integrations.langgraph.checkpoint import (
     ScopedCheckpointer,
     scoped_thread_id,
 )
+from ai_agent_lib_core.integrations.langgraph.history import REQUEST_KEY
 from ai_agent_lib_core.integrations.langgraph.model import (
     GovernedChatModel,
     describe_model_response,
@@ -199,7 +200,7 @@ class LangGraphBindings:
         return {
             "config": {
                 "configurable": {"thread_id": thread_id},
-                "metadata": {"agentlib_request_id": context.request_id},
+                "metadata": {REQUEST_KEY: context.request_id},
             },
             "context": context,
         }

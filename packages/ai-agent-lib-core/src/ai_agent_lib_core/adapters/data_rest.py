@@ -51,7 +51,7 @@ from ai_agent_lib_core.adapters.obligations import (
 from ai_agent_lib_core.adapters.parameters import bind_parameters, coerce_parameter
 from ai_agent_lib_core.adapters.strict_yaml import StrictYamlError, load_strict_yaml
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     Classification,
     Clock,
     ConfigurationError,
@@ -447,7 +447,7 @@ class RestDataSource:
             PolicyDenied: If an obligation cannot be enforced or the API forbade the call.
             CredentialsExpiredError: If the API did not accept the token.
             TransientError: If the API timed out or was unavailable.
-            AgentLibError: If the response was not what the definition declares.
+            AgentCraft2Error: If the response was not what the definition declares.
         """
         endpoints, client = self._started()
         endpoint = endpoints.get(name)
@@ -559,7 +559,7 @@ class RestDataSource:
             try:
                 return json.loads(body)
             except ValueError:
-                raise AgentLibError(f"{where}: the response was not JSON") from None
+                raise AgentCraft2Error(f"{where}: the response was not JSON") from None
         if status == httpx.codes.NOT_FOUND and endpoint.empty_on_not_found:
             return None
         if status in _TRANSIENT_STATUS or httpx.codes.is_server_error(status):
@@ -582,7 +582,7 @@ class RestDataSource:
                 fix="ask the API's owner to grant this service's credentials access",
             )
         if httpx.codes.is_redirect(status):
-            raise AgentLibError(
+            raise AgentCraft2Error(
                 f"{where}: the API redirected, and redirects are not followed",
                 actual=f"HTTP {status}",
                 fix="set base_url to the address the API redirects to",
@@ -599,7 +599,7 @@ class RestDataSource:
                 actual=f"HTTP {status}",
                 fix=hint,
             )
-        raise AgentLibError(f"{where}: the API returned HTTP {status}", actual=f"HTTP {status}")
+        raise AgentCraft2Error(f"{where}: the API returned HTTP {status}", actual=f"HTTP {status}")
 
     async def _read(self, response: httpx.Response, where: str) -> bytes:
         limit = self._options.max_response_bytes
@@ -608,7 +608,7 @@ class RestDataSource:
         async for chunk in response.aiter_bytes():
             size += len(chunk)
             if size > limit:
-                raise AgentLibError(f"{where}: the response is larger than {limit} bytes")
+                raise AgentCraft2Error(f"{where}: the response is larger than {limit} bytes")
             chunks.append(chunk)
         return b"".join(chunks)
 
@@ -619,7 +619,7 @@ class RestDataSource:
         if isinstance(found, dict):
             found = [found]
         if not isinstance(found, list) or not all(isinstance(record, dict) for record in found):
-            raise AgentLibError(
+            raise AgentCraft2Error(
                 f"data source {self._name!r}, query {endpoint.description.name!r}: "
                 "the response does not hold records where the definition says"
             )

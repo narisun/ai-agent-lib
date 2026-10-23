@@ -29,6 +29,7 @@ from ai_agent_lib_core.contracts import (
 from ai_agent_lib_core.contracts.structured import model_safe_name
 from ai_agent_lib_core.integrations.langgraph._trace_schema import SpanSchema, TraceSettings
 from ai_agent_lib_core.integrations.langgraph.context import current_diagnostic_links
+from ai_agent_lib_core.integrations.langgraph.history import request_history
 from ai_agent_lib_core.integrations.langgraph.model_trace import diagnostic_content
 from ai_agent_lib_core.integrations.langgraph.tools import current_native_tool_wrapper
 from ai_agent_lib_core.observability.model_trace import JsonlModelTraceSink
@@ -293,7 +294,7 @@ class AgentTracing:
         if (
             turn is None
             or turn.owner is not self
-            or record.get("request_id") != turn.attributes["agentlib.request_id"]
+            or record.get("request_id") != turn.attributes["agentcraft2.request_id"]
         ):
             return
         key = f"model:{record['call_id']}:{record['attempt']}"
@@ -494,10 +495,8 @@ class AgentTracing:
             # off, which ``checkpoints_truncated`` reports, and the read stops there.
             async with asyncio.timeout(self.checkpoint_timeout_seconds):
                 with bind_request_context(context):
-                    history = graph.aget_state_history(
-                        invocation(context)["config"],
-                        filter={"agentlib_request_id": context.request_id},
-                        limit=65,
+                    history = request_history(
+                        graph, invocation(context)["config"], context.request_id, limit=65
                     )
                     try:
                         async for snapshot in history:

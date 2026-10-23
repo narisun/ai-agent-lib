@@ -1,4 +1,4 @@
-"""Reading registry documents: the frozen ``agentlib.registry/v1`` format.
+"""Reading registry documents: the frozen ``agentcraft2.registry/v1`` format.
 
 Every provider that gets its registries from YAML or JSON uses these
 functions, so a document means the same thing wherever it is stored.
@@ -14,7 +14,14 @@ from dataclasses import dataclass
 from typing import Annotated, Any, Literal, TypeVar
 
 import httpx
-from pydantic import AfterValidator, Field, StringConstraints, ValidationError, model_validator
+from pydantic import (
+    AfterValidator,
+    BeforeValidator,
+    Field,
+    StringConstraints,
+    ValidationError,
+    model_validator,
+)
 
 from ai_agent_lib_core.adapters.strict_yaml import StrictYamlError, load_strict_yaml
 from ai_agent_lib_core.contracts import (
@@ -28,6 +35,7 @@ from ai_agent_lib_core.contracts import (
     ServerEntry,
     ToolEntry,
     ToolSnapshot,
+    current_schema,
     options_error,
     runtime_invocation_url,
 )
@@ -113,7 +121,9 @@ class _ServerModel(OptionsModel):
 
 
 class _ToolsDocument(OptionsModel):
-    schema_: Literal["agentlib.registry/v1"] = Field(alias="schema")
+    schema_: Annotated[Literal["agentcraft2.registry/v1"], BeforeValidator(current_schema)] = Field(
+        alias="schema"
+    )
     servers: list[_ServerModel] = Field(default_factory=list)
 
 
@@ -131,13 +141,15 @@ class _AgentModel(OptionsModel):
 
 
 class _AgentsDocument(OptionsModel):
-    schema_: Literal["agentlib.registry/v1"] = Field(alias="schema")
+    schema_: Annotated[Literal["agentcraft2.registry/v1"], BeforeValidator(current_schema)] = Field(
+        alias="schema"
+    )
     agents: list[_AgentModel] = Field(default_factory=list)
 
 
 ModelT = TypeVar("ModelT", bound=OptionsModel)
 
-if REGISTRY_SCHEMA != "agentlib.registry/v1":  # pragma: no cover - guards the literals above
+if REGISTRY_SCHEMA != "agentcraft2.registry/v1":  # pragma: no cover - guards the literals above
     raise AssertionError("the document models and REGISTRY_SCHEMA disagree")
 
 

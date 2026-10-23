@@ -10,7 +10,7 @@ import click
 from ai_agent_lib_cli.app import cli
 from ai_agent_lib_cli.errors import EXIT_FAILED, EXIT_OK, EXIT_USAGE, report_error
 from ai_agent_lib_cli.toolbox import Toolbox
-from ai_agent_lib_core.contracts import AgentLibError
+from ai_agent_lib_core.contracts import AgentCraft2Error
 
 __all__ = ["main"]
 
@@ -44,7 +44,7 @@ def main(argv: Sequence[str] | None = None, toolbox: Toolbox | None = None) -> i
     except click.Abort:
         click.echo("agentcraft2: stopped", err=True)
         return EXIT_FAILED
-    except AgentLibError as problem:
+    except AgentCraft2Error as problem:
         # CliError is one of these: one place prints every error the CLI reports.
         return report_error(problem)
     return result if isinstance(result, int) else EXIT_OK

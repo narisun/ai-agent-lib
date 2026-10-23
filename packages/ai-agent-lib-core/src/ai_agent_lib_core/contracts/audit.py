@@ -10,7 +10,7 @@ from types import MappingProxyType
 
 __all__ = ["AUDIT_SCHEMA", "AuditOutcome", "AuditRecord", "AuditValue"]
 
-AUDIT_SCHEMA = "agentlib.audit/v1"
+AUDIT_SCHEMA = "agentcraft2.audit/v1"
 
 AuditValue = str | int | float | bool | None
 """Scalar types for audit metadata; callers must exclude content and credentials."""

@@ -10,7 +10,7 @@ from pydantic import Field
 
 from ai_agent_lib_aws.session import AwsSessionFactory
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     AuditOptions,
     AuditRecord,
     ConfigurationError,
@@ -74,7 +74,7 @@ class FirehoseAuditSink:
                 DeliveryStreamName=self._stream,
                 Record={"Data": data},
             )
-        except (AgentLibError, aws.BotoCoreError, aws.ClientError, OSError) as exc:
+        except (AgentCraft2Error, aws.BotoCoreError, aws.ClientError, OSError) as exc:
             raise IntegrityError(
                 f"{_WHAT}: the audit record was not accepted by stream {self._stream!r} "
                 f"({describe(exc)})"
@@ -100,7 +100,7 @@ class FirehoseAuditSink:
             raise ConfigurationError(
                 f"{_WHAT}: stream {self._stream!r} cannot be used ({code})"
             ) from exc
-        except AgentLibError as exc:
+        except AgentCraft2Error as exc:
             raise ConfigurationError.from_error(exc) from exc
         status = reply.get("DeliveryStreamDescription", {}).get("DeliveryStreamStatus")
         if status != _ACTIVE:

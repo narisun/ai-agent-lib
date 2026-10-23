@@ -111,17 +111,17 @@ async def test_bad_or_revoked_tokens_are_unauthorized(
     runtime: Runtime, boundary: SessionBoundary, downstream: Downstream
 ) -> None:
     status, _, body = status_and_body(
-        await call(boundary, scope_for("/api/threads", cookie="agentlib_session=forged"))
+        await call(boundary, scope_for("/api/threads", cookie="agentcraft2_session=forged"))
     )
     assert (status, body) == (401, {"detail": "Sign in to the local UI"})
     token = await runtime.store.new_session(runtime.identity)
     status, _, _ = status_and_body(
-        await call(boundary, scope_for("/api/threads", cookie=f"agentlib_session={token}"))
+        await call(boundary, scope_for("/api/threads", cookie=f"agentcraft2_session={token}"))
     )
     assert status == 200
     await runtime.store.revoke(token)
     status, _, _ = status_and_body(
-        await call(boundary, scope_for("/api/threads", cookie=f"agentlib_session={token}"))
+        await call(boundary, scope_for("/api/threads", cookie=f"agentcraft2_session={token}"))
     )
     assert status == 401
     assert len(downstream.calls) == 1
@@ -131,7 +131,7 @@ async def test_wrong_host_and_cross_origin_mutations_are_forbidden(
     runtime: Runtime, boundary: SessionBoundary, downstream: Downstream
 ) -> None:
     token = await runtime.store.new_session(runtime.identity)
-    cookie = f"agentlib_session={token}"
+    cookie = f"agentcraft2_session={token}"
     status, _, body = status_and_body(
         await call(boundary, scope_for("/api/threads", host="localhost:8765", cookie=cookie))
     )
@@ -164,7 +164,8 @@ async def test_chainlit_identity_must_match_the_parent_session(
         await call(
             boundary,
             scope_for(
-                "/chat/project/threads", cookie=f"agentlib_session={token}; agentlib_chat={other}"
+                "/chat/project/threads",
+                cookie=f"agentcraft2_session={token}; agentcraft2_chat={other}",
             ),
         )
     )
@@ -174,7 +175,8 @@ async def test_chainlit_identity_must_match_the_parent_session(
         await call(
             boundary,
             scope_for(
-                "/chat/project/threads", cookie=f"agentlib_session={token}; agentlib_chat={forged}"
+                "/chat/project/threads",
+                cookie=f"agentcraft2_session={token}; agentcraft2_chat={forged}",
             ),
         )
     )
@@ -185,8 +187,8 @@ async def test_chainlit_identity_must_match_the_parent_session(
             boundary,
             scope_for(
                 "/chat/project/threads",
-                cookie=f"agentlib_session={token}; agentlib_chat={matching}",
-                extra=((b"authorization", b"Bearer leaked"), (b"x-agentlib-user", b"root")),
+                cookie=f"agentcraft2_session={token}; agentcraft2_chat={matching}",
+                extra=((b"authorization", b"Bearer leaked"), (b"x-agentcraft2-user", b"root")),
             ),
         )
     )
@@ -206,7 +208,7 @@ async def test_websocket_without_a_session_closes_with_4403(
     token = await runtime.store.new_session(runtime.identity)
     sent = await call(
         boundary,
-        scope_for("/chat/ws/socket.io/", kind="websocket", cookie=f"agentlib_session={token}"),
+        scope_for("/chat/ws/socket.io/", kind="websocket", cookie=f"agentcraft2_session={token}"),
     )
     assert sent == [{"type": "websocket.close", "code": 4403}]
     sent = await call(
@@ -215,7 +217,7 @@ async def test_websocket_without_a_session_closes_with_4403(
             "/chat/ws/socket.io/",
             kind="websocket",
             origin=origin,
-            cookie=f"agentlib_session={token}",
+            cookie=f"agentcraft2_session={token}",
         ),
     )
     assert sent == [{"type": "websocket.accept"}]
@@ -230,7 +232,7 @@ async def test_public_assets_and_disabled_features(
     assert downstream.calls[0][1] == ""
     token = await runtime.store.new_session(runtime.identity)
     status, _, body = status_and_body(
-        await call(boundary, scope_for("/chat/mcp", cookie=f"agentlib_session={token}"))
+        await call(boundary, scope_for("/chat/mcp", cookie=f"agentcraft2_session={token}"))
     )
     assert (status, body) == (404, {"detail": "This feature is not enabled"})
 

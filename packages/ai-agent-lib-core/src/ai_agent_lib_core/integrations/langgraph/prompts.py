@@ -15,4 +15,4 @@ def static_system_prompt(instructions: str, request_context: str = "") -> System
     blocks: list[str | dict[str, Any]] = [{"type": "text", "text": instructions}]
     if request_context:
         blocks.append({"type": "text", "text": request_context})
-    return SystemMessage(content=blocks, additional_kwargs={"agentlib_static_prefix": True})
+    return SystemMessage(content=blocks, additional_kwargs={"agentcraft2_static_prefix": True})

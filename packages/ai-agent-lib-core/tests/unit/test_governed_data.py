@@ -63,7 +63,7 @@ async def test_an_allowed_query_runs_and_leaves_one_metadata_only_record() -> No
 
     (asked,) = fakes.policy.requests
     assert asked.to_input() == {
-        "schema": "agentlib.decision/v1",
+        "schema": "agentcraft2.decision/v1",
         "principal": {
             "subject": "u-7",
             "tenant": "t-9",
@@ -252,7 +252,7 @@ async def test_rules_csv_and_jsonl_work_together_with_no_server(tmp_path: Path) 
     data_dir, queries_dir = write_accounts_files(tmp_path)
     rules = tmp_path / "rules.yaml"
     rules.write_text(
-        "schema: agentlib.rules/v1\n"
+        "schema: agentcraft2.rules/v1\n"
         "rules:\n"
         "  - id: analysts-see-the-east\n"
         "    actions: [data.query]\n"

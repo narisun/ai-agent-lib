@@ -6,7 +6,7 @@ from typing import Self
 
 import click
 
-from ai_agent_lib_core.contracts import AgentLibError
+from ai_agent_lib_core.contracts import AgentCraft2Error
 from ai_agent_lib_core.observability import explain
 
 __all__ = ["EXIT_FAILED", "EXIT_OK", "EXIT_USAGE", "CliError", "report_error"]
@@ -18,7 +18,7 @@ EXIT_USAGE = 2
 """The command line itself was wrong: an unknown option, a missing argument."""
 
 
-class CliError(AgentLibError):
+class CliError(AgentCraft2Error):
     """A problem the developer can fix, reported in a few lines without a traceback.
 
     It is one of the library's errors, so it carries the same facts
@@ -36,7 +36,7 @@ class CliError(AgentLibError):
 
     @classmethod
     def from_error(  # narrower than the base: adds `where`
-        cls, error: AgentLibError, *, where: str | None = None
+        cls, error: AgentCraft2Error, *, where: str | None = None
     ) -> Self:
         """Return a command-line error that says what ``error`` says, its facts kept apart.
 
@@ -55,7 +55,7 @@ class CliError(AgentLibError):
         )
 
 
-def report_error(problem: AgentLibError) -> int:
+def report_error(problem: AgentCraft2Error) -> int:
     """Print ``problem`` for the terminal and return the exit code to use.
 
     A :class:`CliError` is shown as written, because its message already

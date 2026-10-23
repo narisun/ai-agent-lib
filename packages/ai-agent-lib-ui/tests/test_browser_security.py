@@ -45,7 +45,7 @@ async def test_parent_session_guards_all_mounted_routes_and_origin(server: Local
             "/chat/public/chat.css",
         ):
             assert (
-                await anonymous.get(path, headers={"x-agentlib-user": "dev-user"})
+                await anonymous.get(path, headers={"x-agentcraft2-user": "dev-user"})
             ).status_code == 401
         assert (await anonymous.post("/login", data={"code": "bad"})).status_code == 403
         assert (

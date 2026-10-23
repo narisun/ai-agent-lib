@@ -3,7 +3,7 @@ package agentcraft2.authz_test
 import data.agentcraft2.authz
 
 rules := {
-	"schema": "agentlib.rules/v1",
+	"schema": "agentcraft2.rules/v1",
 	"rules": [
 		{
 			"id": "analysts-query-accounts",
@@ -43,7 +43,7 @@ rules := {
 }
 
 question := {
-	"schema": "agentlib.decision/v1",
+	"schema": "agentcraft2.decision/v1",
 	"principal": {"subject": "u-1", "tenant": "t-9", "roles": ["analyst"]},
 	"action": "data.query",
 	"resource": {"kind": "query", "name": "accounts.by_region", "classification": "restricted"},
@@ -111,7 +111,18 @@ test_a_rule_with_an_empty_role_list_covers_nobody if {
 }
 
 test_an_unknown_input_schema_is_denied if {
-	decide({"schema": "agentlib.decision/v2"}) == {"allow": false, "reason_code": "unsupported_input"}
+	decide({"schema": "agentcraft2.decision/v2"}) == {"allow": false, "reason_code": "unsupported_input"}
+}
+
+# Documents and inputs written before the rename carry the earlier prefix.
+test_the_earlier_decision_schema_is_still_accepted if {
+	decide({"schema": "agentlib.decision/v1"}).allow
+}
+
+test_a_rules_document_with_the_earlier_schema_still_applies if {
+	decision := authz.decision with input as question
+		with data.agentcraft2.rules as object.union(rules, {"schema": "agentlib.rules/v1"})
+	decision.allow
 }
 
 test_no_rules_document_denies_everything if {
@@ -121,7 +132,7 @@ test_no_rules_document_denies_everything if {
 
 test_an_empty_rules_document_denies_everything if {
 	decision := authz.decision with input as question
-		with data.agentcraft2.rules as {"schema": "agentlib.rules/v1", "rules": []}
+		with data.agentcraft2.rules as {"schema": "agentcraft2.rules/v1", "rules": []}
 	decision == {"allow": false, "reason_code": "no_matching_rule"}
 }
 
@@ -165,7 +176,7 @@ with_rule(changes) := decision if {
 		changes,
 	)
 	decision := authz.decision with input as question
-		with data.agentcraft2.rules as {"schema": "agentlib.rules/v1", "rules": [rule]}
+		with data.agentcraft2.rules as {"schema": "agentcraft2.rules/v1", "rules": [rule]}
 }
 
 invalid := {"allow": false, "reason_code": "invalid_rules"}
@@ -194,12 +205,12 @@ test_a_valid_rule_still_decides if {
 test_two_rules_with_one_id_are_refused if {
 	rule := {"id": "same", "actions": ["data.query"], "roles": ["analyst"]}
 	decision := authz.decision with input as question
-		with data.agentcraft2.rules as {"schema": "agentlib.rules/v1", "rules": [rule, rule]}
+		with data.agentcraft2.rules as {"schema": "agentcraft2.rules/v1", "rules": [rule, rule]}
 	decision == invalid
 }
 
 test_a_document_of_another_schema_is_refused if {
 	decision := authz.decision with input as question
-		with data.agentcraft2.rules as {"schema": "agentlib.rules/v2", "rules": []}
+		with data.agentcraft2.rules as {"schema": "agentcraft2.rules/v2", "rules": []}
 	decision == invalid
 }

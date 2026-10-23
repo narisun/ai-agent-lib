@@ -38,7 +38,7 @@ The module creates:
 - A task role with `task_policy_json`, derived from the selected adapters,
   plus permissions the collector needs for X-Ray and CloudWatch.
 - An execution role for pulling images and writing service logs.
-- A log group named `/agentlib/NAME`.
+- A log group named `/agentcraft2/NAME`.
 
 Containers use a read-only root filesystem and a writable `/tmp` volume.
 The `volume-init` container prepares that volume before the service starts

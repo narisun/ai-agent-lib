@@ -24,8 +24,8 @@ from ai_agent_lib_aws.testing import offline_sessions
 from ai_agent_lib_core import bind_request_context
 from ai_agent_lib_core.adapters import StaticIdentityOptions, StaticIdentityVerifier
 from ai_agent_lib_core.contracts import (
+    AgentCraft2Error,
     AgentEntry,
-    AgentLibError,
     Classification,
     ConfigurationError,
     DeploymentEnv,
@@ -307,7 +307,7 @@ def test_the_pack_registers_the_connector_for_the_agentcore_transport() -> None:
     ],
 )
 def test_each_platform_code_has_its_place_in_the_taxonomy(
-    code: int, message: str, kind: type[AgentLibError], fact: str
+    code: int, message: str, kind: type[AgentCraft2Error], fact: str
 ) -> None:
     error = MCPError(code=code, message=f"{message} (the caller sent hunter2)")
     mapped = classify_agentcore_mcp_error(error, where=WHERE)

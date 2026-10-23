@@ -7,6 +7,7 @@ from langchain_core.messages import BaseMessage
 
 from ai_agent_lib_core.contracts import RequestContext
 from ai_agent_lib_core.contracts.inspection import InspectionSection
+from ai_agent_lib_core.integrations.langgraph.history import request_history
 from ai_agent_lib_core.observability.inspection import preview
 from ai_agent_lib_core.pipeline import bind_request_context
 
@@ -39,10 +40,8 @@ class GraphCheckpointPreview:
         """Return up to 50 parent graph snapshots for exactly this request."""
         records: list[object] = []
         with bind_request_context(context):
-            async for snapshot in self.graph().aget_state_history(
-                self.invocation(context)["config"],
-                filter={"agentlib_request_id": request_id},
-                limit=51,
+            async for snapshot in request_history(
+                self.graph(), self.invocation(context)["config"], request_id, limit=51
             ):
                 if len(records) == 50:
                     return preview(records, truncated=True)

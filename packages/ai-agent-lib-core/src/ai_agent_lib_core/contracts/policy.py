@@ -27,7 +27,7 @@ __all__ = [
     "PolicyResource",
 ]
 
-DECISION_SCHEMA = "agentlib.decision/v1"
+DECISION_SCHEMA = "agentcraft2.decision/v1"
 """The schema identifier of the decision input."""
 
 

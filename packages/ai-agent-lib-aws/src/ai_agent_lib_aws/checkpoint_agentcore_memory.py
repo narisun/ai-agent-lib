@@ -37,7 +37,7 @@ from langgraph_checkpoint_aws import AgentCoreMemorySaver
 from ai_agent_lib_aws.checkpoint_options import AgentCoreMemoryCheckpointOptions
 from ai_agent_lib_aws.session import AwsSessionFactory
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     ConfigurationError,
     NotStartedError,
     PolicyDenied,
@@ -417,7 +417,7 @@ class AgentCoreMemoryCheckpointBackend:
             )
         except ConfigurationError:
             raise
-        except AgentLibError as exc:
+        except AgentCraft2Error as exc:
             raise ConfigurationError.from_error(exc) from exc
         except (aws.BotoCoreError, aws.ClientError) as exc:
             code = (

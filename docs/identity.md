@@ -130,7 +130,7 @@ no delegated scope as an application's own.
 
 ```json
 {
-  "schema": "agentlib.decision/v1",
+  "schema": "agentcraft2.decision/v1",
   "principal": {
     "subject": "<user object ID>",
     "tenant": "<tenant ID>",

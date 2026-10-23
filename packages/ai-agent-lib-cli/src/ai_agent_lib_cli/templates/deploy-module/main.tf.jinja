@@ -10,7 +10,7 @@ data "aws_caller_identity" "current" {}
 
 locals {
   account   = data.aws_caller_identity.current.account_id
-  log_group = "/agentlib/${var.name}"
+  log_group = "/agentcraft2/${var.name}"
   # The collector's default configuration writes metrics to this log group.
   metrics_log_group = "/aws/ecs/application/metrics"
 

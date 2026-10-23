@@ -17,7 +17,7 @@ from langchain_core.messages import BaseMessage, SystemMessage
 from pydantic import Field, SecretStr
 
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     ConfigurationError,
     ModelCapabilities,
     OptionsModel,
@@ -116,7 +116,7 @@ class AnthropicChatModelProvider:
             if (
                 not marked
                 and isinstance(message, SystemMessage)
-                and message.additional_kwargs.get("agentlib_static_prefix") is True
+                and message.additional_kwargs.get("agentcraft2_static_prefix") is True
                 and isinstance(message.content, list)
                 and message.content
                 and isinstance(message.content[0], dict)
@@ -153,7 +153,7 @@ class AnthropicChatModelProvider:
             options["model_kwargs"] = {"cache_control": self._cache_control()}
         return self._chat_model(**options)
 
-    def classify_error(self, error: BaseException) -> AgentLibError | None:
+    def classify_error(self, error: BaseException) -> AgentCraft2Error | None:
         """Map Anthropic SDK errors to the taxonomy, by HTTP status.
 
         The vendor's message is not copied into the new error, because it can

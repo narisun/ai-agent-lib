@@ -17,7 +17,7 @@ from typing import Any, Protocol
 
 from ai_agent_lib_cli.errors import CliError
 from ai_agent_lib_cli.proposals import ColumnInfo, TableInfo, is_plain_name, stand_in
-from ai_agent_lib_core.contracts import AgentLibError, ParameterType
+from ai_agent_lib_core.contracts import AgentCraft2Error, ParameterType
 
 __all__ = [
     "CatalogColumnLike",
@@ -204,6 +204,6 @@ async def fetch_catalog(request: RedshiftRequest) -> Sequence[CatalogTableLike]:
         found: Sequence[CatalogTableLike] = await read_redshift_catalog(
             sessions, target, schema=request.schema, tables=request.tables
         )
-    except AgentLibError as problem:
+    except AgentCraft2Error as problem:
         raise CliError(str(problem)) from None
     return found

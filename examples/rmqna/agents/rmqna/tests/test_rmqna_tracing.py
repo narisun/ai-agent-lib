@@ -160,7 +160,7 @@ async def test_the_sql_is_on_the_tool_span_only_when_content_capture_is_on(
     ]
     assert [s.name for s in tools] == ["rmqna-data.execute_sql"]
     attributes = dict(tools[0].attributes or {})
-    assert attributes["agentlib.mcp_server"] == SERVER_ID
+    assert attributes["agentcraft2.mcp_server"] == SERVER_ID
     # The model spans are the two provider calls: the one that wrote the SQL, and the answer.
     assert [s.name for s in spans if s.name == "model"] == ["model", "model"]
 

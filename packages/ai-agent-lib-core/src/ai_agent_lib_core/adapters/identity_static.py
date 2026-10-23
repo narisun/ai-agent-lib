@@ -21,11 +21,11 @@ from ai_agent_lib_core.contracts import (
 
 __all__ = ["StaticIdentityOptions", "StaticIdentityVerifier"]
 
-_PREFIX = "agentlib-dev"
+_PREFIX = "agentcraft2-dev"
 _ISSUER = "static-dev-identity"
 _SERVICE_SUBJECT = "dev-service"
 # Not a secret: this adapter is local-only and cannot start in a deployed environment.
-_DEVELOPMENT_KEY = SecretStr("agentlib-local-development-only")
+_DEVELOPMENT_KEY = SecretStr("agentcraft2-local-development-only")
 
 
 class StaticIdentityOptions(OptionsModel):

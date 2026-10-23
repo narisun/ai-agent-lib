@@ -1,5 +1,5 @@
 {
-  "schema": "agentlib.lock/v1",
+  "schema": "agentcraft2.lock/v1",
   "files": {
     ".github/workflows/check.yml": "9e55652ae5e18c3b2d7ed2716c161683361b41822c2b3a77e100e985f44a1320",
     ".gitignore": "dc6fe2579c9fa72589f53b41544c768dcd2d3143cf10f3fb365e8f31a90b9bfc",

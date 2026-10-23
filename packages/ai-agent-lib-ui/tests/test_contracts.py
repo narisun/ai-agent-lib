@@ -123,7 +123,7 @@ def test_destination_must_be_server_allowlisted_and_local_http_is_explicit() -> 
 
 def test_schema_and_adapter_versions_fail_explicitly() -> None:
     with pytest.raises(ContractError, match="unsupported_schema"):
-        read_manifest({"schema": "agentlib.presentation/v2"})
+        read_manifest({"schema": "agentcraft2.presentation/v2"})
     with pytest.raises(ContractError, match="unsupported_adapter"):
         QuestionAnswerAdapter(manifest().model_copy(update={"adapter": "arbitrary-json/v1"}))
 
@@ -152,7 +152,7 @@ def test_artifacts_are_bound_to_the_verified_invocation() -> None:
 @pytest.mark.parametrize(
     "change",
     [
-        {"schema": "agentlib.artifact/v2"},
+        {"schema": "agentcraft2.artifact/v2"},
         {"request_id": "different"},
         {"thread_id": "different"},
         {"scope": {"tenant": "other"}},

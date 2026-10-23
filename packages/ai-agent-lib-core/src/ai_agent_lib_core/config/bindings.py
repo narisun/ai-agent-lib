@@ -293,7 +293,7 @@ def _owned_and_external_bindings() -> tuple[Binding, ...]:
             example="off",
             details=(
                 "With `opentelemetry` every governed call is a span named after the GenAI "
-                "conventions, and the `agentlib.events` and `agentlib.duration` metrics are "
+                "conventions, and the `agentcraft2.events` and `agentcraft2.duration` metrics are "
                 "recorded, through the OpenTelemetry API. A service entry point sends them by "
                 "calling `start_telemetry()` (`run_agent` and `run_service` do), which installs "
                 "the providers through `configure_telemetry()` when this is on; where to is set "

@@ -2,7 +2,7 @@
 # that is listed here, and only if the tool's live input schema still matches its pin.
 # After changing a tool's arguments, pin it again: agentcraft2 registry pin <server>
 # agentcraft2 rewrites this file when it adds, links or pins a service; comments are not kept.
-schema: agentlib.registry/v1
+schema: agentcraft2.registry/v1
 servers:
 - id: rmqna-data
   owner: commercial-banking

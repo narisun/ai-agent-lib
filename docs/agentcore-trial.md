@@ -169,7 +169,7 @@ instead, and the connector derives the invocation URL from the ARN. The trial
 replaced the `url` line of the copy's registry, keeping the four pinned tools:
 
 ```yaml
-schema: agentlib.registry/v1
+schema: agentcraft2.registry/v1
 servers:
 - id: rmprep-data
   owner: commercial-banking

@@ -25,7 +25,7 @@ from psycopg_pool import AsyncConnectionPool, PoolTimeout
 
 from ai_agent_lib_aws.checkpoint_options import PostgresCheckpointOptions
 from ai_agent_lib_aws.session import AwsSessionFactory
-from ai_agent_lib_core.contracts import AgentLibError, ConfigurationError, describe
+from ai_agent_lib_core.contracts import AgentCraft2Error, ConfigurationError, describe
 
 __all__ = ["PostgresCheckpointBackend", "PostgresCheckpointOptions"]
 
@@ -189,7 +189,7 @@ class PostgresCheckpointBackend:
             await pool.open(wait=True, timeout=self._options.connect_timeout_seconds)
         except (psycopg.Error, PoolTimeout) as exc:
             raise self._unreachable(exc) from exc
-        except AgentLibError as exc:
+        except AgentCraft2Error as exc:
             raise ConfigurationError.from_error(exc) from exc
 
     def _unreachable(self, error: BaseException) -> ConfigurationError:
@@ -220,7 +220,7 @@ class PostgresCheckpointBackend:
             ) from exc
         except (psycopg.Error, PoolTimeout) as exc:
             raise self._unreachable(exc) from exc
-        except AgentLibError as exc:
+        except AgentCraft2Error as exc:
             raise ConfigurationError.from_error(exc) from exc
         version = row["v"] if row is not None else -1
         if version < _NEEDED_VERSION:

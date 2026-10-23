@@ -84,7 +84,7 @@ def question(**overrides: object) -> PolicyRequest:
 
 def test_the_decision_input_has_the_versioned_shape_from_the_specification() -> None:
     assert question().to_input() == {
-        "schema": "agentlib.decision/v1",
+        "schema": "agentcraft2.decision/v1",
         "principal": {
             "subject": "u-123",
             "tenant": "t-9",
@@ -169,7 +169,7 @@ def test_an_obligation_that_is_not_understood_is_an_error_never_ignored(raw: obj
 # -------------------------------------------------------------------- rules
 
 RULES = """\
-schema: agentlib.rules/v1
+schema: agentcraft2.rules/v1
 rules:
   - id: analysts-read
     actions: [data.query]
@@ -211,7 +211,7 @@ def test_a_missing_rules_file_is_an_error_not_an_empty_policy(tmp_path: Path) ->
 @pytest.mark.parametrize(
     ("text", "problem"),
     [
-        (RULES.replace("agentlib.rules/v1", "agentlib.rules/v0"), "schema"),
+        (RULES.replace("agentcraft2.rules/v1", "agentcraft2.rules/v0"), "schema"),
         (RULES.replace("actions: [data.query]", "actions: [data.delete]"), "actions"),
         (RULES.replace("actions: [data.query]", "actions: []"), "actions"),
         (
@@ -241,7 +241,7 @@ def test_an_invalid_rules_file_stops_startup(tmp_path: Path, text: str, problem:
 def test_a_pattern_star_matches_any_text_and_nothing_else_is_special() -> None:
     (rule,) = parse_rules_document(
         {
-            "schema": "agentlib.rules/v1",
+            "schema": "agentcraft2.rules/v1",
             "rules": [
                 {"id": "r", "actions": ["tool.call"], "resources": ["accounts/*", "rates.latest"]}
             ],
@@ -569,7 +569,7 @@ async def test_a_tool_call_is_put_to_the_policy_and_the_decision_is_evidence() -
     )
     (asked,) = policy.requests
     assert asked.to_input() == {
-        "schema": "agentlib.decision/v1",
+        "schema": "agentcraft2.decision/v1",
         "principal": {
             "subject": "u-123",
             "tenant": "t-9",
@@ -658,7 +658,7 @@ async def test_a_model_call_is_put_to_the_policy_as_a_routing_question() -> None
     call = ModelCall(context=CONTEXT, alias="judge", provider="bedrock", model_id="model-x")
     assert await stage.model(call) == "done"
     assert policy.requests[0].to_input() == {
-        "schema": "agentlib.decision/v1",
+        "schema": "agentcraft2.decision/v1",
         "principal": {
             "subject": "u-123",
             "tenant": "t-9",
@@ -716,7 +716,7 @@ def test_the_decision_input_names_the_agents_acting_for_the_caller() -> None:
 # ------------------------------------------------- a denial says how to fix it
 
 NEAR_MISS_RULES = """\
-schema: agentlib.rules/v1
+schema: agentcraft2.rules/v1
 rules:
   - id: managers-call-the-tools
     actions: [tool.call]
@@ -774,7 +774,7 @@ async def test_a_denial_names_what_was_refused_the_rule_that_would_allow_it_and_
 
 
 def test_a_misspelt_field_in_a_rule_is_named_with_the_fields_of_a_rule() -> None:
-    document = {"schema": "agentlib.rules/v1", "rules": [{"id": "a", "actons": ["tool.call"]}]}
+    document = {"schema": "agentcraft2.rules/v1", "rules": [{"id": "a", "actons": ["tool.call"]}]}
 
     with pytest.raises(ConfigurationError) as caught:
         parse_rules_document(document, what="policy rules")

@@ -10,7 +10,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from ai_agent_lib_core.adapters import FakeChatModelProvider
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     AuditOutcome,
     ConfigurationError,
     IntegrityError,
@@ -158,7 +158,7 @@ class _ThrottlingProvider(FakeChatModelProvider):
     def capabilities(self) -> ModelCapabilities:
         return ModelCapabilities()
 
-    def classify_error(self, error: BaseException) -> AgentLibError | None:
+    def classify_error(self, error: BaseException) -> AgentCraft2Error | None:
         if isinstance(error, _VendorError):
             return TransientError("the vendor throttled the request")
         return None

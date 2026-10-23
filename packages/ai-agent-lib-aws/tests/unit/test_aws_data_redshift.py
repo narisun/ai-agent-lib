@@ -19,7 +19,7 @@ from ai_agent_lib_aws.data_redshift import RedshiftDataOptions, RedshiftDataSour
 from ai_agent_lib_aws.pack import register_aws_adapters
 from ai_agent_lib_aws.testing import FakeRedshiftData, client_error, offline_sessions
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     ConfigurationError,
     Obligations,
     ProviderSelection,
@@ -422,11 +422,11 @@ async def test_a_cancelled_call_cancels_its_statement(tmp_path: Path) -> None:
             None,
         ),
         (aws.EndpointConnectionError(endpoint_url="https://redshift-data"), TransientError, None),
-        (aws.UnauthorizedSSOTokenError(), AgentLibError, None),
+        (aws.UnauthorizedSSOTokenError(), AgentCraft2Error, None),
     ],
 )
 async def test_an_error_from_aws_is_mapped_and_never_copied(
-    tmp_path: Path, failure: BaseException, expected: type[AgentLibError], text: str | None
+    tmp_path: Path, failure: BaseException, expected: type[AgentCraft2Error], text: str | None
 ) -> None:
     source, database, _ = await started(tmp_path)
     database.fail_with = failure

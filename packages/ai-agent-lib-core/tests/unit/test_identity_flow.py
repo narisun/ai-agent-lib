@@ -61,7 +61,7 @@ AGENT = AgentEntry(
     client_id=AGENT_CLIENT,
 )
 RULES = {
-    "schema": "agentlib.rules/v1",
+    "schema": "agentcraft2.rules/v1",
     "rules": [
         {
             "id": "analysts-through-the-accounts-agent",

@@ -24,7 +24,7 @@ from ai_agent_lib_core.adapters.registry_documents import (
     parse_tools_document,
     tools_document,
 )
-from ai_agent_lib_core.contracts import AgentEntry, AgentLibError, ServerEntry, describe
+from ai_agent_lib_core.contracts import AgentCraft2Error, AgentEntry, ServerEntry, describe
 
 __all__ = [
     "AGENTS_FILE",
@@ -65,7 +65,7 @@ _RULES_HEADER = """\
 #
 # This file is yours. agentcraft2 appends the rules a new service needs and never
 # changes or removes a rule that is here.
-schema: agentlib.rules/v1
+schema: agentcraft2.rules/v1
 rules: []
 """
 
@@ -89,7 +89,7 @@ def read_agents(root: Path) -> tuple[AgentEntry, ...]:
     raw = _load(root.joinpath(*AGENTS_FILE.parts), "the agent registry")
     try:
         return parse_agents_document(raw) if raw is not None else ()
-    except AgentLibError as exc:
+    except AgentCraft2Error as exc:
         raise CliError.from_error(exc) from None
 
 
@@ -98,7 +98,7 @@ def read_servers(root: Path) -> tuple[ServerEntry, ...]:
     raw = _load(root.joinpath(*TOOLS_FILE.parts), "the tool registry")
     try:
         return parse_tools_document(raw) if raw is not None else ()
-    except AgentLibError as exc:
+    except AgentCraft2Error as exc:
         raise CliError.from_error(exc) from None
 
 
@@ -129,12 +129,12 @@ def _rule_ids(text: str, what: str) -> list[str]:
     try:
         raw = yaml.safe_load(text)
         return [rule.id for rule in parse_rules_document(raw, what=what)]
-    except AgentLibError as exc:
+    except AgentCraft2Error as exc:
         raise CliError.from_error(exc) from None
     except yaml.YAMLError as exc:
         raise CliError(
             f"{what} is not valid YAML",
-            expected="a rules document: 'schema: agentlib.rules/v1' and a list of rules",
+            expected="a rules document: 'schema: agentcraft2.rules/v1' and a list of rules",
             actual=str(exc).splitlines()[0][:120],
         ) from None
 

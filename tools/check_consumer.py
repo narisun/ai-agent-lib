@@ -243,7 +243,7 @@ def main() -> None:
                 run("-m", "pytest", "-q", cwd=workspace)
                 # Run the installed provider through native framework invocation,
                 # tools and structured parsing at both dependency-version bounds.
-                env["AGENTLIB_CONSUMER_MODEL"] = provider
+                env["AGENTCRAFT2_CONSUMER_MODEL"] = provider
                 suite = work / "test_installed_model.py"
                 shutil.copyfile(root / "tools/consumer_model_contract.py", suite)
                 run("-m", "pytest", "-q", "--asyncio-mode=auto", str(suite))

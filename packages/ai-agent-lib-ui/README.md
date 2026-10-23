@@ -179,7 +179,7 @@ code to sign in. Use the exact `127.0.0.1` address. Keep the server window open.
    completed messages and selected agent remain.
 
 **Rate an answer.** Thumbs up and thumbs down appear beneath each accepted
-answer. A click, with an optional comment, appends one `agentlib.feedback/v1` line
+answer. A click, with an optional comment, appends one `agentcraft2.feedback/v1` line
 to `feedback.jsonl` in the UI state folder, beside `conversations.sqlite`. The line
 records the request, thread, agent, who rated it and the verdict (`up` or `down`).
 Feedback is evidence, so the log is append-only: Agent Lab refuses to delete a
@@ -360,7 +360,7 @@ or a different UI state folder.
 Saved conversations and viewer feedback can become an eval set without calling any
 agent. `export_interactions`, in `ai_agent_lib_ui.adapters.interactions`, writes
 every completed exchange the identity owns, active and archived conversations
-alike, as `agentlib.interaction/v1` JSONL. Given `feedback.jsonl`, each exchange
+alike, as `agentcraft2.interaction/v1` JSONL. Given `feedback.jsonl`, each exchange
 carries its latest verdict, matched by request ID. It reads only the UI's existing
 state, so run it after real traffic has been saved.
 
@@ -383,7 +383,7 @@ to that file. Stop the UI before editing settings or refreshing pins.
 | `allowed_urls` | Exact loopback agent base URLs approved during initialization. |
 | `port` | UI port, default `8765`; initialize with `--port` to change it. |
 | `timeout_seconds` | Total HTTP deadline, default `180`, maximum `600`. A timeout means unknown. |
-| `schema_version` | Configuration version, `agentlib.ui-local/v1`. |
+| `schema_version` | Configuration version, `agentcraft2.ui-local/v1`. |
 
 Use `--config path\to\config.json` on each command for another local state folder.
 The server always binds to `127.0.0.1`.

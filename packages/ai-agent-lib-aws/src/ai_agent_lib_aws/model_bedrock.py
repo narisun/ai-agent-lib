@@ -11,7 +11,7 @@ changes between the Anthropic API and Bedrock.
 from __future__ import annotations
 
 from ai_agent_lib_aws.session import AwsSessionFactory
-from ai_agent_lib_core.contracts import AgentLibError, ConfigurationError, ModelCapabilities
+from ai_agent_lib_core.contracts import AgentCraft2Error, ConfigurationError, ModelCapabilities
 
 __all__ = ["BedrockChatModelProvider"]
 
@@ -64,7 +64,7 @@ class BedrockChatModelProvider:
             model_id=model_id, client=self._runtime, bedrock_client=self._control
         )
 
-    def classify_error(self, error: BaseException) -> AgentLibError | None:
+    def classify_error(self, error: BaseException) -> AgentCraft2Error | None:
         """Map AWS SDK errors to the taxonomy.
 
         An expired SSO sign-in becomes ``CredentialsExpiredError`` and names

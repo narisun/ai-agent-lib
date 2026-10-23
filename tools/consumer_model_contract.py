@@ -13,7 +13,7 @@ class TestInstalledModel(LangGraphModelProviderContract):
 
     def make_provider(self) -> ChatModelProvider:
         """Build the selected provider using local test credentials."""
-        provider = os.environ["AGENTLIB_CONSUMER_MODEL"]
+        provider = os.environ["AGENTCRAFT2_CONSUMER_MODEL"]
         if provider == "fake":
             from ai_agent_lib_core.adapters import FakeChatModelProvider
 

@@ -6,7 +6,7 @@
 #
 # This file is yours. agentcraft2 appends samples for a new service and never
 # changes or removes one that is here.
-schema: agentlib.policy-samples/v1
+schema: agentcraft2.policy-samples/v1
 samples:
   - name: an analyst calls a tool of rmprep-data
     action: tool.call

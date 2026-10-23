@@ -193,11 +193,11 @@ In Phoenix, inspect:
 
 | Item | What to look for |
 | --- | --- |
-| Root `rmprep.turn` span | One trace per invocation; the three traces share `session.id` and `agentlib.thread_id`. |
+| Root `rmprep.turn` span | One trace per invocation; the three traces share `session.id` and `agentcraft2.thread_id`. |
 | `model` spans | Select a model span, then view **Input** and **Output** on its **Info** tab. Switch between **Messages** and **Raw**. The next model call includes the preceding tool result. |
-| `rmprep-data.find_clients` span | MCP arguments, result, duration, and `agentlib.mcp_server`. The synthetic search should return zero matches. |
+| `rmprep-data.find_clients` span | MCP arguments, result, duration, and `agentcraft2.mcp_server`. The synthetic search should return zero matches. |
 | Usage | Prompt/completion tokens and cache read/write counts. Prompt totals already include cache tokens. |
-| Checkpoints | `agentlib.checkpoints` on the root span contains checkpoint IDs and parent IDs for that request. Use Agent Lab's **Logs** page to inspect saved state; chat links directly to Phoenix. Failed runs include available checkpoints and an error status; their rejected drafts remain in model traces, not accepted chat history. |
+| Checkpoints | `agentcraft2.checkpoints` on the root span contains checkpoint IDs and parent IDs for that request. Use Agent Lab's **Logs** page to inspect saved state; chat links directly to Phoenix. Failed runs include available checkpoints and an error status; their rejected drafts remain in model traces, not accepted chat history. |
 | Follow-up | Its model input includes the earlier exchange, and its answer reports the same search and count. |
 
 Model spans measure provider-call duration; the root measures agent work including

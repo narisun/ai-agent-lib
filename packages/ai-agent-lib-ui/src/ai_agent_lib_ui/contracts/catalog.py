@@ -4,8 +4,9 @@ from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import quote
 
-from pydantic import Field, model_validator
+from pydantic import BeforeValidator, Field, model_validator
 
+from ai_agent_lib_core.contracts import current_schema
 from ai_agent_lib_core.contracts.diagnostics import DiagnosticValue, Identifier
 from ai_agent_lib_ui.contracts.queries import Availability
 
@@ -22,9 +23,9 @@ class PresentationManifest(DiagnosticValue):
     Endpoints are taken from the registry, never supplied by browser input here.
     """
 
-    schema_version: Literal["agentlib.presentation/v1"] = Field(
-        default="agentlib.presentation/v1", alias="schema"
-    )
+    schema_version: Annotated[
+        Literal["agentcraft2.presentation/v1"], BeforeValidator(current_schema)
+    ] = Field(default="agentcraft2.presentation/v1", alias="schema")
     agent_id: Identifier
     agent_version: Identifier
     registry_revision: Identifier

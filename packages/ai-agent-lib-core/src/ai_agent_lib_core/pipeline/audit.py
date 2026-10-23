@@ -75,10 +75,10 @@ def _ended(
     refusal: BaseException | None = None,
 ) -> dict[str, AuditValue]:
     """What a span learns as its call ends: the outcome, the token usage, a denial's reason."""
-    attributes: dict[str, AuditValue] = {"agentlib.outcome": outcome.value}
+    attributes: dict[str, AuditValue] = {"agentcraft2.outcome": outcome.value}
     attributes.update({_USAGE[key]: value for key, value in extra.items() if key in _USAGE})
     if isinstance(refusal, PolicyDenied):
-        attributes["agentlib.reason_code"] = refusal.reason_code
+        attributes["agentcraft2.reason_code"] = refusal.reason_code
     return attributes
 
 

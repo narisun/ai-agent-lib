@@ -12,7 +12,7 @@ contract suites.
 from typing import TYPE_CHECKING, Any
 
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     BudgetExceeded,
     Classification,
     ConfigurationError,
@@ -56,7 +56,7 @@ def __dir__() -> list[str]:
 
 
 __all__ = [
-    "AgentLibError",
+    "AgentCraft2Error",
     "BudgetExceeded",
     "Classification",
     "ConfigurationError",

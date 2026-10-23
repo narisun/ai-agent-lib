@@ -28,7 +28,7 @@
     ]
   },
   "request": {
-    "schema": "agentlib.decision/v1",
+    "schema": "agentcraft2.decision/v1",
     "principal": {
       "subject": "u-1",
       "tenant": "t-9",

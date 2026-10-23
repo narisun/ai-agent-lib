@@ -27,7 +27,7 @@ from pydantic import Field
 
 from ai_agent_lib_aws.session import AwsSessionFactory
 from ai_agent_lib_core.contracts import (
-    AgentLibError,
+    AgentCraft2Error,
     ConfigurationError,
     GuardrailFinding,
     GuardrailPoint,
@@ -182,7 +182,7 @@ class BedrockGuardrails:
         Raises:
             TransientError: If Bedrock throttled the call or could not be reached.
             ConfigurationError: If AWS refused the service's access.
-            AgentLibError: If the guardrail gave no usable answer.
+            AgentCraft2Error: If the guardrail gave no usable answer.
         """
         where = GuardrailPoint(point)
         if len(text) > self._limits[where]:
@@ -205,7 +205,7 @@ class BedrockGuardrails:
             await self._apply("INPUT", "ready")
         except ConfigurationError:
             raise
-        except AgentLibError as exc:
+        except AgentCraft2Error as exc:
             raise ConfigurationError.from_error(exc) from exc
 
     async def _apply(self, source: str, text: str) -> Mapping[str, Any]:

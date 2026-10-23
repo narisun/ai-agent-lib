@@ -54,9 +54,8 @@ These changes landed afterward; each is documented where it is used and covered 
 
 - Rename `EAP_` variables to `AC2_` wherever you set them: `.env` files, task
   definitions and `deploy.env`, shell profiles. Only the prefix changes
-  (`EAP_MODEL_PROVIDER` is now `AC2_MODEL_PROVIDER`). The `agentlib.*/v*` schema
-  identifiers, span attributes and the deploy resource-name defaults (such as
-  `eap-audit`) keep their names.
+  (`EAP_MODEL_PROVIDER` is now `AC2_MODEL_PROVIDER`). The deploy resource-name
+  defaults (such as `eap-audit`) keep their names.
 - The old `EAP_*` spellings keep working for one minor release and warn. A
   service logs one `WARNING` line per name that names its replacement (for
   example `EAP_MODEL_ID is deprecated; use AC2_MODEL_ID instead`); `agentcraft2
@@ -95,11 +94,39 @@ These changes landed afterward; each is documented where it is used and covered 
   `agentlib.authz` is `agentcraft2.authz`, and `data.agentlib.rules` is
   `data.agentcraft2.rules`. A policy server loaded with an older bundle needs the
   new one, and the rules file must sit under `agentcraft2/`.
-- Not renamed: package and import names (`ai_agent_lib_*`), the `agentlib.*/vN`
-  schema identifiers inside documents, span attribute names, MCP `_meta` keys,
-  cookie and header names, the `AgentLibError` class, the AWS log group
-  `/agentlib/<name>` and the `eap-*` resource-name defaults. Existing files that
-  carry those names keep working.
+- Also renamed, from `agentlib` to `agentcraft2`:
+
+  | What | Was | Is now |
+  |---|---|---|
+  | Schema identifiers in documents | `agentlib.registry/v1`, `agentlib.rules/v1` and the other `agentlib.*/vN` | `agentcraft2.registry/v1`, `agentcraft2.rules/v1` and so on |
+  | Span attributes and metric names | `agentlib.request_id`, `agentlib.events` | `agentcraft2.request_id`, `agentcraft2.events` |
+  | MCP `_meta` keys | `agentlib/request_id`, `agentlib/authorization` | `agentcraft2/request_id`, `agentcraft2/authorization` |
+  | Agent Lab cookies and header | `agentlib_session`, `agentlib_chat`, `x-agentlib-user` | `agentcraft2_session`, `agentcraft2_chat`, `x-agentcraft2-user` |
+  | Diagnostics routes | `/agentlib/diagnostics/v1/...` | `/agentcraft2/diagnostics/v1/...` |
+  | Checkpoint metadata key | `agentlib_request_id` | `agentcraft2_request_id` |
+  | Base error class | `AgentLibError` | `AgentCraft2Error` |
+  | AWS log group in generated Terraform | `/agentlib/<name>` | `/agentcraft2/<name>` |
+  | Tool variable | `AGENTLIB_CONSUMER_MODEL` | `AGENTCRAFT2_CONSUMER_MODEL` |
+
+- Files written before the rename still load. Every document that carries a
+  `schema` field accepts the old `agentlib.*/vN` spelling and is read as the new one:
+  registries, rules (the OPA bundle too, for rules and for decision input), policy
+  samples, eval reports and baselines, feedback and interaction exports,
+  presentation manifests, saved conversations and artifacts, the outcome journal,
+  the Agent Lab settings file, and the audit and model-trace logs that request
+  inspection reads. The lock file's schema is not checked at all. The next write uses
+  the new spelling, and a later version (`agentlib.rules/v2`) is refused as before.
+  Request inspection finds checkpoints recorded under either metadata key.
+- Not read in the old spelling: MCP `_meta` keys, cookies, the header and the
+  diagnostics routes. A new service called by an old client does not see the old
+  request ID or call token, and refuses the call. Browsers sign in again once. Update
+  dashboards and alerts that filter on the old span attribute and metric names. The
+  generated Terraform names the log group `/agentcraft2/<name>`, so the next apply
+  replaces the old group and deletes the logs in it. Export anything you need first.
+- Not renamed: package and import names (`ai_agent_lib_*`), the `eap-*`
+  resource-name defaults, and two hash salts that derive stable identifiers in Agent
+  Lab (`agentlib:answer:` and `agentlib:older:`). Renaming a salt would change the
+  identifiers it produces for saved conversations.
 
 **Migrating from Langfuse.**
 

@@ -26,7 +26,7 @@ class TestStaticIdentityVerifier(IdentityVerifierContract):
 
     def untrusted_credentials(self) -> list[str | None]:
         # Anything that claims to be a development token must be a valid one.
-        return ["agentlib-dev.e30.AAAA", "agentlib-dev.only-two-parts", "agentlib-dev.."]
+        return ["agentcraft2-dev.e30.AAAA", "agentcraft2-dev.only-two-parts", "agentcraft2-dev.."]
 
 
 class TestFakeIdentityVerifier(IdentityVerifierContract):

@@ -29,8 +29,8 @@ class InspectionSection(DiagnosticValue):
 class TurnInspection(RequestRecord):
     """Scope and turn identity accompany every diagnostic response."""
 
-    schema_version: Literal["agentlib.turn-inspection/v1"] = Field(
-        default="agentlib.turn-inspection/v1", alias="schema"
+    schema_version: Literal["agentcraft2.turn-inspection/v1"] = Field(
+        default="agentcraft2.turn-inspection/v1", alias="schema"
     )
     model_inputs: InspectionSection = Field(default_factory=InspectionSection)
     model_outputs: InspectionSection = Field(default_factory=InspectionSection)

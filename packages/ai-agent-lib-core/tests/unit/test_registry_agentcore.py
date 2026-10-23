@@ -21,7 +21,7 @@ URL = (
 )
 
 PLAIN = """\
-schema: agentlib.registry/v1
+schema: agentcraft2.registry/v1
 servers:
   - id: accounts
     owner: treasury-data
@@ -36,7 +36,7 @@ servers:
 """.format(pin="0f" * 32)
 
 HOSTED = f"""\
-schema: agentlib.registry/v1
+schema: agentcraft2.registry/v1
 servers:
   - id: accounts
     owner: treasury-data

@@ -43,7 +43,7 @@ from ai_agent_lib_core.testing import (
 )
 
 TOOLS = """\
-schema: agentlib.registry/v1
+schema: agentcraft2.registry/v1
 servers:
   - id: accounts
     owner: treasury-data
@@ -58,7 +58,7 @@ servers:
 """.format(pin="0f" * 32)
 
 AGENTS = """\
-schema: agentlib.registry/v1
+schema: agentcraft2.registry/v1
 agents:
   - id: accounts-agent
     owner: treasury-data
@@ -129,8 +129,8 @@ def test_a_missing_file_registers_nothing(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("tools", "problem"),
     [
-        (TOOLS.replace("agentlib.registry/v1", "agentlib.registry/v2"), "schema"),
-        (TOOLS.replace("schema: agentlib.registry/v1\n", ""), "schema"),
+        (TOOLS.replace("agentcraft2.registry/v1", "agentcraft2.registry/v2"), "schema"),
+        (TOOLS.replace("schema: agentcraft2.registry/v1\n", ""), "schema"),
         (TOOLS + "    command: rm -rf /\n", "command"),
         (TOOLS + "        entrypoint: os.system\n", "entrypoint"),
         (TOOLS.replace("http://localhost:8001/mcp", "http://user:pw@localhost/mcp"), "credentials"),
@@ -183,7 +183,7 @@ def test_an_invalid_agent_registry_stops_startup(tmp_path: Path, agents: str, pr
 
 def test_the_format_is_chosen_by_the_file_extension(tmp_path: Path) -> None:
     as_json = tmp_path / "mcp-tools.json"
-    as_json.write_text('{"schema": "agentlib.registry/v1", "servers": []}', encoding="utf-8")
+    as_json.write_text('{"schema": "agentcraft2.registry/v1", "servers": []}', encoding="utf-8")
     source = FileRegistrySource(
         FileRegistryOptions(agents_path=tmp_path / "none.yaml", tools_path=as_json)
     )
