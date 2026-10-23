@@ -51,11 +51,11 @@ def container(sessions: AwsSessionFactory, fakes: Fakes) -> ServiceContainer:
     resolved = ConfigResolver(
         MappingConfigSource(
             {
-                "EAP_MODEL_PROVIDER": "bedrock",
-                "EAP_MODEL_ID": MODEL,
+                "AC2_MODEL_PROVIDER": "bedrock",
+                "AC2_MODEL_ID": MODEL,
                 "AWS_REGION": "eu-west-1",
                 # One attempt: these tests are about how an error is reported.
-                "EAP_LIMITS": '{"model": {"retries": 0}}',
+                "AC2_LIMITS": '{"model": {"retries": 0}}',
             }
         )
     ).resolve()

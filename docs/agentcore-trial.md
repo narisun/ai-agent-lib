@@ -19,7 +19,7 @@ Nothing in this page claims a result from those steps.
 
 For the deploy command's options and the Fargate target, use the
 [developer guide](developer-guide.html). For what AgentCore Runtime changes and
-why, read [ADR 0004](adr/0004-agentcore-target.md).
+why, read [ADR 0005](adr/0005-agentcore-target.md).
 
 ## 1. Prerequisites
 
@@ -84,19 +84,19 @@ The file as it ended up, comments removed. `<placeholder>` marks a value the
 operator replaces; the other values are the trial's choices.
 
 ```dotenv
-EAP_PROFILE=aws
-EAP_DEPLOYMENT_ENV=dev
-EAP_TELEMETRY=ambient
-EAP_POLICY_PROVIDER=opa
-EAP_POLICY_OPTIONS={"url": "https://opa.internal:8181"}                    # <placeholder>: an OPA the runtime can reach
-EAP_MODEL_ID=eu.anthropic.claude-sonnet-4-5-20250929-v1:0
-EAP_CHECKPOINT_PROVIDER=agentcore_memory
-EAP_CHECKPOINT_OPTIONS={"memory_id": "created_by_terraform"}               # placeholder by design: Terraform fills it in
-EAP_SECRETS_OPTIONS={"prefix": "eap/rmprep/"}
-EAP_AUDIT_OPTIONS={"stream": "eap-audit"}                                  # <placeholder>: your Firehose stream
-EAP_IDENTITY_OPTIONS={"preset": "entra", "tenant_id": "00000000-0000-0000-0000-000000000000", "audience": "api://rmprep"}   # <placeholder>: tenant GUID
-EAP_REGISTRY_OPTIONS={"bucket": "my-eap-registry"}                         # <placeholder>: your registry bucket
-EAP_GUARDRAILS_OPTIONS={"guardrail_id": "abc123def456", "guardrail_version": "1"}   # <placeholder>: your guardrail
+AC2_PROFILE=aws
+AC2_DEPLOYMENT_ENV=dev
+AC2_TELEMETRY=ambient
+AC2_POLICY_PROVIDER=opa
+AC2_POLICY_OPTIONS={"url": "https://opa.internal:8181"}                    # <placeholder>: an OPA the runtime can reach
+AC2_MODEL_ID=eu.anthropic.claude-sonnet-4-5-20250929-v1:0
+AC2_CHECKPOINT_PROVIDER=agentcore_memory
+AC2_CHECKPOINT_OPTIONS={"memory_id": "created_by_terraform"}               # placeholder by design: Terraform fills it in
+AC2_SECRETS_OPTIONS={"prefix": "eap/rmprep/"}
+AC2_AUDIT_OPTIONS={"stream": "eap-audit"}                                  # <placeholder>: your Firehose stream
+AC2_IDENTITY_OPTIONS={"preset": "entra", "tenant_id": "00000000-0000-0000-0000-000000000000", "audience": "api://rmprep"}   # <placeholder>: tenant GUID
+AC2_REGISTRY_OPTIONS={"bucket": "my-eap-registry"}                         # <placeholder>: your registry bucket
+AC2_GUARDRAILS_OPTIONS={"guardrail_id": "abc123def456", "guardrail_version": "1"}   # <placeholder>: your guardrail
 
 AGENTCORE_AUTH=jwt
 AGENTCORE_DISCOVERY_URL=https://login.microsoftonline.com/00000000-0000-0000-0000-000000000000/v2.0/.well-known/openid-configuration   # <placeholder>: tenant GUID
@@ -113,26 +113,26 @@ Two things differ from the plan document's wording of this pilot. The plan says
 "no OPA (in-process `rules`)": the `rules` policy adapter is registered
 `local_only`, so the plan refuses it in `dev` (see [Troubleshooting](#troubleshooting)),
 and the trial keeps the remote OPA the starter proposes. And
-`EAP_IDENTITY_PROVIDER` is not written: `jwt` is the `aws` profile's default
+`AC2_IDENTITY_PROVIDER` is not written: `jwt` is the `aws` profile's default
 identity provider, and the `entra` preset fills in the issuer and key location
 from `tenant_id`.
 
 ### The MCP server: mcp-servers/rmprep-data/deploy.env
 
 ```dotenv
-EAP_PROFILE=aws
-EAP_DEPLOYMENT_ENV=dev
-EAP_TELEMETRY=ambient
-EAP_POLICY_PROVIDER=opa
-EAP_POLICY_OPTIONS={"url": "https://opa.internal:8181"}                    # <placeholder>
-EAP_CHECKPOINT_PROVIDER=none
-EAP_DATA_SOURCES={"rmprep": {"kind": "redshift_data", "queries_dir": "queries", "database": "rmprep", "workgroup": "rmprep-dev"}}   # <placeholder>: database and workgroup
-EAP_SECRETS_OPTIONS={"prefix": "eap/rmprep-data/"}
-EAP_AUDIT_OPTIONS={"stream": "eap-audit"}                                  # <placeholder>
-EAP_IDENTITY_PROVIDER=agentcore_runtime
-EAP_IDENTITY_OPTIONS={"tenant": "commercial-banking"}
-EAP_REGISTRY_OPTIONS={"bucket": "my-eap-registry"}                         # <placeholder>
-EAP_GUARDRAILS_OPTIONS={"guardrail_id": "abc123def456", "guardrail_version": "1"}   # <placeholder>
+AC2_PROFILE=aws
+AC2_DEPLOYMENT_ENV=dev
+AC2_TELEMETRY=ambient
+AC2_POLICY_PROVIDER=opa
+AC2_POLICY_OPTIONS={"url": "https://opa.internal:8181"}                    # <placeholder>
+AC2_CHECKPOINT_PROVIDER=none
+AC2_DATA_SOURCES={"rmprep": {"kind": "redshift_data", "queries_dir": "queries", "database": "rmprep", "workgroup": "rmprep-dev"}}   # <placeholder>: database and workgroup
+AC2_SECRETS_OPTIONS={"prefix": "eap/rmprep-data/"}
+AC2_AUDIT_OPTIONS={"stream": "eap-audit"}                                  # <placeholder>
+AC2_IDENTITY_PROVIDER=agentcore_runtime
+AC2_IDENTITY_OPTIONS={"tenant": "commercial-banking"}
+AC2_REGISTRY_OPTIONS={"bucket": "my-eap-registry"}                         # <placeholder>
+AC2_GUARDRAILS_OPTIONS={"guardrail_id": "abc123def456", "guardrail_version": "1"}   # <placeholder>
 
 AGENTCORE_AUTH=iam
 AGENTCORE_NETWORK=PUBLIC
@@ -153,7 +153,7 @@ Three settings were changed from the starter, each for a reason the trial met:
   starter's `jwt` identity with the Entra audience `api://rmprep-data` would
   fit the bearer path (`auth: bearer` with a token exchange on the agent),
   which the trial did not take.
-- **`EAP_DATA_SOURCES` with `redshift_data`.** The server reads its evidence
+- **`AC2_DATA_SOURCES` with `redshift_data`.** The server reads its evidence
   from CSV files through `duckdb_csv` at home. The plan warned that
   `deploy.env` did not configure the data source `rmprep`; copying the local
   value was refused, because `duckdb_csv` is `local_only`. `redshift_data` is
@@ -191,7 +191,7 @@ servers:
 execution role's credentials, so that role needs
 `bedrock-agentcore:InvokeAgentRuntime` on this ARN. The deploy plan does not
 read the registry, so `permissions.tf` cannot derive that grant; it is written
-by hand (section 7). The agent's `EAP_REGISTRY_OPTIONS` selects `s3_file`, so
+by hand (section 7). The agent's `AC2_REGISTRY_OPTIONS` selects `s3_file`, so
 the registry files are uploaded to `s3://<bucket>/registry/agents.yaml` and
 `s3://<bucket>/registry/mcp-tools.yaml` after the placeholder is replaced.
 
@@ -248,7 +248,7 @@ Container:
   service: opentelemetry-instrument python -m rmprep.service --profile agentcore
 
 Environment: 13 variables from agents/rmprep/deploy.env.
-  EAP_PROFILE ... EAP_GUARDRAILS_OPTIONS
+  AC2_PROFILE ... AC2_GUARDRAILS_OPTIONS
 
 Warnings:
   - AGENTCORE_MEMORY=create: Terraform creates the memory, puts its ID into the checkpoint option memory_id of the runtime's environment and grants the role access to it; memory_id in agents/rmprep/deploy.env ('created_by_terraform') is a placeholder, and the statement in permissions.tf names that placeholder
@@ -314,17 +314,17 @@ command printed it; the fix is what changed in `deploy.env`.
 
 | Setting tried | Refusal (recorded) | Fix |
 | --- | --- | --- |
-| `EAP_POLICY_PROVIDER=rules` (the plan's "no OPA") | `policy rules runs only on a developer's machine; select another in agents/rmprep/deploy.env` | Keep `opa` with a remote `url`. Open item below. |
-| `EAP_POLICY_OPTIONS={"url": "http://localhost:8181"}` (the Fargate value) | `policy opa decides on the loopback address, where its sidecar would run; nothing runs beside a container on AgentCore Runtime. Point url in EAP_POLICY_OPTIONS at an OPA the runtime can reach, or set EAP_POLICY_PROVIDER=rules in agents/rmprep/deploy.env` | `{"url": "https://opa.internal:8181"}`. The message's second option, `rules`, is itself refused in `dev`. |
-| `EAP_TELEMETRY=opentelemetry` (the Fargate value) | `EAP_TELEMETRY=opentelemetry installs the service's own tracer and meter providers, which collide with the ones ADOT installs on AgentCore Runtime; set EAP_TELEMETRY=ambient (or off) in agents/rmprep/deploy.env` | `EAP_TELEMETRY=ambient` |
-| `EAP_CHECKPOINT_PROVIDER=sqlite` (the local value) | Two problems: `checkpoint sqlite runs only on a developer's machine; select another ...` and `checkpoint sqlite has nowhere durable to write on AgentCore Runtime, whose disk ends with the session; set EAP_CHECKPOINT_PROVIDER to one of postgres, agentcore_memory, none ...`; plus the warning `AGENTCORE_MEMORY=create while checkpoint sqlite does not use AgentCore Memory` | `EAP_CHECKPOINT_PROVIDER=agentcore_memory` with `{"memory_id": "created_by_terraform"}` |
-| `EAP_DATA_SOURCES` copied from the server's `.env.example` (`duckdb_csv`) | `data source rmprep (duckdb_csv) runs only on a developer's machine; select another in mcp-servers/rmprep-data/deploy.env` | `redshift_data` with the server's `queries` folder (section 2) |
+| `AC2_POLICY_PROVIDER=rules` (the plan's "no OPA") | `policy rules runs only on a developer's machine; select another in agents/rmprep/deploy.env` | Keep `opa` with a remote `url`. Open item below. |
+| `AC2_POLICY_OPTIONS={"url": "http://localhost:8181"}` (the Fargate value) | `policy opa decides on the loopback address, where its sidecar would run; nothing runs beside a container on AgentCore Runtime. Point url in AC2_POLICY_OPTIONS at an OPA the runtime can reach, or set AC2_POLICY_PROVIDER=rules in agents/rmprep/deploy.env` | `{"url": "https://opa.internal:8181"}`. The message's second option, `rules`, is itself refused in `dev`. |
+| `AC2_TELEMETRY=opentelemetry` (the Fargate value) | `AC2_TELEMETRY=opentelemetry installs the service's own tracer and meter providers, which collide with the ones ADOT installs on AgentCore Runtime; set AC2_TELEMETRY=ambient (or off) in agents/rmprep/deploy.env` | `AC2_TELEMETRY=ambient` |
+| `AC2_CHECKPOINT_PROVIDER=sqlite` (the local value) | Two problems: `checkpoint sqlite runs only on a developer's machine; select another ...` and `checkpoint sqlite has nowhere durable to write on AgentCore Runtime, whose disk ends with the session; set AC2_CHECKPOINT_PROVIDER to one of postgres, agentcore_memory, none ...`; plus the warning `AGENTCORE_MEMORY=create while checkpoint sqlite does not use AgentCore Memory` | `AC2_CHECKPOINT_PROVIDER=agentcore_memory` with `{"memory_id": "created_by_terraform"}` |
+| `AC2_DATA_SOURCES` copied from the server's `.env.example` (`duckdb_csv`) | `data source rmprep (duckdb_csv) runs only on a developer's machine; select another in mcp-servers/rmprep-data/deploy.env` | `redshift_data` with the server's `queries` folder (section 2) |
 | `ai-agent-lib-aws` missing from `agents/rmprep/pyproject.toml` | `audit firehose, checkpoint agentcore_memory, guardrails bedrock, model bedrock, registry s3_file, secrets secrets_manager need ai-agent-lib-aws, which rmprep does not install; list "ai-agent-lib-aws[agentcore,bedrock]" in the dependencies in agents/rmprep/pyproject.toml and run 'python -m ai_agent_lib_cli install'` | Add the dependency line. The plan checks the file, not the installed packages. |
-| `AGENTCORE_MEMORY=rmprep_memory-abc123` with the placeholder still in the options | `AGENTCORE_MEMORY names the memory rmprep_memory-abc123, but the checkpoint option memory_id is 'created_by_terraform'; make them agree in agents/rmprep/deploy.env (AGENTCORE_MEMORY and EAP_CHECKPOINT_OPTIONS)` | Either `create` with the placeholder, or the same ID in both places once the memory exists. |
+| `AGENTCORE_MEMORY=rmprep_memory-abc123` with the placeholder still in the options | `AGENTCORE_MEMORY names the memory rmprep_memory-abc123, but the checkpoint option memory_id is 'created_by_terraform'; make them agree in agents/rmprep/deploy.env (AGENTCORE_MEMORY and AC2_CHECKPOINT_OPTIONS)` | Either `create` with the placeholder, or the same ID in both places once the memory exists. |
 | `AGENTCORE_AUTH=jwt` with neither clients nor audience | `AGENTCORE_ALLOWED_CLIENTS in agents/rmprep/deploy.env is not valid` / `expected: at least one client ID in AGENTCORE_ALLOWED_CLIENTS or one audience in AGENTCORE_ALLOWED_AUDIENCE` / `got: neither is set` | `AGENTCORE_ALLOWED_AUDIENCE=api://rmprep` |
 | `AGENTCORE_DISCOVERY_URL=https://login.microsoftonline.com/<tenant>/v2.0` | `AGENTCORE_DISCOVERY_URL in agents/rmprep/deploy.env is not valid` / `expected: an https URL ending in .well-known/openid-configuration` | Append `/.well-known/openid-configuration` |
-| `EAP_DEPLOYMENT_ENV=local` | `agents/rmprep/deploy.env describes a developer's machine, not a deployment` / `expected: EAP_DEPLOYMENT_ENV=dev or EAP_DEPLOYMENT_ENV=prod` | `EAP_DEPLOYMENT_ENV=dev` |
-| An `EAP_SECRET_API_KEY=...` line | `agents/rmprep/deploy.env holds secrets, and its values become the task's environment` / `fix: remove them from agents/rmprep/deploy.env and store each in Secrets Manager` | Remove the line; the service reads secrets under `EAP_SECRETS_OPTIONS`'s prefix. |
+| `AC2_DEPLOYMENT_ENV=local` | `agents/rmprep/deploy.env describes a developer's machine, not a deployment` / `expected: AC2_DEPLOYMENT_ENV=dev or AC2_DEPLOYMENT_ENV=prod` | `AC2_DEPLOYMENT_ENV=dev` |
+| An `AC2_SECRET_API_KEY=...` line | `agents/rmprep/deploy.env holds secrets, and its values become the task's environment` / `fix: remove them from agents/rmprep/deploy.env and store each in Secrets Manager` | Remove the line; the service reads secrets under `AC2_SECRETS_OPTIONS`'s prefix. |
 
 The `AGENTCORE_` refusals and the `local` and secret refusals stop the command
 before the plan is printed; the adapter refusals are listed under `Problems`
@@ -357,7 +357,7 @@ Next: read deploy/rmprep/README.md, build and push the ARM64 image, then run ter
 written for a container artifact. `settings.tf` and `permissions.tf` are
 rewritten on every run from `deploy.env`; the other seven are written once and
 are yours. In the agent's `settings.tf`, `memory_option_variable =
-"EAP_CHECKPOINT_OPTIONS"` tells `main.tf` which variable to rewrite with the
+"AC2_CHECKPOINT_OPTIONS"` tells `main.tf` which variable to rewrite with the
 created memory's ID; `request_header_configuration` passes `Authorization`
 through because `auth = "jwt"`. The Dockerfile starts
 `FROM --platform=linux/arm64 python:3.13-slim`, installs the lock with
@@ -515,7 +515,7 @@ The operator's steps. None of them ran in the dry run.
    `{"status": "HealthyBusy"}` while a turn is in progress, and 503 with the
    lifecycle state before it is ready. Read the result in the runtime's log
    group (`/aws/bedrock-agentcore/runtimes/<runtime id>-DEFAULT`).
-9. **Traces.** With `EAP_TELEMETRY=ambient` the ADOT distribution the image
+9. **Traces.** With `AC2_TELEMETRY=ambient` the ADOT distribution the image
    installs owns the providers, and the session ID travels in OpenTelemetry
    baggage as `session.id`. In the CloudWatch console, open **GenAI
    Observability** and pick the agent runtime; sessions are listed by that ID.
@@ -549,7 +549,7 @@ the resolved values under `Runtime:`.
 | `AGENTCORE_GATEWAY` | `none`, `create` (a gateway in front of the runtime with the workspace's MCP servers as targets) or a gateway ARN | `none` |
 | `AGENTCORE_MEMORY` | `none`, `create` (Terraform creates the memory the checkpoints go to) or a memory ID, which must then equal the checkpoint option `memory_id` | agent `create`, server `none` |
 
-The service's own variables are the `EAP_` ones of section 2; run
+The service's own variables are the `AC2_` ones of section 2; run
 `"%PYTHON%" -m ai_agent_lib_cli config explain rmprep` with `deploy.env` as the
 settings file to see how each resolves. The generated `deploy/<service>/README.md`
 repeats the build and apply steps for that service.
@@ -559,7 +559,7 @@ repeats the build and apply steps for that service.
 - **In-process policy.** The plan document asked for "no OPA (in-process
   `rules`)". The `rules` policy adapter is registered `local_only`, so the plan
   refuses it in `dev` and `prod`. The pilot therefore needs an OPA the runtime
-  can reach at `EAP_POLICY_OPTIONS`'s `url`: from a `PUBLIC` runtime, one
+  can reach at `AC2_POLICY_OPTIONS`'s `url`: from a `PUBLIC` runtime, one
   reachable over the internet with TLS; otherwise `AGENTCORE_NETWORK=VPC` with
   the subnets that reach it. Lifting `local_only` from `rules`, with the Rego
   bundle's decisions mirrored, is the way to the plan's intent.
@@ -600,24 +600,24 @@ nothing is written while a problem remains.
 
 | Message | What to do |
 | --- | --- |
-| `policy rules runs only on a developer's machine; select another in <service>/deploy.env` | `rules` is `local_only`. Set `EAP_POLICY_PROVIDER=opa` and point `url` in `EAP_POLICY_OPTIONS` at a remote OPA. |
-| `policy opa decides on the loopback address, where its sidecar would run; nothing runs beside a container on AgentCore Runtime. Point url in EAP_POLICY_OPTIONS at an OPA the runtime can reach, or set EAP_POLICY_PROVIDER=rules ...` | Replace the Fargate sidecar's `http://localhost:8181` with the remote OPA's `https` URL. |
-| `EAP_TELEMETRY=opentelemetry installs the service's own tracer and meter providers, which collide with the ones ADOT installs on AgentCore Runtime; set EAP_TELEMETRY=ambient (or off) ...` | `EAP_TELEMETRY=ambient`. The Fargate starter's `opentelemetry` is for the collector sidecar, which the runtime does not have. |
-| `checkpoint sqlite has nowhere durable to write on AgentCore Runtime, whose disk ends with the session; set EAP_CHECKPOINT_PROVIDER to one of postgres, agentcore_memory, none ...` | `EAP_CHECKPOINT_PROVIDER=agentcore_memory` (with `AGENTCORE_MEMORY=create` and the `memory_id` placeholder), `postgres`, or `none` for an MCP server. |
+| `policy rules runs only on a developer's machine; select another in <service>/deploy.env` | `rules` is `local_only`. Set `AC2_POLICY_PROVIDER=opa` and point `url` in `AC2_POLICY_OPTIONS` at a remote OPA. |
+| `policy opa decides on the loopback address, where its sidecar would run; nothing runs beside a container on AgentCore Runtime. Point url in AC2_POLICY_OPTIONS at an OPA the runtime can reach, or set AC2_POLICY_PROVIDER=rules ...` | Replace the Fargate sidecar's `http://localhost:8181` with the remote OPA's `https` URL. |
+| `AC2_TELEMETRY=opentelemetry installs the service's own tracer and meter providers, which collide with the ones ADOT installs on AgentCore Runtime; set AC2_TELEMETRY=ambient (or off) ...` | `AC2_TELEMETRY=ambient`. The Fargate starter's `opentelemetry` is for the collector sidecar, which the runtime does not have. |
+| `checkpoint sqlite has nowhere durable to write on AgentCore Runtime, whose disk ends with the session; set AC2_CHECKPOINT_PROVIDER to one of postgres, agentcore_memory, none ...` | `AC2_CHECKPOINT_PROVIDER=agentcore_memory` (with `AGENTCORE_MEMORY=create` and the `memory_id` placeholder), `postgres`, or `none` for an MCP server. |
 | `AGENTCORE_MEMORY=create while checkpoint <provider> does not use AgentCore Memory; ...` (warning) | Either select `agentcore_memory`, or set `AGENTCORE_MEMORY=none` so that Terraform creates no memory. |
-| `AGENTCORE_MEMORY names the memory <id>, but the checkpoint option memory_id is '<other>'; make them agree ...` | Put the same ID in `AGENTCORE_MEMORY` and in `memory_id` of `EAP_CHECKPOINT_OPTIONS`, or go back to `create` with the placeholder. |
-| `data source rmprep (duckdb_csv) runs only on a developer's machine; select another ...` | Select `redshift_data` in `EAP_DATA_SOURCES` with `queries_dir`, `database` and `workgroup`, and load the CSV files into that workgroup. |
+| `AGENTCORE_MEMORY names the memory <id>, but the checkpoint option memory_id is '<other>'; make them agree ...` | Put the same ID in `AGENTCORE_MEMORY` and in `memory_id` of `AC2_CHECKPOINT_OPTIONS`, or go back to `create` with the placeholder. |
+| `data source rmprep (duckdb_csv) runs only on a developer's machine; select another ...` | Select `redshift_data` in `AC2_DATA_SOURCES` with `queries_dir`, `database` and `workgroup`, and load the CSV files into that workgroup. |
 | `... need ai-agent-lib-aws, which <service> does not install; list "ai-agent-lib-aws[agentcore,bedrock]" in the dependencies in <service>/pyproject.toml ...` | Add the dependency line to the service's `pyproject.toml`. The plan reads the file; no install is needed for it to pass. |
 | `AGENTCORE_ALLOWED_CLIENTS in <service>/deploy.env is not valid` / `expected: at least one client ID in AGENTCORE_ALLOWED_CLIENTS or one audience in AGENTCORE_ALLOWED_AUDIENCE` | With `AGENTCORE_AUTH=jwt`, uncomment `AGENTCORE_ALLOWED_AUDIENCE` (or list clients). |
 | `AGENTCORE_DISCOVERY_URL in <service>/deploy.env is not valid` / `expected: an https URL ending in .well-known/openid-configuration` | Use the full discovery document URL, not the issuer. |
-| `<service>/deploy.env describes a developer's machine, not a deployment` | `EAP_DEPLOYMENT_ENV=dev` or `prod`. `local` is for `.env`. |
-| `<service>/deploy.env holds secrets, and its values become the task's environment` | Remove every `EAP_SECRET_*` line; the service reads its secrets from Secrets Manager under `EAP_SECRETS_OPTIONS`'s prefix. |
-| `the service reads the data sources rmprep locally, but <service>/deploy.env does not configure them, so the deployed service cannot find them; set EAP_DATA_SOURCES there` (warning) | The server's `.env.example` names a data source the deployment does not. Configure it with an AWS adapter, as above. |
+| `<service>/deploy.env describes a developer's machine, not a deployment` | `AC2_DEPLOYMENT_ENV=dev` or `prod`. `local` is for `.env`. |
+| `<service>/deploy.env holds secrets, and its values become the task's environment` | Remove every `AC2_SECRET_*` line; the service reads its secrets from Secrets Manager under `AC2_SECRETS_OPTIONS`'s prefix. |
+| `the service reads the data sources rmprep locally, but <service>/deploy.env does not configure them, so the deployed service cannot find them; set AC2_DATA_SOURCES there` (warning) | The server's `.env.example` names a data source the deployment does not. Configure it with an AWS adapter, as above. |
 | `this workspace installs the library from a local checkout, which an image build cannot reach; publish the library to a package index before building the image` (warning) | Expected for the example workspace. Publish the distributions, or change `[library]` in `agentlib.toml` to the index. |
 | `terraform validate` reports a missing provider | Run `terraform -chdir=deploy\<service> init -backend=false` first; it needs network access to fetch `hashicorp/aws`. |
 | `The settings deploy a container: set image to the ARM64 image pushed to the repository, pinned by digest.` (at `terraform plan`) | Copy `terraform.tfvars.example` to `terraform.tfvars` and set `image` to the pushed digest (section 6). |
 
-References: [ADR 0004](adr/0004-agentcore-target.md),
+References: [ADR 0005](adr/0005-agentcore-target.md),
 [implementation plan, Part B](design/implementation-plan-2026-10-22.md),
 the generated `deploy/<service>/README.md`,
 [Add observability to your AgentCore resources](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/observability-configure.html).

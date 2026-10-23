@@ -16,8 +16,11 @@ from pydantic import SecretStr, ValidationError
 
 from ai_agent_lib_core.config.bindings import (
     DEFAULT_BINDINGS,
+    LEGACY_PREFIX,
+    LEGACY_SECRET_VARIABLE_PREFIX,
     PREFIX,
     SECRET_KEY_PREFIX,
+    SECRET_VARIABLE_PREFIX,
     Binding,
     Key,
     ValueKind,
@@ -27,7 +30,6 @@ from ai_agent_lib_core.config.bindings import (
     secret_name,
     validate_bindings,
 )
-from ai_agent_lib_core.config.langfuse import LANGFUSE_VARIABLES
 from ai_agent_lib_core.config.phoenix import PHOENIX_VARIABLES
 from ai_agent_lib_core.config.profiles import PROFILE_DEFAULTS, ProfileDefaults
 from ai_agent_lib_core.contracts import (
@@ -60,6 +62,12 @@ _DATA_SOURCE_KIND = "kind"
 _DATA_SOURCE_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 # What AWS sets its execution-environment variable to on compute it manages.
 _MANAGED_RUNTIMES = ("AWS_ECS_", "AWS_Lambda_")
+
+
+def _both_spellings(name: str) -> tuple[str, str]:
+    """Return the current and the legacy spelling of an owned variable name."""
+    stem = name.removeprefix(PREFIX).removeprefix(LEGACY_PREFIX)
+    return PREFIX + stem, LEGACY_PREFIX + stem
 
 
 @dataclass(frozen=True, slots=True)
@@ -206,20 +214,35 @@ class ConfigResolver:
 
     def _reject_unknown_names(self) -> None:
         known = {name for binding in self._bindings for name in binding.all_names}
-        # Optional tracing is resolved by its own loader at the service boundary.
-        known.update(LANGFUSE_VARIABLES.values())
-        known.update(PHOENIX_VARIABLES)
+        # Optional tracing is resolved by its own loader at the service boundary. Only the
+        # library's own names have a second spelling; the vendor's PHOENIX_* names have none, and
+        # inventing AC2_PHOENIX_API_KEY would accept a variable that nothing reads.
+        for name in PHOENIX_VARIABLES:
+            if name.startswith(PREFIX):
+                known.update(_both_spellings(name))
+            else:
+                known.add(name)
+        # An old spelling that nothing binds is policed like a current one: a legacy typo
+        # or a removed variable must not be silently ignored while the old prefix is accepted.
         unknown = sorted(
             name
             for name in self._source.names()
-            if name.startswith(PREFIX) and name not in known and secret_name(name) is None
+            if name.startswith((PREFIX, LEGACY_PREFIX))
+            and name not in known
+            and secret_name(name) is None
         )
         if not unknown:
             return
         owned = sorted(name for name in known if name.startswith(PREFIX))
+        # A name that borrows the vendor's tracing setting is best pointed at the vendor's own.
+        suggestions = [*owned, *(name for name in PHOENIX_VARIABLES if not name.startswith(PREFIX))]
         details = []
         for name in unknown:
-            close = difflib.get_close_matches(name, owned, n=1)
+            current = PREFIX + name.removeprefix(LEGACY_PREFIX)
+            if name.startswith(LEGACY_PREFIX) and current in known:
+                details.append(f"{name} (did you mean {current}?)")
+                continue
+            close = difflib.get_close_matches(current, suggestions, n=1)
             details.append(f"{name} (did you mean {close[0]}?)" if close else name)
         raise ConfigurationError(
             f"unknown configuration variable{'s' if len(details) != 1 else ''}: "
@@ -232,7 +255,13 @@ class ConfigResolver:
         )
 
     def _read(self) -> tuple[dict[str, str], dict[str, str], list[str]]:
-        """Read every bound variable, applying alternate and deprecated names."""
+        """Read every bound variable, applying alternate and deprecated names.
+
+        A deprecated name that carries the same value as the name found before
+        it is tolerated without a word: an operator migrating a file may have
+        both spellings for a while. A different value is a conflict, because
+        guessing which spelling was meant is the hazard.
+        """
         values: dict[str, str] = {}
         origins: dict[str, str] = {}
         notes: list[str] = []
@@ -252,19 +281,26 @@ class ConfigResolver:
                         f"{old_name} is deprecated and conflicts with {found[0]}; "
                         f"set only {binding.name}"
                     )
-                note = f"{old_name} is deprecated; use {binding.name} instead"
-                notes.append(note)
-                warnings.warn(note, DeprecationWarning, stacklevel=4)
+                if found is None or found[0] in binding.deprecated_names:
+                    self._deprecated(notes, old_name, binding.name)
                 if found is None:
                     found = (old_name, old_value)
             if found is not None:
                 origins[binding.key] = f"variable {found[0]}"
                 values[binding.key] = found[1]
-        self._read_named_secrets(values, origins)
+        self._read_named_secrets(values, origins, notes)
         return values, origins, notes
 
-    def _read_named_secrets(self, values: dict[str, str], origins: dict[str, str]) -> None:
-        """Read the variables that each supply one named secret."""
+    @staticmethod
+    def _deprecated(notes: list[str], old_name: str, new_name: str) -> None:
+        note = f"{old_name} is deprecated; use {new_name} instead"
+        notes.append(note)
+        warnings.warn(note, DeprecationWarning, stacklevel=5)
+
+    def _read_named_secrets(
+        self, values: dict[str, str], origins: dict[str, str], notes: list[str]
+    ) -> None:
+        """Read the variables that each supply one named secret, in either spelling."""
         for variable in sorted(self._source.names()):
             name = secret_name(variable)
             value = self._clean(self._source.get(variable)) if name is not None else None
@@ -276,6 +312,12 @@ class ConfigResolver:
                 raise ConfigurationError(
                     f"{variable} and {other} both set the secret {name!r}; set only one"
                 )
+            if variable.startswith(LEGACY_SECRET_VARIABLE_PREFIX):
+                current = SECRET_VARIABLE_PREFIX + variable.removeprefix(
+                    LEGACY_SECRET_VARIABLE_PREFIX
+                )
+                if self._clean(self._source.get(current)) is None:
+                    self._deprecated(notes, variable, current)
             values[key] = value
             origins.setdefault(key, f"variable {variable}")
 

@@ -19,7 +19,7 @@ accounts-mcp            # serves http://127.0.0.1:8001/mcp, with /healthz and /r
 
 No model, key or policy server is needed. Local state is written under
 `.agentlib/`: the audit log as JSON lines. The server compiles no graph, so its
-configuration selects no checkpoint store (`EAP_CHECKPOINT_PROVIDER=none`).
+configuration selects no checkpoint store (`AC2_CHECKPOINT_PROVIDER=none`).
 
 ## Call it from the reference agent
 
@@ -28,9 +28,9 @@ caller a role:
 
 ```bash
 cd examples/accounts-agent
-export EAP_REGISTRY_OPTIONS='{"agents_path": "../accounts-mcp/registry/agents.yaml", "tools_path": "../accounts-mcp/registry/mcp-tools.yaml"}'
-export EAP_IDENTITY_OPTIONS='{"roles": ["analyst"]}'
-ANTHROPIC_API_KEY=... EAP_MODEL_ID=<model id> accounts-agent "Which accounts are in the west region?"
+export AC2_REGISTRY_OPTIONS='{"agents_path": "../accounts-mcp/registry/agents.yaml", "tools_path": "../accounts-mcp/registry/mcp-tools.yaml"}'
+export AC2_IDENTITY_OPTIONS='{"roles": ["analyst"]}'
+ANTHROPIC_API_KEY=... AC2_MODEL_ID=<model id> accounts-agent "Which accounts are in the west region?"
 ```
 
 The agent exchanges the caller's identity for a short-lived development token
@@ -57,13 +57,13 @@ for one bound to this server, and this server verifies that. The whole path is
 described in [`docs/identity.md`](../../docs/identity.md).
 
 Locally, the development identity is the default and needs nothing. It cannot
-be used when `EAP_DEPLOYMENT_ENV` is `dev` or `prod`.
+be used when `AC2_DEPLOYMENT_ENV` is `dev` or `prod`.
 
 ## Decide with OPA instead of the in-process rules
 
 ```bash
 opa run --server --addr 127.0.0.1:8181 -b ../../policies/bundle policies
-EAP_POLICY_PROVIDER=opa accounts-mcp
+AC2_POLICY_PROVIDER=opa accounts-mcp
 ```
 
 OPA evaluates the same `policies/agentlib/rules/data.yaml`, so the outcome is

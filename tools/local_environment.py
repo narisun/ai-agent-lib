@@ -20,8 +20,9 @@ def agent_environment(
         EnvironConfigSource,
         LayeredConfigSource,
         MappingConfigSource,
+        log_resolution_warnings,
     )
-    from ai_agent_lib_core.config.tracing import resolve_tracing_settings
+    from ai_agent_lib_core.config.phoenix import resolve_phoenix_settings
     from ai_agent_lib_core.contracts import ConfigurationError
     from tools.local_config_report import report_environment
 
@@ -37,7 +38,9 @@ def agent_environment(
             LayeredConfigSource(MappingConfigSource(environment), service),
             base_dir=service_env.parent,
         ).explain()
-        tracing = resolve_tracing_settings(
+        # Python hides DeprecationWarning; the launcher is where an operator first looks.
+        log_resolution_warnings(resolution)
+        tracing = resolve_phoenix_settings(
             service_env, environment=MappingConfigSource(environment), working_dir=working_dir
         )
     except ConfigurationError as error:

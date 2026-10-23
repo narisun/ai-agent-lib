@@ -29,7 +29,7 @@ variable "port" {
 }
 
 variable "environment" {
-  description = "The service's settings: its EAP_ variables. Never a secret: secrets stay in Secrets Manager."
+  description = "The service's settings: its AC2_ variables. Never a secret: secrets stay in Secrets Manager."
   type        = map(string)
   default     = {}
 }

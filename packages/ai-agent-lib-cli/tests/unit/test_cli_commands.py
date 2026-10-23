@@ -195,6 +195,8 @@ def test_new_mcp_adds_a_server_registers_it_and_adds_its_rules(
         "tests/test_hello_mcp.py",
     }
     assert files[service + ".env"] == files[service + ".env.example"]
+    assert "\nAC2_CHECKPOINT_PROVIDER=none\n" in files[service + ".env.example"]
+    assert "EAP_" not in "".join(text for name, text in files.items() if name.startswith(service))
     assert 'SERVER_ID = "hello"' in files[service + "src/hello_mcp/server.py"]
     assert '@server.tool(name="hello.people_by_team")' in files[service + "src/hello_mcp/server.py"]
 
@@ -232,7 +234,7 @@ def test_new_agent_adds_an_agent_linked_to_the_servers_it_names(
         ".env.example",
         "README.md",
         "docs/anthropic-example.md",
-        "docs/langfuse.md",
+        "docs/tracing.md",
         "evals/cases.jsonl",
         "pyproject.toml",
         "src/hello_agent/__init__.py",

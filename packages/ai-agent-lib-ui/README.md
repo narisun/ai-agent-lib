@@ -15,8 +15,9 @@ and stop/restart. The manual instructions below connect **your own agents**.
 
 Use steps 1–4 below to connect your own agents. After your first chat, see
 [responses and inspection](#responses-and-inspection), [memos](#memos-beside-chat),
-and [interrupted requests](#interrupted-requests). For code changes, start with
-[how the code fits together](#how-the-code-fits-together).
+[interrupted requests](#interrupted-requests), and
+[online evals from saved chats](#online-evals-from-saved-chats). For code changes,
+start with [how the code fits together](#how-the-code-fits-together).
 
 This checkout supports a local developer with a configured static identity.
 Enterprise SSO and shared hosting remain separate deployment work.
@@ -24,18 +25,32 @@ Enterprise SSO and shared hosting remain separate deployment work.
 ## 1. Prepare the UI packages
 
 Use company-provided **Python 3.11 or newer**, pip configured for JFrog or your
-approved package index, and a browser. Open **Command Prompt** at the repository root.
-For the complete rmprep stack, use `setup-local.bat`. To install just Agent Lab:
+approved package index, and a browser. Open **Command Prompt** (Windows) or a
+**Bash terminal** (macOS/Linux) at the repository root.
+For the complete rmprep stack, use `setup-local.bat` (`./setup-local.sh` on POSIX).
+To install just Agent Lab:
 
 ```bat
 python tools\package_runtime.py ui --install -e packages\ai-agent-lib-core -e "packages\ai-agent-lib-ui[chat]"
 python tools\package_runtime.py ui --check
 ```
 
+Or on POSIX:
+
+```bash
+python3 tools/package_runtime.py ui --install -e packages/ai-agent-lib-core -e "packages/ai-agent-lib-ui[chat]"
+python3 tools/package_runtime.py ui --check
+```
+
+Commands are shown for Windows, then for POSIX where they differ. Paths in the
+prose use Windows separators; on macOS/Linux use `/` and `python3`, for example
+`.agentlib/ui/config.json`.
+
 The `chat` extra installs Chainlit 2.12.0 and its required dependencies into
-`packages\ai-agent-lib-ui\.venv\Lib\site-packages`. The launcher uses your existing Python with
+`packages\ai-agent-lib-ui\.venv\Lib\site-packages` (`.venv/lib/python3.x/site-packages`
+on macOS/Linux). The launcher uses your existing Python with
 that package folder. It runs the default Python and its pip module; `.venv` executables are never
-selected. Use a fresh Command Prompt without activating an environment.
+selected. Use a fresh terminal without activating an environment.
 Chainlit requires MCP 1.x; the agent/MCP server uses MCP 2.x. Separate package
 sets let these HTTP services use the same Python executable reliably.
 
@@ -51,13 +66,13 @@ agent's imports. After changing Python versions, reinstall the UI package set.
 
 ## 2. Start your agent and register its address
 
-Start the agent and its MCP services in their own Command Prompt windows using
-the same approved Python. The agent must accept `POST /invoke` with `input.question` and
-return `output.answer`, `thread_id`, and `request_id`.
+Start the agent and its MCP services in their own Command Prompt windows (or Bash
+terminals) using the same approved Python. The agent must accept `POST /invoke` with
+`input.question` and return `output.answer`, `thread_id`, and `request_id`.
 
 For [rmprep](../../examples/rmprep/README.md), run `setup-local.bat`
-and configure its service `.env` first. These direct commands do not load the
-root `.env` used by `start-local.bat`.
+(`./setup-local.sh` on POSIX) and configure its service `.env` first. These direct
+commands do not load the root `.env` used by `start-local.bat` (`./start-local.sh`).
 In a fresh Command Prompt at the repository root, start the MCP service with
 your approved Python:
 
@@ -65,10 +80,22 @@ your approved Python:
 python tools\package_runtime.py agent -m rmprep_data
 ```
 
+Or on POSIX:
+
+```bash
+python3 tools/package_runtime.py agent -m rmprep_data
+```
+
 In another Command Prompt at the repository root, start the HTTP agent:
 
 ```bat
 python tools\package_runtime.py agent -m rmprep.service --host 127.0.0.1 --port 8000
+```
+
+Or on POSIX:
+
+```bash
+python3 tools/package_runtime.py agent -m rmprep.service --host 127.0.0.1 --port 8000
 ```
 
 The checked-in `rmprep` entry in `examples\rmprep\registry\agents.yaml` includes
@@ -92,9 +119,16 @@ python tools\package_runtime.py ui -m ai_agent_lib_ui init --env-file examples\r
 python tools\package_runtime.py ui -m ai_agent_lib_ui check
 ```
 
-`init` reads `EAP_REGISTRY_OPTIONS` and `EAP_IDENTITY_OPTIONS` from that agent's
+Or on POSIX:
+
+```bash
+python3 tools/package_runtime.py ui -m ai_agent_lib_ui init --env-file examples/rmprep/agents/rmprep/.env --agent rmprep --artifacts-agent rmprep --allow-url http://127.0.0.1:8000
+python3 tools/package_runtime.py ui -m ai_agent_lib_ui check
+```
+
+`init` reads `AC2_REGISTRY_OPTIONS` and `AC2_IDENTITY_OPTIONS` from that agent's
 `.env`. Relative registry paths resolve from the file's directory. Local setup
-uses `EAP_PROFILE=local`, the `file` registry and `static` identity providers. Model API
+uses `AC2_PROFILE=local`, the `file` registry and `static` identity providers. Model API
 keys and shell overrides are not imported. Confirm the file matches the running
 service's settings.
 
@@ -119,6 +153,13 @@ type .agentlib\ui\access-code
 python tools\package_runtime.py ui -m ai_agent_lib_ui serve
 ```
 
+Or on POSIX:
+
+```bash
+cat .agentlib/ui/access-code
+python3 tools/package_runtime.py ui -m ai_agent_lib_ui serve
+```
+
 Copy the displayed code and open [the local UI](http://127.0.0.1:8765). Enter the
 code to sign in. Use the exact `127.0.0.1` address. Keep the server window open.
 
@@ -136,6 +177,16 @@ code to sign in. Use the exact `127.0.0.1` address. Keep the server window open.
    history** provides rename, search, archive and restore.
 6. Stop with **Ctrl+C**, run `serve` again, and reopen your conversation. The
    completed messages and selected agent remain.
+
+**Rate an answer.** Thumbs up and thumbs down appear beneath each accepted
+answer. A click, with an optional comment, appends one `agentlib.feedback/v1` line
+to `feedback.jsonl` in the UI state folder, beside `conversations.sqlite`. The line
+records the request, thread, agent, who rated it and the verdict (`up` or `down`).
+Feedback is evidence, so the log is append-only: Agent Lab refuses to delete a
+rating, and a second click on the same answer adds a line rather than editing the
+first. Only accepted answers can be rated. The file holds your comments; keep it
+private, like the conversation database. [Online evals from saved
+chats](#online-evals-from-saved-chats) joins these verdicts to conversations.
 
 A conversation keeps its original agent. Start a new conversation to change
 agents. **Choose agent** also lists MCP services referenced by your selected agents;
@@ -171,9 +222,11 @@ Each response shows input tokens, output tokens, elapsed time, the cache-hit
 ratio, and cache read/write counts when reported. These metrics remain visible
 when you reopen a conversation. A warming request can write the cache with 0% hits.
 
-Chat shows the answer, usage, elapsed time and an **Open trace in Agent Lab** (or
-**Open trace in Langfuse**) link when tracing is enabled. The Agent Lab link opens
-the configured Phoenix trace. Comparison tables show values without
+Chat shows the answer, usage, elapsed time and an **Open trace in Agent Lab** link
+when tracing is enabled. The link opens the configured Phoenix trace. A trace link
+the UI cannot validate, such as a link from a retired tracing provider in an older
+agent or saved conversation, is dropped; the answer and metrics are unaffected.
+Comparison tables show values without
 repeating long references in each cell. Full source references remain in the saved
 answer and memo documents for review. Model/tool details are available through
 the trace link and Logs page.
@@ -181,7 +234,7 @@ the trace link and Logs page.
 Use the per-response trace link to inspect model input/output, MCP tool arguments
 and results, timing, usage and checkpoint references. Enable content capture for
 approved test data to see messages and tool results. See the
-[Phoenix setup](../../docs/phoenix-trial.md) or [Langfuse setup](../../docs/langfuse.md).
+[Phoenix setup](../../docs/phoenix-trial.md).
 Agent Lab uses a transparent grey logo in light mode and a soft white logo in dark
 mode so the artwork stays in the background.
 
@@ -190,9 +243,10 @@ file-based diagnostics and saved checkpoint state. They load only when opened;
 inspection never reruns the agent or calls an MCP tool.
 
 The local rmprep service supplies the diagnostic reader. Set
-`EAP_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl` in the agent's `.env`, then
+`AC2_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl` in the agent's `.env`, then
 restart the agent to capture model exchanges for new turns. For the batch stack,
-run `stop-local.bat`, then `start-local.bat`.
+run `stop-local.bat`, then `start-local.bat` (`./stop-local.sh`, then `./start-local.sh`
+on POSIX).
 Tracing captures conversation content; use the same private storage and retention
 rules as the agent's checkpoints. The inspector reads the agent's configured trace
 file, so retain that file to inspect earlier turns. Capture is not retroactive.
@@ -241,7 +295,7 @@ agent logs to fix the artifact before requesting another memo.
 
 ## Live responses and metrics
 
-Restart the agent and UI after updating this checkout. The batch launcher and new
+Restart the agent and UI after updating this checkout. The launcher and new
 CLI-generated agents enable live responses automatically. For an existing agent,
 add `live_updates=True` to its `agent_app(...)` call in `service.py`.
 
@@ -301,6 +355,21 @@ One process may own a state
 folder at a time. This admission guard does not coordinate direct agent API callers
 or a different UI state folder.
 
+## Online evals from saved chats
+
+Saved conversations and viewer feedback can become an eval set without calling any
+agent. `export_interactions`, in `ai_agent_lib_ui.adapters.interactions`, writes
+every completed exchange the identity owns, active and archived conversations
+alike, as `agentlib.interaction/v1` JSONL. Given `feedback.jsonl`, each exchange
+carries its latest verdict, matched by request ID. It reads only the UI's existing
+state, so run it after real traffic has been saved.
+
+It is a Python entry point, not yet a command. The export holds conversation
+content, so write it under the UI state folder with the rest of the private state.
+The worked script is in [online evals: capture](../../docs/evals.md#4-online-capture);
+sampling and scoring the export follow in
+[online evals: scoring](../../docs/evals.md#5-online-scoring).
+
 ## Configuration and common fixes
 
 Settings live in `.agentlib\ui\config.json`. Paths can be absolute or relative
@@ -338,11 +407,17 @@ Changing identity makes old ownership scopes inaccessible to the new identity.
 | Location | Responsibility |
 | --- | --- |
 | `contracts/` | Values and interfaces for catalog, conversations, artifacts and diagnostics. |
+| `contracts/traces.py` | The private Phoenix `TraceLink`, and `tolerant_trace`, which drops a link that no longer validates instead of failing its answer. |
+| `contracts/feedback.py` | The `FeedbackLog` port that appends a viewer's judgement of an answer. |
 | `application/chat.py` | Admit requests and own their lifecycle independently of the browser. |
 | `application/question_answer.py` | Validate the existing question/answer HTTP format. |
 | `adapters/catalog.py` | Reuse core's public registry parser, authorize selection and check pins. |
 | `adapters/http.py` | Bound request time/response size; disable redirects and automatic retries. |
+| `adapters/events.py` | Parse the bounded server-sent event stream of live drafts and the terminal result. |
 | `adapters/sqlite.py`, `migrations/` | Store threads, admitted turns, accepted answers and sessions. |
+| `adapters/documents.py` | Read the immutable document versions saved with accepted answers. |
+| `adapters/inspection.py` | Fetch bounded turn diagnostics from a registry-approved agent. |
+| `adapters/interactions.py` | `export_interactions`: join saved conversations and feedback into online-eval records. |
 | `config/` | Translate explicit local settings and validate loopback destinations. |
 | `integrations/`, `assets/` | Assemble adapters and connect FastAPI/Chainlit to the application. |
 
@@ -356,6 +431,12 @@ boundary and the data layer in process. The UI never imports an agent graph or
 reads its checkpoint database.
 The catalog uses `ai_agent_lib_core.kit` for the shared parser; contracts and the
 application stay independent of Chainlit and agent framework imports.
+
+CI enforces that independence with import-linter contracts in `pyproject.toml`:
+`contracts` imports nothing else from the package, `application` imports no
+adapters, integrations, Chainlit, FastAPI or Starlette, and only `integrations`
+imports Chainlit. After changing imports, run `lint-imports` from this directory
+(the `dev` extra installs it).
 
 Agent profiles share the same chat appearance and shell settings. The pinned
 Chainlit release needs a small session-configuration adapter to read those
@@ -378,6 +459,20 @@ python ..\..\tools\package_runtime.py ui -m ruff format --check .
 python ..\..\tools\package_runtime.py ui --check
 python -m pip wheel --no-deps --wheel-dir dist .
 cd ..\..
+```
+
+Or on POSIX:
+
+```bash
+python3 tools/package_runtime.py ui --install -e packages/ai-agent-lib-core -e "packages/ai-agent-lib-ui[chat,dev]"
+cd packages/ai-agent-lib-ui
+python3 ../../tools/package_runtime.py ui -m pytest
+python3 ../../tools/package_runtime.py ui -m mypy
+python3 ../../tools/package_runtime.py ui -m ruff check .
+python3 ../../tools/package_runtime.py ui -m ruff format --check .
+python3 ../../tools/package_runtime.py ui --check
+python3 -m pip wheel --no-deps --wheel-dir dist .
+cd ../..
 ```
 
 Tests use synthetic local agents. They cover real Socket.IO chat, same-thread
@@ -409,10 +504,12 @@ preview does not imply approval for shared production hosting.
 ## Local Phoenix tracing
 
 The [Phoenix trial](../../docs/phoenix-trial.md) uses the same Python, a separate package folder, and SQLite.
-Run `start-phoenix.bat setup` once from the library repository root, then follow
-the guide to enable Phoenix in the root `.env`. `start-local.bat` starts the local
-Phoenix server before rmprep and Agent Lab, using `.agentlib\phoenix\.venv\Lib\site-packages`.
-`stop-local.bat` in another Command Prompt stops the stack and keeps saved
+Run `start-phoenix.bat setup` (`./start-phoenix.sh setup` on POSIX) once from the
+library repository root, then follow the guide to enable Phoenix in the root `.env`.
+`start-local.bat` (`./start-local.sh`) starts the local Phoenix server before rmprep
+and Agent Lab, using `.agentlib\phoenix\.venv\Lib\site-packages`
+(`.agentlib/phoenix/.venv/lib/python3.x/site-packages` on POSIX).
+`stop-local.bat` (`./stop-local.sh`) in another terminal stops the stack and keeps saved
 conversations, traces, and checkpoints. **Ctrl+C** in the launcher window also works.
 Each response links to its Phoenix trace using **Open trace in Agent Lab**.
 The **Logs** page provides local diagnostic inspection.

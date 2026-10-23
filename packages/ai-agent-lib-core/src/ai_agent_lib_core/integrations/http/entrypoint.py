@@ -4,11 +4,8 @@ Every agent and MCP server starts the same way: load the configuration, set
 up logging, start telemetry, run a coroutine, stop telemetry, and explain a
 failure as an exit code. :func:`run_service` does that for a process that
 serves until the platform stops it, :func:`run_command` for a one-shot command
-that prints an answer. Part B's AgentCore entry point plugs in here too: it is
-another ``serve`` coroutine handed to :func:`run_service`.
-
-:func:`question_input` is the input check an agent's ``/invoke`` body goes
-through before the graph runs.
+that prints an answer. An agent composed as an ``AgentService`` goes through
+``run_agent`` instead, which is this wiring plus the agent's HTTP application.
 """
 
 from __future__ import annotations
@@ -19,8 +16,12 @@ from collections.abc import Callable, Coroutine
 from pathlib import Path
 from typing import Any
 
-from ai_agent_lib_core.config import load_service_config
-from ai_agent_lib_core.contracts import ServiceConfig, ValidationFailed
+from ai_agent_lib_core.config import (
+    load_service_config,
+    log_resolution_warnings,
+    service_resolver,
+)
+from ai_agent_lib_core.contracts import ServiceConfig
 from ai_agent_lib_core.observability import (
     configure_logging,
     report_error,
@@ -28,7 +29,7 @@ from ai_agent_lib_core.observability import (
     start_telemetry,
 )
 
-__all__ = ["EXIT_INTERRUPTED", "question_input", "run_command", "run_service"]
+__all__ = ["EXIT_INTERRUPTED", "run_command", "run_service"]
 
 EXIT_INTERRUPTED = 130
 """The exit code of a process stopped by an interrupt, as the shell reports it."""
@@ -47,7 +48,10 @@ def run_service(
     Logging is set up before anything else, so that nothing else sets up
     logging first: one line of JSON per event on standard output, and on a
     developer's machine a line about an error also says what the error said.
-    Traces and metrics go to the collector when the settings turn them on, and
+    A deprecated variable spelling the configuration was read from is told
+    once in the log, after logging is set up, so that the people who run the
+    service see it where they look. Traces and metrics go to the collector
+    when the settings turn them on, and
     the last spans and metrics are flushed when ``serve`` returns, however it
     returns.
 
@@ -67,8 +71,12 @@ def run_service(
     """
     config: ServiceConfig | None = None
     try:
-        config = load_service_config(env_file)
+        # explain() rather than resolve(): the same configuration, plus the deprecation
+        # warnings, which the service's log shows once logging is set up.
+        resolution = service_resolver(env_file).explain()
+        config = resolution.config
         configure_logging(application, details=shows_details(config))
+        log_resolution_warnings(resolution)
         stop_telemetry = start_telemetry(application, config)
         try:
             asyncio.run(serve(config))
@@ -116,24 +124,3 @@ def run_command(
     if answer is not None:
         sys.stdout.write(answer + "\n")
     return 0
-
-
-def question_input(given: Any, *, example: str = "Say hello to Ada.") -> str:
-    """Return the question in a request body, or refuse the body.
-
-    Args:
-        given: The decoded request body.
-        example: A question shown in the explanation of a refused body.
-
-    Raises:
-        ValidationFailed: If ``given`` is not an object with a non-empty
-            ``"question"`` string.
-    """
-    question = given.get("question") if isinstance(given, dict) else None
-    if not isinstance(question, str) or not question.strip():
-        raise ValidationFailed(
-            "the input is not a question",
-            expected=f'an object such as {{"question": "{example}"}}',
-            actual="no non-empty 'question' in it",
-        )
-    return question

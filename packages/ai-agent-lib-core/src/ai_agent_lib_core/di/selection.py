@@ -38,13 +38,19 @@ AdapterKey = tuple[str, str, str]
 def selected_adapters(config: ServiceConfig) -> list[AdapterKey]:
     """Return the adapters the configuration selects, in legacy order.
 
-    Dependency ordering happens afterwards; this is what is wanted, not the
-    order in which it is built.
+    Legacy order is the order that predates declared dependencies: one adapter
+    per ``Section``, in the order the ``Section`` enum lists them, then each
+    selected model provider, then each data-source instance. Dependency
+    ordering happens afterwards (``build_order`` keeps this order, only pulling
+    a declared dependency ahead of the adapter that needs it); this is what is
+    wanted, not the order in which it is built.
     """
     selected: list[AdapterKey] = [
         (section.value, config.section(section).provider, "") for section in Section
     ]
-    # The same choice the permission plan makes: no model configured, no provider.
+    # Model providers come from ``di/access.selected_models``, which the access
+    # planner also uses, so the container builds the providers the plan grants
+    # access to. A service with no model configured gets no model provider.
     selected.extend((MODEL_PORT, name, "") for name in selected_models(config))
     selected.extend(
         (DATA_PORT, selection.provider, source) for source, selection in config.data_sources.items()

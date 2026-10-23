@@ -4,7 +4,7 @@
 
 [tool.uv.workspace]
 members = ["packages/*", "examples/*"]
-exclude = ["examples/rmprep", "packages/ai-agent-lib-ui"] # Separately managed environments.
+exclude = ["examples/rmprep", "examples/rmqna", "packages/ai-agent-lib-ui"] # Separately managed environments.
 
 [dependency-groups]
 dev = [
@@ -33,6 +33,8 @@ dev = [
 line-length = 100
 target-version = "py311"
 src = ["packages/*/src", "examples/*/src"]
+# Plan documents quote Python fragments that are not standalone files.
+exclude = ["docs/superpowers"]
 
 [tool.ruff.lint]
 select = [
@@ -114,6 +116,8 @@ mypy_path = [
     "$MYPY_CONFIG_FILE_DIR/examples/accounts-mcp/tests",
     "$MYPY_CONFIG_FILE_DIR/examples/rmprep/agents/rmprep/src",
     "$MYPY_CONFIG_FILE_DIR/examples/rmprep/mcp-servers/rmprep-data/src",
+    "$MYPY_CONFIG_FILE_DIR/examples/rmqna/agents/rmqna/src",
+    "$MYPY_CONFIG_FILE_DIR/examples/rmqna/mcp-servers/rmqna-data/src",
     "$MYPY_CONFIG_FILE_DIR/tests",
     "$MYPY_CONFIG_FILE_DIR/docs/guide",
 ]
@@ -131,6 +135,9 @@ files = [
     "examples/rmprep/agents",
     "examples/rmprep/mcp-servers",
     "examples/rmprep/tests",
+    "examples/rmqna/agents",
+    "examples/rmqna/mcp-servers",
+    "examples/rmqna/tests",
     "tests",
     "docs/guide",
     "tools",
@@ -151,7 +158,8 @@ addopts = [
     "--allow-hosts=127.0.0.1,::1",
     "--allow-unix-socket",
     # Tests that need something outside the process are opt-in: -m integration
-    "-m", "not integration and not container",
+    # An eval runs a real model against a dataset: -m eval
+    "-m", "not integration and not container and not eval",
 ]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
@@ -165,6 +173,7 @@ markers = [
     "container: needs a container runtime",
     "integration: needs something outside the process, such as an opa binary or an AWS account",
     "slow: spawns other processes or depends on the real clock; deselect with -m 'not slow'",
+    "eval: runs a real model against a dataset; see evals/ in each agent",
 ]
 
 # ------------------------------------------------------------------ import-linter

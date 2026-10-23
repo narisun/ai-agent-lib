@@ -7,6 +7,11 @@ It runs only when asked, and only with a real model set in the service's .env:
 
 The report is written to .agentlib/eval-report.json. Keep it with the change
 that produced it, and raise the bar as the agent gets better.
+
+When evals/baseline.json exists — written by `agentlib eval {{ name }} --accept` —
+the run also fails on regressions against it. `agentlib eval {{ name }} --accept`
+leaves a marker beside the report for this run only, so it skips just that
+gate to move the bar on purpose.
 """
 
 from __future__ import annotations
@@ -15,7 +20,15 @@ from pathlib import Path
 
 import pytest
 from ai_agent_lib_core import ServiceContainer
-from ai_agent_lib_core.evaluation import EvalCase, load_cases, run_eval, scored_by
+from ai_agent_lib_core.evaluation import (
+    EvalCase,
+    dataset_digest,
+    load_cases,
+    load_report,
+    require_no_regression,
+    run_eval,
+    scored_by,
+)
 from ai_agent_lib_core.testing import load_eval_config
 
 from {{ package }} import APPLICATION, answer, build_graph
@@ -23,6 +36,8 @@ from {{ package }} import APPLICATION, answer, build_graph
 SERVICE = Path(__file__).resolve().parents[1]
 CASES = SERVICE / "evals" / "cases.jsonl"
 REPORT = SERVICE / ".agentlib" / "eval-report.json"
+BASELINE = SERVICE / "evals" / "baseline.json"
+ACCEPT_MARKER = SERVICE / ".agentlib" / "eval-accept.flag"
 
 
 def mentions(case: EvalCase, output: str) -> bool:
@@ -48,8 +63,22 @@ async def test_{{ package }}_meets_its_bar(tmp_path: Path) -> None:
             )
             return await answer(graph, services, context, str(case.input["question"]))
 
-        report = await run_eval(ask, load_cases(CASES), [scored_by("mentions", mentions)])
+        report = await run_eval(
+            ask,
+            load_cases(CASES),
+            [scored_by("mentions", mentions)],
+            case_timeout=120.0,
+            metadata={
+                "application": APPLICATION,
+                "model": f"{config.model.provider}:{config.model.model_id or ''}",
+                "dataset": dataset_digest(CASES),
+            },
+        )
     REPORT.parent.mkdir(parents=True, exist_ok=True)
     REPORT.write_text(report.to_json(), encoding="utf-8")
     print("\n".join(report.summary()))
+    if BASELINE.exists() and not ACCEPT_MARKER.exists():
+        # A passing run may still be worse than the last accepted one. agentlib
+        # eval --accept leaves ACCEPT_MARKER to move the bar on purpose.
+        require_no_regression(report, load_report(BASELINE), tolerance=0.05)
     report.require({"mentions": 0.8})

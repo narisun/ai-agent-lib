@@ -1,0 +1,117 @@
+# Sample requests for the rules in policies/agentlib/rules/data.yaml.
+# Each says who asks for what, and what the answer should be.
+#
+#   agentlib policy test          decide them with the rules, as the services do locally
+#   agentlib policy test --opa    also with OPA, as deployed services do; the two must agree
+#
+# This file is yours. agentlib appends samples for a new service and never
+# changes or removes one that is here.
+schema: agentlib.policy-samples/v1
+samples:
+  - name: an analyst runs SQL at rmqna-data
+    action: tool.call
+    application: rmqna-data
+    resource: "rmqna-data/rmqna-data.execute_sql"
+    classification: confidential
+    roles: [analyst]
+    expect: allow
+    reason: rmqna-data-staff-call-the-tools
+
+  - name: a manager looks up values at rmqna-data
+    action: tool.call
+    application: rmqna-data
+    resource: "rmqna-data/rmqna-data.search_column_values"
+    classification: confidential
+    roles: [manager]
+    expect: allow
+    reason: rmqna-data-staff-call-the-tools
+
+  - name: an analyst reads the schema at rmqna-data
+    action: tool.call
+    application: rmqna-data
+    resource: "rmqna-data/rmqna-data.get_schema"
+    classification: internal
+    roles: [analyst]
+    expect: allow
+    reason: rmqna-data-staff-call-the-tools
+
+  - name: anyone else is denied at rmqna-data
+    action: tool.call
+    application: rmqna-data
+    resource: "rmqna-data/rmqna-data.execute_sql"
+    classification: confidential
+    roles: [intern]
+    expect: deny
+    reason: no_matching_rule
+
+  - name: a caller with no role is denied at rmqna-data
+    action: tool.call
+    application: rmqna-data
+    resource: "rmqna-data/rmqna-data.execute_sql"
+    classification: confidential
+    roles: []
+    expect: deny
+    reason: no_matching_rule
+
+  - name: rmqna-data allows only tools that live under its own name
+    action: tool.call
+    application: rmqna-data
+    resource: "other-server/rmqna-data.execute_sql"
+    classification: confidential
+    roles: [analyst]
+    expect: deny
+    reason: no_matching_rule
+
+  - name: rmqna uses its default model
+    action: model.route
+    application: rmqna
+    resource: default
+    expect: allow
+    reason: rmqna-uses-its-models
+
+  - name: rmqna may not call a tool no rule names
+    action: tool.call
+    application: rmqna
+    resource: delete_everything
+    expect: deny
+    reason: no_matching_rule
+
+  - name: rmqna calls a tool of rmqna-data
+    action: tool.call
+    application: rmqna
+    resource: "rmqna-data/rmqna-data.execute_sql"
+    classification: confidential
+    expect: allow
+    reason: rmqna-calls-rmqna-data
+
+  - name: rmqna looks up values at rmqna-data
+    action: tool.call
+    application: rmqna
+    resource: "rmqna-data/rmqna-data.search_column_values"
+    classification: confidential
+    expect: allow
+    reason: rmqna-calls-rmqna-data
+
+  - name: rmqna reads the schema at rmqna-data
+    action: tool.call
+    application: rmqna
+    resource: "rmqna-data/rmqna-data.get_schema"
+    classification: internal
+    expect: allow
+    reason: rmqna-calls-rmqna-data
+
+  - name: rmqna may not call a tool of another server
+    action: tool.call
+    application: rmqna
+    resource: "other-server/rmqna-data.execute_sql"
+    classification: confidential
+    expect: deny
+    reason: no_matching_rule
+
+  - name: rmqna may not see restricted data through rmqna-data
+    action: tool.call
+    application: rmqna
+    resource: "rmqna-data/rmqna-data.execute_sql"
+    classification: restricted
+    expect: deny
+    reason: no_matching_rule

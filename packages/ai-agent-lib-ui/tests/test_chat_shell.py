@@ -17,8 +17,8 @@ from ai_agent_lib_ui.config.settings import LocalIdentity, Settings, agent_envir
 def test_env_translation_is_explicit_and_does_not_export_model_keys(tmp_path: Path) -> None:
     env = tmp_path / ".env"
     env.write_text(
-        'EAP_REGISTRY_OPTIONS={"agents_path":"../agents.yaml","tools_path":"tools.yaml"}\n'
-        'EAP_IDENTITY_OPTIONS={"subject":"ada","tenant":"bank","roles":["analyst"]}\n'
+        'AC2_REGISTRY_OPTIONS={"agents_path":"../agents.yaml","tools_path":"tools.yaml"}\n'
+        'AC2_IDENTITY_OPTIONS={"subject":"ada","tenant":"bank","roles":["analyst"]}\n'
         "ANTHROPIC_API_KEY=not-a-real-key\n",
         encoding="utf-8",
     )
@@ -26,13 +26,13 @@ def test_env_translation_is_explicit_and_does_not_export_model_keys(tmp_path: Pa
     assert agents == (tmp_path.parent / "agents.yaml").resolve()
     assert tools == tmp_path / "tools.yaml"
     assert identity.subject == "ada"
-    env.write_text("EAP_IDENTITY_PROVIDER=jwt\n")
+    env.write_text("AC2_IDENTITY_PROVIDER=jwt\n")
     with pytest.raises(ValueError, match="static"):
         agent_environment(env)
-    env.write_text('EAP_IDENTITY_OPTIONS={"audience":"memo","token_ttl_seconds":600}\n')
+    env.write_text('AC2_IDENTITY_OPTIONS={"audience":"memo","token_ttl_seconds":600}\n')
     _, _, defaults = agent_environment(env)
     assert defaults == LocalIdentity(subject="dev-user", tenant="dev-tenant", roles=())
-    env.write_text("EAP_PROFILE=aws\n")
+    env.write_text("AC2_PROFILE=aws\n")
     with pytest.raises(ValueError, match="local"):
         agent_environment(env)
 

@@ -1,0 +1,14 @@
+# The agent registry: which agents exist and which MCP servers each may call.
+# agentlib rewrites this file when it adds, links or pins a service; comments are not kept.
+schema: agentlib.registry/v1
+agents:
+- id: rmqna
+  owner: commercial-banking
+  version: 0.1.0
+  description: Answers relationship-manager questions by writing and running read-only SQL over the client data.
+  mcp_servers:
+  - rmqna-data
+  model_aliases:
+  - default
+  classification_ceiling: confidential
+  status: active

@@ -270,8 +270,9 @@ class ProviderSpec:
         extra: The optional extra of its distribution that it needs installed,
             such as ``"bedrock"`` for ``ai-agent-lib-aws[bedrock]``.
         dependencies: Singleton ports to build first and allow through ``get``.
-            ``()`` declares none; ``None`` preserves legacy ordering and access
-            to any already-built singleton.
+            ``()`` declares none; ``None`` keeps the legacy build order (defined
+            in ``ServiceContainer._selected``) and access to any already-built
+            singleton.
         contract: Optional typed descriptor used to check a factory's result.
     """
 
@@ -383,7 +384,8 @@ class ServiceProviders:
             extra: The optional extra of its distribution that it needs.
             replace: Allow overwriting an existing registration.
             dependencies: Singleton ports needed by this factory, built first.
-                ``None`` preserves legacy section ordering and access to any
+                ``None`` keeps the legacy build order (defined in
+                ``ServiceContainer._selected``) and access to any
                 already-built singleton.
                 An explicit empty iterable declares no dependencies.
 

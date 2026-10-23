@@ -195,7 +195,7 @@ For a direct Python invocation, wrap the complete agent run with
 `async with diagnostics.operation(context)`. Do not also wrap a run already
 covered by `agent_app`, and await all model work before returning.
 
-Metadata capture is independent of `EAP_MODEL_TRACE_PATH`. Its default is off
+Metadata capture is independent of `AC2_MODEL_TRACE_PATH`. Its default is off
 unless a recorder is injected. It stores no prompts, responses, tool arguments,
 provider exception text or credentials. The existing `agentlib.model-trace/v1`
 records and audit format remain unchanged. When both captures are enabled, they

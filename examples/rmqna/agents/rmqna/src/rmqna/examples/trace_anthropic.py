@@ -1,0 +1,127 @@
+"""Ask Anthropic two questions on one thread and inspect model and checkpoint data."""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+from collections.abc import Sequence
+from dataclasses import replace
+from typing import Any
+from uuid import uuid4
+
+from ai_agent_lib_core import ConfigurationError, ServiceConfig, ServiceContainer
+from ai_agent_lib_core.config import load_service_config
+from ai_agent_lib_core.di import ServiceProviders
+from ai_agent_lib_core.observability import report_error
+from ai_agent_lib_core.pipeline import bind_request_context
+
+from rmqna.graph import APPLICATION, answer, build_graph
+from rmqna.settings import ENV_FILE
+
+SERVICE = ENV_FILE.parent
+QUESTIONS = (
+    "Which tables describe a client's credit facilities?",
+    "Which of those holds covenant tests? Use our conversation so far.",
+)
+
+
+async def run_two_turns(
+    config: ServiceConfig,
+    thread_id: str,
+    *,
+    providers: ServiceProviders | None = None,
+) -> list[dict[str, Any]]:
+    """Run the graph and return a checkpoint snapshot after each question.
+
+    Runtime providers come from configuration. Tests inject a scripted model
+    while keeping the local identity, policy checks, and SQLite checkpoints.
+    """
+    history: list[dict[str, Any]] = []
+    async with ServiceContainer(config, providers) as services:
+        await services.validate()
+        # This walkthrough builds the graph without MCP tools, so the model answers from the
+        # schema document in its prompt alone. MCP discovery belongs to the normal agent entry
+        # points, documented in the agent's README; trace_react runs the tool loop.
+        graph = build_graph(services)
+        for turn, question in enumerate(QUESTIONS, start=1):
+            # Authenticate each request separately: same conversation, fresh request ID.
+            context = await services.authenticate(
+                None, application=APPLICATION, thread_id=thread_id
+            )
+            print(f"\nTurn {turn} (request {context.request_id})")
+            print(f"Question: {question}")
+            reply = await answer(graph, services, context, question)
+            # JSON escaping keeps any model language readable in Command Prompt.
+            print(f"Answer: {json.dumps(reply, ensure_ascii=True)}")
+            with bind_request_context(context):
+                snapshot = await graph.aget_state(services.invocation(context)["config"])
+            messages = [message.model_dump(mode="json") for message in snapshot.values["messages"]]
+            history.append(
+                {
+                    "turn": turn,
+                    "request_id": context.request_id,
+                    "thread_id": thread_id,
+                    "question": question,
+                    "answer": reply,
+                    "messages": messages,
+                }
+            )
+            print(f"Checkpoint after turn {turn}: {len(messages)} messages")
+            print(json.dumps(messages, indent=2, ensure_ascii=True))
+    return history
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Load Anthropic settings, enable tracing for this run, and show saved output."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--thread", help="continue this thread; defaults to a fresh conversation")
+    args = parser.parse_args(argv)
+    if args.thread is not None and not args.thread.strip():
+        parser.error("--thread must not be empty")
+    run_id = uuid4().hex
+    thread_id = args.thread or f"anthropic-demo-{run_id}"
+    folder = SERVICE / ".agentlib" / "anthropic-demo" / run_id
+    trace_path = folder / "model-trace.jsonl"
+    history_path = folder / "checkpoint-history.json"
+    try:
+        config = load_service_config(ENV_FILE)
+        try:
+            model = config.model.resolve("default")
+        except ConfigurationError as error:
+            raise ConfigurationError(
+                "configure the Anthropic model before running this example",
+                fix="set AC2_MODEL_PROVIDER=anthropic and AC2_MODEL_ID in agents/rmqna/.env",
+            ) from error
+        if model.provider != "anthropic":
+            raise ConfigurationError(
+                "this example requires Anthropic for the default model alias",
+                fix="set AC2_MODEL_PROVIDER=anthropic; check AC2_MODEL_ALIASES for a default override",
+            )
+        # Always use a fresh file, even when continuing an existing checkpoint thread.
+        config = replace(config, model_trace_path=trace_path)
+        print(f"Model: {model.model_id}")
+        print(f"Thread: {thread_id}")
+        print(f"Trace file: {trace_path}")
+        print(f"Checkpoint history file: {history_path}")
+        history = asyncio.run(run_two_turns(config, thread_id))
+        folder.mkdir(parents=True, exist_ok=True)
+        history_path.write_text(
+            json.dumps(history, indent=2, ensure_ascii=True) + "\n", encoding="utf-8"
+        )
+        if not trace_path.is_file():
+            raise ConfigurationError(
+                "the questions completed, but the model trace was not written",
+                fix="check write permissions and the model_trace.disabled warning, then rerun",
+            )
+        print("\nModel trace (each request and response from this run):")
+        with trace_path.open(encoding="utf-8") as trace:
+            for line in trace:
+                print(json.dumps(json.loads(line), indent=2, ensure_ascii=True))
+    except Exception as error:
+        return report_error("trace-anthropic", error, details=False)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

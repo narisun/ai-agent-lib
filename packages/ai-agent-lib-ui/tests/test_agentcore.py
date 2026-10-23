@@ -438,16 +438,16 @@ async def test_event_stream_through_the_runtime_correlates_on_the_session_id() -
 
 async def test_an_envelope_trace_link_is_kept_over_the_console_link() -> None:
     trace = {
-        "provider": "langfuse",
+        "provider": "phoenix",
         "trace_id": "1234567890abcdef1234567890abcdef",
-        "url": "https://traces.example/project/trial/traces/1234567890abcdef1234567890abcdef",
+        "url": "https://traces.example/redirects/traces/1234567890abcdef1234567890abcdef",
     }
     body = envelope(LONG_THREAD)
     body["output"]["trace"] = trace
     recorder = Recorder(httpx.Response(200, json=body))
     result = await dispatch(recorder)
     assert result.trace is not None
-    assert result.trace.provider == "langfuse"
+    assert result.trace.provider == "phoenix"
 
 
 async def test_outcome_is_not_reconciled_through_the_runtime(
@@ -518,7 +518,7 @@ def test_other_providers_keep_their_trace_id_and_route_rules() -> None:
         )
     with pytest.raises(ValidationError):
         TraceLink(
-            provider="langfuse",
+            provider="phoenix",
             trace_id="1234567890abcdef1234567890abcdef",
             url="https://eu-west-1.console.aws.amazon.com/cloudwatch/home?region=eu-west-1#gen-ai-observability",
         )
@@ -542,7 +542,7 @@ def test_init_pins_a_runtime_agent_that_settings_read_and_check_accept(tmp_path:
     )
     (tmp_path / "tools.json").write_text('{"schema":"agentlib.registry/v1","servers":[]}')
     (tmp_path / "agent.env").write_text(
-        'EAP_REGISTRY_OPTIONS={"agents_path":"agents.json","tools_path":"tools.json"}\n'
+        'AC2_REGISTRY_OPTIONS={"agents_path":"agents.json","tools_path":"tools.json"}\n'
     )
     token = tmp_path / "token"
     token.write_text("secret-token\n")

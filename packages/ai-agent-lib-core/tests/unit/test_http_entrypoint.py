@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -12,7 +13,6 @@ from ai_agent_lib_core.contracts import ConfigurationError, ServiceConfig, Valid
 from ai_agent_lib_core.integrations.http import (
     EXIT_INTERRUPTED,
     entrypoint,
-    question_input,
     run_command,
     run_service,
 )
@@ -24,10 +24,22 @@ class Recorder:
     def __init__(self, config: ServiceConfig | None = None) -> None:
         self.config = config if config is not None else ServiceConfig.for_testing()
         self.calls: list[tuple[str, Any]] = []
+        self.warnings: tuple[str, ...] = ()
 
     def load_service_config(self, env_file: Path | None) -> ServiceConfig:
         self.calls.append(("load", env_file))
         return self.config
+
+    def service_resolver(self, env_file: Path | None) -> Any:
+        """A service explains its configuration: the same load, with the warnings."""
+        recorder = self
+
+        class Resolver:
+            def explain(self) -> Any:
+                config = recorder.load_service_config(env_file)
+                return SimpleNamespace(config=config, warnings=recorder.warnings)
+
+        return Resolver()
 
     def configure_logging(self, service: str, **options: Any) -> logging.Handler:
         self.calls.append(("logging", (service, options)))
@@ -43,6 +55,7 @@ class Recorder:
 
     def install(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(entrypoint, "load_service_config", self.load_service_config)
+        monkeypatch.setattr(entrypoint, "service_resolver", self.service_resolver)
         monkeypatch.setattr(entrypoint, "configure_logging", self.configure_logging)
         monkeypatch.setattr(entrypoint, "start_telemetry", self.start_telemetry)
 
@@ -99,6 +112,27 @@ def test_telemetry_is_stopped_and_a_library_error_is_explained_when_serving_fail
     assert "Traceback" not in err
 
 
+def test_a_deprecated_spelling_is_told_once_logging_is_set_up(
+    recorder: Recorder, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The warning goes to the log, after logging is set up and before telemetry."""
+    recorder.warnings = ("EAP_X is deprecated; use AC2_X instead",)
+    told: list[str] = []
+
+    def log_warnings(resolution: Any) -> None:
+        told.extend(resolution.warnings)
+        recorder.calls.append(("warnings", tuple(resolution.warnings)))
+
+    monkeypatch.setattr(entrypoint, "log_resolution_warnings", log_warnings)
+
+    async def serve(config: ServiceConfig) -> None:
+        pass
+
+    assert run_service("accounts-agent", serve) == 0
+    assert told == ["EAP_X is deprecated; use AC2_X instead"]
+    assert recorder.steps == ["load", "logging", "warnings", "telemetry", "stop"]
+
+
 def test_the_program_name_defaults_to_the_application(
     recorder: Recorder, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -128,10 +162,10 @@ def test_a_configuration_that_does_not_load_is_reported_with_details_on(
     recorder = Recorder()
     recorder.install(monkeypatch)
 
-    def failing_load(env_file: Path | None) -> ServiceConfig:
+    def failing_resolver(env_file: Path | None) -> Any:
         raise RuntimeError("the .env file is not UTF-8")
 
-    monkeypatch.setattr(entrypoint, "load_service_config", failing_load)
+    monkeypatch.setattr(entrypoint, "service_resolver", failing_resolver)
 
     async def serve(config: ServiceConfig) -> None:
         raise AssertionError("never reached")
@@ -195,30 +229,3 @@ def test_an_interrupted_command_exits_130(
 
     assert run_command("hello-agent", run) == EXIT_INTERRUPTED
     assert capsys.readouterr() == ("", "")
-
-
-# --------------------------------------------------------------- question_input
-
-
-def test_a_question_is_taken_from_the_request_body() -> None:
-    assert question_input({"question": "x"}) == "x"
-    assert question_input({"question": "  spaced  ", "extra": 1}) == "  spaced  "
-
-
-EMPTY = [None, {}, {"question": ""}, {"question": "   "}, {"question": 3}]
-
-
-@pytest.mark.parametrize("given", EMPTY)
-def test_a_body_without_a_question_is_refused(given: Any) -> None:
-    with pytest.raises(ValidationFailed) as caught:
-        question_input(given)
-    error = caught.value
-    assert error.message == "the input is not a question"
-    assert error.expected == 'an object such as {"question": "Say hello to Ada."}'
-    assert error.actual == "no non-empty 'question' in it"
-
-
-def test_the_example_question_in_the_explanation_can_be_changed() -> None:
-    with pytest.raises(ValidationFailed) as caught:
-        question_input({}, example="Which accounts are overdue?")
-    assert caught.value.expected == 'an object such as {"question": "Which accounts are overdue?"}'

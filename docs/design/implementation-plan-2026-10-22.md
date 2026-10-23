@@ -159,7 +159,7 @@ with the reason:
   `identity=agentcore_runtime` rather than JWT, because the agent calls it with
   SigV4 (`auth: sigv4` in the registry); the bearer path to the server is
   untried. The server's data source is Redshift in the plan, since DuckDB over
-  CSV is local-only and the data folder is not in the image. ADR 0004 records
+  CSV is local-only and the data folder is not in the image. ADR 0005 records
   the six decisions as built; the `rules` policy adapter is still local-only,
   so the pilot uses a remote OPA.
 - Agent Lab's `agentcore` binding derives the invocation URL from the ARN
@@ -552,7 +552,7 @@ downloader.
   checkpoints, `ambient` telemetry, no OPA (in-process `rules`). Record the run
   as `docs/agentcore-trial.md` in the style of `docs/phoenix-trial.md`.
 - Developer guide: a new "Deploy to AgentCore" section generated from the target's
-  options table by `docs/guide/build_guide.py`; ADR 0004 recording the choices in
+  options table by `docs/guide/build_guide.py`; ADR 0005 recording the choices in
   "Open decisions" below.
 - `docs/Specification.md` §16 gains "AWS AgentCore deployment" beside Fargate.
 

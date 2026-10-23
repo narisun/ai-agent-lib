@@ -1,0 +1,11 @@
+name,value,unit,as_of,source
+Fed Funds Target (upper),3.69,percent,2026-06-30,"FRED (Board of Governors of the Federal Reserve System, H.15)"
+Prime Rate,6.86,percent,2026-06-30,"FRED (Board of Governors of the Federal Reserve System, H.15)"
+SOFR,3.81,percent,2026-06-30,FRED (Federal Reserve Bank of New York)
+Term SOFR 3M,3.81,pct,2026-06-30,"Derived by this project from FRED SOFR (Federal Reserve Bank of New York) and FRED Treasury Constant Maturity series (Board of Governors of the Federal Reserve System, H.15) â€” see reference/market_rates.yaml"
+Treasury 10Y,4.20,percent,2026-06-30,"FRED (Board of Governors of the Federal Reserve System, H.15)"
+Treasury 1M,3.81,percent,2026-06-30,"FRED (Board of Governors of the Federal Reserve System, H.15)"
+Treasury 1Y,3.58,percent,2026-06-30,"FRED (Board of Governors of the Federal Reserve System, H.15)"
+Treasury 2Y,3.49,percent,2026-06-30,"FRED (Board of Governors of the Federal Reserve System, H.15)"
+Treasury 3M,3.70,percent,2026-06-30,"FRED (Board of Governors of the Federal Reserve System, H.15)"
+Treasury 5Y,3.67,percent,2026-06-30,"FRED (Board of Governors of the Federal Reserve System, H.15)"

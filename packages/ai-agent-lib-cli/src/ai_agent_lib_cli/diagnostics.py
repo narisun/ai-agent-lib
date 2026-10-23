@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import logging
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from warnings import catch_warnings, simplefilter
 
 from ai_agent_lib_cli.errors import CliError
 from ai_agent_lib_cli.names import package_name
@@ -18,10 +21,8 @@ from ai_agent_lib_core.adapters import (
     RulesPolicyOptions,
     UuidGenerator,
 )
-from ai_agent_lib_core.config import DEFAULT_BINDINGS, load_service_config, service_resolver
-from ai_agent_lib_core.config.langfuse import resolve_langfuse_settings
+from ai_agent_lib_core.config import DEFAULT_BINDINGS, service_resolver
 from ai_agent_lib_core.config.phoenix import resolve_phoenix_settings
-from ai_agent_lib_core.config.tracing import TracingResolution, resolve_tracing_settings
 from ai_agent_lib_core.contracts import AgentLibError, CheckResult
 from ai_agent_lib_core.di import diagnose
 from ai_agent_lib_core.observability import redact
@@ -36,6 +37,28 @@ __all__ = [
 
 _ENV = ".env"
 _MAX_VALUE = 120
+_CONFIG_LOGGER = "ai_agent_lib_core.config"
+"""The logger the library tells a deprecated variable on, as a running service's log shows it."""
+
+
+@contextmanager
+def _reported_here() -> Iterator[None]:
+    """Resolve without telling a deprecated spelling twice.
+
+    A report below names each deprecated spelling itself, as a check or a warning
+    line. The resolver's ``DeprecationWarning`` and the Phoenix loader's log line are
+    for a program and for a running service, so neither is raised here as well; this
+    command has no logging set up, and the log line would come out bare on standard error.
+    """
+    logger = logging.getLogger(_CONFIG_LOGGER)
+    level = logger.level
+    logger.setLevel(logging.CRITICAL)
+    try:
+        with catch_warnings():
+            simplefilter("ignore", DeprecationWarning)
+            yield
+    finally:
+        logger.setLevel(level)
 
 
 def service_folder(root: Path, answers: WorkspaceAnswers, name: str) -> Path:
@@ -66,26 +89,19 @@ async def check_service(folder: Path) -> tuple[CheckResult, ...]:
             ),
         )
     try:
-        config = load_service_config(dotenv)
+        with _reported_here():
+            resolution = service_resolver(dotenv).explain()
     except AgentLibError as problem:
         return (CheckResult.failed("settings", problem),)
+    config = resolution.config
+    phoenix_warnings: tuple[str, ...] = ()
     try:
-        langfuse_resolution = resolve_langfuse_settings(dotenv)
-    except AgentLibError as problem:
-        langfuse = CheckResult.failed("langfuse", problem)
-    else:
-        langfuse = CheckResult(
-            "langfuse",
-            ok=True,
-            detail="disabled"
-            if langfuse_resolution.settings is None
-            else "configuration valid (connectivity not checked)",
-        )
-    try:
-        phoenix_resolution = resolve_phoenix_settings(dotenv)
+        with _reported_here():
+            phoenix_resolution = resolve_phoenix_settings(dotenv)
     except AgentLibError as problem:
         phoenix = CheckResult.failed("phoenix", problem)
     else:
+        phoenix_warnings = phoenix_resolution.warnings
         phoenix = CheckResult(
             "phoenix",
             ok=True,
@@ -93,13 +109,18 @@ async def check_service(folder: Path) -> tuple[CheckResult, ...]:
             if phoenix_resolution.settings is None
             else "configuration valid (connectivity not checked)",
         )
-    checks = [CheckResult("settings", ok=True, detail="resolved"), langfuse, phoenix]
-    if langfuse.ok and phoenix.ok:
-        try:
-            TracingResolution(langfuse_resolution, phoenix_resolution).validate()
-        except AgentLibError as problem:
-            checks.append(CheckResult.failed("tracing", problem))
-    return (*checks, *await diagnose(config))
+    return (
+        CheckResult("settings", ok=True, detail="resolved"),
+        *_warnings(resolution.warnings),
+        phoenix,
+        *_warnings(phoenix_warnings),
+        *await diagnose(config),
+    )
+
+
+def _warnings(texts: Sequence[str]) -> tuple[CheckResult, ...]:
+    """Tell each deprecated spelling as a passing check: it still works, so it does not fail."""
+    return tuple(CheckResult("warning", ok=True, detail=text) for text in texts)
 
 
 def _pins(
@@ -200,8 +221,9 @@ def explain_service(folder: Path) -> tuple[Sequence[Setting], Sequence[str]]:
         CliError: If the configuration is not valid.
     """
     try:
-        resolution = service_resolver(folder / _ENV).explain()
-        tracing = resolve_tracing_settings(folder / _ENV)
+        with _reported_here():
+            resolution = service_resolver(folder / _ENV).explain()
+            phoenix = resolve_phoenix_settings(folder / _ENV)
     except AgentLibError as problem:
         raise CliError.from_error(problem) from None
     by_key = {binding.key: binding.name for binding in DEFAULT_BINDINGS}
@@ -225,8 +247,7 @@ def explain_service(folder: Path) -> tuple[Sequence[Setting], Sequence[str]]:
         if key not in by_key
     ]
     settings += [
-        Setting(variable=name, value=redact(value)[:_MAX_VALUE], origin=backend.origins[name])
-        for backend in (tracing.langfuse, tracing.phoenix)
-        for name, value in backend.shown.items()
+        Setting(variable=name, value=redact(value)[:_MAX_VALUE], origin=phoenix.origins[name])
+        for name, value in phoenix.shown.items()
     ]
-    return settings, resolution.warnings
+    return settings, (*resolution.warnings, *phoenix.warnings)

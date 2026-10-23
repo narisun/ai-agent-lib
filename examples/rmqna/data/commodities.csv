@@ -1,0 +1,9 @@
+name,value,unit,as_of,source,qoq_change_pct,note
+Copper,5.40,USD/lb,2026-06-30,IMF Primary Commodity Price System via FRED series PCOPPUSDM,0.22,
+Corn,4.38,USD/bu,2026-06-30,CME Group (CBOT) ZC=F front-month futures via Yahoo Finance chart API,-0.02,
+Diesel,3.60,USD/gal,2026-06-30,EIA monthly retail diesel survey via FRED series GASDESM,0.11,
+Lumber,546.62,USD/1000 board feet,2026-06-30,CME Group LBR=F front-month futures via Yahoo Finance chart API,0.02,
+Natural Gas,4.29,USD/MMBtu,2026-06-30,EIA via FRED series MHHNGSP,0.00,
+Steel HRC,920.64,USD/short ton,2026-06-30,CME Group HRC=F front-month futures via Yahoo Finance chart API; the CME HRC contract settles against CRU's US Midwest hot-rolled coil index,1.15,
+Wheat,5.28,USD/bu,2026-06-30,CME Group (CBOT) ZW=F front-month futures via Yahoo Finance chart API,0.53,
+WTI Crude,57.89,USD/bbl,2026-06-30,EIA via FRED series WTISPLC,0.49,

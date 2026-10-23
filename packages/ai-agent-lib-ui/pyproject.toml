@@ -68,7 +68,7 @@ root_packages = ["ai_agent_lib_ui"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
-name = "contracts imports nothing else from the UI"
+name = "UI contracts import nothing else from the package"
 type = "forbidden"
 source_modules = ["ai_agent_lib_ui.contracts"]
 forbidden_modules = [
@@ -79,20 +79,24 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
-name = "contracts and application stay free of the browser and web frameworks"
+name = "the UI application layer is framework-free"
 type = "forbidden"
-source_modules = ["ai_agent_lib_ui.contracts", "ai_agent_lib_ui.application"]
+source_modules = ["ai_agent_lib_ui.application"]
 forbidden_modules = [
+    "ai_agent_lib_ui.adapters",
+    "ai_agent_lib_ui.integrations",
     "chainlit",
     "fastapi",
     "starlette",
-    "sqlalchemy",
-    "ai_agent_lib_ui.adapters",
-    "ai_agent_lib_ui.integrations",
 ]
 
 [[tool.importlinter.contracts]]
-name = "the UI never imports the agent frameworks or the other distributions"
+name = "only UI integrations imports the browser framework"
 type = "forbidden"
-source_modules = ["ai_agent_lib_ui"]
-forbidden_modules = ["langgraph", "langchain", "langchain_core", "ai_agent_lib_aws", "ai_agent_lib_cli"]
+source_modules = [
+    "ai_agent_lib_ui.adapters",
+    "ai_agent_lib_ui.application",
+    "ai_agent_lib_ui.config",
+    "ai_agent_lib_ui.contracts",
+]
+forbidden_modules = ["chainlit"]

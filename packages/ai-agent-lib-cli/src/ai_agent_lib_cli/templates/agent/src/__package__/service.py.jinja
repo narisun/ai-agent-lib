@@ -2,127 +2,97 @@
 
 from __future__ import annotations
 
-import argparse
+import dataclasses
 from collections.abc import AsyncIterator, Sequence
 from typing import Any
 
 from ai_agent_lib_core import RequestContext, ServiceConfig, ServiceContainer
 from ai_agent_lib_core.integrations.http import (
+    AgentService,
     OutcomeJournal,
     ServiceLifecycle,
     SqliteOutcomeJournal,
-    agent_app,
-    agentcore_app,
-    question_input,
-    run_service,
-    serve,
+    build_agent_app,
+    run_agent,
 )
-from ai_agent_lib_core.integrations.langgraph.langfuse import LangfuseTracing, langfuse_tracing
+from ai_agent_lib_core.integrations.langgraph import AgentTracing
 
 from {{ package }}.graph import APPLICATION, answer, build_graph, steps
 from {{ package }}.settings import ENV_FILE
 
-__all__ = ["PROFILES", "build_app", "main"]
+__all__ = ["SERVICE", "build_app", "main"]
 
-# How the service listens: the library's own contract, or a hosting platform's.
-# AgentCore Runtime invokes POST /invocations and asks GET /ping on 0.0.0.0:8080.
-PROFILES: dict[str, tuple[str, int]] = {
-    "standard": ("127.0.0.1", {{ port }}),
-    "agentcore": ("0.0.0.0", 8080),  # the platform reaches the container at any address
-}
+
+async def _build_graph(services: ServiceContainer) -> Any:
+    # Admission stays closed until discovery and graph compilation succeed.
+    return build_graph(services, await services.registered_mcp_tools(APPLICATION))
+
+
+async def _respond(
+    graph: Any, services: ServiceContainer, context: RequestContext, question: str
+) -> dict[str, Any]:
+    return {"answer": await answer(graph, services, context, question)}
+
+
+async def _stream(
+    graph: Any, services: ServiceContainer, context: RequestContext, given: Any
+) -> AsyncIterator[dict[str, Any]]:
+    # POST /invoke/stream sends each step as a server-sent event.
+    async for step in steps(graph, services, context, SERVICE.question(given)):
+        yield step
+
+
+def _outcomes(config: ServiceConfig) -> OutcomeJournal | None:
+    # Local-only: a deployed service gets no durable journal from this library.
+    if config.deployment_env == "local":
+        return SqliteOutcomeJournal(ENV_FILE.parent / ".agentlib" / "outcomes.sqlite")
+    return None
+
+
+SERVICE = AgentService(
+    application=APPLICATION,
+    build_graph=_build_graph,
+    respond=_respond,
+    stream=_stream,
+    default_port={{ port }},
+    env_file=ENV_FILE,
+    outcomes=_outcomes,
+)
 
 
 async def build_app(
-    services: ServiceContainer, lifecycle: ServiceLifecycle, *, outcomes: OutcomeJournal | None = None,
-    tracing: LangfuseTracing | None = None, agentcore: bool = False,
+    services: ServiceContainer,
+    lifecycle: ServiceLifecycle,
+    *,
+    outcomes: OutcomeJournal | None = None,
+    tracing: AgentTracing | None = None,
+    agentcore: bool = False,
 ) -> Any:
-    """Build the agent's HTTP application.
+    """Build the agent's HTTP application; kept for callers of the previous shape.
 
-    The graph is prepared once after the listener starts and before readiness.
-    Each request brings its own caller: the entry point turns the bearer token into a
-    request context before the graph runs.
-
-    Args:
-        services: The container used by request handlers. The lifecycle startup
-            callback must start and validate it before graph preparation runs.
-        lifecycle: Receives deferred preparation before serving starts.
-        outcomes: Optional durable journal of accepted answers.
-        tracing: Optional library tracing, owned by the service entry point.
-        agentcore: Also serve AgentCore Runtime's contract: POST /invocations and
-            GET /ping beside the library's own routes.
+    ``outcomes`` is ``None`` by default here, as it always was for a caller of
+    this shape; ``main`` is the only caller that runs the generated service
+    for real, and it resolves the durable journal from ``SERVICE.outcomes``
+    against the deployment's resolved configuration. ``agentcore`` also serves
+    AgentCore Runtime's contract, POST /invocations and GET /ping, beside the
+    library's own routes, as ``main --profile agentcore`` does.
     """
-    graph: Any = None
-
-    async def prepare() -> None:
-        # Admission stays closed until discovery and graph compilation succeed.
-        nonlocal graph
-        graph = build_graph(services, await services.registered_mcp_tools(APPLICATION))
-
-    lifecycle.prepare(prepare)
-
-    async def respond(current_graph: Any, container: ServiceContainer,
-                      context: RequestContext, question: str) -> dict[str, Any]:
-        return {"answer": await answer(current_graph, container, context, question)}
-
-    async def run(context: RequestContext, given: Any) -> dict[str, Any]:
-        question = question_input(given)
-        if tracing is not None:
-            return await tracing.run(graph, services, context, question, respond=respond)
-        return await respond(graph, services, context, question)
-
-    async def stream(context: RequestContext, given: Any) -> AsyncIterator[dict[str, Any]]:
-        # POST /invoke/stream sends each step as a server-sent event.
-        async for step in steps(graph, services, context, question_input(given)):
-            yield step
-
-    build = agentcore_app if agentcore else agent_app
-    return build(
-        services, run, application=APPLICATION, lifecycle=lifecycle, stream=stream,
-        live_updates=True, outcomes=outcomes,
+    service = dataclasses.replace(
+        SERVICE, agentcore=agentcore, app_kwargs={**dict(SERVICE.app_kwargs), "outcomes": outcomes}
     )
-
-
-async def _serve(config: ServiceConfig, host: str, port: int, *, agentcore: bool) -> None:
-    async with langfuse_tracing(APPLICATION, config, dotenv_path=ENV_FILE) as tracing:
-        services = ServiceContainer(config, model_trace=tracing)
-
-        async def start() -> None:
-            await services.start()
-            await services.validate()
-
-        lifecycle = ServiceLifecycle(start)
-        try:
-            # The listener is available during adapter startup and graph preparation.
-            await serve(await build_app(
-                services, lifecycle, tracing=tracing, agentcore=agentcore,
-                outcomes=SqliteOutcomeJournal(ENV_FILE.parent / ".agentlib" / "outcomes.sqlite")
-                if config.deployment_env == "local" else None,
-            ), lifecycle, host=host, port=port)
-        finally:
-            await services.aclose()
+    return await build_agent_app(service, services, lifecycle, tracing=tracing)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Serve until stopped. SIGTERM lets requests in flight finish first."""
-    parser = argparse.ArgumentParser(prog="{{ name }}-serve", description=__doc__)
-    parser.add_argument(
-        "--profile", choices=sorted(PROFILES), default="standard",
-        help="how to listen: standard, or agentcore (0.0.0.0:8080, /invocations and /ping)",
-    )
-    parser.add_argument("--host", help="address to listen on (the profile's by default)")
-    parser.add_argument("--port", type=int, help="port to listen on (the profile's by default)")
-    arguments = parser.parse_args(argv)
-    host, port = PROFILES[arguments.profile]
-    host = arguments.host if arguments.host is not None else host
-    port = arguments.port if arguments.port is not None else port
-    # Configuration, logging, telemetry and the explanation of a failure are
-    # the library's entry-point wiring; this module only says what to serve.
-    return run_service(
-        APPLICATION,
-        lambda config: _serve(config, host, port, agentcore=arguments.profile == "agentcore"),
-        env_file=ENV_FILE,
-        program="{{ name }}-serve",
-    )
+    """Serve until stopped. SIGTERM lets requests in flight finish first.
+
+    ``--profile agentcore`` listens where AgentCore Runtime reaches the container
+    (0.0.0.0:8080) and serves its contract too; ``--host`` and ``--port`` override
+    the profile's address. Configuration, logging, telemetry, tracing and the
+    explanation of a failure are the library's entry-point wiring; this module
+    only says what to serve.
+    """
+    return run_agent(SERVICE, argv)
 
 
 if __name__ == "__main__":

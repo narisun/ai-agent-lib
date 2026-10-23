@@ -12,7 +12,7 @@ from ai_agent_lib_ui.contracts.artifacts import Artifact, ScopedArtifact
 from ai_agent_lib_ui.contracts.catalog import PresentationManifest
 from ai_agent_lib_ui.contracts.conversations import TurnAdmission
 from ai_agent_lib_ui.contracts.queries import Availability, ContractError, ErrorCode, ViewContext
-from ai_agent_lib_ui.contracts.traces import TraceLink
+from ai_agent_lib_ui.contracts.traces import TraceLink, tolerant_trace
 
 
 class AcceptedAnswer(DiagnosticValue):
@@ -89,12 +89,8 @@ class QuestionAnswerAdapter:
                 model_calls=value.get("model_calls"),
             )
         # Trace links are service metadata, never extracted from model answer text.
-        # Optional malformed diagnostics must not discard an accepted answer.
-        if output.get("trace") is not None:
-            with suppress(ValidationError, ValueError):
-                answer = answer.model_copy(
-                    update={"trace": TraceLink.model_validate(output["trace"])}
-                )
+        # Optional malformed or retired-provider diagnostics must not discard an accepted answer.
+        answer = answer.model_copy(update={"trace": tolerant_trace(output.get("trace"))})
         return self._artifacts(view, output, answer)
 
     def _artifacts(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -118,3 +119,126 @@ def test_eval_says_so_when_there_are_none(
     err = capsys.readouterr().err
     assert "there are no evals in mcp-servers/hello-mcp" in err
     assert "@pytest.mark.eval" in err
+
+
+def test_eval_accept_promotes_the_report_to_the_baseline(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    tools = Tools()
+    assert (
+        main(["new", "agent", "helper", "--workspace", str(workspace)], toolbox=toolbox(tools)) == 0
+    )
+    report = workspace / "agents" / "helper" / ".agentlib" / "eval-report.json"
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(
+        '{"schema": "agentlib.eval-report/v1", "means": {"m": 1.0}, "results": [], "metadata": {}}',
+        encoding="utf-8",
+    )
+    assert (
+        main(["eval", "helper", "--accept", "--workspace", str(workspace)], toolbox=toolbox(tools))
+        == 0
+    )
+    baseline = workspace / "agents" / "helper" / "evals" / "baseline.json"
+    assert json.loads(baseline.read_text(encoding="utf-8"))["means"] == {"m": 1.0}
+    assert "baseline accepted: agents/helper/evals/baseline.json" in capsys.readouterr().out
+
+
+def test_eval_accept_without_a_service_is_refused(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    tools = Tools()
+    assert main(["eval", "--accept", "--workspace", str(workspace)], toolbox=toolbox(tools)) != 0
+    assert "--accept needs a service" in capsys.readouterr().err
+
+
+def test_eval_accept_without_a_report_names_the_fix(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    tools = Tools()
+    assert (
+        main(["new", "agent", "helper", "--workspace", str(workspace)], toolbox=toolbox(tools)) == 0
+    )
+    assert (
+        main(["eval", "helper", "--accept", "--workspace", str(workspace)], toolbox=toolbox(tools))
+        != 0
+    )
+    assert "eval-report.json" in capsys.readouterr().err
+
+
+def _write_eval_report(workspace: Path) -> None:
+    report = workspace / "agents" / "helper" / ".agentlib" / "eval-report.json"
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(
+        '{"schema": "agentlib.eval-report/v1", "means": {"m": 1.0}, "results": [], "metadata": {}}',
+        encoding="utf-8",
+    )
+
+
+def _accept_marker(workspace: Path) -> Path:
+    return workspace / "agents" / "helper" / ".agentlib" / "eval-accept.flag"
+
+
+def test_eval_accept_leaves_a_marker_during_the_pytest_run_and_removes_it(
+    workspace: Path,
+) -> None:
+    tools = Tools()
+    assert (
+        main(["new", "agent", "helper", "--workspace", str(workspace)], toolbox=toolbox(tools)) == 0
+    )
+    _write_eval_report(workspace)
+    marker = _accept_marker(workspace)
+    captured: dict[str, bool] = {}
+
+    def run_tool(module: str, arguments: Sequence[str], folder: Path) -> int:
+        captured["during"] = marker.exists()
+        return 0
+
+    assert not marker.exists()
+    assert (
+        main(
+            ["eval", "helper", "--accept", "--workspace", str(workspace)],
+            toolbox=toolbox_for_tests(pins=PINS, run_tool=run_tool),
+        )
+        == 0
+    )
+    assert captured["during"] is True
+    assert not marker.exists()
+
+
+def test_eval_without_accept_leaves_no_marker(workspace: Path) -> None:
+    tools = Tools()
+    assert (
+        main(["new", "agent", "helper", "--workspace", str(workspace)], toolbox=toolbox(tools)) == 0
+    )
+    marker = _accept_marker(workspace)
+    captured: dict[str, bool] = {}
+
+    def run_tool(module: str, arguments: Sequence[str], folder: Path) -> int:
+        captured["during"] = marker.exists()
+        return 0
+
+    assert (
+        main(
+            ["eval", "helper", "--workspace", str(workspace)],
+            toolbox=toolbox_for_tests(pins=PINS, run_tool=run_tool),
+        )
+        == 0
+    )
+    assert captured["during"] is False
+    assert not marker.exists()
+
+
+def test_eval_accept_removes_the_marker_even_when_the_evals_fail(workspace: Path) -> None:
+    tools = Tools()
+    assert (
+        main(["new", "agent", "helper", "--workspace", str(workspace)], toolbox=toolbox(tools)) == 0
+    )
+    marker = _accept_marker(workspace)
+    failing = Tools(failing=["pytest"])
+    assert (
+        main(
+            ["eval", "helper", "--accept", "--workspace", str(workspace)], toolbox=toolbox(failing)
+        )
+        != 0
+    )
+    assert not marker.exists()

@@ -55,7 +55,7 @@ def test_ambient_telemetry_fails_fast_without_a_provider(no_global_provider: Non
             "accounts-agent", ServiceConfig.for_testing(telemetry=TelemetryMode.AMBIENT)
         )
     assert caught.value.expected == (
-        "a process started under opentelemetry-instrument, or EAP_TELEMETRY=opentelemetry"
+        "a process started under opentelemetry-instrument, or AC2_TELEMETRY=opentelemetry"
     )
     assert "opentelemetry-instrument" in (caught.value.fix or "")
     # Off and opentelemetry are not affected by the missing provider.

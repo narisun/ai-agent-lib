@@ -5,8 +5,6 @@ from uuid import uuid4
 import pytest
 from browser_protocol import LocalServer, connect, poll, send, wait_thread, wait_turns
 
-from ai_agent_lib_ui.contracts.traces import TraceLink
-
 pytestmark = pytest.mark.slow
 
 
@@ -122,14 +120,10 @@ async def test_resume_recovers_lost_response_without_another_agent_invocation(
 
 
 @pytest.mark.parametrize("mode", ["json", "stream", "reconcile"])
-@pytest.mark.parametrize("provider", ["langfuse", "phoenix"])
-async def test_trace_link_and_metrics_survive_resume(
-    server: LocalServer, mode: str, provider: str
-) -> None:
+async def test_trace_link_and_metrics_survive_resume(server: LocalServer, mode: str) -> None:
     trace_id = uuid4().hex
-    path = "redirects" if provider == "phoenix" else "project/trial"
-    url = f"https://traces.example/{path}/traces/{trace_id}"
-    server.trace = {"provider": provider, "trace_id": trace_id, "url": url}
+    url = f"https://traces.example/redirects/traces/{trace_id}"
+    server.trace = {"provider": "phoenix", "trace_id": trace_id, "url": url}
     server.streaming = mode == "stream"
     server.lose_response = mode == "reconcile"
     async with server.login() as client:
@@ -154,8 +148,7 @@ async def test_trace_link_and_metrics_survive_resume(
             assert turns[0]["run"]["trace"] == server.trace
             restored = [v for n, v in resumed.events_seen if n == "resume_thread"][-1]
             text = restored["steps"][-1]["output"]
-            label = TraceLink.model_validate(server.trace).label
-            assert f"[Open trace in {label}]({url})" in text
+            assert f"[Open trace in Agent Lab]({url})" in text
             assert "Open trace in Phoenix" not in text
             assert "Input tokens:" in text
             assert "Output tokens:" in text

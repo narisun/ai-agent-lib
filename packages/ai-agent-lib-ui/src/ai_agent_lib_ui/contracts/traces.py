@@ -8,17 +8,18 @@ from pydantic import Field, model_validator
 
 from ai_agent_lib_core.contracts.diagnostics import DiagnosticValue
 
-TraceProvider = Literal["langfuse", "phoenix", "cloudwatch"]
+# Phoenix is the library's trace backend; CloudWatch is where an agent on AgentCore
+# Runtime is observed. Langfuse links are retired: a stored row that still carries
+# one is reloaded without its link by ``tolerant_trace``.
+TraceProvider = Literal["phoenix", "cloudwatch"]
 
 # A CloudWatch link identifies an AgentCore session, not a 128-bit trace id.
 SESSION_ID = r"[A-Za-z0-9._:-]{33,128}"
 _TRACE_IDS: dict[str, str] = {
-    "langfuse": r"[0-9a-f]{32}",
     "phoenix": r"[0-9a-f]{32}",
     "cloudwatch": SESSION_ID,
 }
 _LABELS: dict[str, str] = {
-    "langfuse": "Langfuse",
     "phoenix": "Agent Lab",
     "cloudwatch": "CloudWatch",
 }
@@ -37,7 +38,7 @@ class TraceLink(DiagnosticValue):
 
     @model_validator(mode="after")
     def check_url(self) -> Self:
-        """Allow only private project trace routes, with no credentials or Markdown escapes."""
+        """Allow only private trace routes, with no credentials or Markdown escapes."""
         parts = urlsplit(self.url)
         _ = parts.port  # Reject malformed or out-of-range ports before rendering a link.
         if (
@@ -56,15 +57,11 @@ class TraceLink(DiagnosticValue):
         return self
 
     def _trace_route(self, parts: SplitResult) -> bool:
-        route = (
-            r"/project/[A-Za-z0-9_-]{1,128}/traces/"
-            if self.provider == "langfuse"
-            else r"/redirects/traces/"
-        )
+        """The private Phoenix redirect route for this trace id, over HTTPS or loopback HTTP."""
         return (
             not parts.query
             and not parts.fragment
-            and re.fullmatch(route + self.trace_id, parts.path) is not None
+            and re.fullmatch(r"/redirects/traces/" + self.trace_id, parts.path) is not None
             and (
                 parts.scheme == "https"
                 or (parts.scheme == "http" and parts.hostname in {"localhost", "127.0.0.1", "::1"})
@@ -94,10 +91,22 @@ class TraceLink(DiagnosticValue):
         """The one display name for this provider's trace viewer.
 
         Phoenix runs as part of the local Agent Lab stack, so its traces open
-        "in Agent Lab"; Langfuse and CloudWatch are separate products and keep
-        their own names.
+        "in Agent Lab"; CloudWatch is a separate product and keeps its own name.
         """
         return _LABELS[self.provider]
+
+
+def tolerant_trace(payload: object) -> TraceLink | None:
+    """A trace link that no longer validates degrades to None; the answer never fails for it.
+
+    A trace is optional diagnostics. An agent that still emits a retired provider's
+    link during a mixed-version rollout, and a row stored by an older UI, must keep
+    its answer and metrics; only the link is dropped.
+    """
+    try:
+        return TraceLink.model_validate(payload)
+    except ValueError:  # pydantic wraps validator errors, so ValidationError is the only escape.
+        return None
 
 
 def console_link(region: str, session_id: str) -> TraceLink:

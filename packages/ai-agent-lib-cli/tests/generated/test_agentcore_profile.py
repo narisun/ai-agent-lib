@@ -11,7 +11,7 @@ import pytest
 from ai_agent_lib_cli.__main__ import main
 from ai_agent_lib_cli.testing import toolbox_for_tests
 from ai_agent_lib_core import Principal, ServiceContainer
-from ai_agent_lib_core.integrations.http import SESSION_HEADER, ServiceLifecycle
+from ai_agent_lib_core.integrations.http import PROFILES, SESSION_HEADER, ServiceLifecycle
 from ai_agent_lib_core.testing import FakeChatModelProvider, FakeIdentityVerifier, Fakes
 
 SESSION = "runtime-session-0123456789abcdef0123456789abcdef"
@@ -31,10 +31,12 @@ async def test_the_generated_agent_serves_the_runtime_contract_in_the_agentcore_
     service = importlib.import_module("core_agent.service")
     mcp_main = importlib.import_module("core_mcp.__main__")
 
-    # The profiles say where each kind of service listens for the runtime.
-    assert service.PROFILES["agentcore"] == (ANY_ADDRESS, 8080)
+    # The profiles say where each kind of service listens for the runtime: an agent
+    # takes them from run_agent, an MCP server declares its own.
+    assert PROFILES["agentcore"] == (ANY_ADDRESS, 8080)
     assert mcp_main.PROFILES["agentcore"] == (ANY_ADDRESS, 8000)
-    assert service.PROFILES["standard"][0] == mcp_main.PROFILES["standard"][0] == "127.0.0.1"
+    assert PROFILES["standard"][0] == mcp_main.PROFILES["standard"][0] == "127.0.0.1"
+    assert service.SERVICE.agentcore is False
 
     kit = Fakes(
         model=FakeChatModelProvider(["Hello Ada"]),

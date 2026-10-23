@@ -99,6 +99,29 @@ async def test_invalid_document_warning_survives_dispatch_and_restart(
     assert legacy.artifact_warning is None
 
 
+async def test_stored_run_with_retired_trace_provider_still_loads(
+    chat: tuple[ChatService, ScriptedAgent, SqliteThreads], settings: Settings
+) -> None:
+    """A row saved while Langfuse links existed reloads with its answer and no link."""
+    service, _, store = chat
+    principal = settings.identity.principal()
+    thread = (await service.create(principal, "memo")).thread.thread_id
+    saved = await service.submit(principal, thread, "one", "A question")
+    trace_id = "1234567890abcdef1234567890abcdef"
+    with store.connection() as db:
+        row = db.execute("SELECT record FROM runs WHERE id=?", (saved.run_id,)).fetchone()
+        record = json.loads(row[0])
+        record["trace"] = {
+            "provider": "langfuse",
+            "trace_id": trace_id,
+            "url": f"https://traces.example/project/trial/traces/{trace_id}",
+        }
+        db.execute("UPDATE runs SET record=? WHERE id=?", (json.dumps(record), saved.run_id))
+    restored = (await store.history(view_for(principal, "memo"), thread))[0].run
+    assert restored.trace is None
+    assert restored == saved
+
+
 async def test_duplicate_disconnect_and_same_thread_race(
     chat: tuple[ChatService, ScriptedAgent, SqliteThreads], settings: Settings
 ) -> None:

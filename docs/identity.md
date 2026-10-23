@@ -67,16 +67,16 @@ server = MCPServer("accounts-mcp", **services.mcp_server_kwargs("accounts"))
 An MCP server only verifies:
 
 ```bash
-EAP_IDENTITY_PROVIDER=jwt
-EAP_IDENTITY_OPTIONS={"preset": "entra", "tenant_id": "<tenant-guid>", "audience": ["<mcp-client-id>", "api://<mcp-client-id>"]}
+AC2_IDENTITY_PROVIDER=jwt
+AC2_IDENTITY_OPTIONS={"preset": "entra", "tenant_id": "<tenant-guid>", "audience": ["<mcp-client-id>", "api://<mcp-client-id>"]}
 ```
 
 An agent verifies and exchanges. `client_secret` is the name of a secret, read
 through the secrets port:
 
 ```bash
-EAP_IDENTITY_PROVIDER=jwt
-EAP_IDENTITY_OPTIONS={"preset": "entra", "tenant_id": "<tenant-guid>", "audience": ["<agent-client-id>", "api://<agent-client-id>"], "exchange": {"client_id": "<agent-client-id>", "client_secret": "entra_client_secret"}}
+AC2_IDENTITY_PROVIDER=jwt
+AC2_IDENTITY_OPTIONS={"preset": "entra", "tenant_id": "<tenant-guid>", "audience": ["<agent-client-id>", "api://<agent-client-id>"], "exchange": {"client_id": "<agent-client-id>", "client_secret": "entra_client_secret"}}
 ```
 
 The registries connect the two. The agent registry gives each agent its client
@@ -162,10 +162,10 @@ a deny, and so is an obligation the library does not recognise.
 ## Local development without Entra
 
 Nothing needs to be switched off. With no configuration the identity provider is
-`static`: a fixed development principal, set in `EAP_IDENTITY_OPTIONS`:
+`static`: a fixed development principal, set in `AC2_IDENTITY_OPTIONS`:
 
 ```bash
-EAP_IDENTITY_OPTIONS={"subject": "dev-user", "tenant": "dev-tenant", "roles": ["analyst"]}
+AC2_IDENTITY_OPTIONS={"subject": "dev-user", "tenant": "dev-tenant", "roles": ["analyst"]}
 ```
 
 With the `static` provider an MCP server has no check at the door, so a
@@ -175,12 +175,12 @@ exchanges the development principal for a short-lived signed development token,
 and the server rebuilds the caller from it, so roles, the agent check and policy
 behave as they do with Entra.
 
-The `static` provider is local-only. A service whose `EAP_DEPLOYMENT_ENV` is
+The `static` provider is local-only. A service whose `AC2_DEPLOYMENT_ENV` is
 `dev` or `prod` refuses to start with it. A service that forgot to set
-`EAP_DEPLOYMENT_ENV` would default to `local`, so a process on ECS, Fargate or
+`AC2_DEPLOYMENT_ENV` would default to `local`, so a process on ECS, Fargate or
 Lambda, which AWS marks with `AWS_EXECUTION_ENV`, refuses to start until it
 names its environment as `dev` or `prod`. On other compute, the deployment
-must set `EAP_DEPLOYMENT_ENV` itself.
+must set `AC2_DEPLOYMENT_ENV` itself.
 
 To test against real tokens without Entra, `ai_agent_lib_core.testing.oauth`
 has a stand-in identity provider that signs tokens, publishes its keys and

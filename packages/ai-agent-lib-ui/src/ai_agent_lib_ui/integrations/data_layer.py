@@ -20,6 +20,7 @@ from fastapi import HTTPException
 
 from ai_agent_lib_ui.adapters.sqlite import now
 from ai_agent_lib_ui.application.chat import view_for
+from ai_agent_lib_ui.contracts.feedback import FeedbackRecord
 from ai_agent_lib_ui.contracts.queries import ContractError, ErrorCode, PageRequest
 from ai_agent_lib_ui.integrations.answer_format import answer_id, outcome_text
 from ai_agent_lib_ui.integrations.runtime import Runtime
@@ -205,14 +206,40 @@ class DataLayer(BaseDataLayer):
         raise HTTPException(404, "Document elements are not enabled")
 
     async def upsert_feedback(self, feedback: Feedback) -> str:
-        """Reject unsupported feedback storage."""
-        await current_principal(self.resources)
-        raise HTTPException(404, "Feedback is not enabled")
+        """Record a judgement of an accepted answer as append-only evidence."""
+        principal = await current_principal(self.resources)
+        if not feedback.threadId:
+            raise HTTPException(404, "Feedback needs a thread")
+        conversation = await self.resources.store.get(principal, feedback.threadId)
+        application = conversation.thread.scope.application
+        view = view_for(principal, application)
+        history = await self.resources.store.history_page(view, feedback.threadId, PageRequest())
+        run = next(
+            (
+                stored.run
+                for stored in history.items
+                if stored.run.state == "completed" and answer_id(stored.run) == feedback.forId
+            ),
+            None,
+        )
+        if run is None:
+            raise HTTPException(404, "Feedback target not found")
+        record = FeedbackRecord(
+            request_id=run.request_id,
+            thread_id=feedback.threadId,
+            application=application,
+            subject=principal.subject,
+            verdict="up" if feedback.value else "down",
+            comment=feedback.comment or "",
+            created_at=now().isoformat(),
+        )
+        await self.resources.feedback.write(record)
+        return answer_id(run)
 
     async def delete_feedback(self, feedback_id: str) -> bool:
-        """Reject unsupported feedback deletion."""
+        """Keep judgements append-only; recorded evidence is never unrecorded."""
         await current_principal(self.resources)
-        raise HTTPException(404, "Feedback is not enabled")
+        raise HTTPException(404, "Feedback cannot be deleted")
 
     async def get_favorite_steps(self, user_id: str) -> list[StepDict]:
         """Check identity even when the favorites feature is disabled."""

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import signal
 import subprocess
 import sys
@@ -29,7 +30,8 @@ from ai_agent_lib_cli.workspace import (
     WorkspaceAnswers,
 )
 from ai_agent_lib_core.adapters import OpaPolicyDecisionPoint
-from ai_agent_lib_core.config import Key, secret_key, variable_for
+from ai_agent_lib_core.config import Key, deprecations, secret_key, variable_for
+from ai_agent_lib_core.config.bindings import legacy_spelling
 
 PINS = {"hello.greet": "ab" * 32, "hello.people_by_team": "cd" * 32}
 RULES = Path("policies/agentlib/rules/data.yaml")
@@ -133,6 +135,96 @@ def test_doctor_reports_broken_shared_files_and_unknown_services(
     assert "no service called 'nobody'" in capsys.readouterr().err
 
 
+def test_doctor_tells_a_deprecated_spelling_and_still_passes(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    env = workspace / "agents/hello-agent/.env"
+    current, old = variable_for(Key.MODEL_ID), legacy_spelling(variable_for(Key.MODEL_ID))
+    assert old.startswith("EAP_")  # the spelling the previous release documented
+    capsys.readouterr()
+
+    assert run("doctor", "hello-agent", "--workspace", workspace) == 0
+    assert "deprecated" not in capsys.readouterr().out  # canonical spellings are not told
+
+    env.write_text(
+        env.read_text(encoding="utf-8").replace(f"{current}=", f"{old}="), encoding="utf-8"
+    )
+    assert run("doctor", "hello-agent", "--workspace", workspace) == 0
+    out = capsys.readouterr().out
+    assert f"  ok    warning: {old} is deprecated; use {current} instead" in out
+    assert "FAIL" not in out
+    assert "Everything checked is usable." in out
+
+
+def test_doctor_tells_a_deprecated_phoenix_spelling_after_the_phoenix_check(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    env = workspace / "agents/hello-agent/.env"
+    env.write_text(
+        env.read_text(encoding="utf-8")
+        + "EAP_PHOENIX_ENABLED=true\nAC2_PHOENIX_CAPTURE_CONTENT=false\n",
+        encoding="utf-8",
+    )
+    capsys.readouterr()
+
+    assert run("doctor", "hello-agent", "--workspace", workspace) == 0
+    out = capsys.readouterr().out
+    assert (
+        "  ok    phoenix: configuration valid (connectivity not checked)\n"
+        "  ok    warning: EAP_PHOENIX_ENABLED is deprecated; use AC2_PHOENIX_ENABLED instead\n"
+    ) in out
+    assert out.count("is deprecated") == 1  # the canonical capture setting is not told
+    assert "FAIL" not in out
+
+    assert run("config", "explain", "hello-agent", "--workspace", workspace) == 0
+    assert (
+        "warning: EAP_PHOENIX_ENABLED is deprecated; use AC2_PHOENIX_ENABLED instead"
+        in capsys.readouterr().err
+    )
+
+
+def test_a_deprecated_phoenix_spelling_is_not_also_logged_bare_by_doctor_or_explain(
+    workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # The loader tells a service's log once per process; start from a process that has not.
+    monkeypatch.setattr(deprecations, "_LOGGED", set())
+    env = workspace / "agents/hello-agent/.env"
+    env.write_text(env.read_text(encoding="utf-8") + "EAP_PHOENIX_ENABLED=true\n", encoding="utf-8")
+    logger = logging.getLogger("ai_agent_lib_core.config")
+    level = logger.level
+    capsys.readouterr()
+
+    with caplog.at_level(logging.WARNING):
+        assert run("doctor", "hello-agent", "--workspace", workspace) == 0
+        doctor = capsys.readouterr()
+        assert run("config", "explain", "hello-agent", "--workspace", workspace) == 0
+        explain = capsys.readouterr()
+
+    # The report names the spelling once; the library's log line would be a bare duplicate.
+    assert [r for r in caplog.records if r.name == "ai_agent_lib_core.config"] == []
+    assert doctor.out.count("EAP_PHOENIX_ENABLED is deprecated") == 1
+    assert "is deprecated" not in doctor.err
+    assert explain.err.count("EAP_PHOENIX_ENABLED is deprecated") == 1
+    assert logger.level == level  # the quiet is lifted when the command is done
+
+
+def test_doctor_fails_a_setting_that_carries_both_spellings_with_different_values(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    env = workspace / "agents/hello-agent/.env"
+    current = variable_for(Key.MODEL_ID)
+    old = legacy_spelling(current)
+    env.write_text(env.read_text(encoding="utf-8") + f"{old}=another-model\n", encoding="utf-8")
+    capsys.readouterr()
+
+    assert run("doctor", "hello-agent", "--workspace", workspace) == 1
+    out = capsys.readouterr().out
+    assert f"  FAIL  settings: {old} is deprecated and conflicts with {current}" in out
+
+
 def test_a_server_that_cannot_report_its_pins_fails_its_check(
     workspace: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -182,133 +274,6 @@ def test_config_explain_shows_each_setting_its_origin_and_no_secret(
     assert "got: 'mars'" in err
 
 
-_LANGFUSE_VALID = (
-    "EAP_LANGFUSE_ENABLED=true\nLANGFUSE_BASE_URL=http://localhost:3000\n"
-    "LANGFUSE_PROJECT_ID=project\nLANGFUSE_PUBLIC_KEY=public-test-secret\n"
-    "LANGFUSE_SECRET_KEY=private-test-secret\n"
-)
-
-
-@pytest.mark.parametrize(
-    ("broken", "expected"),
-    [
-        ("LANGFUSE_BASE_URL=https://user:private-test-secret@trace.test\n", "HTTPS origin"),
-        ("LANGFUSE_PROJECT_ID=private-test-secret?\n", "project ID"),
-        ("LANGFUSE_SECRET_KEY=\n", "project keys"),
-        ("EAP_LANGFUSE_ENABLED=private-test-secret\n", "true or false"),
-        ("EAP_LANGFUSE_CAPTURE_CONTENT=private-test-secret\n", "true or false"),
-        ("EAP_LANGFUSE_ENV_FILE=missing-traces.env\n", "configuration file not found"),
-    ],
-)
-def test_langfuse_configuration_errors_fail_both_commands_without_exposing_keys(
-    workspace: Path,
-    capsys: pytest.CaptureFixture[str],
-    broken: str,
-    expected: str,
-) -> None:
-    env = workspace / "agents/hello-agent/.env"
-    env.write_text(env.read_text(encoding="utf-8") + _LANGFUSE_VALID + broken, encoding="utf-8")
-    capsys.readouterr()
-    assert run("doctor", "hello-agent", "--workspace", workspace) == 1
-    doctor = capsys.readouterr()
-    assert "FAIL  langfuse:" in doctor.out
-    assert expected in doctor.out
-    assert run("config", "explain", "hello-agent", "--workspace", workspace) == 1
-    explain = capsys.readouterr()
-    assert expected in explain.err
-    for result in (doctor, explain):
-        assert "public-test-secret" not in result.out + result.err
-        assert "private-test-secret" not in result.out + result.err
-
-
-def test_langfuse_explanation_uses_startup_precedence_origins_and_masks_keys(
-    workspace: Path,
-    capsys: pytest.CaptureFixture[str],
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from ai_agent_lib_cli.diagnostics import explain_service
-    from ai_agent_lib_core.config.langfuse import load_langfuse_settings
-
-    folder = workspace / "agents/hello-agent"
-    env = folder / ".env"
-    env.write_text(
-        env.read_text(encoding="utf-8")
-        + "EAP_LANGFUSE_ENV_FILE=traces.env\n"
-        + "LANGFUSE_PROJECT_ID=lower-priority\n",
-        encoding="utf-8",
-    )
-    (folder / "traces.env").write_text(_LANGFUSE_VALID, encoding="utf-8")
-    monkeypatch.setenv("LANGFUSE_PROJECT_ID", "from-process")
-    monkeypatch.chdir(workspace.parent)
-    actual = load_langfuse_settings(env)
-    assert actual is not None
-    assert actual.project_id == "from-process"
-    entries = {entry.variable: entry for entry in explain_service(folder)[0]}
-    assert entries["LANGFUSE_PROJECT_ID"].value == actual.project_id
-    assert "process environment" in entries["LANGFUSE_PROJECT_ID"].origin
-    assert str(folder / "traces.env") in entries["LANGFUSE_BASE_URL"].origin
-    assert str(env) in entries["EAP_LANGFUSE_ENV_FILE"].origin
-    assert entries["LANGFUSE_SECRET_KEY"].value == "********"
-    assert entries["LANGFUSE_PUBLIC_KEY"].value == "********"
-    capsys.readouterr()
-    assert run("doctor", "hello-agent", "--workspace", workspace) == 0
-    assert "configuration valid (connectivity not checked)" in capsys.readouterr().out
-    assert run("config", "explain", "hello-agent", "--workspace", workspace) == 0
-    out = capsys.readouterr().out
-    assert "public-test-secret" not in out
-    assert "private-test-secret" not in out
-
-
-def test_langfuse_disabled_override_skips_extra_file_and_diagnostics_show_disabled(
-    workspace: Path,
-    capsys: pytest.CaptureFixture[str],
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    env = workspace / "agents/hello-agent/.env"
-    env.write_text(
-        env.read_text(encoding="utf-8") + _LANGFUSE_VALID + "EAP_LANGFUSE_ENV_FILE=missing.env\n",
-        encoding="utf-8",
-    )
-    monkeypatch.setenv("EAP_LANGFUSE_ENABLED", "false")
-    capsys.readouterr()
-    assert run("doctor", "hello-agent", "--workspace", workspace) == 0
-    assert "langfuse: disabled" in capsys.readouterr().out
-    assert run("config", "explain", "hello-agent", "--workspace", workspace) == 0
-    assert "EAP_LANGFUSE_ENABLED" in capsys.readouterr().out
-
-
-def test_langfuse_legacy_aliases_are_declared_once_for_startup_and_diagnostics(
-    workspace: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from ai_agent_lib_cli.diagnostics import explain_service
-    from ai_agent_lib_core.config.langfuse import load_langfuse_settings
-
-    folder = workspace / "agents/hello-agent"
-    project = folder / "pyproject.toml"
-    project.write_text(
-        project.read_text(encoding="utf-8")
-        + '\n[tool.ai-agent-lib.langfuse]\nlegacy-prefix = "RMPREP"\n',
-        encoding="utf-8",
-    )
-    env = folder / ".env"
-    env.write_text(
-        env.read_text(encoding="utf-8")
-        + _LANGFUSE_VALID.replace("EAP_LANGFUSE_ENABLED=true", "RMPREP_LANGFUSE_ENABLED=true"),
-        encoding="utf-8",
-    )
-    assert load_langfuse_settings(env) is not None
-    monkeypatch.setenv("RMPREP_LANGFUSE_ENABLED", "false")
-    assert load_langfuse_settings(env) is None
-    entries = {entry.variable: entry for entry in explain_service(folder)[0]}
-    assert entries["EAP_LANGFUSE_ENABLED"].value == "false"
-    assert entries["EAP_LANGFUSE_ENABLED"].origin == "process environment: RMPREP_LANGFUSE_ENABLED"
-    monkeypatch.setenv("EAP_LANGFUSE_ENABLED", "true")
-    assert load_langfuse_settings(env) is not None
-    entries = {entry.variable: entry for entry in explain_service(folder)[0]}
-    assert entries["EAP_LANGFUSE_ENABLED"].origin == "process environment: EAP_LANGFUSE_ENABLED"
-
-
 # ------------------------------------------------------------------- policy test
 
 
@@ -316,12 +281,11 @@ def test_langfuse_legacy_aliases_are_declared_once_for_startup_and_diagnostics(
     ("broken", "expected"),
     [
         ("PHOENIX_COLLECTOR_ENDPOINT=not-an-origin\n", "HTTPS origin"),
-        ("EAP_PHOENIX_CAPTURE_CONTENT=yes\n", "true or false"),
-        ("EAP_PHOENIX_ENV_FILE=missing.env\n", "configuration file not found"),
-        (_LANGFUSE_VALID, "Enable one"),
+        ("AC2_PHOENIX_CAPTURE_CONTENT=yes\n", "true or false"),
+        ("AC2_PHOENIX_ENV_FILE=missing.env\n", "configuration file not found"),
     ],
 )
-def test_phoenix_and_destination_conflicts_fail_diagnostics(
+def test_phoenix_configuration_errors_fail_diagnostics(
     workspace: Path,
     capsys: pytest.CaptureFixture[str],
     broken: str,
@@ -329,7 +293,7 @@ def test_phoenix_and_destination_conflicts_fail_diagnostics(
 ) -> None:
     env = workspace / "agents/hello-agent/.env"
     env.write_text(
-        env.read_text(encoding="utf-8") + "EAP_PHOENIX_ENABLED=true\n"
+        env.read_text(encoding="utf-8") + "AC2_PHOENIX_ENABLED=true\n"
         "PHOENIX_API_KEY=phoenix-test-secret\n" + broken,
         encoding="utf-8",
     )
@@ -354,12 +318,12 @@ def test_phoenix_explanation_matches_file_precedence_and_disabled_override(
     folder = workspace / "agents/hello-agent"
     env = folder / ".env"
     env.write_text(
-        env.read_text(encoding="utf-8") + "EAP_PHOENIX_ENV_FILE=traces.env\n", encoding="utf-8"
+        env.read_text(encoding="utf-8") + "AC2_PHOENIX_ENV_FILE=traces.env\n", encoding="utf-8"
     )
     extra = folder / "traces.env"
     extra.write_text(
-        "EAP_PHOENIX_ENABLED=true\nPHOENIX_PROJECT_NAME=from-file\n"
-        "PHOENIX_API_KEY=private-key\nEAP_PHOENIX_CAPTURE_CONTENT=true\n",
+        "AC2_PHOENIX_ENABLED=true\nPHOENIX_PROJECT_NAME=from-file\n"
+        "PHOENIX_API_KEY=private-key\nAC2_PHOENIX_CAPTURE_CONTENT=true\n",
         encoding="utf-8",
     )
     monkeypatch.setenv("PHOENIX_PROJECT_NAME", "from-shell")
@@ -367,10 +331,10 @@ def test_phoenix_explanation_matches_file_precedence_and_disabled_override(
     assert settings is not None
     entries = {entry.variable: entry for entry in explain_service(folder)[0]}
     assert entries["PHOENIX_PROJECT_NAME"].value == settings.project_name == "from-shell"
-    assert str(extra) in entries["EAP_PHOENIX_CAPTURE_CONTENT"].origin
+    assert str(extra) in entries["AC2_PHOENIX_CAPTURE_CONTENT"].origin
     assert entries["PHOENIX_API_KEY"].value == "********"
-    monkeypatch.setenv("EAP_PHOENIX_ENABLED", "false")
-    monkeypatch.setenv("EAP_PHOENIX_ENV_FILE", "missing.env")
+    monkeypatch.setenv("AC2_PHOENIX_ENABLED", "false")
+    monkeypatch.setenv("AC2_PHOENIX_ENV_FILE", "missing.env")
     assert run("doctor", "hello-agent", "--workspace", workspace) == 0
     assert "phoenix: disabled" in capsys.readouterr().out
 
@@ -685,6 +649,34 @@ def test_update_replaces_what_the_developer_left_alone_and_keeps_what_they_chang
     assert [path.name for path in again.kept] == ["tools.py"]
 
 
+def test_plan_lists_changes_without_writing(tmp_path: Path) -> None:
+    scaffolder().init(tmp_path, ANSWERS)
+    agent = tmp_path / "agents/hello-agent"
+    tools = agent / "src/hello_agent/tools.py"
+    tools.write_text(tools.read_text(encoding="utf-8") + "\n# my tool\n", encoding="utf-8")
+
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    report = scaffolder(NewerTemplates()).plan(tmp_path)
+    after = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    assert after == before  # nothing was written
+
+    assert [path.as_posix() for path in report.updated] == [
+        "agents/hello-agent/src/hello_agent/graph.py"
+    ]
+    assert [path.as_posix() for path in report.created] == [
+        "agents/hello-agent/src/hello_agent/extra.py"
+    ]
+    assert [path.as_posix() for path in report.kept] == [
+        "agents/hello-agent/src/hello_agent/tools.py"
+    ]
+    assert "# written by a newer version" in report.new_text[report.kept[0]]
+    # The listed "would be updated" file was not actually touched on disk.
+    graph = agent / "src/hello_agent/graph.py"
+    assert "# written by a newer version" not in graph.read_text(encoding="utf-8")
+    assert not (agent / "src/hello_agent/extra.py").exists()
+    assert tools.read_text(encoding="utf-8").endswith("# my tool\n")
+
+
 def test_the_update_command_lists_what_it_did_and_can_show_the_difference(
     workspace: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -704,6 +696,42 @@ def test_the_update_command_lists_what_it_did_and_can_show_the_difference(
     assert '    -    return f"Good day, {cleaned}!"' in out
     assert '    +    return f"Hello, {cleaned}!"' in out
     assert "Good day" in tools.read_text(encoding="utf-8")
+
+
+def test_update_plan_flag_previews_and_exits_clean(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    before = {p: p.read_bytes() for p in workspace.rglob("*") if p.is_file()}
+
+    newer_tools = toolbox_for_tests(pins=PINS, renderer=NewerTemplates())
+    capsys.readouterr()
+    assert run("update", "--plan", "--workspace", workspace, tools=newer_tools) == 0
+    out = capsys.readouterr().out
+    assert "would update  agents/hello-agent/src/hello_agent/graph.py" in out
+    assert "would create  agents/hello-agent/src/hello_agent/extra.py" in out
+
+    after = {p: p.read_bytes() for p in workspace.rglob("*") if p.is_file()}
+    assert after == before  # nothing was written
+
+
+def test_the_diff_hint_in_plan_mode_names_the_command_that_writes_nothing(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    tools = workspace / "agents/hello-agent/src/hello_agent/tools.py"
+    original = tools.read_text(encoding="utf-8")
+    tools.write_text(original.replace("Hello, ", "Good day, "), encoding="utf-8")
+    capsys.readouterr()
+
+    assert run("update", "--plan", "--workspace", workspace) == 0
+    out = capsys.readouterr().out
+    assert "agentlib update --plan --diff" in out
+    # Plain `update --diff` writes; the dry-run hint must not send people to it.
+    assert "agentlib update --diff" not in out
+    assert "Good day" in tools.read_text(encoding="utf-8")
+
+    # Once --diff is given there is nothing left to suggest.
+    assert run("update", "--plan", "--diff", "--workspace", workspace) == 0
+    assert "See what the templates would change" not in capsys.readouterr().out
 
 
 def test_a_lock_file_that_cannot_be_read_stops_the_command(

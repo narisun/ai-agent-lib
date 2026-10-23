@@ -1,0 +1,29 @@
+# The MCP tool registry: which servers and tools exist. An agent can only use a tool
+# that is listed here, and only if the tool's live input schema still matches its pin.
+# After changing a tool's arguments, pin it again: agentlib registry pin <server>
+# agentlib rewrites this file when it adds, links or pins a service; comments are not kept.
+schema: agentlib.registry/v1
+servers:
+- id: rmqna-data
+  owner: commercial-banking
+  url: http://127.0.0.1:8300/mcp
+  audience: rmqna-data
+  tools:
+  - name: rmqna-data.execute_sql
+    version: 0.1.0
+    schema_sha256: 6257e35b4099798dc5ddefdc4f50dc961253f0a2e132839833305e446731800a
+    classification: confidential
+    read_only: true
+    description: Run one validated, read-only SQL SELECT over the RM tables and return its rows.
+  - name: rmqna-data.search_column_values
+    version: 0.1.0
+    schema_sha256: 632dd4f450789bcc5e07d1d874f1208f8ca9e100845beea53c9f4fe392a6566f
+    classification: confidential
+    read_only: true
+    description: Find the stored values of a column that contain some text.
+  - name: rmqna-data.get_schema
+    version: 0.1.0
+    schema_sha256: 31c51d54ff473d00073bda364fd4d7a9e9023c7920c5e8ff049b01f82a86664a
+    classification: internal
+    read_only: true
+    description: Return the schema document describing every table and column.

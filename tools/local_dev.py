@@ -91,15 +91,22 @@ def prepare_ui(root: Path, config: Path) -> int:
     return port
 
 
+# Setup runs before the library is installed, so it cannot ask the library for these names.
+_PROVIDER = "AC2_MODEL_PROVIDER"
+_LEGACY_PROVIDER = "EAP_MODEL_PROVIDER"  # Deprecation window: accepted, with a notice.
+
+
 def setup_model(root: Path, selected: str = "auto") -> str:
     """Read only the provider setting, before third-party packages are installed.
 
     Precedence matches startup: explicit setup option, shell, root .env, service
     .env (or its example), then fake. This does not read or print credentials.
+    The earlier ``EAP_`` spelling is read as well. Both spellings with different
+    values stop setup, as they stop the agent, because neither is guessed to be meant.
     """
     if selected != "auto":
         return selected
-    provider = "fake"
+    found: dict[str, str] = {}
     service = root / AGENT_ENV
     for path in (
         service if service.is_file() else service.with_name(".env.example"),
@@ -109,10 +116,24 @@ def setup_model(root: Path, selected: str = "auto") -> str:
             continue
         for line in path.read_text(encoding="utf-8-sig").splitlines():
             key, separator, value = line.partition("=")
-            if separator and key.strip().removeprefix("export ").strip() == "EAP_MODEL_PROVIDER":
+            name = key.strip().removeprefix("export ").strip()
+            if separator and name in {_PROVIDER, _LEGACY_PROVIDER}:
                 parts = shlex.split(value, comments=True)
-                provider = parts[0] if len(parts) == 1 else ""
-    provider = os.environ.get("EAP_MODEL_PROVIDER", provider)
+                found[name] = parts[0] if len(parts) == 1 else ""
+    found.update(
+        (name, os.environ[name]) for name in (_PROVIDER, _LEGACY_PROVIDER) if name in os.environ
+    )
+    provider = found.get(_PROVIDER)
+    if (legacy := found.get(_LEGACY_PROVIDER)) is not None:
+        if provider is None:
+            report(f"{_LEGACY_PROVIDER} is deprecated; use {_PROVIDER} instead")
+            provider = legacy
+        elif provider != legacy:
+            raise ValueError(
+                f"{_LEGACY_PROVIDER} is deprecated and conflicts with {_PROVIDER}; "
+                f"set only {_PROVIDER}"
+            )
+    provider = "fake" if provider is None else provider
     if provider not in {"fake", "anthropic", "bedrock"}:
         raise ValueError("Select --model fake, anthropic, or bedrock for local setup.")
     return provider

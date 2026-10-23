@@ -77,7 +77,7 @@ def test_the_first_run_writes_a_starting_settings_file_and_nothing_else(
     assert "created  agents/helper/deploy.env" in out
     assert 'add "ai-agent-lib-aws[bedrock,postgres]" to the dependencies' in out
     text = _settings(workspace).read_text(encoding="utf-8")
-    assert "EAP_PROFILE=aws" in text
+    assert "AC2_PROFILE=aws" in text
     assert "never put a secret here" in text
     assert not (workspace / "deploy").exists()
 
@@ -133,7 +133,7 @@ def test_deploy_writes_the_module_and_the_files_derived_from_the_settings(
     ) in permissions
     settings = (ready / "deploy/helper/settings.tf").read_text(encoding="utf-8")
     assert "  uses_opa  = true\n" in settings
-    assert '    EAP_AUDIT_OPTIONS      = "{\\"stream\\": \\"eap-audit\\"}"\n' in settings
+    assert '    AC2_AUDIT_OPTIONS      = "{\\"stream\\": \\"eap-audit\\"}"\n' in settings
     dockerfile = (ready / "deploy/helper/Dockerfile").read_text(encoding="utf-8")
     assert "python -m pip install --no-cache-dir --require-hashes" in dockerfile
     assert "COPY agents/helper agents/helper" in dockerfile
@@ -248,16 +248,46 @@ def test_running_again_rewrites_what_is_derived_and_keeps_what_is_yours(
     assert "other-audit" in (ready / "deploy/helper/permissions.tf").read_text(encoding="utf-8")
 
 
+def test_legacy_spellings_in_the_settings_are_flagged_in_the_plan_and_passed_through_verbatim(
+    ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    settings = _settings(ready)
+    text = settings.read_text(encoding="utf-8")
+    settings.write_text(text.replace("AC2_AUDIT_OPTIONS", "EAP_AUDIT_OPTIONS"), encoding="utf-8")
+
+    assert run("deploy", "helper", "--plan", "--workspace", ready) == 0
+    out = capsys.readouterr().out
+    assert "Deprecated spellings in agents/helper/deploy.env" in out
+    assert "  EAP_AUDIT_OPTIONS -> AC2_AUDIT_OPTIONS" in out
+    assert "stops working after one minor release" in out
+    assert "  EAP_AUDIT_OPTIONS\n" in out  # the environment lists the name as written
+    assert "AC2_PROFILE\n" in out
+    assert "  AC2_PROFILE ->" not in out
+
+    assert run("deploy", "helper", "--workspace", ready) == 0
+    capsys.readouterr()
+    tasks = (ready / "deploy/helper/settings.tf").read_text(encoding="utf-8")
+    assert '    EAP_AUDIT_OPTIONS      = "{\\"stream\\": \\"eap-audit\\"}"\n' in tasks
+    assert "AC2_AUDIT_OPTIONS" not in tasks
+
+
+def test_canonical_settings_have_no_deprecated_spellings_section(
+    ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert run("deploy", "helper", "--plan", "--workspace", ready) == 0
+    assert "Deprecated spellings" not in capsys.readouterr().out
+
+
 def test_a_secret_in_the_settings_is_refused_and_its_value_never_shown(
     ready: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     with _settings(ready).open("a", encoding="utf-8") as file:
-        file.write("EAP_SECRET_RATES_TOKEN=s3cr3t-value\n")
+        file.write("AC2_SECRET_RATES_TOKEN=s3cr3t-value\n")
 
     assert run("deploy", "helper", "--plan", "--workspace", ready) == 1
     captured = capsys.readouterr()
     assert "holds secrets" in captured.err
-    assert "EAP_SECRET_RATES_TOKEN" in captured.err
+    assert "AC2_SECRET_RATES_TOKEN" in captured.err
     assert "s3cr3t-value" not in captured.out + captured.err
 
 
@@ -267,22 +297,22 @@ def test_settings_for_a_developers_machine_are_refused(
     settings = _settings(ready)
     settings.write_text(
         settings.read_text(encoding="utf-8").replace(
-            "EAP_DEPLOYMENT_ENV=dev", "EAP_DEPLOYMENT_ENV=local"
+            "AC2_DEPLOYMENT_ENV=dev", "AC2_DEPLOYMENT_ENV=local"
         ),
         encoding="utf-8",
     )
 
     assert run("deploy", "helper", "--plan", "--workspace", ready) == 1
     err = capsys.readouterr().err
-    assert "expected: EAP_DEPLOYMENT_ENV=dev or EAP_DEPLOYMENT_ENV=prod" in err
-    assert "got: EAP_DEPLOYMENT_ENV is local" in err
+    assert "expected: AC2_DEPLOYMENT_ENV=dev or AC2_DEPLOYMENT_ENV=prod" in err
+    assert "got: AC2_DEPLOYMENT_ENV is local" in err
 
 
 def test_a_local_only_adapter_is_a_problem_that_names_itself(
     ready: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     with _settings(ready).open("a", encoding="utf-8") as file:
-        file.write("EAP_AUDIT_PROVIDER=jsonl\nEAP_AUDIT_OPTIONS={}\n")
+        file.write("AC2_AUDIT_PROVIDER=jsonl\nAC2_AUDIT_OPTIONS={}\n")
 
     assert run("deploy", "helper", "--plan", "--workspace", ready) == 1
     out = capsys.readouterr().out
@@ -293,7 +323,7 @@ def test_a_bad_option_says_which_adapter_and_which_file(
     ready: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     with _settings(ready).open("a", encoding="utf-8") as file:
-        file.write('EAP_AUDIT_OPTIONS={"stream": "has spaces"}\n')
+        file.write('AC2_AUDIT_OPTIONS={"stream": "has spaces"}\n')
 
     assert run("deploy", "helper", "--plan", "--workspace", ready) == 1
     err = capsys.readouterr().err
@@ -307,10 +337,10 @@ def test_an_mcp_server_keeps_no_conversations_and_is_served_by_its_own_command(
     assert run("deploy", "people", "--workspace", workspace) == 0
     _depend_on_aws(workspace, "mcp-servers/people")
     settings = _settings(workspace, "mcp-servers/people")
-    assert "EAP_CHECKPOINT_PROVIDER=none" in settings.read_text(encoding="utf-8")
+    assert "AC2_CHECKPOINT_PROVIDER=none" in settings.read_text(encoding="utf-8")
     # An OPA server elsewhere needs no sidecar.
     with settings.open("a", encoding="utf-8") as file:
-        file.write('EAP_POLICY_OPTIONS={"url": "https://opa.internal:8181"}\n')
+        file.write('AC2_POLICY_OPTIONS={"url": "https://opa.internal:8181"}\n')
     capsys.readouterr()
 
     assert run("deploy", "people", "--workspace", workspace) == 0
@@ -385,7 +415,7 @@ def _plan_with(
     root: Path, factory: Any, *, extra: str | None = None, resolve: DistributionResolver
 ) -> Any:
     with _settings(root).open("a", encoding="utf-8") as file:
-        file.write("EAP_AUDIT_PROVIDER=own_audit\nEAP_AUDIT_OPTIONS={}\n")
+        file.write("AC2_AUDIT_PROVIDER=own_audit\nAC2_AUDIT_OPTIONS={}\n")
     registry = ServiceProviders.default().register("audit", "own_audit", factory, extra=extra)
     answers = load_answers(root)
     target = target_of(answers, "helper")
@@ -445,10 +475,10 @@ def test_f7_the_collector_and_the_sdk_follow_the_same_switch_as_the_service(
 ) -> None:
     settings = _settings(ready)
     text = settings.read_text(encoding="utf-8")
-    text = text.replace("EAP_TELEMETRY=opentelemetry", f"EAP_TELEMETRY={telemetry}")
+    text = text.replace("AC2_TELEMETRY=opentelemetry", f"AC2_TELEMETRY={telemetry}")
     text = text.replace(
-        'EAP_AUDIT_OPTIONS={"stream": "eap-audit"}',
-        f'EAP_AUDIT_OPTIONS={{"stream": "eap-audit", "tracing": {str(tracing).lower()}}}',
+        'AC2_AUDIT_OPTIONS={"stream": "eap-audit"}',
+        f'AC2_AUDIT_OPTIONS={{"stream": "eap-audit", "tracing": {str(tracing).lower()}}}',
     )
     settings.write_text(text, encoding="utf-8")
     pyproject = ready / "agents/helper/pyproject.toml"
@@ -512,9 +542,9 @@ def test_the_agentcore_starter_selects_ambient_telemetry_a_memory_and_the_deploy
     assert 'add "ai-agent-lib-aws[bedrock,agentcore]" to the dependencies' in out
     assert "run 'agentlib deploy helper --target agentcore --plan'" in out
     text = _settings(workspace).read_text(encoding="utf-8")
-    assert "EAP_TELEMETRY=ambient\n" in text
-    assert "EAP_CHECKPOINT_PROVIDER=agentcore_memory\n" in text
-    assert 'EAP_CHECKPOINT_OPTIONS={"memory_id": "created_by_terraform"}\n' in text
+    assert "AC2_TELEMETRY=ambient\n" in text
+    assert "AC2_CHECKPOINT_PROVIDER=agentcore_memory\n" in text
+    assert 'AC2_CHECKPOINT_OPTIONS={"memory_id": "created_by_terraform"}\n' in text
     assert "AGENTCORE_AUTH=iam\n" in text
     assert "# AGENTCORE_DISCOVERY_URL=" in text
     assert "AGENTCORE_NETWORK=PUBLIC\n" in text
@@ -556,11 +586,11 @@ def test_the_agentcore_plan_shows_the_runtime_before_the_adapters_and_no_sidecar
 def test_agentcore_refuses_the_services_own_telemetry_providers(
     agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _edit_settings(agentcore_ready, {"EAP_TELEMETRY=ambient": "EAP_TELEMETRY=opentelemetry"})
+    _edit_settings(agentcore_ready, {"AC2_TELEMETRY=ambient": "AC2_TELEMETRY=opentelemetry"})
     assert _agentcore(agentcore_ready, "--plan") == 1
     out = capsys.readouterr().out
     assert "collide with the ones ADOT installs" in out
-    assert "set EAP_TELEMETRY=ambient (or off) in agents/helper/deploy.env" in out
+    assert "set AC2_TELEMETRY=ambient (or off) in agents/helper/deploy.env" in out
 
 
 def test_agentcore_refuses_the_older_audit_tracing_switch_with_telemetry_off(
@@ -569,9 +599,9 @@ def test_agentcore_refuses_the_older_audit_tracing_switch_with_telemetry_off(
     _edit_settings(
         agentcore_ready,
         {
-            "EAP_TELEMETRY=ambient": "EAP_TELEMETRY=off",
-            'EAP_AUDIT_OPTIONS={"stream": "eap-audit"}': (
-                'EAP_AUDIT_OPTIONS={"stream": "eap-audit", "tracing": true}'
+            "AC2_TELEMETRY=ambient": "AC2_TELEMETRY=off",
+            'AC2_AUDIT_OPTIONS={"stream": "eap-audit"}': (
+                'AC2_AUDIT_OPTIONS={"stream": "eap-audit", "tracing": true}'
             ),
         },
     )
@@ -589,8 +619,8 @@ def test_agentcore_refuses_opa_on_the_loopback_address(
     assert _agentcore(agentcore_ready, "--plan") == 1
     out = capsys.readouterr().out
     assert "nothing runs beside a container on AgentCore Runtime" in out
-    assert "EAP_POLICY_PROVIDER=rules" in out
-    assert "Point url in EAP_POLICY_OPTIONS" in out
+    assert "AC2_POLICY_PROVIDER=rules" in out
+    assert "Point url in AC2_POLICY_OPTIONS" in out
 
 
 def test_agentcore_refuses_a_checkpoint_store_on_the_sessions_disk(
@@ -599,9 +629,9 @@ def test_agentcore_refuses_a_checkpoint_store_on_the_sessions_disk(
     _edit_settings(
         agentcore_ready,
         {
-            "EAP_CHECKPOINT_PROVIDER=agentcore_memory": "EAP_CHECKPOINT_PROVIDER=sqlite",
-            'EAP_CHECKPOINT_OPTIONS={"memory_id": "created_by_terraform"}': (
-                "EAP_CHECKPOINT_OPTIONS={}"
+            "AC2_CHECKPOINT_PROVIDER=agentcore_memory": "AC2_CHECKPOINT_PROVIDER=sqlite",
+            'AC2_CHECKPOINT_OPTIONS={"memory_id": "created_by_terraform"}': (
+                "AC2_CHECKPOINT_OPTIONS={}"
             ),
         },
     )
@@ -609,7 +639,7 @@ def test_agentcore_refuses_a_checkpoint_store_on_the_sessions_disk(
     out = capsys.readouterr().out
     assert "checkpoint sqlite runs only on a developer's machine" in out
     assert "checkpoint sqlite has nowhere durable to write" in out
-    assert "set EAP_CHECKPOINT_PROVIDER to one of postgres, agentcore_memory, none" in out
+    assert "set AC2_CHECKPOINT_PROVIDER to one of postgres, agentcore_memory, none" in out
     assert "AGENTCORE_MEMORY=create while checkpoint sqlite does not use AgentCore Memory" in out
 
 
@@ -655,15 +685,15 @@ def test_agentcore_memory_without_the_memory_checkpoint_is_a_warning(
     _edit_settings(
         agentcore_ready,
         {
-            "EAP_CHECKPOINT_PROVIDER=agentcore_memory": "EAP_CHECKPOINT_PROVIDER=none",
-            'EAP_CHECKPOINT_OPTIONS={"memory_id": "created_by_terraform"}': "",
+            "AC2_CHECKPOINT_PROVIDER=agentcore_memory": "AC2_CHECKPOINT_PROVIDER=none",
+            'AC2_CHECKPOINT_OPTIONS={"memory_id": "created_by_terraform"}': "",
         },
     )
     assert _agentcore(agentcore_ready, "--plan") == 0
     out = capsys.readouterr().out
     assert "Warnings:" in out
     assert "AGENTCORE_MEMORY=create while checkpoint none does not use AgentCore Memory" in out
-    assert "set EAP_CHECKPOINT_PROVIDER=agentcore_memory" in out
+    assert "set AC2_CHECKPOINT_PROVIDER=agentcore_memory" in out
 
 
 def test_agentcore_code_artifact_warns_about_wheels_and_writes_the_zip_builder(
@@ -804,16 +834,16 @@ def test_agentcore_jwt_and_vpc_settings_reach_settings_tf(
 def test_agentcore_environment_leaves_the_block_out_and_keeps_an_empty_value(
     agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _edit_settings(agentcore_ready, append="EAP_TLS_CA_BUNDLE=\n")
+    _edit_settings(agentcore_ready, append="AC2_TLS_CA_BUNDLE=\n")
     assert _agentcore(agentcore_ready) == 0
     capsys.readouterr()
     settings = (agentcore_ready / "deploy/helper/settings.tf").read_text(encoding="utf-8")
     environment = settings[settings.index("environment = {") :]
     assert "AGENTCORE_" not in environment
-    assert '    EAP_TLS_CA_BUNDLE       = ""\n' in environment
-    assert '  memory_option_variable = "EAP_CHECKPOINT_OPTIONS"\n' in settings
+    assert '    AC2_TLS_CA_BUNDLE       = ""\n' in environment
+    assert '  memory_option_variable = "AC2_CHECKPOINT_OPTIONS"\n' in settings
     assert (
-        '    EAP_CHECKPOINT_OPTIONS  = "{\\"memory_id\\": \\"created_by_terraform\\"}"\n'
+        '    AC2_CHECKPOINT_OPTIONS  = "{\\"memory_id\\": \\"created_by_terraform\\"}"\n'
         in settings
     )
 
@@ -855,7 +885,7 @@ def test_agentcore_writes_a_root_module_alone_and_an_arm64_image_per_kind(
     # An MCP server listens on the runtime's MCP port, served by its own package.
     assert _agentcore(agentcore_ready, service="people") == 0
     _depend_on_aws(agentcore_ready, "mcp-servers/people")
-    _edit_settings(agentcore_ready, folder="mcp-servers/people", append="EAP_DATA_SOURCES={}\n")
+    _edit_settings(agentcore_ready, folder="mcp-servers/people", append="AC2_DATA_SOURCES={}\n")
     capsys.readouterr()
     assert _agentcore(agentcore_ready, service="people") == 0
     out = capsys.readouterr().out
@@ -896,7 +926,7 @@ def test_the_fargate_target_is_the_default_and_ignores_the_agentcore_block(
     agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """The same deploy.env, deployed to Fargate: the block is not the service's environment."""
-    _edit_settings(agentcore_ready, {"EAP_TELEMETRY=ambient": "EAP_TELEMETRY=off"})
+    _edit_settings(agentcore_ready, {"AC2_TELEMETRY=ambient": "AC2_TELEMETRY=off"})
     assert run("deploy", "helper", "--plan", "--workspace", agentcore_ready) == 0
     out = capsys.readouterr().out
     assert out.startswith("Deploying helper with the settings in agents/helper/deploy.env.\n")
@@ -920,8 +950,8 @@ def test_the_fargate_target_is_the_default_and_ignores_the_agentcore_block(
             "# AGENTCORE_ALLOWED_AUDIENCE=api://helper": "AGENTCORE_ALLOWED_AUDIENCE=api://helper",
             "AGENTCORE_GATEWAY=none": "AGENTCORE_GATEWAY=create",
             "AGENTCORE_MEMORY=create": "AGENTCORE_MEMORY=none",
-            'EAP_CHECKPOINT_OPTIONS={"memory_id": "created_by_terraform"}': (
-                'EAP_CHECKPOINT_OPTIONS={"memory_id": "helper_mem-0123456789"}'
+            'AC2_CHECKPOINT_OPTIONS={"memory_id": "created_by_terraform"}': (
+                'AC2_CHECKPOINT_OPTIONS={"memory_id": "helper_mem-0123456789"}'
             ),
         },
     ],

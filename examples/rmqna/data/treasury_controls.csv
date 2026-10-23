@@ -1,0 +1,13 @@
+control_id,uen,product,control_type,status,severity,observation,detected_date,owner,target_date,last_updated
+CTL-0001,ALLO-0001,Wire Transfer,user_entitlement,pending_remediation,high,Two former employees remain on the wire entitlement review pending client confirmation,2026-07-22,TPS Implementation,2026-08-08,2026-08-02
+CTL-0002,BARG-0002,Online Banking for Business,security_token,open,high,Two critical token-reset requests remain unresolved and one user cannot approve payments,2026-07-18,Digital Support,2026-08-04,2026-08-03
+CTL-0003,BENC-0003,Positive Pay,implementation,implementation_in_progress,medium,Issued-check file testing passed format validation but exception-workflow training is incomplete,2026-07-24,TPS Implementation,2026-08-16,2026-08-01
+CTL-0004,BOST-0007,Merchant Services,chargeback_trend,watch,medium,Chargeback rate increased for card-not-present transactions during the last two months,2026-07-31,Merchant Risk,2026-08-20,2026-08-02
+CTL-0005,BUSH-0009,Wire Transfer,payment_access,open,critical,Client reported an inability to initiate wires during a supplier payment window,2026-07-29,Payments Operations,2026-08-04,2026-08-03
+CTL-0006,CANA-0010,Analyzed Operating DDA,fee_exception,open,high,Repeated analysis-fee disputes remain unresolved and are blocking balance-consolidation discussions,2026-07-15,TPS Sales,2026-08-07,2026-08-03
+CTL-0007,FARI-0016,FX Services,hedge_documentation,ready,low,Forecast and authorized-signer documentation are complete for an indicative forward discussion,2026-07-30,Capital Markets,2026-08-12,2026-08-01
+CTL-0008,JONE-0022,ACH Origination,return_rate,watch,high,ACH return rate exceeded the client's recent baseline and coincides with liquidity stress,2026-07-28,TPS Risk,2026-08-09,2026-08-03
+CTL-0009,MCCO-0030,Commercial Card,program_adoption,underutilized,medium,Only a small share of eligible supplier spend is routed through the commercial-card program,2026-07-20,Card Sales,2026-08-30,2026-08-01
+CTL-0010,REMB-0036,Wire Transfer,dual_control,open,high,One payment workflow permits the same user to create and release wires below the secondary threshold,2026-07-26,TPS Risk,2026-08-10,2026-08-03
+CTL-0011,VERM-0045,Online Banking for Business,user_entitlement,pending_remediation,critical,Administrator access remains active for a departed controller while the relationship is on Watch,2026-07-31,Digital Support,2026-08-04,2026-08-03
+CTL-0012,WAWO-0046,Positive Pay,control_gap,not_enabled,medium,Positive Pay is not enabled despite meaningful check issuance and a recent altered-check inquiry,2026-07-19,TPS Sales,2026-09-01,2026-08-02

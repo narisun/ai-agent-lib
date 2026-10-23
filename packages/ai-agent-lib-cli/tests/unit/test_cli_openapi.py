@@ -520,7 +520,7 @@ def test_new_mcp_from_openapi_writes_a_server_whose_tests_answer_for_the_api(
     readme = (service / "README.md").read_text(encoding="utf-8")
     assert "endpoint definition in `queries/`, generated from the OpenAPI" in readme
     assert '"auth_secret": "rates_token"' in readme
-    assert "EAP_SECRET_RATES_TOKEN" in readme
+    assert "AC2_SECRET_RATES_TOKEN" in readme
     assert "## Add a tool over your own data" not in readme
 
     (entry,) = read_servers(workspace)

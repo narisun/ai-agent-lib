@@ -34,7 +34,7 @@ class _AuditTracing(AuditOptions):
 
 
 def telemetry_enabled(config: ServiceConfig) -> bool:
-    """Whether telemetry is on: ``EAP_TELEMETRY`` other than ``off``, or the older audit option.
+    """Whether telemetry is on: ``AC2_TELEMETRY`` other than ``off``, or the older audit option.
 
     ``opentelemetry`` and ``ambient`` both turn it on; they differ only in who
     installs the providers. The audit option ``tracing: true`` predates the

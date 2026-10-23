@@ -10,19 +10,24 @@ from __future__ import annotations
 
 import enum
 import re
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
+from types import MappingProxyType
 
 from ai_agent_lib_core.contracts import Section
 
 __all__ = [
     "DEFAULT_BINDINGS",
+    "LEGACY_PREFIX",
+    "LEGACY_SECRET_VARIABLE_PREFIX",
+    "LOCAL_ONLY_ADAPTERS",
     "PREFIX",
     "SECRET_KEY_PREFIX",
     "SECRET_VARIABLE_PREFIX",
     "Binding",
     "Key",
     "ValueKind",
+    "legacy_spelling",
     "options_key",
     "provider_key",
     "secret_key",
@@ -30,8 +35,11 @@ __all__ = [
     "validate_bindings",
 ]
 
-PREFIX = "EAP_"
-"""Prefix of every variable the library owns: Enterprise Agentic Platform."""
+PREFIX = "AC2_"
+"""Prefix of every variable the library owns."""
+
+LEGACY_PREFIX = "EAP_"
+"""The earlier prefix. Its spellings keep working for one minor release, with a warning."""
 
 _OWNED_NAME = re.compile(rf"^{PREFIX}[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$")
 _ANY_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
@@ -92,13 +100,27 @@ Adapters ask the secrets port for a secret by name. In local development the
 ``<prefix>RATES_TOKEN`` supplies the secret ``rates_token``.
 """
 
-_SECRET_VARIABLE = re.compile(rf"^{SECRET_VARIABLE_PREFIX}(?P<name>[A-Z][A-Z0-9]*(_[A-Z0-9]+)*)$")
+LEGACY_SECRET_VARIABLE_PREFIX = f"{LEGACY_PREFIX}SECRET_"
+"""The earlier prefix of the secret variables, accepted with a warning."""
+
+_SECRET_VARIABLE = re.compile(
+    rf"^(?:{SECRET_VARIABLE_PREFIX}|{LEGACY_SECRET_VARIABLE_PREFIX})"
+    r"(?P<name>[A-Z][A-Z0-9]*(_[A-Z0-9]+)*)$"
+)
 
 
 def secret_name(variable: str) -> str | None:
-    """Return the secret a variable supplies, or ``None`` if it is not a secret variable."""
+    """Return the secret a variable supplies, or ``None`` if it is not a secret variable.
+
+    Both the current and the legacy spelling of the variable are recognised.
+    """
     match = _SECRET_VARIABLE.match(variable)
     return match.group("name").lower() if match is not None else None
+
+
+def legacy_spelling(name: str) -> str:
+    """Return the legacy spelling of an owned variable name."""
+    return LEGACY_PREFIX + name.removeprefix(PREFIX)
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,16 +167,54 @@ class Binding:
         return (self.name, *self.alternate_names, *self.deprecated_names)
 
 
+LOCAL_ONLY_ADAPTERS: Mapping[tuple[str, str], str] = MappingProxyType(
+    {
+        ("identity", "static"): "the development identity",
+        ("policy", "rules"): "the rules engine",
+        ("audit", "jsonl"): "JSONL audit",
+        ("checkpoint", "sqlite"): "SQLite",
+        ("data", "duckdb_csv"): "DuckDB over CSV",
+        ("model", "fake"): "the fake model",
+    }
+)
+"""The adapters registered as local only, by ``(port, name)``, with how the reference says them.
+
+The one-way guard refuses these outside local development. This module cannot
+ask the provider registry, because configuration may not import it, so the
+list is kept here and an architecture test compares it with the registry.
+"""
+
+_LOCAL_ONLY_PHRASES = ", ".join(LOCAL_ONLY_ADAPTERS.values())
+
 _SECTION_DETAILS = {
-    Section.SECRETS: "Where adapters get credentials by name.",
-    Section.AUDIT: "Where the audit trail of every governed call goes.",
-    Section.IDENTITY: (
-        "Who the caller is: a development identity locally, OAuth 2.0 JWTs when deployed."
+    Section.SECRETS: (
+        "Where adapters get credentials by name: `env` reads `AC2_SECRET_<NAME>` variables "
+        "locally, `secrets_manager` is the AWS option."
     ),
-    Section.CHECKPOINT: "Where LangGraph keeps conversation state between turns.",
-    Section.REGISTRY: "The agent and MCP tool registries.",
-    Section.POLICY: "Who may do what: the in-process rules engine locally, OPA when deployed.",
-    Section.GUARDRAILS: "Content checks on prompts, replies and tool results.",
+    Section.AUDIT: (
+        "Where the audit trail of every governed call goes: `jsonl` writes a local file and is "
+        "local-only, `firehose` is the AWS option."
+    ),
+    Section.IDENTITY: (
+        "Who the caller is: a development identity (`static`, local-only) locally, "
+        "OAuth 2.0 JWTs (`jwt`) when deployed."
+    ),
+    Section.CHECKPOINT: (
+        "Where LangGraph keeps conversation state between turns: `sqlite` is a local file and "
+        "is local-only, `postgres` is the AWS option."
+    ),
+    Section.REGISTRY: (
+        "The agent and MCP tool registries: `file` reads them from disk and can be deployed, "
+        "`s3_file` is the AWS option."
+    ),
+    Section.POLICY: (
+        "Who may do what: the in-process rules engine (`rules`, local-only) locally, "
+        "OPA (`opa`) when deployed."
+    ),
+    Section.GUARDRAILS: (
+        "Content checks on prompts, replies and tool results: `patterns` checks text patterns "
+        "in the process and can be deployed, `bedrock` is the AWS option."
+    ),
 }
 
 
@@ -188,7 +248,20 @@ def _section_bindings() -> list[Binding]:
     return bindings
 
 
+def _with_legacy_spelling(binding: Binding) -> Binding:
+    """Return an owned binding that also accepts its legacy spelling, with a warning."""
+    if not binding.owned:
+        return binding
+    return replace(
+        binding, deprecated_names=(*binding.deprecated_names, legacy_spelling(binding.name))
+    )
+
+
 def _default_bindings() -> tuple[Binding, ...]:
+    return tuple(_with_legacy_spelling(binding) for binding in _owned_and_external_bindings())
+
+
+def _owned_and_external_bindings() -> tuple[Binding, ...]:
     return (
         Binding(
             name=f"{PREFIX}PROFILE",
@@ -199,7 +272,7 @@ def _default_bindings() -> tuple[Binding, ...]:
                 "`local` selects file storage, SQLite, local rules, a development identity, "
                 "and the Anthropic model provider. `aws` selects the AWS deployment defaults. "
                 "Override individual providers to match your environment; use "
-                "`EAP_MODEL_PROVIDER=fake` for the local tutorial."
+                "`AC2_MODEL_PROVIDER=fake` for the local tutorial."
             ),
         ),
         Binding(
@@ -209,9 +282,8 @@ def _default_bindings() -> tuple[Binding, ...]:
             example="local",
             details=(
                 "Says where the process runs. Anything other than `local` turns on the one-way "
-                "guard: adapters registered as local only (the development identity, the rules "
-                "engine, JSONL audit, SQLite, DuckDB over CSV, the fake model) refuse to start. "
-                "Inside ECS, Fargate or Lambda the value must be dev or prod."
+                f"guard: adapters registered as local only ({_LOCAL_ONLY_PHRASES}) refuse to "
+                "start. Inside ECS, Fargate or Lambda the value must be dev or prod."
             ),
         ),
         Binding(
@@ -222,12 +294,13 @@ def _default_bindings() -> tuple[Binding, ...]:
             details=(
                 "With `opentelemetry` every governed call is a span named after the GenAI "
                 "conventions, and the `agentlib.events` and `agentlib.duration` metrics are "
-                "recorded, through the OpenTelemetry API. The service sends them by calling "
-                "`configure_telemetry()`; where to is set with the standard `OTEL_` variables. "
-                "With `ambient` the same signals go to the providers the host installed, as "
-                "`opentelemetry-instrument` does, and the service installs none; it refuses to "
-                "start when no provider is found. The audit option `tracing: true` also turns "
-                "it on."
+                "recorded, through the OpenTelemetry API. A service entry point sends them by "
+                "calling `start_telemetry()` (`run_agent` and `run_service` do), which installs "
+                "the providers through `configure_telemetry()` when this is on; where to is set "
+                "with the standard `OTEL_` variables. With `ambient` the same signals go to the "
+                "providers the host installed, as `opentelemetry-instrument` does, and the "
+                "service installs none; it refuses to start when no provider is found. The audit "
+                "option `tracing: true` also turns it on."
             ),
         ),
         Binding(
@@ -281,7 +354,9 @@ def _default_bindings() -> tuple[Binding, ...]:
             example="anthropic",
             details=(
                 "The provider of the model behind the `default` alias, and of any alias that does "
-                "not name its own provider."
+                "not name its own provider. `anthropic` calls the Anthropic API, `bedrock` is the "
+                "AWS option, and `fake` replies from the process without a network call and is "
+                "local-only."
             ),
         ),
         Binding(
@@ -329,7 +404,8 @@ def _default_bindings() -> tuple[Binding, ...]:
             kind=ValueKind.JSON,
             details=(
                 "Named data sources for MCP tools. Each entry names its adapter with `kind`; the "
-                "other keys are that adapter's options. Code asks for "
+                "other keys are that adapter's options. `duckdb_csv` reads local CSV files and is "
+                "the local-only kind; `rest` and `redshift_data` can be deployed. Code asks for "
                 '`services.data_source("ledger")` and never sees the backend.'
             ),
             default="`{}`: no data sources",
@@ -361,7 +437,7 @@ def _default_bindings() -> tuple[Binding, ...]:
                 "name its deployment environment as dev or prod."
             ),
             details=(
-                "Set by AWS on its managed runtimes. Its presence with `EAP_DEPLOYMENT_ENV=local` "
+                "Set by AWS on its managed runtimes. Its presence with `AC2_DEPLOYMENT_ENV=local` "
                 "stops startup, so a container never runs with development adapters by accident."
             ),
         ),

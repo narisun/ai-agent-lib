@@ -6,12 +6,14 @@ from pathlib import Path
 
 import httpx
 
+from ai_agent_lib_core.evaluation.feedback import JsonlFeedbackLog
 from ai_agent_lib_ui.adapters.catalog import FileCatalog, LocalAccess
 from ai_agent_lib_ui.adapters.http import HttpDispatcher
 from ai_agent_lib_ui.adapters.sqlite import SqliteThreads
 from ai_agent_lib_ui.application.chat import ChatService
 from ai_agent_lib_ui.config.settings import Settings
 from ai_agent_lib_ui.config.shell import prepare_shell
+from ai_agent_lib_ui.contracts.feedback import FeedbackLog
 
 
 @dataclass
@@ -25,6 +27,7 @@ class Runtime:
     client: httpx.AsyncClient
     auth_secret: str
     access_code: str
+    feedback: FeedbackLog
 
     @property
     def identity(self) -> str:
@@ -46,7 +49,8 @@ def compose(settings: Settings, state: Path) -> Runtime:
     catalog = FileCatalog(settings, access)
     client = httpx.AsyncClient(trust_env=False, follow_redirects=False)
     chat = ChatService(store, catalog, HttpDispatcher(client, settings.timeout_seconds))
-    return Runtime(settings, store, catalog, chat, client, secret, code)
+    feedback = JsonlFeedbackLog(state / "feedback.jsonl")
+    return Runtime(settings, store, catalog, chat, client, secret, code, feedback)
 
 
 # Chainlit executes integrations/callbacks.py by file path and calls its decorated

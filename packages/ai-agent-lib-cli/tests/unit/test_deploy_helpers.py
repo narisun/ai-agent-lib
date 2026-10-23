@@ -53,7 +53,7 @@ BEDROCK = Access(
 
 
 def _plan(target: Target = AGENT, *adapters: AdapterAccess, **fields: Any) -> DeploymentPlan:
-    environment = fields.pop("environment", (("EAP_PROFILE", "aws"), ("EAP_AUDIT", '{"a": 1}')))
+    environment = fields.pop("environment", (("AC2_PROFILE", "aws"), ("AC2_AUDIT", '{"a": 1}')))
     return DeploymentPlan(target, tuple(environment), AccessPlan(tuple(adapters)), **fields)
 
 
@@ -220,8 +220,8 @@ def test_settings_tf_holds_the_command_the_sidecars_and_the_environment() -> Non
         "  collector = false\n"
         "\n"
         "  environment = {\n"
-        '    EAP_PROFILE = "aws"\n'
-        '    EAP_AUDIT   = "{\\"a\\": 1}"\n'
+        '    AC2_PROFILE = "aws"\n'
+        '    AC2_AUDIT   = "{\\"a\\": 1}"\n'
         "  }\n"
         "}\n"
     )
@@ -339,22 +339,22 @@ def test_starter_settings_of_an_agent_select_bedrock_and_postgres() -> None:
     text = starter_settings(AGENT)
     assert "How helper runs in AWS." in text
     assert "never put a secret here" in text
-    assert "EAP_PROFILE=aws\n" in text
-    assert "EAP_DEPLOYMENT_ENV=dev\n" in text
-    assert "EAP_TELEMETRY=opentelemetry\n" in text
-    assert "EAP_MODEL_ID=eu.anthropic.claude-sonnet-4-5-20250929-v1:0\n" in text
+    assert "AC2_PROFILE=aws\n" in text
+    assert "AC2_DEPLOYMENT_ENV=dev\n" in text
+    assert "AC2_TELEMETRY=opentelemetry\n" in text
+    assert "AC2_MODEL_ID=eu.anthropic.claude-sonnet-4-5-20250929-v1:0\n" in text
     assert '"user": "helper"' in text  # the checkpoint database user, a valid identifier
     assert '"prefix": "eap/helper/"' in text
     assert '"audience": "api://helper"' in text
-    assert "EAP_CHECKPOINT_PROVIDER" not in text
-    assert "EAP_SECRET_" not in text  # example values, never a secret
+    assert "AC2_CHECKPOINT_PROVIDER" not in text
+    assert "AC2_SECRET_" not in text  # example values, never a secret
 
 
 def test_starter_settings_of_an_mcp_server_keep_no_conversations_and_name_no_model() -> None:
     text = starter_settings(SERVER)
-    assert "EAP_CHECKPOINT_PROVIDER=none\n" in text
-    assert "EAP_MODEL_ID" not in text
-    assert "EAP_CHECKPOINT_OPTIONS" not in text
+    assert "AC2_CHECKPOINT_PROVIDER=none\n" in text
+    assert "AC2_MODEL_ID" not in text
+    assert "AC2_CHECKPOINT_OPTIONS" not in text
     assert "'agentlib deploy people --plan'" in text
 
 
@@ -442,7 +442,7 @@ def test_agentcore_settings_tf_holds_the_runtime_the_block_and_the_environment()
         gateway="arn:aws:bedrock-agentcore:eu-west-1:123456789012:gateway/gw-1",
         memory="mem_01234567890",
     )
-    environment = (("EAP_PROFILE", "aws"), ("EAP_CHECKPOINT_PROVIDER", "agentcore_memory"))
+    environment = (("AC2_PROFILE", "aws"), ("AC2_CHECKPOINT_PROVIDER", "agentcore_memory"))
     assert agentcore_settings_tf(_agentcore_plan(settings, environment=environment), HEADER) == (
         "# header\n"
         "\n"
@@ -469,8 +469,8 @@ def test_agentcore_settings_tf_holds_the_runtime_the_block_and_the_environment()
         "  memory_option_variable = null\n"
         "\n"
         "  environment = {\n"
-        '    EAP_PROFILE             = "aws"\n'
-        '    EAP_CHECKPOINT_PROVIDER = "agentcore_memory"\n'
+        '    AC2_PROFILE             = "aws"\n'
+        '    AC2_CHECKPOINT_PROVIDER = "agentcore_memory"\n'
         "  }\n"
         "}\n"
     )
@@ -478,13 +478,13 @@ def test_agentcore_settings_tf_holds_the_runtime_the_block_and_the_environment()
 
 def test_agentcore_settings_tf_names_the_variable_a_created_memory_rewrites() -> None:
     created = AgentCoreSettings(memory="create")
-    with_memory_checkpoint = (("EAP_CHECKPOINT_PROVIDER", "agentcore_memory"),)
+    with_memory_checkpoint = (("AC2_CHECKPOINT_PROVIDER", "agentcore_memory"),)
     text = agentcore_settings_tf(
         _agentcore_plan(created, environment=with_memory_checkpoint), HEADER
     )
     assert "  create_memory          = true\n" in text
     assert "  memory_id              = null\n" in text
-    assert '  memory_option_variable = "EAP_CHECKPOINT_OPTIONS"\n' in text
+    assert '  memory_option_variable = "AC2_CHECKPOINT_OPTIONS"\n' in text
     # The checkpoints go elsewhere: the created memory touches no variable.
     text = agentcore_settings_tf(_agentcore_plan(created, environment=()), HEADER)
     assert "  memory_option_variable = null\n" in text
@@ -536,21 +536,21 @@ def test_agentcore_deployment_files_are_one_root_module_with_the_artifacts_files
 def test_agentcore_starter_settings_select_ambient_telemetry_and_a_created_memory() -> None:
     text = starter_settings(AGENT_ON_AGENTCORE)
     assert "How helper runs on AgentCore Runtime." in text
-    assert "EAP_TELEMETRY=ambient\n" in text
-    assert "EAP_CHECKPOINT_PROVIDER=agentcore_memory\n" in text
-    assert 'EAP_CHECKPOINT_OPTIONS={"memory_id": "created_by_terraform"}\n' in text
+    assert "AC2_TELEMETRY=ambient\n" in text
+    assert "AC2_CHECKPOINT_PROVIDER=agentcore_memory\n" in text
+    assert 'AC2_CHECKPOINT_OPTIONS={"memory_id": "created_by_terraform"}\n' in text
     assert "AGENTCORE_MEMORY=create\n" in text
     assert "rds.amazonaws.com" not in text
-    assert "EAP_SECRET_" not in text
-    assert text.index("EAP_GUARDRAILS_OPTIONS") < text.index("AGENTCORE_AUTH=iam")
+    assert "AC2_SECRET_" not in text
+    assert text.index("AC2_GUARDRAILS_OPTIONS") < text.index("AGENTCORE_AUTH=iam")
 
     server = starter_settings(SERVER_ON_AGENTCORE)
-    assert "EAP_CHECKPOINT_PROVIDER=none\n" in server
+    assert "AC2_CHECKPOINT_PROVIDER=none\n" in server
     assert "AGENTCORE_MEMORY=none\n" in server
-    assert "EAP_MODEL_ID" not in server
+    assert "AC2_MODEL_ID" not in server
     # The Fargate starter is as it was.
     assert "AGENTCORE_" not in starter_settings(AGENT)
-    assert "EAP_TELEMETRY=opentelemetry\n" in starter_settings(AGENT)
+    assert "AC2_TELEMETRY=opentelemetry\n" in starter_settings(AGENT)
 
 
 def test_agentcore_next_steps_ask_for_the_memory_extra(tmp_path: Path) -> None:
@@ -563,7 +563,7 @@ def test_agentcore_next_steps_ask_for_the_memory_extra(tmp_path: Path) -> None:
 
 
 def test_read_agentcore_settings_defaults_when_the_block_is_absent() -> None:
-    settings = read_agentcore_settings(MappingConfigSource({"EAP_PROFILE": "aws"}), "deploy.env")
+    settings = read_agentcore_settings(MappingConfigSource({"AC2_PROFILE": "aws"}), "deploy.env")
     assert settings == AgentCoreSettings()
     assert not settings.jwt
     assert not settings.create_memory

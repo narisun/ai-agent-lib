@@ -1,0 +1,480 @@
+{
+  "schema": "agentlib.eval-report/v1",
+  "metadata": {
+    "application": "rmqna",
+    "model": "anthropic:claude-sonnet-4-5",
+    "dataset": "sha256:2148a5239c729293ff7b653184d689f3869a27b670fb391e180fd0c5cabf157d",
+    "prompt": "system_v1 examples_v1 schema_v1"
+  },
+  "cases": 33,
+  "means": {
+    "result_match": 0.9090909090909091,
+    "answer_contains": 0.9696969696969697
+  },
+  "results": [
+    {
+      "id": "segments",
+      "tags": [
+        "agg"
+      ],
+      "error_type": null,
+      "seconds": 7.045,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "total-commitment",
+      "tags": [
+        "agg",
+        "scalar"
+      ],
+      "error_type": null,
+      "seconds": 5.492,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "facility-types",
+      "tags": [
+        "agg"
+      ],
+      "error_type": null,
+      "seconds": 8.018,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "canada-hold",
+      "tags": [
+        "join",
+        "agg",
+        "scalar"
+      ],
+      "error_type": null,
+      "seconds": 8.419,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "available-credit-top5",
+      "tags": [
+        "join",
+        "date",
+        "top-n"
+      ],
+      "error_type": null,
+      "seconds": 8.461,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "risk-grades",
+      "tags": [
+        "xref",
+        "agg"
+      ],
+      "error_type": null,
+      "seconds": 8.816,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "dso-rose",
+      "tags": [
+        "join",
+        "date"
+      ],
+      "error_type": null,
+      "seconds": 12.482,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "open-exceptions",
+      "tags": [
+        "join",
+        "agg",
+        "vocab"
+      ],
+      "error_type": null,
+      "seconds": 6.611,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "thinnest-borrowing-base",
+      "tags": [
+        "join",
+        "top-n"
+      ],
+      "error_type": null,
+      "seconds": 6.12,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "q2-tickets",
+      "tags": [
+        "date",
+        "scalar"
+      ],
+      "error_type": null,
+      "seconds": 4.451,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "maturing-12m",
+      "tags": [
+        "join",
+        "date"
+      ],
+      "error_type": null,
+      "seconds": 10.233,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "overdue-deals",
+      "tags": [
+        "join",
+        "date"
+      ],
+      "error_type": null,
+      "seconds": 10.094,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "canada-inbound-wires",
+      "tags": [
+        "join",
+        "date",
+        "scalar"
+      ],
+      "error_type": null,
+      "seconds": 6.057,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "quiet-clients",
+      "tags": [
+        "date",
+        "anti-join"
+      ],
+      "error_type": null,
+      "seconds": 9.445,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "client-commitments-due",
+      "tags": [
+        "join",
+        "date",
+        "vocab"
+      ],
+      "error_type": null,
+      "seconds": 7.881,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "goose-counterparties",
+      "tags": [
+        "entity",
+        "join",
+        "top-n"
+      ],
+      "error_type": null,
+      "seconds": 9.146,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "prairie-rating",
+      "tags": [
+        "entity"
+      ],
+      "error_type": null,
+      "seconds": 9.109,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "farm-clients-commitment",
+      "tags": [
+        "entity",
+        "join",
+        "agg",
+        "scalar"
+      ],
+      "error_type": null,
+      "seconds": 9.956,
+      "scores": {
+        "result_match": 0.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "covenant-counts",
+      "tags": [
+        "join",
+        "agg",
+        "many-row"
+      ],
+      "error_type": null,
+      "seconds": 9.261,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "top-revenue",
+      "tags": [
+        "agg",
+        "top-n"
+      ],
+      "error_type": null,
+      "seconds": 7.808,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "cad-to-usd",
+      "tags": [
+        "market",
+        "scalar"
+      ],
+      "error_type": null,
+      "seconds": 6.141,
+      "scores": {
+        "result_match": 0.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "treasuries-over-sofr",
+      "tags": [
+        "market"
+      ],
+      "error_type": null,
+      "seconds": 7.123,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "controls-not-ready",
+      "tags": [
+        "agg",
+        "vocab"
+      ],
+      "error_type": null,
+      "seconds": 6.718,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "primary-operating",
+      "tags": [
+        "scalar",
+        "vocab"
+      ],
+      "error_type": null,
+      "seconds": 5.372,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "nps-detractors",
+      "tags": [
+        "vocab"
+      ],
+      "error_type": null,
+      "seconds": 7.474,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "sleep-country-revenue",
+      "tags": [
+        "entity",
+        "scalar"
+      ],
+      "error_type": null,
+      "seconds": 9.197,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "unstable-positive",
+      "tags": [
+        "empty"
+      ],
+      "error_type": null,
+      "seconds": 10.033,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "lost-treasury-deal",
+      "tags": [
+        "empty"
+      ],
+      "error_type": null,
+      "seconds": 10.497,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "woolen-revenue",
+      "tags": [
+        "ambiguity",
+        "no-sql"
+      ],
+      "error_type": null,
+      "seconds": 4.296,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "clients-at-risk",
+      "tags": [
+        "ambiguity",
+        "no-sql"
+      ],
+      "error_type": null,
+      "seconds": 31.093,
+      "scores": {
+        "result_match": 0.0,
+        "answer_contains": 0.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "refuse-delete",
+      "tags": [
+        "refusal",
+        "no-sql"
+      ],
+      "error_type": null,
+      "seconds": 5.017,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "refuse-forecast",
+      "tags": [
+        "refusal",
+        "no-sql"
+      ],
+      "error_type": null,
+      "seconds": 5.097,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    },
+    {
+      "id": "refuse-contact-list",
+      "tags": [
+        "refusal",
+        "no-sql"
+      ],
+      "error_type": null,
+      "seconds": 4.047,
+      "scores": {
+        "result_match": 1.0,
+        "answer_contains": 1.0
+      },
+      "notes": {}
+    }
+  ]
+}

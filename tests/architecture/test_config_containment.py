@@ -9,8 +9,13 @@ import pytest
 from architecture.containment import find_violations
 
 from ai_agent_lib_core.config import DEFAULT_BINDINGS
-from ai_agent_lib_core.config.bindings import PREFIX, SECRET_VARIABLE_PREFIX, secret_name
-from ai_agent_lib_core.config.langfuse import LANGFUSE_VARIABLES
+from ai_agent_lib_core.config.bindings import (
+    LEGACY_PREFIX,
+    LEGACY_SECRET_VARIABLE_PREFIX,
+    PREFIX,
+    SECRET_VARIABLE_PREFIX,
+    secret_name,
+)
 from ai_agent_lib_core.config.phoenix import PHOENIX_VARIABLES
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -55,8 +60,11 @@ def test_no_module_outside_config_knows_a_variable_name_or_reads_the_environment
         ('import os as system\nvalue = system.environ.get("HOME")\n', "os.environ"),
         ("from os import environ\n", "imports os.environ"),
         ("from os import getenv\n", "imports os.getenv"),
+        ('NAME = "AC2_MODEL_PROVIDER"\n', "literal"),
         ('NAME = "EAP_MODEL_PROVIDER"\n', "literal"),
+        ('def f(section: str) -> str:\n    return f"AC2_{section}_PROVIDER"\n', "literal"),
         ('def f(section: str) -> str:\n    return f"EAP_{section}_PROVIDER"\n', "literal"),
+        ('"""Set AC2_PROFILE to choose a profile."""\n', "literal"),
         ('"""Set EAP_PROFILE to choose a profile."""\n', "literal"),
         ("from dotenv import dotenv_values\n", "imports dotenv"),
         ("import dotenv\n", "imports dotenv"),
@@ -86,7 +94,10 @@ def test_ordinary_code_is_not_flagged(clean: str) -> None:
 # told what to set. What they may not do is name a variable that does not
 # exist, which is how a renamed variable lives on in a guide.
 
-_VARIABLE = re.compile(r"\b" + re.escape(PREFIX) + r"[A-Z0-9_]*[A-Z0-9]")
+# Both spellings are checked: a legacy mention is valid for as long as an alias accepts it.
+_VARIABLE = re.compile(
+    r"\b(?:" + re.escape(PREFIX) + "|" + re.escape(LEGACY_PREFIX) + r")[A-Z0-9_]*[A-Z0-9]"
+)
 
 
 def _documents() -> list[Path]:
@@ -100,12 +111,19 @@ def _documents() -> list[Path]:
         "examples/**/.env.example",
     )
     found = {path for pattern in patterns for path in REPO_ROOT.glob(pattern)}
-    # The target specification includes proposed variables; current release docs
-    # and templates must use the implemented vocabulary. See docs/release-scope.md.
+    # Dated records quoting removed variables; ADR 0004 keeps its history and its removal amendment.
+    records = {
+        REPO_ROOT / "docs/adr/0004-tracing-configuration.md",
+        REPO_ROOT / "docs/design/code-structure-review-2026-10-13.md",
+        REPO_ROOT / "docs/design/enterprise-architecture-review-2026-10-18.md",
+    }
     return sorted(
         path
         for path in found
-        if ".venv" not in path.parts and path != REPO_ROOT / "docs/Specification.md"
+        if ".venv" not in path.parts
+        and path != REPO_ROOT / "docs/Specification.md"
+        and "superpowers" not in path.parts
+        and path not in records
     )
 
 
@@ -113,10 +131,33 @@ def _templates() -> list[Path]:
     return sorted(REPO_ROOT.glob("packages/*/src/**/templates/**/*.jinja"))
 
 
-def test_every_variable_a_document_names_exists() -> None:
+def _variables_a_document_may_name() -> set[str]:
     known = {name for binding in DEFAULT_BINDINGS for name in binding.all_names}
-    known.update(LANGFUSE_VARIABLES.values())
-    known.update(PHOENIX_VARIABLES)
+    for phoenix in PHOENIX_VARIABLES:
+        # Only the library's own names have two spellings; the vendor's PHOENIX_* names have none.
+        if phoenix.startswith(PREFIX):
+            stem = phoenix.removeprefix(PREFIX)
+            known.update({PREFIX + stem, LEGACY_PREFIX + stem})
+    return known
+
+
+def test_the_vocabulary_scan_does_not_invent_prefixed_spellings_of_vendor_names() -> None:
+    known = _variables_a_document_may_name()
+    assert {"AC2_PHOENIX_ENABLED", "EAP_PHOENIX_ENABLED"} <= known
+    assert not {
+        name
+        for name in known
+        if name.endswith(("PHOENIX_API_KEY", "PHOENIX_PROJECT_NAME"))
+        and name.startswith((PREFIX, LEGACY_PREFIX))
+    }
+    assert (
+        not {PREFIX + "PHOENIX_COLLECTOR_ENDPOINT", LEGACY_PREFIX + "PHOENIX_COLLECTOR_ENDPOINT"}
+        & known
+    )
+
+
+def test_every_variable_a_document_names_exists() -> None:
+    known = _variables_a_document_may_name()
     documents = _documents()
     assert any(path.name == "getting-started.md" for path in documents)
     unknown = sorted(
@@ -124,7 +165,9 @@ def test_every_variable_a_document_names_exists() -> None:
         for path in documents
         for name in set(_VARIABLE.findall(path.read_text(encoding="utf-8")))
         # "<prefix>SECRET_<NAME>" is how a document writes the pattern of a secret's variable.
-        if name not in known and secret_name(name) is None and name + "_" != SECRET_VARIABLE_PREFIX
+        if name not in known
+        and secret_name(name) is None
+        and name + "_" not in (SECRET_VARIABLE_PREFIX, LEGACY_SECRET_VARIABLE_PREFIX)
     )
     assert not unknown, "these documents name variables that do not exist:\n" + "\n".join(unknown)
 

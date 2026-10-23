@@ -1,0 +1,114 @@
+xref_id,xref_type,xref_name,xref_value,xref_description
+XR-0001,payment_rail,ach,ach,Automated Clearing House — batch electronic credits/debits; the low-cost rail for supplier payments and payroll
+XR-0002,payment_rail,ach,ACH,
+XR-0003,payment_rail,eft,EFT,Canadian electronic funds transfer — Canada's domestic batch rail
+XR-0004,payment_rail,wire,wire,High-value same-day settlement; domestic (Fedwire/Lynx) and international (SWIFT)
+XR-0005,payment_rail,wire,Wire,
+XR-0006,payment_rail,wire,Wire Transfer,
+XR-0007,payment_rail,card,card,Commercial / purchasing / T&E card volume (interchange-bearing)
+XR-0008,payment_rail,card,Card,
+XR-0009,payment_rail,card,Credit Card,
+XR-0010,payment_rail,check,check,Paper check disbursements and receipts
+XR-0011,payment_rail,check,Check,
+XR-0012,payment_rail,check,Cheque,Canadian spelling — maps to the check rail
+XR-0013,payment_rail,rtp,rtp,Instant 24x7 payments (RTP network / FedNow; Interac in Canada)
+XR-0014,payment_rail,rtp,RTP,
+XR-0015,payment_rail,rtp,FedNow,US instant-payments network — maps to the rtp rail
+XR-0016,payment_rail,rtp,Real-Time Payments,
+XR-0017,payment_rail,rtp,Interac e-Transfer,Canadian instant-payments network — maps to the rtp rail
+XR-0018,payment_direction,inbound,inbound,Money coming IN to the client (receivables / collections)
+XR-0019,payment_direction,inbound,Incoming,
+XR-0020,payment_direction,inbound,Receipt,
+XR-0021,payment_direction,outbound,outbound,Money going OUT from the client (payables / disbursements)
+XR-0022,payment_direction,outbound,Outgoing,
+XR-0023,payment_direction,outbound,Disbursement,
+XR-0024,facility_type,revolving,revolving,Committed revolving credit — draw/repay/redraw for working capital (incl. ABL revolvers and LC sublimits)
+XR-0025,facility_type,revolving,Revolving Credit,
+XR-0026,facility_type,revolving,Letter of Credit,LC facilities are carried under the revolver in the agent's model
+XR-0027,facility_type,revolving,Operating Line,Canadian term for a working-capital revolver
+XR-0028,facility_type,term_loan,term_loan,Amortizing term financing with a fixed repayment schedule
+XR-0029,facility_type,term_loan,Term Loan,
+XR-0030,facility_type,term_loan,Delayed Draw Term Loan,
+XR-0031,facility_type,equipment_finance,equipment_finance,Financing or lease secured by the equipment itself
+XR-0032,facility_type,equipment_finance,Equipment Finance,
+XR-0033,facility_type,equipment_finance,Equipment Lease,
+XR-0034,opportunity_stage,Prospecting,Prospecting,Early-stage: need identified but not yet qualified
+XR-0035,opportunity_stage,Prospecting,Prospect,
+XR-0036,opportunity_stage,Qualification,Qualification,Fit and budget being validated with the client
+XR-0037,opportunity_stage,Qualification,Qualify,
+XR-0038,opportunity_stage,Proposal,Proposal,Terms proposed to the client
+XR-0039,opportunity_stage,Negotiation,Negotiation,Terms under active negotiation
+XR-0040,opportunity_stage,Closed Won,Closed Won,Won — booked business
+XR-0041,opportunity_stage,Closed Won,Won,
+XR-0042,opportunity_stage,Closed Lost,Closed Lost,Lost to a competitor or no decision
+XR-0043,opportunity_stage,Closed Lost,Lost,
+XR-0044,statement_type,income_statement,income_statement,Income statement (P&L)
+XR-0045,statement_type,income_statement,Income Statement,
+XR-0046,statement_type,income_statement,P&L,
+XR-0047,statement_type,income_statement,IS,
+XR-0048,statement_type,balance_sheet,balance_sheet,Balance sheet
+XR-0049,statement_type,balance_sheet,Balance Sheet,
+XR-0050,statement_type,balance_sheet,BS,
+XR-0051,statement_type,cash_flow,cash_flow,Statement of cash flows
+XR-0052,statement_type,cash_flow,Cash Flow,
+XR-0053,statement_type,cash_flow,CF,
+XR-0054,source_type,internal_authoritative,internal_authoritative,Bank system of record (CRM / core banking / loan servicing / profitability)
+XR-0055,source_type,external_public,external_public,Public or third-party feed (SEC EDGAR / market data / news)
+XR-0056,source_type,synthetic_demo,synthetic_demo,Fabricated demo data with no real-world referent
+XR-0057,source_type,derived,derived,Computed or aggregated from other records (ratios / trends / signals)
+XR-0058,deposit_account_type,Operating DDA,Operating DDA,Primary USD operating demand-deposit account
+XR-0059,deposit_account_type,Operating DDA,DDA,
+XR-0060,deposit_account_type,Operating DDA (CAD),Operating DDA (CAD),Canadian-dollar operating account
+XR-0061,deposit_account_type,Money Market,Money Market,Interest-bearing money-market deposit account
+XR-0062,deposit_account_type,Money Market,MMDA,
+XR-0063,deposit_account_type,Collateral / Escrow,Collateral / Escrow,Pledged or escrowed balances (not operating cash)
+XR-0064,activity_type,Call,Call,Phone call logged by the coverage team
+XR-0065,activity_type,Email,Email,Email interaction logged by the coverage team
+XR-0066,activity_type,Meeting,Meeting,In-person or virtual meeting
+XR-0067,nps_band,Promoter,Promoter,NPS 9-10 — actively recommends the bank
+XR-0068,nps_band,Passive,Passive,NPS 7-8 — satisfied but not enthusiastic
+XR-0069,nps_band,Detractor,Detractor,NPS 0-6 — attrition and reputation risk
+XR-0070,line_of_business,Commercial Banking,Commercial Banking,Credit and deposit relationship banking
+XR-0071,line_of_business,Treasury & Payment Solutions,Treasury & Payment Solutions,"Cash management, payments and liquidity"
+XR-0072,line_of_business,Treasury & Payment Solutions,TPS,
+XR-0073,line_of_business,Capital Markets,Capital Markets,"FX, rates, commodities hedging and capital raising"
+XR-0074,line_of_business,Wealth,Wealth,Retirement plans and private banking for principals
+XR-0075,signal_severity,info,info,Informational — an opportunity or context worth knowing
+XR-0076,signal_severity,watch,watch,Needs attention on the next touchpoint
+XR-0077,signal_severity,urgent,urgent,Act now — credit or relationship risk
+XR-0078,deposit_account_type,Operating DDA (Analyzed),Operating DDA (Analyzed),Analyzed operating account — fees offset by earnings credit on balances
+XR-0079,deposit_account_type,Operating DDA (Analyzed),Analyzed Checking,core_deposits ACCT_TYPE spelling
+XR-0080,deposit_account_type,Sweep,Sweep,Overnight investment-sweep position linked to the operating account
+XR-0081,deposit_account_type,Operating DDA,Commercial Checking,core_deposits ACCT_TYPE spelling
+XR-0082,payment_rail,eft,eft,Canadian electronic funds transfer — the domestic batch rail for Canadian clients (ACH's counterpart)
+XR-0083,risk_rating,Excellent,Excellent,Obligor risk grade 1 of 6 — strongest credit; BMO-style scale
+XR-0084,risk_rating,Excellent,excellent,
+XR-0085,risk_rating,Excellent,Pass-1,legacy regulatory-style spelling
+XR-0086,risk_rating,Excellent,1,numeric facility-grade spelling
+XR-0087,risk_rating,Very Good,Very Good,Obligor risk grade 2 of 6
+XR-0088,risk_rating,Very Good,very good,
+XR-0089,risk_rating,Very Good,Pass-2,legacy regulatory-style spelling
+XR-0090,risk_rating,Very Good,2,numeric facility-grade spelling
+XR-0091,risk_rating,Good,Good,Obligor risk grade 3 of 6
+XR-0092,risk_rating,Good,good,
+XR-0093,risk_rating,Good,Pass-3,legacy regulatory-style spelling
+XR-0094,risk_rating,Good,3,numeric facility-grade spelling
+XR-0095,risk_rating,Watch,Watch,Obligor risk grade 4 of 6 — heightened monitoring
+XR-0096,risk_rating,Watch,watch,
+XR-0097,risk_rating,Watch,4,numeric facility-grade spelling
+XR-0098,risk_rating,Unstable,Unstable,Obligor risk grade 5 of 6 — impaired outlook; classified credit
+XR-0099,risk_rating,Unstable,unstable,
+XR-0100,risk_rating,Unstable,Substandard,legacy regulatory-style spelling
+XR-0101,risk_rating,Unstable,5,numeric facility-grade spelling
+XR-0102,risk_rating,Default,Default,Obligor risk grade 6 of 6 — in default / loss
+XR-0103,risk_rating,Default,default,
+XR-0104,risk_rating,Default,Doubtful,legacy regulatory-style spelling
+XR-0105,risk_rating,Default,Loss,legacy regulatory-style spelling
+XR-0106,risk_rating,Default,6,numeric facility-grade spelling
+XR-0107,client_segment,Lower Mid-Market,Lower Mid-Market,RM-covered commercial segment < $100MM annual revenue
+XR-0108,client_segment,Lower Mid-Market,lower mid-market,
+XR-0109,client_segment,Mid-Market,Mid-Market,RM-covered commercial segment $100MM-$500MM annual revenue
+XR-0110,client_segment,Mid-Market,mid-market,
+XR-0111,client_segment,Mid-Market,Middle Market,legacy spelling
+XR-0112,client_segment,Upper Mid-Market,Upper Mid-Market,RM-covered commercial segment >= $500MM annual revenue
+XR-0113,client_segment,Upper Mid-Market,upper mid-market,

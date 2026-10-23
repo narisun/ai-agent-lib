@@ -158,8 +158,8 @@ def test_an_eval_config_keeps_the_real_model_and_reads_the_environment(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     dotenv = tmp_path / ".env"
-    dotenv.write_text("EAP_MODEL_PROVIDER=anthropic\n", encoding="utf-8")
-    monkeypatch.setenv("EAP_MODEL_ID", "claude-test")
+    dotenv.write_text("AC2_MODEL_PROVIDER=anthropic\n", encoding="utf-8")
+    monkeypatch.setenv("AC2_MODEL_ID", "claude-test")
     config = load_eval_config(dotenv, state_dir=tmp_path / "state")
     assert (config.model.provider, config.model.model_id) == ("anthropic", "claude-test")
     audit = config.section(Section.AUDIT)

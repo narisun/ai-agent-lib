@@ -27,11 +27,11 @@ from ai_agent_lib_core.contracts import Access, AccessQuery, ConfigurationError,
 from ai_agent_lib_core.di import access_plan
 
 _AWS_OPTIONS = {
-    "EAP_AUDIT_OPTIONS": '{"stream": "eap-audit"}',
-    "EAP_REGISTRY_OPTIONS": '{"bucket": "eap-registry"}',
-    "EAP_GUARDRAILS_OPTIONS": '{"guardrail_id": "g1", "guardrail_version": "3"}',
-    "EAP_CHECKPOINT_OPTIONS": '{"host": "db.internal", "database": "eap", "user": "eap_app"}',
-    "EAP_SECRETS_OPTIONS": '{"prefix": "eap/helper/"}',
+    "AC2_AUDIT_OPTIONS": '{"stream": "eap-audit"}',
+    "AC2_REGISTRY_OPTIONS": '{"bucket": "eap-registry"}',
+    "AC2_GUARDRAILS_OPTIONS": '{"guardrail_id": "g1", "guardrail_version": "3"}',
+    "AC2_CHECKPOINT_OPTIONS": '{"host": "db.internal", "database": "eap", "user": "eap_app"}',
+    "AC2_SECRETS_OPTIONS": '{"prefix": "eap/helper/"}',
 }
 
 
@@ -250,9 +250,9 @@ def test_the_aws_profile_derives_a_complete_plan() -> None:
     config = ConfigResolver(
         MappingConfigSource(
             {
-                "EAP_PROFILE": "aws",
-                "EAP_DEPLOYMENT_ENV": "prod",
-                "EAP_MODEL_ID": "us.anthropic.claude-x",
+                "AC2_PROFILE": "aws",
+                "AC2_DEPLOYMENT_ENV": "prod",
+                "AC2_MODEL_ID": "us.anthropic.claude-x",
                 **_AWS_OPTIONS,
             }
         )
@@ -267,7 +267,7 @@ def test_the_aws_profile_derives_a_complete_plan() -> None:
 
 
 def test_a_missing_option_says_which_adapter_was_being_worked_out() -> None:
-    values = {"EAP_PROFILE": "aws", **_AWS_OPTIONS, "EAP_AUDIT_OPTIONS": "{}"}
+    values = {"AC2_PROFILE": "aws", **_AWS_OPTIONS, "AC2_AUDIT_OPTIONS": "{}"}
     config = ConfigResolver(MappingConfigSource(values)).resolve()
 
     with pytest.raises(ConfigurationError) as caught:

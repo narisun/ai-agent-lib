@@ -30,9 +30,15 @@ from ai_agent_lib_core.integrations.http.agentcore import (
     SessionBaggageMiddleware,
     agentcore_app,
 )
+from ai_agent_lib_core.integrations.http.composition import (
+    PROFILES,
+    AgentService,
+    build_agent_app,
+    read_question,
+    run_agent,
+)
 from ai_agent_lib_core.integrations.http.entrypoint import (
     EXIT_INTERRUPTED,
-    question_input,
     run_command,
     run_service,
 )
@@ -46,10 +52,12 @@ __all__ = [
     "INVOCATIONS_PATH",
     "INVOKE_PATH",
     "PING_PATH",
+    "PROFILES",
     "READY_PATH",
     "REQUEST_ID_HEADER_AGENTCORE",
     "SESSION_HEADER",
     "STREAM_PATH",
+    "AgentService",
     "AgentServices",
     "InMemoryThreadAdmission",
     "OutcomeJournal",
@@ -65,8 +73,10 @@ __all__ = [
     "add_health_routes",
     "agent_app",
     "agentcore_app",
+    "build_agent_app",
     "health_routes",
-    "question_input",
+    "read_question",
+    "run_agent",
     "run_command",
     "run_service",
     "serve",

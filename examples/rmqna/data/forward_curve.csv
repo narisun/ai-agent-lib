@@ -1,0 +1,8 @@
+curve,tenor,rate,as_of,source
+SOFR,10Y,4.31,2026-06-30,"Derived by this project from FRED SOFR (Federal Reserve Bank of New York) and FRED Treasury Constant Maturity series (Board of Governors of the Federal Reserve System, H.15) â€” see reference/market_rates.yaml"
+SOFR,1Y,3.69,2026-06-30,"Derived by this project from FRED SOFR (Federal Reserve Bank of New York) and FRED Treasury Constant Maturity series (Board of Governors of the Federal Reserve System, H.15) â€” see reference/market_rates.yaml"
+SOFR,2Y,3.60,2026-06-30,"Derived by this project from FRED SOFR (Federal Reserve Bank of New York) and FRED Treasury Constant Maturity series (Board of Governors of the Federal Reserve System, H.15) â€” see reference/market_rates.yaml"
+SOFR,3M,3.81,2026-06-30,"Derived by this project from FRED SOFR (Federal Reserve Bank of New York) and FRED Treasury Constant Maturity series (Board of Governors of the Federal Reserve System, H.15) â€” see reference/market_rates.yaml"
+SOFR,3Y,3.66,2026-06-30,"Derived by this project from FRED SOFR (Federal Reserve Bank of New York) and FRED Treasury Constant Maturity series (Board of Governors of the Federal Reserve System, H.15) â€” see reference/market_rates.yaml"
+SOFR,5Y,3.78,2026-06-30,"Derived by this project from FRED SOFR (Federal Reserve Bank of New York) and FRED Treasury Constant Maturity series (Board of Governors of the Federal Reserve System, H.15) â€” see reference/market_rates.yaml"
+SOFR,6M,3.77,2026-06-30,"Derived by this project from FRED SOFR (Federal Reserve Bank of New York) and FRED Treasury Constant Maturity series (Board of Governors of the Federal Reserve System, H.15) â€” see reference/market_rates.yaml"

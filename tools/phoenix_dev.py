@@ -15,9 +15,9 @@ if not __package__:
 
 from tools import package_runtime
 from tools.local_processes import Service, report, serve
+from tools.phoenix_server import PINNED_VERSION as VERSION
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "20.22.0"
 
 
 def setup(root: Path) -> None:
@@ -32,8 +32,20 @@ def server_environment(folder: Path) -> dict[str, str]:
     environment = {
         key: value
         for key, value in os.environ.items()
+        # LANGFUSE_ is defense for stale environments: the library no longer reads it.
+        # EAP_ is the earlier prefix of the library's variables (deprecation window).
         if not key.startswith(
-            ("EAP_", "RMPREP_", "PHOENIX_", "OTEL_", "LANGFUSE_", "ANTHROPIC_", "OPENAI_", "AWS_")
+            (
+                "AC2_",
+                "EAP_",
+                "RMPREP_",
+                "PHOENIX_",
+                "OTEL_",
+                "LANGFUSE_",
+                "ANTHROPIC_",
+                "OPENAI_",
+                "AWS_",
+            )
         )
     }
     environment.update(
@@ -93,14 +105,17 @@ def configured_service(
 ) -> Service | None:
     """Start the local trial only when the agent's effective settings select it."""
     from ai_agent_lib_core.config import MappingConfigSource
-    from ai_agent_lib_core.config.phoenix import load_phoenix_settings
+    from ai_agent_lib_core.config.bindings import legacy_spelling
+    from ai_agent_lib_core.config.phoenix import PHOENIX_LABELS, load_phoenix_settings
     from ai_agent_lib_core.contracts import ConfigurationError
 
     # Environment-file paths in shell/root overrides use the agent's working
-    # directory, just as they do when the child resolves its own settings.
+    # directory, just as they do when the child resolves its own settings. Either
+    # spelling may carry one; when both do, the loader judges whether they agree.
     settings_env = dict(environment)
-    if extra := settings_env.get("EAP_PHOENIX_ENV_FILE"):
-        settings_env["EAP_PHOENIX_ENV_FILE"] = str((agent_cwd / extra).resolve())
+    for name in (PHOENIX_LABELS["env_file"], legacy_spelling(PHOENIX_LABELS["env_file"])):
+        if extra := settings_env.get(name):
+            settings_env[name] = str((agent_cwd / extra).resolve())
     try:
         settings = load_phoenix_settings(service_env, environment=MappingConfigSource(settings_env))
     except ConfigurationError as error:

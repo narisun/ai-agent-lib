@@ -27,7 +27,7 @@ from ai_agent_lib_ui.contracts.catalog import AgentBinding, AgentCoreRuntime
 from ai_agent_lib_ui.contracts.chat import StoredTurn
 from ai_agent_lib_ui.contracts.conversations import FailureCode, RunRecord, TurnAdmission
 from ai_agent_lib_ui.contracts.queries import ContractError, ErrorCode, ViewContext
-from ai_agent_lib_ui.contracts.traces import SESSION_ID, TraceLink, console_link
+from ai_agent_lib_ui.contracts.traces import SESSION_ID, console_link, tolerant_trace
 
 # Operational records only: a status, a path and identifiers. Never a body.
 logger = logging.getLogger(__name__)
@@ -516,8 +516,4 @@ def _failed_run(run: RunRecord, started: float, body: bytes) -> RunRecord:
                 "model_calls": envelope.get("model_calls"),
             }
         )
-    try:
-        trace = TraceLink.model_validate(envelope.get("trace"))
-    except ValidationError:
-        return failed
-    return failed.model_copy(update={"trace": trace})
+    return failed.model_copy(update={"trace": tolerant_trace(envelope.get("trace"))})

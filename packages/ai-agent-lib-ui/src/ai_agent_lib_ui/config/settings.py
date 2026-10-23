@@ -1,6 +1,9 @@
 """Validated local settings and explicit translation of an agent's environment."""
 
 import json
+import logging
+import threading
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
@@ -82,6 +85,39 @@ class Settings(BaseModel):
         )
 
 
+# The UI may import only core's contracts, so it reads the agent's settings itself. A deprecated
+# spelling is reported on the library's own configuration logger, where an operator already
+# looks for the same notice from the agent, and once per process however often it is read.
+_LOG = logging.getLogger("ai_agent_lib_core.config")
+_REPORTED: set[str] = set()
+_LOCK = threading.Lock()
+_PREFIX = "AC2_"
+_LEGACY_PREFIX = "EAP_"  # Deprecation window: accepted for one minor release, with a warning.
+
+
+def _setting(values: Mapping[str, str | None], stem: str, default: str | None = None) -> str | None:
+    """Read an agent setting by its ``AC2_`` name, or by the deprecated ``EAP_`` one.
+
+    Equal values in both spellings are fine. Different values are an error naming
+    both, because guessing which spelling was meant is the hazard.
+    """
+    name, old_name = _PREFIX + stem, _LEGACY_PREFIX + stem
+    value, old_value = values.get(name), values.get(old_name)
+    if old_value is None:
+        return default if value is None else value
+    if value is None:
+        message = f"{old_name} is deprecated; use {name} instead"
+        with _LOCK:
+            first = message not in _REPORTED
+            _REPORTED.add(message)
+        if first:
+            _LOG.warning("%s", message)
+        return old_value
+    if value != old_value:
+        raise ValueError(f"{old_name} is deprecated and conflicts with {name}; set only {name}")
+    return value
+
+
 class StaticEnvironmentOptions(LocalIdentity):
     """Accept the agent's static token options without copying them into UI authority."""
 
@@ -100,17 +136,17 @@ def agent_environment(path: Path) -> tuple[Path, Path, LocalIdentity]:
     if not path.is_file():
         raise ValueError("the --env-file must name an existing agent .env file")
     values = dotenv_values(path, interpolate=False)
-    if values.get("EAP_PROFILE", "local") != "local":
-        raise ValueError("the local UI requires EAP_PROFILE=local")
-    if values.get("EAP_REGISTRY_PROVIDER", "file") != "file":
-        raise ValueError("the local UI supports EAP_REGISTRY_PROVIDER=file")
-    if values.get("EAP_IDENTITY_PROVIDER", "static") != "static":
-        raise ValueError("the local UI supports EAP_IDENTITY_PROVIDER=static on loopback")
-    registry = json.loads(values.get("EAP_REGISTRY_OPTIONS") or "{}")
+    if _setting(values, "PROFILE", "local") != "local":
+        raise ValueError("the local UI requires AC2_PROFILE=local")
+    if _setting(values, "REGISTRY_PROVIDER", "file") != "file":
+        raise ValueError("the local UI supports AC2_REGISTRY_PROVIDER=file")
+    if _setting(values, "IDENTITY_PROVIDER", "static") != "static":
+        raise ValueError("the local UI supports AC2_IDENTITY_PROVIDER=static on loopback")
+    registry = json.loads(_setting(values, "REGISTRY_OPTIONS") or "{}")
     if not isinstance(registry, dict) or set(registry) - {"agents_path", "tools_path"}:
         raise ValueError("use file registry options: agents_path and tools_path")
     options = StaticEnvironmentOptions.model_validate(
-        json.loads(values.get("EAP_IDENTITY_OPTIONS") or "{}")
+        json.loads(_setting(values, "IDENTITY_OPTIONS") or "{}")
     )
     identity = LocalIdentity(subject=options.subject, tenant=options.tenant, roles=options.roles)
     return (

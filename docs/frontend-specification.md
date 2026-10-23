@@ -562,7 +562,7 @@ metadata into PostgreSQL with idempotent record IDs. Track ingestion watermarks;
 Start with request/time/event lookup; a dedicated search service is optional later.
 
 Use separate typed UI configuration with a reserved `AGENTLIB_UI_` prefix; do not
-pass new names to core's strict `EAP_` parser. The implementation must publish one
+pass new names to core's strict `AC2_` parser. The implementation must publish one
 generated variable table with name, purpose, local/AWS examples, defaults, and
 sensitivity. Settings cover bind address, registry/bindings, identity/session,
 stores, diagnostics permissions/capture visibility, limits, and retention.

@@ -263,7 +263,7 @@ graph = build_graph(
 
 ## Inspect the decision
 
-Set `EAP_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl` in the agent's `.env`.
+Set `AC2_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl` in the agent's `.env`.
 Each model request contains a `Context selection` manifest in its system
 message. It identifies the selected memo IDs, client, meeting date, retrieval
 date and mode. The model messages show the actual evidence projection.
@@ -323,7 +323,7 @@ the static prefix without changing which evidence the model can see.
 For Anthropic, set this in `agents\rmprep\.env` and restart the agent:
 
 ```dotenv
-EAP_MODEL_OPTIONS={"anthropic":{"prompt_caching":true,"cache_ttl":"5m"}}
+AC2_MODEL_OPTIONS={"anthropic":{"prompt_caching":true,"cache_ttl":"5m"}}
 ```
 
 The library marks the static block with an explicit cache breakpoint and enables

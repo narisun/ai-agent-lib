@@ -80,7 +80,7 @@ def test_plain_system_messages_use_automatic_cache_without_inventing_a_static_bo
 @pytest.mark.parametrize("raw", ["[]", '{"anthropic":true}', '{"anthropic":null}'])
 def test_invalid_model_options_shape_is_rejected(raw: str) -> None:
     with pytest.raises(ConfigurationError):
-        ConfigResolver(MappingConfigSource({"EAP_MODEL_OPTIONS": raw})).resolve()
+        ConfigResolver(MappingConfigSource({"AC2_MODEL_OPTIONS": raw})).resolve()
 
 
 @pytest.mark.parametrize(
@@ -92,7 +92,7 @@ def test_invalid_cache_settings_are_rejected(options: dict[str, object]) -> None
 
 
 def test_provider_options_are_immutable_and_shared_by_aliases() -> None:
-    raw = {"EAP_MODEL_OPTIONS": '{"anthropic":{"prompt_caching":true}}'}
+    raw = {"AC2_MODEL_OPTIONS": '{"anthropic":{"prompt_caching":true}}'}
     resolved = ConfigResolver(MappingConfigSource(raw)).resolve()
     model = ModelSection(
         "fake",

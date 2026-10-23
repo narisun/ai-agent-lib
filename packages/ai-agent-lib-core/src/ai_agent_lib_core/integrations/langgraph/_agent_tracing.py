@@ -57,6 +57,8 @@ InvocationArguments = Callable[[RequestContext], Mapping[str, Any]]
 """Return the ``ainvoke`` arguments for one request; ``["config"]`` locates its checkpoints."""
 
 _LOG = logging.getLogger(__name__)
+# The most serialized JSON text kept on one span, counted in characters, not bytes.
+# Longer content is replaced by a ``truncated`` marker with a preview of this length.
 _CONTENT_LIMIT = 262_144
 _OTEL_EXTRA = 'python -m pip install "ai-agent-lib-core[otel]"'
 
@@ -133,15 +135,17 @@ class _ToolSpans(BaseCallbackHandler):
 
     run_inline = True
 
-    def __init__(self, trial: AgentTracing) -> None:
-        self.trial = trial
+    def __init__(self, tracing: AgentTracing) -> None:
+        self.tracing = tracing
 
     def on_tool_start(
         self, serialized: dict[str, Any], input_str: str, *, run_id: UUID, **kwargs: Any
     ) -> None:
-        """Start one tool span under this request, with no shared last-trace state."""
+        """Start one tool span in the trace of the request this call belongs to."""
+        # The request comes from a context variable, so concurrent requests each keep
+        # their own trace; nothing remembers "the latest trace" across requests.
         turn = _current.get()
-        if turn is None or turn.owner is not self.trial:
+        if turn is None or turn.owner is not self.tracing:
             return
         name = str(serialized.get("name", "tool"))
         # GovernedTool invokes a native tool with the same name underneath it.
@@ -149,17 +153,17 @@ class _ToolSpans(BaseCallbackHandler):
         if current_native_tool_wrapper() == name:
             return
         registered = turn.tools.get(name)
-        span = self.trial.tracer.start_span(
+        span = self.tracing.tracer.start_span(
             registered[1] if registered else name,
             context=set_span_in_context(turn.root),
             attributes=turn.attributes,
         )
-        self.trial.schema.kind(span, "tool")
-        self.trial.schema.metadata(span, "tool_run_id", str(run_id))
+        self.tracing.schema.kind(span, "tool")
+        self.tracing.schema.metadata(span, "tool_run_id", str(run_id))
         if registered:
-            self.trial.schema.metadata(span, "mcp_server", registered[0])
-        if self.trial.settings.capture_content:
-            _content(self.trial.schema, span, "input", kwargs.get("inputs") or input_str)
+            self.tracing.schema.metadata(span, "mcp_server", registered[0])
+        if self.tracing.settings.capture_content:
+            _content(self.tracing.schema, span, "input", kwargs.get("inputs") or input_str)
         turn.pending[str(run_id)] = span
         turn.tool_calls += 1
 
@@ -168,13 +172,13 @@ class _ToolSpans(BaseCallbackHandler):
         turn = _current.get()
         if (
             turn is not None
-            and turn.owner is self.trial
+            and turn.owner is self.tracing
             and (span := turn.pending.pop(str(run_id), None)) is not None
         ):
             if isinstance(output, ToolMessage):
-                self.trial.schema.metadata(span, "tool_call_id", output.tool_call_id)
-            if self.trial.settings.capture_content:
-                _content(self.trial.schema, span, "output", output)
+                self.tracing.schema.metadata(span, "tool_call_id", output.tool_call_id)
+            if self.tracing.settings.capture_content:
+                _content(self.tracing.schema, span, "output", output)
             # ToolNode can return an error ToolMessage without raising an exception.
             if isinstance(output, BaseMessage) and getattr(output, "status", None) == "error":
                 span.set_status(Status(StatusCode.ERROR))
@@ -185,7 +189,7 @@ class _ToolSpans(BaseCallbackHandler):
         turn = _current.get()
         if (
             turn is not None
-            and turn.owner is self.trial
+            and turn.owner is self.tracing
             and (span := turn.pending.pop(str(run_id), None)) is not None
         ):
             span.set_attribute("error.type", type(error).__name__)
@@ -212,7 +216,11 @@ def _turn_dependencies(services: object) -> tuple[RegistrySource, InvocationArgu
 
 
 class AgentTracing:
-    """Own a trace exporter and optionally preserve the existing local JSONL sink.
+    """Own a trace exporter and, optionally, also feed the local JSONL model-trace sink.
+
+    In a configured service that sink is the file at the configured model-trace
+    path. It receives each model record beside the exporter, and the two fail
+    independently.
 
     Injection of a SpanExporter makes the complete graph flow testable without a
     tracing server. An export failure cannot retry an agent or model operation.
@@ -280,6 +288,7 @@ class AgentTracing:
                 )
 
     def _model_event(self, record: Mapping[str, object]) -> None:
+        """Open a span for a model request, or finish it with its response or error."""
         turn = _current.get()
         if (
             turn is None
@@ -481,6 +490,8 @@ class AgentTracing:
         """Bound optional history reads; cancellation of the request still propagates."""
         try:
             references = []
+            # Read one more reference than the 64 kept: a 65th proves history was cut
+            # off, which ``checkpoints_truncated`` reports, and the read stops there.
             async with asyncio.timeout(self.checkpoint_timeout_seconds):
                 with bind_request_context(context):
                     history = graph.aget_state_history(

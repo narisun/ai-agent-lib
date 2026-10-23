@@ -5,18 +5,19 @@ configuration, and tests. Install and run generated services using Python and pi
 
 For your first project, follow the [getting-started tutorial](../../docs/getting-started.md).
 To test the included rmprep agent in Agent Lab, use the repository's
-[batch startup guide](../../docs/local-startup.md). The commands below create
+[startup guide](../../docs/local-startup.md). The commands below create
 your own workspace.
 
 ## Create a workspace
 
 Open **Command Prompt** in the library checkout, using your team's Python and
-approved pip package source. Choose another name if `my-platform` already exists:
+approved pip package source. `set "PYTHON=..."` stores the Python command;
+`"%PYTHON%"` runs it. If your team supplies a specific executable, set `PYTHON`
+to its full path. Choose another name if `my-platform` already exists:
 
 ```bat
 set "LIBRARY=%CD%"
-python -m venv .venv
-set "PYTHON=%LIBRARY%\.venv\Scripts\python.exe"
+set "PYTHON=python"
 "%PYTHON%" -m pip install -e packages/ai-agent-lib-core -e packages/ai-agent-lib-cli
 "%PYTHON%" -m ai_agent_lib_cli init my-platform --dir .. --lib-path "%LIBRARY%" --owner my-team
 cd /d ..\my-platform
@@ -36,9 +37,13 @@ In the same window, check the service and start its HTTP endpoint:
 "%PYTHON%" -m ai_agent_lib_cli run hello-agent
 ```
 
-Keep that window open; stop with **Ctrl+C**. In a new window, select the same
-`PYTHON` executable and change to your workspace root before running commands.
-The `agentlib` shorthand below is equivalent to `"%PYTHON%" -m ai_agent_lib_cli`.
+Keep that window open; stop with **Ctrl+C**. In a new window, set `PYTHON`
+again and change to your workspace root before running commands. The `agentlib`
+shorthand below is equivalent to `"%PYTHON%" -m ai_agent_lib_cli`.
+
+On macOS/Linux, use a bash or zsh terminal. Write `LIBRARY="$PWD"` and
+`PYTHON=python3` for the two `set` lines, `"$PYTHON"` for `"%PYTHON%"`, and
+`cd ../my-platform` for `cd /d ..\my-platform`; paths use `/`.
 
 ## Commands
 
@@ -59,10 +64,10 @@ The `agentlib` shorthand below is equivalent to `"%PYTHON%" -m ai_agent_lib_cli`
 | `agentlib run SERVICE [ARGS]` | Starts an agent's HTTP entry point or an MCP server, from any folder of the workspace |
 | `agentlib graph AGENT` | Prints the agent's graph as a Mermaid diagram |
 | `agentlib policy test [--opa]` | Decides the sample requests in `tests/policy-samples.yaml` and compares with what each expects |
-| `agentlib update [--diff]` | Brings generated files up to what this version writes, leaving the files you changed alone |
+| `agentlib update [--plan] [--diff]` | Brings generated files up to what this version writes, leaving the files you changed alone. `--plan` previews every change and writes nothing; `--diff` shows what the templates would change in the files you changed (without `--plan`, `--diff` also applies the update). See [Updating generated code](#updating-generated-code) |
 | `agentlib config options [PORT [NAME]] [--schema]` | Lists every adapter, and each adapter's options with types, defaults and meanings; `--schema` prints JSON Schema for an editor |
 | `agentlib check [--opa] [--keep-going]` | Runs what CI runs: ruff, the format check, mypy, pytest and the policy samples. Names the step that failed |
-| `agentlib eval [SERVICE]` | Runs the evals of one service or all: its tests marked `eval`, with the real model in its `.env` |
+| `agentlib eval [SERVICE] [--accept]` | Runs the evals of one service or all: its tests marked `eval`, with the real model in its `.env`. `--accept` runs one service's evals and, if they pass, promotes the report to `evals/baseline.json`; later runs gate on it. See [Measure an agent with evals](../../docs/evals.md) |
 | `agentlib deploy SERVICE [--plan]` | Writes the Terraform and Dockerfiles that run the service on ECS Fargate, from the settings in its `deploy.env`; every IAM permission comes from the adapter that needs it. `--plan` shows it all and writes nothing |
 
 At a terminal a missing answer is asked for, one question at a time. Given as
@@ -195,8 +200,27 @@ you tested locally decide the same way on the server side.
 `agentlib.lock` records a digest of every generated file. `agentlib update`
 uses it to tell your files from untouched ones: an untouched file is replaced
 with what the templates write now, a file you changed is left alone and
-listed, and `--diff` shows what the templates would change in it. A file you
-deleted is not brought back. Commit the lock file.
+listed, and a file you deleted is not brought back. Commit the lock file.
+
+After upgrading the library, start from a committed or backed-up workspace and
+run from the workspace root:
+
+```bat
+agentlib update --plan
+agentlib update --diff
+agentlib install
+agentlib check
+```
+
+**`--plan` is the dry run.** It lists every file the update would replace or
+create, and every file it would leave alone because you edited it, and writes
+nothing. Add `--diff` (`update --plan --diff`) to also see how each edited file
+differs from what the templates now write.
+
+**`update --diff` without `--plan` applies changes.** It replaces the untouched
+files, leaves the ones you edited alone, and prints their proposed template
+changes for you to merge. Review the resulting changes before running
+`agentlib install` and `agentlib check`.
 
 ## What the commands will not do
 
@@ -243,18 +267,9 @@ package index. Then create a workspace with
 `agentlib.toml` controls `agentlib install`; optional `[tool.uv.sources]`
 metadata is only used by uv.
 
-
 ## Install a generated workspace with pip
 
 Use `python -m ai_agent_lib_cli install` after adding services or changing their
 dependencies. It resolves all members and the development tools together in the
 current Python environment. `--no-dev` omits the development group. Keep Agent
-Lab in its [separate UI environment](../ai-agent-lib-ui/README.md#1-prepare-a-separate-ui-environment).
-
-## Upgrade generated files
-
-Run `agentlib update --diff` from the workspace root after reviewing your current
-changes. It updates untouched generated files and shows template differences for
-files you edited. **`--diff` is not a dry run.** Your `.env`, policies, and
-registries remain under your control. Review the resulting changes before running
-`agentlib install` and `agentlib check`.
+Lab in its [separate UI environment](../ai-agent-lib-ui/README.md#1-prepare-the-ui-packages).

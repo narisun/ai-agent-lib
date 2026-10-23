@@ -69,7 +69,7 @@ def resilience(limits: CallLimits, *, tool: bool = False) -> ResilienceIntercept
         limits,
         FrozenClock(),
         what="tool call" if tool else "model call",
-        variable="EAP_LIMITS",
+        variable="AC2_LIMITS",
         may_retry=(lambda call: call.read_only) if tool else None,
         sleep=no_wait,
         jitter=lambda: 1.0,
@@ -171,7 +171,7 @@ async def test_an_attempt_that_takes_too_long_is_a_transient_failure_that_says_s
         "none after 0.01 seconds",
     )
     assert error.fix is not None
-    assert "timeout_seconds in EAP_LIMITS" in error.fix
+    assert "timeout_seconds in AC2_LIMITS" in error.fix
 
 
 async def done(call: object) -> str:
@@ -181,7 +181,7 @@ async def done(call: object) -> str:
 async def test_a_request_over_its_call_budget_is_stopped_and_told_how_to_raise_it() -> None:
     ledger = BudgetLedger()
     stage: BudgetInterceptor[Any, Any] = BudgetInterceptor(
-        BudgetLimits(model_calls=2), ledger, kind="model", variable="EAP_LIMITS"
+        BudgetLimits(model_calls=2), ledger, kind="model", variable="AC2_LIMITS"
     )
     await stage(model_call(), done)
     await stage(model_call(), done)
@@ -191,7 +191,7 @@ async def test_a_request_over_its_call_budget_is_stopped_and_told_how_to_raise_i
     assert error.expected == "at most 2 model calls per request"
     assert error.actual == "2 used before this model call"
     assert error.fix is not None
-    assert "budget.model_calls in EAP_LIMITS" in error.fix
+    assert "budget.model_calls in AC2_LIMITS" in error.fix
     # Another request has a budget of its own.
     assert await stage(model_call(context("r-2")), done) == "done"
 

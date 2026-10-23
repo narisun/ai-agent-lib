@@ -63,8 +63,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     host = arguments.host if arguments.host is not None else host
     port = arguments.port if arguments.port is not None else port
     # Configuration, logging (set up before the server is built, so that nothing
-    # else sets up logging first), telemetry and the explanation of a failure
-    # are the library's entry-point wiring; this module only says what to serve.
+    # else sets up logging first), the deprecation warnings a configuration read
+    # from an old variable spelling earns (told once, in the log), telemetry and
+    # the explanation of a failure are the library's entry-point wiring; this
+    # module only says what to serve.
     return run_service(
         APPLICATION,
         lambda config: _serve(config, host, port),

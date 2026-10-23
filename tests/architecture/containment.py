@@ -11,7 +11,8 @@ import ast
 
 __all__ = ["find_violations"]
 
-PREFIX = "EAP_"
+PREFIXES = ("AC2_", "EAP_")
+"""The current and the legacy variable prefix: both are kept inside ``config``."""
 _ENV_ATTRIBUTES = frozenset({"environ", "environb", "getenv", "getenvb", "putenv", "unsetenv"})
 _FORBIDDEN_MODULES = frozenset({"dotenv"})
 
@@ -53,8 +54,10 @@ class _Scanner(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_Constant(self, node: ast.Constant) -> None:
-        if isinstance(node.value, str) and PREFIX in node.value:
-            self._add(node, f"contains a literal with the {PREFIX} prefix")
+        if isinstance(node.value, str):
+            for prefix in PREFIXES:
+                if prefix in node.value:
+                    self._add(node, f"contains a literal with the {prefix} prefix")
         self.generic_visit(node)
 
 

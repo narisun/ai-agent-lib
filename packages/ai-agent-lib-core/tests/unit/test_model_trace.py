@@ -44,12 +44,12 @@ def records(path: Path) -> list[dict[str, Any]]:
 def test_trace_configuration_is_opt_in_and_relative_to_the_service_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.delenv("EAP_MODEL_TRACE_PATH", raising=False)
+    monkeypatch.delenv("AC2_MODEL_TRACE_PATH", raising=False)
     assert ConfigResolver(MappingConfigSource({})).resolve().model_trace_path is None
-    blank = MappingConfigSource({"EAP_MODEL_TRACE_PATH": "  "})
+    blank = MappingConfigSource({"AC2_MODEL_TRACE_PATH": "  "})
     assert ConfigResolver(blank).resolve().model_trace_path is None
     dotenv = tmp_path / ".env"
-    dotenv.write_text("EAP_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl\n", encoding="utf-8")
+    dotenv.write_text("AC2_MODEL_TRACE_PATH=.agentlib/model-trace.jsonl\n", encoding="utf-8")
     assert load_service_config(dotenv).model_trace_path == tmp_path / ".agentlib/model-trace.jsonl"
     assert not (tmp_path / ".agentlib").exists()
 

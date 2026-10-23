@@ -69,19 +69,42 @@ def check(
 
 @click.command("eval")
 @click.argument("service", required=False)
+@click.option(
+    "--accept",
+    is_flag=True,
+    help="After the evals pass, save the report as the service's evals/baseline.json.",
+)
 @workspace_option
 @pass_toolbox
-def evals(tools: Toolbox, service: str | None, workspace: Path | None) -> None:
+def evals(tools: Toolbox, service: str | None, accept: bool, workspace: Path | None) -> None:
     """Run the evals of SERVICE, or of every service: its tests marked eval, with a real model.
 
     An eval skips itself until a real model is set in the service's .env. Each
     writes a report to the service's .agentlib/eval-report.json.
+    --accept saves the passing report as evals/baseline.json; later runs fail
+    on regressions against it. --accept still enforces the absolute bar. While
+    the pytest run is in flight it leaves a marker beside the eval report. The
+    generated test skips only the regression gate against the existing baseline
+    when that marker is there, so a deliberate change moves the baseline instead
+    of deadlocking on it. The marker is removed once the run ends.
     """
+    if accept and not service:
+        raise CliError("--accept needs a service", fix="agentlib eval SERVICE --accept")
     root = workspace_root(workspace)
     target = service_folder(root, load_answers(root), service) if service else root
     arguments = ("-m", "eval", "-q", "-rs", target.relative_to(root).as_posix() if service else ".")
     click.echo(f"== evals: python -m pytest {' '.join(arguments)}")
-    code = tools.run_tool("pytest", arguments, root)
+    accept_marker = target / ".agentlib" / "eval-accept.flag"
+    # A marker left by a killed --accept run must not skip later regression gates.
+    accept_marker.unlink(missing_ok=True)
+    if accept:
+        accept_marker.parent.mkdir(parents=True, exist_ok=True)
+        accept_marker.touch()
+    try:
+        code = tools.run_tool("pytest", arguments, root)
+    finally:
+        if accept:
+            accept_marker.unlink(missing_ok=True)
     # pytest says 5 when no test was collected: a service with no evals yet.
     if code == _NO_TESTS:
         raise CliError(
@@ -90,6 +113,17 @@ def evals(tools: Toolbox, service: str | None, workspace: Path | None) -> None:
         )
     if code != 0:
         raise CliError("the evals did not meet their bar", fix="read the report above")
+    if accept:
+        report = target / ".agentlib" / "eval-report.json"
+        if not report.is_file():
+            raise CliError(
+                f"there is no report at {report.relative_to(root).as_posix()}",
+                fix="run the evals once without --accept, or check the service's eval test",
+            )
+        baseline = target / "evals" / "baseline.json"
+        baseline.parent.mkdir(parents=True, exist_ok=True)
+        baseline.write_bytes(report.read_bytes())
+        click.echo(f"baseline accepted: {baseline.relative_to(root).as_posix()}")
 
 
 _NO_TESTS = 5

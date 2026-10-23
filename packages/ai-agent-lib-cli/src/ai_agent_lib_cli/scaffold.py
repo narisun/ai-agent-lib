@@ -373,6 +373,13 @@ class Scaffolder:
         replaced. A file they changed, or deleted, is left alone. Registries,
         rules, samples and ``.env`` files are never touched.
         """
+        return self._update(root, write=True)
+
+    def plan(self, root: Path) -> UpdateReport:
+        """What update would do, without doing it: updated and created mean "would be"."""
+        return self._update(root, write=False)
+
+    def _update(self, root: Path, *, write: bool) -> UpdateReport:
         answers = load_answers(root)
         files = self._workspace_files(answers)
         for server in answers.mcp_servers:
@@ -384,7 +391,7 @@ class Scaffolder:
         files = self._formatted(files, answers)
 
         lock = self._read_lock(root)
-        write: dict[PurePosixPath, str] = {}
+        to_write: dict[PurePosixPath, str] = {}
         updated: list[PurePosixPath] = []
         created: list[PurePosixPath] = []
         kept: dict[PurePosixPath, str] = {}
@@ -394,18 +401,19 @@ class Scaffolder:
             if current is None:
                 if recorded is None:
                     created.append(path)
-                    write[path] = text
+                    to_write[path] = text
                 # Otherwise it was generated before and the developer removed it.
             elif current == text:
                 lock[path.as_posix()] = _digest(text)
             elif recorded == _digest(current):
                 updated.append(path)
-                write[path] = text
+                to_write[path] = text
             else:
                 kept[path] = text
-        write_files(root, write, force=True)
-        lock.update({path.as_posix(): _digest(text) for path, text in write.items()})
-        self._write_lock(root, lock)
+        if write:
+            write_files(root, to_write, force=True)
+            lock.update({path.as_posix(): _digest(text) for path, text in to_write.items()})
+            self._write_lock(root, lock)
         return UpdateReport(tuple(updated), tuple(created), tuple(sorted(kept)), kept)
 
     # ---------------------------------------------------------------- helpers

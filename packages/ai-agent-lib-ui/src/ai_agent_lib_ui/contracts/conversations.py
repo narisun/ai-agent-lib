@@ -2,7 +2,7 @@
 
 from typing import Annotated, Literal, Self
 
-from pydantic import AwareDatetime, Field, model_validator
+from pydantic import AwareDatetime, Field, field_validator, model_validator
 
 from ai_agent_lib_core.contracts import Scope
 from ai_agent_lib_core.contracts.diagnostics import (
@@ -13,7 +13,7 @@ from ai_agent_lib_core.contracts.diagnostics import (
 )
 from ai_agent_lib_ui.contracts.artifacts import ScopedArtifact
 from ai_agent_lib_ui.contracts.queries import Availability, ContractError, ErrorCode
-from ai_agent_lib_ui.contracts.traces import TraceLink
+from ai_agent_lib_ui.contracts.traces import TraceLink, tolerant_trace
 
 RunState = Literal["accepted", "running", "completed", "failed", "unknown"]
 # The agent's own terminal refusals, plus the one AgentCore Runtime reports for it:
@@ -75,6 +75,12 @@ class RunRecord(RequestRecord):
     trace: TraceLink | None = None
     failure_code: FailureCode | None = None
     registry_revision: Identifier | None = None
+
+    @field_validator("trace", mode="before")
+    @classmethod
+    def degrade_trace(cls, value: object) -> TraceLink | None:
+        """Reload a stored row whose link no longer validates, keeping its answer and metrics."""
+        return tolerant_trace(value)
 
     @model_validator(mode="after")
     def check_answer(self) -> Self:
