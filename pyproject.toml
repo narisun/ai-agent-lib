@@ -16,8 +16,9 @@ dev = [
     "mcp>=2.3",
     "mypy>=1.11",
     "opentelemetry-sdk>=1.28",
-    # A real PostgreSQL for the checkpoint store's integration tests. No wheel for Linux on ARM.
-    "pgserver>=0.1.4; sys_platform != 'linux' or platform_machine == 'x86_64'",
+    # A real PostgreSQL for the checkpoint store's integration tests. No wheel for Linux on ARM,
+    # and none for Python 3.13 or newer yet; the tests skip when it is absent.
+    "pgserver>=0.1.4; (sys_platform != 'linux' or platform_machine == 'x86_64') and python_version < '3.13'",
     "pytest>=8.2",
     "pytest-asyncio>=1.4",
     "pytest-cov>=5.0",
