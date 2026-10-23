@@ -1,0 +1,79 @@
+"""Command-line entry point: serve the MCP server over Streamable HTTP."""
+
+from __future__ import annotations
+
+import argparse
+from collections.abc import Sequence
+
+from agentcraft2_core import ServiceConfig, ServiceContainer
+from agentcraft2_core.contracts import DeploymentEnv
+from agentcraft2_core.integrations.http import (
+    ServiceLifecycle,
+    add_health_routes,
+    run_service,
+    serve,
+)
+from agentcraft2_core.integrations.mcp import verify_registration
+
+from {{ package }}.server import APPLICATION, SERVER_ID, build_server
+from {{ package }}.settings import ENV_FILE
+
+__all__ = ["PROFILES", "main"]
+
+# How the server listens: the library's own contract, or a hosting platform's.
+# AgentCore Runtime reaches an MCP server at 0.0.0.0:8000/mcp.
+PROFILES: dict[str, tuple[str, int]] = {
+    "standard": ("127.0.0.1", {{ port }}),
+    "agentcore": ("0.0.0.0", 8000),  # the platform reaches the container at any address
+}
+
+
+async def _serve(config: ServiceConfig, host: str, port: int) -> None:
+    async with ServiceContainer(config) as services:
+        server = build_server(services)
+        # Health and readiness answer without a token; a load balancer has none.
+        lifecycle = ServiceLifecycle(services.validate)
+        add_health_routes(server, lifecycle)
+        entry = services.registry.tools.get(SERVER_ID)
+        if entry is not None:
+            # Fail at startup, not on the first call, if the tools and the registry disagree.
+            local = services.config.deployment_env is DeploymentEnv.LOCAL
+            await verify_registration(server, entry, require_pins=not local)
+        app = server.streamable_http_app(stateless_http=True, json_response=True, host=host)
+        # An identity provider that trusts the hosting platform's perimeter gets a
+        # door that refuses requests the perimeter did not send; any other
+        # identity provider leaves the app unchanged.
+        app = services.mcp_door(app)
+        # serve() runs services.validate() once it is listening, and on SIGTERM
+        # lets the calls in flight finish before it returns.
+        await serve(app, lifecycle, host=host, port=port)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Serve until stopped. SIGTERM lets calls in flight finish first."""
+    parser = argparse.ArgumentParser(prog="{{ name }}", description=__doc__)
+    parser.add_argument(
+        "--profile", choices=sorted(PROFILES), default="standard",
+        help="how to listen: standard, or agentcore (0.0.0.0:8000)",
+    )
+    parser.add_argument("--host", help="address to listen on (the profile's by default)")
+    parser.add_argument("--port", type=int, help="port to listen on (the profile's by default)")
+    arguments = parser.parse_args(argv)
+    host, port = PROFILES[arguments.profile]
+    host = arguments.host if arguments.host is not None else host
+    port = arguments.port if arguments.port is not None else port
+    # Configuration, logging (set up before the server is built, so that nothing
+    # else sets up logging first), the deprecation warnings a configuration read
+    # from an old variable spelling earns (told once, in the log), telemetry and
+    # the explanation of a failure are the library's entry-point wiring; this
+    # module only says what to serve.
+    return run_service(
+        APPLICATION,
+        lambda config: _serve(config, host, port),
+        env_file=ENV_FILE,
+        program="{{ name }}",
+    )
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

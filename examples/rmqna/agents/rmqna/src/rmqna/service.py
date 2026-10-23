@@ -6,8 +6,8 @@ import dataclasses
 from collections.abc import AsyncIterator, Sequence
 from typing import Any
 
-from ai_agent_lib_core import RequestContext, ServiceConfig, ServiceContainer
-from ai_agent_lib_core.integrations.http import (
+from agentcraft2_core import RequestContext, ServiceConfig, ServiceContainer
+from agentcraft2_core.integrations.http import (
     AgentService,
     OutcomeJournal,
     ServiceLifecycle,
@@ -15,7 +15,7 @@ from ai_agent_lib_core.integrations.http import (
     build_agent_app,
     run_agent,
 )
-from ai_agent_lib_core.integrations.langgraph import AgentTracing
+from agentcraft2_core.integrations.langgraph import AgentTracing
 
 from rmqna.graph import APPLICATION, answer, build_graph, registered_mcp_tools, steps
 from rmqna.settings import ENV_FILE

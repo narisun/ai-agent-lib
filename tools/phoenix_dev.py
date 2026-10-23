@@ -104,10 +104,10 @@ def configured_service(
     root: Path, service_env: Path, environment: Mapping[str, str], *, agent_cwd: Path
 ) -> Service | None:
     """Start the local trial only when the agent's effective settings select it."""
-    from ai_agent_lib_core.config import MappingConfigSource
-    from ai_agent_lib_core.config.bindings import legacy_spelling
-    from ai_agent_lib_core.config.phoenix import PHOENIX_LABELS, load_phoenix_settings
-    from ai_agent_lib_core.contracts import ConfigurationError
+    from agentcraft2_core.config import MappingConfigSource
+    from agentcraft2_core.config.bindings import legacy_spelling
+    from agentcraft2_core.config.phoenix import PHOENIX_LABELS, load_phoenix_settings
+    from agentcraft2_core.contracts import ConfigurationError
 
     # Environment-file paths in shell/root overrides use the agent's working
     # directory, just as they do when the child resolves its own settings. Either

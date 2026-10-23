@@ -5,7 +5,7 @@ description = "Prepare relationship manager client meeting memos and answer foll
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "ai-agent-lib-core[jwt,mcp,otel,serve]",
+    "agentcraft2-core[jwt,mcp,otel,serve]",
 ]
 
 [project.scripts]

@@ -30,14 +30,14 @@ from pathlib import Path, PurePosixPath
 import click
 from configuration_examples import configuration_examples
 
-from ai_agent_lib_cli.app import cli
-from ai_agent_lib_cli.deploy import Target, starter_settings
-from ai_agent_lib_cli.deploy import agentcore as agentcore_target
-from ai_agent_lib_cli.envfiles import variable_names
-from ai_agent_lib_cli.render import TemplateRenderer
-from ai_agent_lib_cli.workspace import LibrarySource
-from ai_agent_lib_core.config import ConfigResolver, Key, MappingConfigSource, variable_for
-from ai_agent_lib_core.config.bindings import (
+from agentcraft2_cli.app import cli
+from agentcraft2_cli.deploy import Target, starter_settings
+from agentcraft2_cli.deploy import agentcore as agentcore_target
+from agentcraft2_cli.envfiles import variable_names
+from agentcraft2_cli.render import TemplateRenderer
+from agentcraft2_cli.workspace import LibrarySource
+from agentcraft2_core.config import ConfigResolver, Key, MappingConfigSource, variable_for
+from agentcraft2_core.config.bindings import (
     DEFAULT_BINDINGS,
     SECRET_VARIABLE_PREFIX,
     Binding,
@@ -46,12 +46,12 @@ from ai_agent_lib_core.config.bindings import (
     options_key,
     provider_key,
 )
-from ai_agent_lib_core.config.phoenix import PHOENIX_VARIABLES
-from ai_agent_lib_core.config.profiles import PROFILE_DEFAULTS
-from ai_agent_lib_core.config.reference import default_text
-from ai_agent_lib_core.contracts import NoOptions, OptionsModel, Profile, Section
-from ai_agent_lib_core.contracts.options_help import options_help, options_summary
-from ai_agent_lib_core.di import DATA_PORT, MODEL_PORT, ServiceProviders, access_plan
+from agentcraft2_core.config.phoenix import PHOENIX_VARIABLES
+from agentcraft2_core.config.profiles import PROFILE_DEFAULTS
+from agentcraft2_core.config.reference import default_text
+from agentcraft2_core.contracts import NoOptions, OptionsModel, Profile, Section
+from agentcraft2_core.contracts.options_help import options_help, options_summary
+from agentcraft2_core.di import DATA_PORT, MODEL_PORT, ServiceProviders, access_plan
 
 __all__ = [
     "API_MODULES",
@@ -424,7 +424,7 @@ def _registry() -> ServiceProviders:
 
 def _package_of(factory: Callable[..., object]) -> str:
     module = getattr(factory, "__module__", "") or ""
-    return "ai-agent-lib-aws" if module.startswith("ai_agent_lib_aws") else "ai-agent-lib-core"
+    return "agentcraft2-aws" if module.startswith("agentcraft2_aws") else "agentcraft2-core"
 
 
 def profiles() -> str:
@@ -623,7 +623,7 @@ def _extra_comments(text: str) -> dict[str, str]:
 def extras() -> str:
     """The optional extras of each distribution, from its pyproject.toml."""
     rows = []
-    for package in ("ai-agent-lib-core", "ai-agent-lib-aws", "ai-agent-lib-cli"):
+    for package in ("agentcraft2-core", "agentcraft2-aws", "agentcraft2-cli"):
         text = (_PACKAGES / package / "pyproject.toml").read_text(encoding="utf-8")
         found = tomllib.loads(text)["project"].get("optional-dependencies", {})
         comments = _extra_comments(text)
@@ -725,20 +725,20 @@ def agentcore_settings() -> str:
 # --------------------------------------------------------------- public API
 
 API_MODULES: tuple[str, ...] = (
-    "ai_agent_lib_core",
-    "ai_agent_lib_core.contracts",
-    "ai_agent_lib_core.config",
-    "ai_agent_lib_core.di",
-    "ai_agent_lib_core.observability",
-    "ai_agent_lib_core.integrations.langgraph",
-    "ai_agent_lib_core.integrations.mcp",
-    "ai_agent_lib_core.integrations.http",
-    "ai_agent_lib_core.testing",
-    "ai_agent_lib_core.evaluation",
-    "ai_agent_lib_core.adapters",
-    "ai_agent_lib_core.pipeline",
-    "ai_agent_lib_core.kit",
-    "ai_agent_lib_aws",
+    "agentcraft2_core",
+    "agentcraft2_core.contracts",
+    "agentcraft2_core.config",
+    "agentcraft2_core.di",
+    "agentcraft2_core.observability",
+    "agentcraft2_core.integrations.langgraph",
+    "agentcraft2_core.integrations.mcp",
+    "agentcraft2_core.integrations.http",
+    "agentcraft2_core.testing",
+    "agentcraft2_core.evaluation",
+    "agentcraft2_core.adapters",
+    "agentcraft2_core.pipeline",
+    "agentcraft2_core.kit",
+    "agentcraft2_aws",
 )
 """The modules whose ``__all__`` is the library's public API, in reading order."""
 

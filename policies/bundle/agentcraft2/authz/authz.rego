@@ -3,7 +3,7 @@
 # The policy is a small, fixed evaluator. What is actually allowed lives in a
 # rules document, loaded as data at `data.agentcraft2.rules`. The first rule that
 # covers the request allows it and supplies its obligations; a request that no
-# rule covers is denied. The in-process `rules` provider of ai-agent-lib-core
+# rule covers is denied. The in-process `rules` provider of agentcraft2-core
 # evaluates the same document the same way, and one contract test suite runs
 # against both.
 #

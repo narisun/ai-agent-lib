@@ -8,10 +8,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
-from ai_agent_lib_core import Principal, RequestContext, ValidationFailed
-from ai_agent_lib_core.pipeline import bind_request_context
-from ai_agent_lib_core.pipeline.guardrails import frame_untrusted
-from ai_agent_lib_core.testing import FakeChatModelProvider, Fakes
+from agentcraft2_core import Principal, RequestContext, ValidationFailed
+from agentcraft2_core.pipeline import bind_request_context
+from agentcraft2_core.pipeline.guardrails import frame_untrusted
+from agentcraft2_core.testing import FakeChatModelProvider, Fakes
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableLambda
 from langchain_core.tools import tool

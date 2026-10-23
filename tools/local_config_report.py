@@ -11,9 +11,9 @@ from tools.local_config_redaction import display_json
 from tools.local_processes import report
 
 if TYPE_CHECKING:
-    from ai_agent_lib_core.config import Resolution
-    from ai_agent_lib_core.config.phoenix import PhoenixResolution
-    from ai_agent_lib_core.contracts import ConfigSource
+    from agentcraft2_core.config import Resolution
+    from agentcraft2_core.config.phoenix import PhoenixResolution
+    from agentcraft2_core.contracts import ConfigSource
 
 # Application and tracing controls outside the core binding table. Everything
 # else is masked, including custom credentials with unfamiliar variable names.
@@ -38,8 +38,8 @@ _VISIBLE_EXTRAS = frozenset(
 
 def _display(value: str, *, visible: bool) -> str:
     """Mask first, then bound and escape a value for a single console line."""
-    from ai_agent_lib_core.config import MASKED
-    from ai_agent_lib_core.contracts.redaction import redact
+    from agentcraft2_core.config import MASKED
+    from agentcraft2_core.contracts.redaction import redact
 
     if not value:
         return "(empty)"
@@ -75,7 +75,7 @@ def report_environment(
     JSON option blocks keep their structure while sensitive fields are masked.
     Unrelated shell variables are never enumerated.
     """
-    from ai_agent_lib_core.config import DEFAULT_BINDINGS, ValueKind
+    from agentcraft2_core.config import DEFAULT_BINDINGS, ValueKind
 
     bindings = {binding.key: binding for binding in DEFAULT_BINDINGS}
     rows: dict[str, tuple[str, str]] = {}

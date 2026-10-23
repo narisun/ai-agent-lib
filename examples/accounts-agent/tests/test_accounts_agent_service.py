@@ -23,10 +23,10 @@ from accounts_agent import APPLICATION
 from accounts_agent import service as entrypoint
 from accounts_agent.graph import build_graph
 from accounts_agent.service import build_app
-from ai_agent_lib_core import Principal, RequestContext, ServiceContainer
-from ai_agent_lib_core.integrations.http import ServiceLifecycle, ServiceState, serve
-from ai_agent_lib_core.pipeline import bind_request_context
-from ai_agent_lib_core.testing import FakeChatModelProvider, FakeIdentityVerifier, Fakes, calls_tool
+from agentcraft2_core import Principal, RequestContext, ServiceContainer
+from agentcraft2_core.integrations.http import ServiceLifecycle, ServiceState, serve
+from agentcraft2_core.pipeline import bind_request_context
+from agentcraft2_core.testing import FakeChatModelProvider, FakeIdentityVerifier, Fakes, calls_tool
 
 ANN = {"authorization": "Bearer ann-token"}
 BO = {"authorization": "Bearer bo-token"}

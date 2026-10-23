@@ -4,7 +4,7 @@
 
 [tool.uv.workspace]
 members = ["packages/*", "examples/*"]
-exclude = ["examples/rmprep", "examples/rmqna", "packages/ai-agent-lib-ui"] # Separately managed environments.
+exclude = ["examples/rmprep", "examples/rmqna", "packages/agentcraft2-ui"] # Separately managed environments.
 
 [dependency-groups]
 dev = [
@@ -105,12 +105,12 @@ namespace_packages = true
 plugins = ["pydantic.mypy"]
 explicit_package_bases = true
 mypy_path = [
-    "$MYPY_CONFIG_FILE_DIR/packages/ai-agent-lib-core/src",
-    "$MYPY_CONFIG_FILE_DIR/packages/ai-agent-lib-aws/src",
-    "$MYPY_CONFIG_FILE_DIR/packages/ai-agent-lib-cli/src",
-    "$MYPY_CONFIG_FILE_DIR/packages/ai-agent-lib-core/tests",
-    "$MYPY_CONFIG_FILE_DIR/packages/ai-agent-lib-aws/tests",
-    "$MYPY_CONFIG_FILE_DIR/packages/ai-agent-lib-cli/tests",
+    "$MYPY_CONFIG_FILE_DIR/packages/agentcraft2-core/src",
+    "$MYPY_CONFIG_FILE_DIR/packages/agentcraft2-aws/src",
+    "$MYPY_CONFIG_FILE_DIR/packages/agentcraft2-cli/src",
+    "$MYPY_CONFIG_FILE_DIR/packages/agentcraft2-core/tests",
+    "$MYPY_CONFIG_FILE_DIR/packages/agentcraft2-aws/tests",
+    "$MYPY_CONFIG_FILE_DIR/packages/agentcraft2-cli/tests",
     "$MYPY_CONFIG_FILE_DIR/examples/accounts-agent/src",
     "$MYPY_CONFIG_FILE_DIR/examples/accounts-agent/tests",
     "$MYPY_CONFIG_FILE_DIR/examples/accounts-mcp/src",
@@ -123,12 +123,12 @@ mypy_path = [
     "$MYPY_CONFIG_FILE_DIR/docs/guide",
 ]
 files = [
-    "packages/ai-agent-lib-core/src",
-    "packages/ai-agent-lib-aws/src",
-    "packages/ai-agent-lib-cli/src",
-    "packages/ai-agent-lib-core/tests",
-    "packages/ai-agent-lib-aws/tests",
-    "packages/ai-agent-lib-cli/tests",
+    "packages/agentcraft2-core/src",
+    "packages/agentcraft2-aws/src",
+    "packages/agentcraft2-cli/src",
+    "packages/agentcraft2-core/tests",
+    "packages/agentcraft2-aws/tests",
+    "packages/agentcraft2-cli/tests",
     "examples/accounts-agent/src",
     "examples/accounts-agent/tests",
     "examples/accounts-mcp/src",
@@ -151,7 +151,7 @@ testpaths = ["packages", "examples", "tests"]
 # Lets the repository-level tests import their shared helpers.
 pythonpath = ["tests", "examples/accounts-mcp/tests", "docs/guide"]
 addopts = [
-    "--ignore=packages/ai-agent-lib-ui/tests",
+    "--ignore=packages/agentcraft2-ui/tests",
     "--import-mode=importlib",
     "--strict-markers",
     "--strict-config",
@@ -179,66 +179,66 @@ markers = [
 
 # ------------------------------------------------------------------ import-linter
 [tool.importlinter]
-root_packages = ["ai_agent_lib_core", "ai_agent_lib_aws", "ai_agent_lib_cli"]
+root_packages = ["agentcraft2_core", "agentcraft2_aws", "agentcraft2_cli"]
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "contracts imports nothing else from the library"
 type = "forbidden"
-source_modules = ["ai_agent_lib_core.contracts"]
+source_modules = ["agentcraft2_core.contracts"]
 forbidden_modules = [
-    "ai_agent_lib_core.adapters",
-    "ai_agent_lib_core.config",
-    "ai_agent_lib_core.di",
-    "ai_agent_lib_core.integrations",
-    "ai_agent_lib_core.kit",
-    "ai_agent_lib_core.pipeline",
-    "ai_agent_lib_core.testing",
+    "agentcraft2_core.adapters",
+    "agentcraft2_core.config",
+    "agentcraft2_core.di",
+    "agentcraft2_core.integrations",
+    "agentcraft2_core.kit",
+    "agentcraft2_core.pipeline",
+    "agentcraft2_core.testing",
 ]
 
 [[tool.importlinter.contracts]]
 name = "config, pipeline and adapters import contracts only"
 type = "independence"
 modules = [
-    "ai_agent_lib_core.adapters",
-    "ai_agent_lib_core.config",
-    "ai_agent_lib_core.pipeline",
+    "agentcraft2_core.adapters",
+    "agentcraft2_core.config",
+    "agentcraft2_core.pipeline",
 ]
 
 [[tool.importlinter.contracts]]
 name = "config, pipeline and adapters stay below di and integrations"
 type = "forbidden"
 source_modules = [
-    "ai_agent_lib_core.adapters",
-    "ai_agent_lib_core.config",
-    "ai_agent_lib_core.observability",
-    "ai_agent_lib_core.pipeline",
+    "agentcraft2_core.adapters",
+    "agentcraft2_core.config",
+    "agentcraft2_core.observability",
+    "agentcraft2_core.pipeline",
 ]
 forbidden_modules = [
-    "ai_agent_lib_core.di",
-    "ai_agent_lib_core.integrations",
-    "ai_agent_lib_core.kit",
-    "ai_agent_lib_core.testing",
+    "agentcraft2_core.di",
+    "agentcraft2_core.integrations",
+    "agentcraft2_core.kit",
+    "agentcraft2_core.testing",
 ]
 
 [[tool.importlinter.contracts]]
 # observability formats what the pipeline records; the pipeline must not depend on it.
 name = "pipeline stays below observability"
 type = "forbidden"
-source_modules = ["ai_agent_lib_core.pipeline"]
-forbidden_modules = ["ai_agent_lib_core.observability"]
+source_modules = ["agentcraft2_core.pipeline"]
+forbidden_modules = ["agentcraft2_core.observability"]
 
 [[tool.importlinter.contracts]]
 name = "only integrations.langgraph imports langgraph"
 type = "forbidden"
 source_modules = [
-    "ai_agent_lib_core.adapters",
-    "ai_agent_lib_core.config",
-    "ai_agent_lib_core.contracts",
-    "ai_agent_lib_core.di",
-    "ai_agent_lib_core.integrations.http",
-    "ai_agent_lib_core.integrations.mcp",
-    "ai_agent_lib_core.pipeline",
+    "agentcraft2_core.adapters",
+    "agentcraft2_core.config",
+    "agentcraft2_core.contracts",
+    "agentcraft2_core.di",
+    "agentcraft2_core.integrations.http",
+    "agentcraft2_core.integrations.mcp",
+    "agentcraft2_core.pipeline",
 ]
 forbidden_modules = ["langgraph"]
 # di reaches LangGraph only through integrations.langgraph, which is the point.
@@ -248,14 +248,14 @@ allow_indirect_imports = true
 name = "only integrations.http imports the HTTP server framework"
 type = "forbidden"
 source_modules = [
-    "ai_agent_lib_core.adapters",
-    "ai_agent_lib_core.config",
-    "ai_agent_lib_core.contracts",
-    "ai_agent_lib_core.di",
-    "ai_agent_lib_core.integrations.langgraph",
-    "ai_agent_lib_core.integrations.mcp",
-    "ai_agent_lib_core.pipeline",
-    "ai_agent_lib_aws",
+    "agentcraft2_core.adapters",
+    "agentcraft2_core.config",
+    "agentcraft2_core.contracts",
+    "agentcraft2_core.di",
+    "agentcraft2_core.integrations.langgraph",
+    "agentcraft2_core.integrations.mcp",
+    "agentcraft2_core.pipeline",
+    "agentcraft2_aws",
 ]
 forbidden_modules = ["starlette", "uvicorn"]
 # The MCP SDK serves with the same framework; core reaches it only through integrations.http.
@@ -265,13 +265,13 @@ allow_indirect_imports = true
 name = "only integrations.mcp imports the MCP SDK"
 type = "forbidden"
 source_modules = [
-    "ai_agent_lib_core.adapters",
-    "ai_agent_lib_core.config",
-    "ai_agent_lib_core.contracts",
-    "ai_agent_lib_core.di",
-    "ai_agent_lib_core.integrations.http",
-    "ai_agent_lib_core.integrations.langgraph",
-    "ai_agent_lib_core.pipeline",
+    "agentcraft2_core.adapters",
+    "agentcraft2_core.config",
+    "agentcraft2_core.contracts",
+    "agentcraft2_core.di",
+    "agentcraft2_core.integrations.http",
+    "agentcraft2_core.integrations.langgraph",
+    "agentcraft2_core.pipeline",
 ]
 forbidden_modules = ["mcp", "mcp_types"]
 # di and the LangGraph bindings reach the SDK only through integrations.mcp.
@@ -281,32 +281,32 @@ allow_indirect_imports = true
 name = "the request path never imports evaluation"
 type = "forbidden"
 source_modules = [
-    "ai_agent_lib_core.adapters",
-    "ai_agent_lib_core.config",
-    "ai_agent_lib_core.contracts",
-    "ai_agent_lib_core.di",
-    "ai_agent_lib_core.integrations",
-    "ai_agent_lib_core.pipeline",
+    "agentcraft2_core.adapters",
+    "agentcraft2_core.config",
+    "agentcraft2_core.contracts",
+    "agentcraft2_core.di",
+    "agentcraft2_core.integrations",
+    "agentcraft2_core.pipeline",
 ]
-forbidden_modules = ["ai_agent_lib_core.evaluation"]
+forbidden_modules = ["agentcraft2_core.evaluation"]
 
 [[tool.importlinter.contracts]]
 name = "core never imports the AWS SDK, the AWS package or the CLI"
 type = "forbidden"
-source_modules = ["ai_agent_lib_core"]
-forbidden_modules = ["boto3", "botocore", "ai_agent_lib_aws", "ai_agent_lib_cli"]
+source_modules = ["agentcraft2_core"]
+forbidden_modules = ["boto3", "botocore", "agentcraft2_aws", "agentcraft2_cli"]
 
 [[tool.importlinter.contracts]]
 name = "a provider pack builds on contracts and the kit only"
 type = "forbidden"
-source_modules = ["ai_agent_lib_aws"]
+source_modules = ["agentcraft2_aws"]
 forbidden_modules = [
-    "ai_agent_lib_core.adapters",
-    "ai_agent_lib_core.config",
-    "ai_agent_lib_core.di",
-    "ai_agent_lib_core.integrations",
-    "ai_agent_lib_core.pipeline",
-    "ai_agent_lib_core.testing",
+    "agentcraft2_core.adapters",
+    "agentcraft2_core.config",
+    "agentcraft2_core.di",
+    "agentcraft2_core.integrations",
+    "agentcraft2_core.pipeline",
+    "agentcraft2_core.testing",
 ]
 # The kit itself is built from core's adapters and registry; a pack reaches them only through it.
 allow_indirect_imports = true
@@ -314,16 +314,16 @@ allow_indirect_imports = true
 [[tool.importlinter.contracts]]
 name = "in the AWS package only the checkpoint stores import langgraph"
 type = "forbidden"
-source_modules = ["ai_agent_lib_aws"]
+source_modules = ["agentcraft2_aws"]
 forbidden_modules = ["langgraph"]
 ignore_imports = [
-    "ai_agent_lib_aws.checkpoint_postgres -> langgraph",
-    "ai_agent_lib_aws.checkpoint_agentcore_memory -> langgraph",
+    "agentcraft2_aws.checkpoint_postgres -> langgraph",
+    "agentcraft2_aws.checkpoint_agentcore_memory -> langgraph",
 ]
 allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "no runtime package imports the CLI"
 type = "forbidden"
-source_modules = ["ai_agent_lib_aws"]
-forbidden_modules = ["ai_agent_lib_cli"]
+source_modules = ["agentcraft2_aws"]
+forbidden_modules = ["agentcraft2_cli"]

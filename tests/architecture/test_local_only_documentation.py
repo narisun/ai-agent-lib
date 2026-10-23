@@ -12,11 +12,11 @@ import re
 
 import pytest
 
-from ai_agent_lib_core.config import DEFAULT_BINDINGS, Key, provider_key, render_reference
-from ai_agent_lib_core.config.bindings import LOCAL_ONLY_ADAPTERS, Binding
-from ai_agent_lib_core.contracts import Section
-from ai_agent_lib_core.di import ServiceProviders, ports
-from ai_agent_lib_core.di.providers import DATA_PORT, MODEL_PORT
+from agentcraft2_core.config import DEFAULT_BINDINGS, Key, provider_key, render_reference
+from agentcraft2_core.config.bindings import LOCAL_ONLY_ADAPTERS, Binding
+from agentcraft2_core.contracts import Section
+from agentcraft2_core.di import ServiceProviders, ports
+from agentcraft2_core.di.providers import DATA_PORT, MODEL_PORT
 
 _PORTS = (MODEL_PORT, *(section.value for section in Section), DATA_PORT)
 

@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ai_agent_lib_core import ServiceContainer
-from ai_agent_lib_core.testing import (
+from agentcraft2_core import ServiceContainer
+from agentcraft2_core.testing import (
     audit_records,
     load_test_config,
     scripted_model,

@@ -20,7 +20,7 @@ from tools import local_dev, local_processes, package_runtime
 from tools.local_environment import agent_environment
 from tools.local_processes import RunningService, Service
 
-from ai_agent_lib_core.config import deprecations as deprecations_module
+from agentcraft2_core.config import deprecations as deprecations_module
 
 
 def test_copy_settings_preserves_existing_file(tmp_path: Path) -> None:
@@ -92,18 +92,18 @@ def test_setup_installs_runtime_packages_and_opt_in_development_tools(
     assert [call.args[1] for call in calls] == ["agent", "ui"]
     requirements_to_install = calls[0].args[2]
     for relative in (
-        "packages/ai-agent-lib-core",
+        "packages/agentcraft2-core",
         "examples/rmprep/agents/rmprep",
         "examples/rmprep/mcp-servers/rmprep-data",
     ):
         assert requirements_to_install.count(str(tmp_path / relative)) == 1
-    assert not any("ai-agent-lib-aws" in value for value in requirements_to_install)
-    assert (str(tmp_path / "packages/ai-agent-lib-cli") in requirements_to_install) is dev
-    assert "ai-agent-lib-cli" not in requirements_to_install
+    assert not any("agentcraft2-aws" in value for value in requirements_to_install)
+    assert (str(tmp_path / "packages/agentcraft2-cli") in requirements_to_install) is dev
+    assert "agentcraft2-cli" not in requirements_to_install
     for requirement in requirements:
-        if requirement != "ai-agent-lib-cli":
+        if requirement != "agentcraft2-cli":
             assert (requirement in requirements_to_install) is dev
-    assert calls[1].args[2][-1].endswith(f"ai-agent-lib-ui[{'chat,dev' if dev else 'chat'}]")
+    assert calls[1].args[2][-1].endswith(f"agentcraft2-ui[{'chat,dev' if dev else 'chat'}]")
     execute.assert_not_called()  # No installation into the default Python's site-packages.
 
 
@@ -142,10 +142,10 @@ def test_setup_installs_the_selected_model_extra(
     monkeypatch.setattr(package_runtime, "install", install)
     local_dev.setup(tmp_path, model=provider)
     command = install.call_args_list[0].args[2]
-    assert (str(tmp_path / "packages/ai-agent-lib-aws") + "[bedrock]" in command) is (
+    assert (str(tmp_path / "packages/agentcraft2-aws") + "[bedrock]" in command) is (
         provider == "bedrock"
     )
-    assert (str(tmp_path / "packages/ai-agent-lib-core") + "[anthropic]" in command) is (
+    assert (str(tmp_path / "packages/agentcraft2-core") + "[anthropic]" in command) is (
         provider == "anthropic"
     )
 
@@ -177,7 +177,7 @@ def test_existing_ui_configuration_is_checked_without_overwriting(
     assert local_dev.prepare_ui(tmp_path, config) == 9876
     execute.assert_called_once_with(
         package_runtime.command(
-            tmp_path, "ui", "-m", "ai_agent_lib_ui", "check", "--config", str(config)
+            tmp_path, "ui", "-m", "agentcraft2_ui", "check", "--config", str(config)
         ),
         tmp_path,
     )
@@ -233,7 +233,7 @@ def test_missing_custom_ui_config_is_not_initialized_as_rmprep(
     monkeypatch.setattr(local_dev, "prepare_ui", prepare)
     assert local_dev.main(["ui", "--config", "missing/config.json"], root=tmp_path) == 1
     prepare.assert_not_called()
-    assert "ai_agent_lib_ui init" in capsys.readouterr().out
+    assert "agentcraft2_ui init" in capsys.readouterr().out
 
 
 def test_failed_installation_stops_setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -596,7 +596,7 @@ def test_agent_environment_applies_legacy_names_and_logs_each_deprecation_once(
     overrides.write_text("EAP_MODEL_PROVIDER=fake\nEAP_MODEL_ID=file-model\n")
     # Python's own DeprecationWarning is still raised for programs that call the resolver.
     with (
-        caplog.at_level(logging.WARNING, logger="ai_agent_lib_core.config"),
+        caplog.at_level(logging.WARNING, logger="agentcraft2_core.config"),
         pytest.warns(DeprecationWarning, match="EAP_MODEL_ID is deprecated"),
     ):
         environment = agent_environment(service, overrides, required=True)
@@ -606,7 +606,7 @@ def test_agent_environment_applies_legacy_names_and_logs_each_deprecation_once(
     assert environment["EAP_MODEL_ID"] == "file-model"
     assert "fake / file-model" in capsys.readouterr().out
     # A launcher is a resolution point: the notice reaches its log once, as the agent's will.
-    assert [r.getMessage() for r in caplog.records if r.name == "ai_agent_lib_core.config"] == [
+    assert [r.getMessage() for r in caplog.records if r.name == "agentcraft2_core.config"] == [
         "EAP_MODEL_ID is deprecated; use AC2_MODEL_ID instead"
     ]
 

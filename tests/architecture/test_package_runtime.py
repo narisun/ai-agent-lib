@@ -251,9 +251,9 @@ def test_module_command_uses_same_python_and_isolated_target(
 ) -> None:
     execute = Mock(return_value=7)
     monkeypatch.setattr("tools.package_runtime.wait_for_child", execute)
-    assert package_runtime.main(["ui", "-m", "ai_agent_lib_ui", "check"]) == 7
+    assert package_runtime.main(["ui", "-m", "agentcraft2_ui", "check"]) == 7
     assert execute.call_args.args[0] == package_runtime.command(
-        ROOT, "ui", "-m", "ai_agent_lib_ui", "check"
+        ROOT, "ui", "-m", "agentcraft2_ui", "check"
     )
 
 

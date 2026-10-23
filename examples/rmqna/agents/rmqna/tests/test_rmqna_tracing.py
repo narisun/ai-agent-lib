@@ -9,18 +9,18 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from ai_agent_lib_core import ServiceContainer
-from ai_agent_lib_core.config.phoenix import PhoenixSettings
-from ai_agent_lib_core.integrations.langgraph.phoenix import PhoenixTracing
-from ai_agent_lib_core.observability.model_trace import JsonlModelTraceSink
-from ai_agent_lib_core.pipeline import bind_request_context
-from ai_agent_lib_core.testing import (
+from agentcraft2_core import ServiceContainer
+from agentcraft2_core.config.phoenix import PhoenixSettings
+from agentcraft2_core.integrations.langgraph.phoenix import PhoenixTracing
+from agentcraft2_core.observability.model_trace import JsonlModelTraceSink
+from agentcraft2_core.pipeline import bind_request_context
+from agentcraft2_core.testing import (
     audit_records,
     calls_tool,
     load_test_config,
     scripted_providers,
 )
-from ai_agent_lib_core.testing.mcp import InProcessMcpConnector
+from agentcraft2_core.testing.mcp import InProcessMcpConnector
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from rmqna import service

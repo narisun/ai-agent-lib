@@ -14,7 +14,7 @@ def agent_environment(
     therefore keep the same base directory as a direct ``python -m`` launch.
     Imports are lazy so batch help and first-time setup need only standard Python.
     """
-    from ai_agent_lib_core.config import (
+    from agentcraft2_core.config import (
         ConfigResolver,
         DotenvConfigSource,
         EnvironConfigSource,
@@ -22,8 +22,8 @@ def agent_environment(
         MappingConfigSource,
         log_resolution_warnings,
     )
-    from ai_agent_lib_core.config.phoenix import resolve_phoenix_settings
-    from ai_agent_lib_core.contracts import ConfigurationError
+    from agentcraft2_core.config.phoenix import resolve_phoenix_settings
+    from agentcraft2_core.contracts import ConfigurationError
     from tools.local_config_report import report_environment
 
     try:

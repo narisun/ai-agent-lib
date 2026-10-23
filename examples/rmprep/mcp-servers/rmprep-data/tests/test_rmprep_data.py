@@ -10,10 +10,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from ai_agent_lib_core import ServiceContainer
-from ai_agent_lib_core.integrations.mcp import mcp_result_text, verify_registration
-from ai_agent_lib_core.testing import TEST_AGENT, audit_records, load_test_config
-from ai_agent_lib_core.testing.mcp import call_tool_as
+from agentcraft2_core import ServiceContainer
+from agentcraft2_core.integrations.mcp import mcp_result_text, verify_registration
+from agentcraft2_core.testing import TEST_AGENT, audit_records, load_test_config
+from agentcraft2_core.testing.mcp import call_tool_as
 from mcp.server.mcpserver import MCPServer
 
 from rmprep_data import APPLICATION, SERVER_ID, build_server

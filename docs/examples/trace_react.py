@@ -12,9 +12,9 @@ from pathlib import Path
 
 from helper.graph import APPLICATION, answer, build_graph
 
-from ai_agent_lib_core import Principal, RequestContext, ServiceConfig
-from ai_agent_lib_core.pipeline import bind_request_context
-from ai_agent_lib_core.testing import FakeChatModelProvider, Fakes, calls_tool
+from agentcraft2_core import Principal, RequestContext, ServiceConfig
+from agentcraft2_core.pipeline import bind_request_context
+from agentcraft2_core.testing import FakeChatModelProvider, Fakes, calls_tool
 
 
 async def main() -> None:

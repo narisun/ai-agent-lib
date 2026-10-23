@@ -50,10 +50,10 @@ Open Command Prompt at the workspace root and select Python as described in the
 include the core `otel` extra; the installer uses Python and pip.
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli install
+"%PYTHON%" -m agentcraft2_cli install
 set "AC2_PHOENIX_ENV_FILE=F:\work\phoenix\agent.env"
-"%PYTHON%" -m ai_agent_lib_cli config explain rmqna
-"%PYTHON%" -m ai_agent_lib_cli doctor rmqna
+"%PYTHON%" -m agentcraft2_cli config explain rmqna
+"%PYTHON%" -m agentcraft2_cli doctor rmqna
 "%PYTHON%" -m rmqna.service --port 8200
 ```
 

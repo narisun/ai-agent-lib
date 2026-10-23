@@ -10,7 +10,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from ai_agent_lib_core.contracts import MASK
+from agentcraft2_core.contracts import MASK
 
 
 def _number(value: object) -> Decimal | None:

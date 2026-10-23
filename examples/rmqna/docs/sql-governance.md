@@ -6,7 +6,7 @@ Status: accepted, 19 October 2026. Applies to `mcp-servers/rmqna-data` only. The
 
 The library governs data through **named queries**. The `DataSource` port says a caller "never
 supplies query text, so nothing a model writes can become part of a statement"
-(`packages/ai-agent-lib-core/src/ai_agent_lib_core/contracts/data.py`). Every query is declared in a
+(`packages/agentcraft2-core/src/agentcraft2_core/contracts/data.py`). Every query is declared in a
 file with its parameters, row limit and classification, and each call passes a `data.query` policy
 decision that can mask columns and cap rows. rmprep keeps to this: its four tools compose reviewed
 queries.

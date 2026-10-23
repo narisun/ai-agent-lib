@@ -12,10 +12,10 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from ai_agent_lib_core import ServiceContainer
-from ai_agent_lib_core.pipeline import bind_request_context
-from ai_agent_lib_core.testing import calls_tool, load_test_config, scripted_providers
-from ai_agent_lib_core.testing.mcp import InProcessMcpConnector
+from agentcraft2_core import ServiceContainer
+from agentcraft2_core.pipeline import bind_request_context
+from agentcraft2_core.testing import calls_tool, load_test_config, scripted_providers
+from agentcraft2_core.testing.mcp import InProcessMcpConnector
 
 from rmqna.graph import APPLICATION, answer, build_graph
 from rmqna.settings import ENV_FILE

@@ -21,7 +21,7 @@ from pathlib import Path
 
 import duckdb
 import pytest
-from ai_agent_lib_core.contracts import ConfigurationError
+from agentcraft2_core.contracts import ConfigurationError
 
 from rmqna_data import engine as engine_module
 from rmqna_data.engine import ExecuteResult, RmqnaEngine, ValuesResult

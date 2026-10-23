@@ -10,11 +10,11 @@ from dataclasses import replace
 from typing import Any
 from uuid import uuid4
 
-from ai_agent_lib_core import ConfigurationError, ServiceConfig, ServiceContainer
-from ai_agent_lib_core.config import load_service_config
-from ai_agent_lib_core.di import ServiceProviders
-from ai_agent_lib_core.observability import report_error
-from ai_agent_lib_core.pipeline import bind_request_context
+from agentcraft2_core import ConfigurationError, ServiceConfig, ServiceContainer
+from agentcraft2_core.config import load_service_config
+from agentcraft2_core.di import ServiceProviders
+from agentcraft2_core.observability import report_error
+from agentcraft2_core.pipeline import bind_request_context
 
 from rmqna.graph import APPLICATION, answer, build_graph
 from rmqna.settings import ENV_FILE

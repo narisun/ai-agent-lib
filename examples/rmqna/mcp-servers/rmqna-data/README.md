@@ -20,7 +20,7 @@ every new terminal. These commands use Windows Command Prompt; in bash/zsh repla
 Install the workspace once, and again after changing dependencies:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli install
+"%PYTHON%" -m agentcraft2_cli install
 ```
 
 ## Available tools
@@ -76,7 +76,7 @@ Open a terminal at the workspace root and select Python as described above.
 Start this server **before** any agent that calls its tools:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli run rmqna-data
+"%PYTHON%" -m agentcraft2_cli run rmqna-data
 ```
 
 Leave this terminal running. Wait for the `ready` log event before starting
@@ -92,7 +92,7 @@ To check readiness from another terminal, select Python there and run:
 
 **Expected result:** a ready server prints `200`. A connection error means the
 listener is unavailable; HTTP 503 means it has not become ready. Read the server's
-output or run `"%PYTHON%" -m ai_agent_lib_cli doctor rmqna-data` to diagnose a failure.
+output or run `"%PYTHON%" -m agentcraft2_cli doctor rmqna-data` to diagnose a failure.
 
 On this machine a caller without a token is the development identity in
 `AC2_IDENTITY_OPTIONS`. Local state is written under
@@ -125,8 +125,8 @@ The data is the workspace's `data/` folder, one table per file, except `data_mod
 2. Change `validate.py`, `engine.py` or `server.py`. A new refusal rule needs a new `error_kind`
    only if the agent should treat it differently; the current kinds are used by the agent's prompt.
 3. If a tool's arguments changed, pin it again from the workspace root:
-   `"%PYTHON%" -m ai_agent_lib_cli registry pin rmqna-data`.
-4. Run `"%PYTHON%" -m ai_agent_lib_cli check` from the workspace root.
+   `"%PYTHON%" -m agentcraft2_cli registry pin rmqna-data`.
+4. Run `"%PYTHON%" -m agentcraft2_cli check` from the workspace root.
 
 ## Deployment
 

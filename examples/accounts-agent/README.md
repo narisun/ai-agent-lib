@@ -20,7 +20,7 @@ conversation checkpoints in SQLite.
 ## Run it on the Anthropic API
 
 ```bash
-python -m pip install -e "../../packages/ai-agent-lib-core[anthropic]"
+python -m pip install -e "../../packages/agentcraft2-core[anthropic]"
 ANTHROPIC_API_KEY=... AC2_MODEL_ID=<model id> accounts-agent "What is the balance of account 4411?"
 ```
 

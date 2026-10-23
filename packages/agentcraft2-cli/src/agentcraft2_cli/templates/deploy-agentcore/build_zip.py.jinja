@@ -1,0 +1,32 @@
+"""Build the code artifact of {{ name }}: the zip AgentCore Runtime runs.
+
+Run it from the workspace root with the Python that has the CLI installed:
+
+    python deploy/{{ name }}/build_zip.py
+
+It installs the wheels of deploy/{{ name }}/requirements.lock for Python {{ python }} on
+ARM64 Linux, the service itself, and a main.py that starts the service with its
+agentcore profile, then writes deploy/{{ name }}/{{ name }}.zip. Terraform uploads
+that zip (variable code_zip). To upload it yourself instead, add
+--upload --bucket <bucket>, which needs boto3. Any option of
+agentcraft2_cli.deploy.zipbuild may follow, such as --python-version.
+
+A dependency without a wheel for that platform stops the build: it cannot run
+on the runtime. Replace it, or deploy a container image instead.
+"""
+
+from __future__ import annotations
+
+import sys
+
+from agentcraft2_cli.deploy.zipbuild import main
+
+ARGUMENTS = [
+    "--service", "{{ folder }}",
+    "--lock", "deploy/{{ name }}/requirements.lock",
+    "--entry", "{{ entry_module }}",
+    "--output", "deploy/{{ name }}/{{ name }}.zip",
+]
+
+if __name__ == "__main__":
+    raise SystemExit(main([*ARGUMENTS, *sys.argv[1:]]))

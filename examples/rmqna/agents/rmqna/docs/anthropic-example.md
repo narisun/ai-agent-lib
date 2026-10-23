@@ -24,7 +24,7 @@ This agent's dependency already includes the library's `anthropic` extra.
 Install the workspace after saving any dependency changes:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli install
+"%PYTHON%" -m agentcraft2_cli install
 ```
 
 `install` uses this Python's pip and the library source in `agentcraft2.toml`.
@@ -153,7 +153,7 @@ checkpoints. They also reopen the container to check saved history:
 
 ```bat
 "%PYTHON%" -m pytest agents/rmqna/tests/test_rmqna_tracing.py
-"%PYTHON%" -m ai_agent_lib_cli check
+"%PYTHON%" -m agentcraft2_cli check
 ```
 
 See [Model tracing and ReAct checkpoints](../README.md#inspect-model-input-and-output) for trace fields,

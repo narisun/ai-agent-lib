@@ -23,19 +23,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - run: python -m pip install -e packages/ai-agent-lib-core -e "packages/ai-agent-lib-ui[chat,dev]"
+      - run: python -m pip install -e packages/agentcraft2-core -e "packages/agentcraft2-ui[chat,dev]"
       - run: python -m ruff check .
-        working-directory: packages/ai-agent-lib-ui
+        working-directory: packages/agentcraft2-ui
       - run: python -m ruff format --check .
-        working-directory: packages/ai-agent-lib-ui
+        working-directory: packages/agentcraft2-ui
       - run: lint-imports
-        working-directory: packages/ai-agent-lib-ui
+        working-directory: packages/agentcraft2-ui
       - run: python -m pytest
-        working-directory: packages/ai-agent-lib-ui
+        working-directory: packages/agentcraft2-ui
       - run: python -m mypy
-        working-directory: packages/ai-agent-lib-ui
+        working-directory: packages/agentcraft2-ui
       - run: python -m pip check
-      - run: python -m pip wheel --no-deps --wheel-dir dist packages/ai-agent-lib-ui
+      - run: python -m pip wheel --no-deps --wheel-dir dist packages/agentcraft2-ui
       - name: Installed UI wheel chat and restart checks
         run: python tools/check_consumer.py --profile ui-chat
 
@@ -61,14 +61,14 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.python == '3.11'
         # The specification sets 90; the measured floor on 2026-10-18 was 94.
         run: >
-          python -m pytest packages/ai-agent-lib-core -q
-          --cov=ai_agent_lib_core.contracts --cov=ai_agent_lib_core.config
-          --cov=ai_agent_lib_core.di --cov=ai_agent_lib_core.pipeline
+          python -m pytest packages/agentcraft2-core -q
+          --cov=agentcraft2_core.contracts --cov=agentcraft2_core.config
+          --cov=agentcraft2_core.di --cov=agentcraft2_core.pipeline
           --cov-branch --cov-report=term --cov-fail-under=90
       - name: Relationship manager example policy samples
-        run: python -m ai_agent_lib_cli policy test --workspace examples/rmprep
+        run: python -m agentcraft2_cli policy test --workspace examples/rmprep
       - name: Relationship manager data-question example policy samples
-        run: python -m ai_agent_lib_cli policy test --workspace examples/rmqna
+        run: python -m agentcraft2_cli policy test --workspace examples/rmqna
       - name: The developer guide matches the code
         run: python docs/guide/build_guide.py --check
 
@@ -120,4 +120,4 @@ jobs:
         with:
           python-version: "3.11"
       - run: python tools/install_dev.py
-      - run: python -m pytest packages/ai-agent-lib-cli/tests/unit/test_cli_deploy.py -q -m container
+      - run: python -m pytest packages/agentcraft2-cli/tests/unit/test_cli_deploy.py -q -m container

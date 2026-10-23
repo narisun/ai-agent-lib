@@ -1,10 +1,10 @@
 # Agent Lab contracts: Phase 1
 
-Agent Lab is the application supplied by the `ai-agent-lib-ui` package. Phase 1
+Agent Lab is the application supplied by the `agentcraft2-ui` package. Phase 1
 provides the contracts shared by future
 chat, document and inspector screens. Phase 2 adds the local browser server,
 HTTP dispatcher, SQLite history and `init`, `check`, `serve` commands. Start with the
-[package setup](../packages/ai-agent-lib-ui/README.md) to install and run its checks
+[package setup](../packages/agentcraft2-ui/README.md) to install and run its checks
 using Command Prompt, Python and pip.
 
 ## Package boundaries
@@ -55,7 +55,7 @@ Production destinations require HTTPS. Explicit local mode permits HTTP on
 ```
 
 Use `read_manifest` and `bind_agent` from
-`ai_agent_lib_ui.application.catalog`. Binding checks the agent ID, version,
+`agentcraft2_ui.application.catalog`. Binding checks the agent ID, version,
 registry revision, adapter and destination. Rebind against the latest registry
 before dispatch. Authentication, audience-specific credentials and policy checks
 will be supplied by the HTTP/catalog adapters; the manifest never authorizes a call.
@@ -105,8 +105,8 @@ content references are not resolved by the local panel. Optional presentation
 capability changes preserve existing chat bindings; endpoint, version, adapter,
 audience and scope changes still require a new binding.
 
-See the executable synthetic [manifest](../packages/ai-agent-lib-ui/tests/fixtures/presentation.json)
-and [memo response](../packages/ai-agent-lib-ui/tests/fixtures/invoke.json) fixtures.
+See the executable synthetic [manifest](../packages/agentcraft2-ui/tests/fixtures/presentation.json)
+and [memo response](../packages/agentcraft2-ui/tests/fixtures/invoke.json) fixtures.
 
 ## Scope, permissions and query limits
 
@@ -172,10 +172,10 @@ into both the container and HTTP entry point. For example, in the agent's
 composition root, where `config`, `run`, `lifecycle` and `metadata_sink` already exist:
 
 ```python
-from ai_agent_lib_core.adapters.system import SystemClock, UuidGenerator
-from ai_agent_lib_core.di import ServiceContainer
-from ai_agent_lib_core.integrations.http import agent_app
-from ai_agent_lib_core.observability import Diagnostics
+from agentcraft2_core.adapters.system import SystemClock, UuidGenerator
+from agentcraft2_core.di import ServiceContainer
+from agentcraft2_core.integrations.http import agent_app
+from agentcraft2_core.observability import Diagnostics
 
 diagnostics = Diagnostics(metadata_sink, SystemClock(), UuidGenerator())
 services = ServiceContainer(config, diagnostics=diagnostics)
@@ -234,7 +234,7 @@ Writes have a one-second timeout by default, configurable through
 `Diagnostics(write_timeout_seconds=...)`, so an unresponsive async sink cannot
 hold a chat request indefinitely. Sinks must use nonblocking, cancellation-aware IO.
 
-The [diagnostic fixture](../packages/ai-agent-lib-ui/tests/fixtures/diagnostics.json)
+The [diagnostic fixture](../packages/agentcraft2-ui/tests/fixtures/diagnostics.json)
 shows a 120-token draft rejected by application validation, followed by an SDK
 failure whose usage is unavailable. Both belong to the terminal attempt list;
 neither becomes an accepted answer. Phase 3 will implement metric aggregation,

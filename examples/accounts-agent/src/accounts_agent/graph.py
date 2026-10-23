@@ -13,7 +13,7 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
 from accounts_agent.tools import lookup_balance
-from ai_agent_lib_core import RequestContext, ServiceContainer
+from agentcraft2_core import RequestContext, ServiceContainer
 
 __all__ = ["APPLICATION", "State", "ask", "build_graph", "registered_mcp_tools"]
 

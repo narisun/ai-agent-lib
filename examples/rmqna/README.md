@@ -40,9 +40,9 @@ Use Python 3.11 or newer in a virtual environment. From this workspace's folder,
 checkout two levels up (see `agentcraft2.toml`):
 
 ```bash
-python -m pip install -e ../../packages/ai-agent-lib-core -e ../../packages/ai-agent-lib-cli
-python -m ai_agent_lib_cli install
-python -m ai_agent_lib_cli check
+python -m pip install -e ../../packages/agentcraft2-core -e ../../packages/agentcraft2-cli
+python -m agentcraft2_cli install
+python -m agentcraft2_cli check
 ```
 
 `install` installs both services and the development tools; `check` runs lint, format, types, the
@@ -56,8 +56,8 @@ Set the model in `agents/rmqna/.env` (`AC2_MODEL_ID`, and `ANTHROPIC_API_KEY` or
 credential mechanism). Running the agent calls the real model and uses billable tokens.
 
 ```bash
-python -m ai_agent_lib_cli run rmqna-data     # terminal 1: MCP server on :8300, wait for "ready"
-python -m ai_agent_lib_cli run rmqna          # terminal 2: agent on :8200 (also: rmqna-serve)
+python -m agentcraft2_cli run rmqna-data     # terminal 1: MCP server on :8300, wait for "ready"
+python -m agentcraft2_cli run rmqna          # terminal 2: agent on :8200 (also: rmqna-serve)
 python -m rmqna "Which clients have a covenant in breach?" --thread demo    # terminal 3, one question
 ```
 
@@ -123,8 +123,8 @@ it passes only if the agent sent no SQL, and its `answer_contains` checks the wo
 out: `result_match` and `answer_contains`.
 
 ```bash
-python -m ai_agent_lib_cli eval rmqna            # real model, tools in process; no server to start
-python -m ai_agent_lib_cli eval rmqna --accept   # re-runs the whole eval (a second billable live run)
+python -m agentcraft2_cli eval rmqna            # real model, tools in process; no server to start
+python -m agentcraft2_cli eval rmqna --accept   # re-runs the whole eval (a second billable live run)
                                                  # and saves that fresh passing report as the baseline
 ```
 

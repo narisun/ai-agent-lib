@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ai_agent_lib_core import RequestContext
+from agentcraft2_core import RequestContext
 
 from rmprep.state import State
 

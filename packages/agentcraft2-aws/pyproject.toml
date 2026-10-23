@@ -1,0 +1,42 @@
+[project]
+name = "agentcraft2-aws"
+version = "0.1.0"
+description = "AWS adapters for the Enterprise Agentic Platform library."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "agentcraft2-core",
+    "boto3>=1.35",
+    "sqlglot>=25.0",
+]
+
+[project.optional-dependencies]
+# The bedrock model provider.
+bedrock = [
+    "langchain-aws>=1.0,<2",
+]
+# The postgres checkpoint store.
+postgres = [
+    "langgraph-checkpoint-postgres>=3.1,<4",
+    "psycopg[binary,pool]>=3.2",
+    "psycopg-pool>=3.3",
+]
+# The AgentCore Memory checkpoint store, and the connector that calls MCP servers on AgentCore runtimes.
+agentcore = [
+    "agentcraft2-core[mcp]",
+    "langgraph-checkpoint-aws>=1.2,<2",
+]
+
+[project.entry-points."agentcraft2.providers"]
+aws = "agentcraft2_aws:register"
+
+[tool.uv.sources]
+agentcraft2-core = { workspace = true }
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentcraft2_aws"]

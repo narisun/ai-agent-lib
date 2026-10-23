@@ -14,9 +14,9 @@ resolution-markers = [
 members = [
     "accounts-agent",
     "accounts-mcp",
-    "ai-agent-lib-aws",
-    "ai-agent-lib-cli",
-    "ai-agent-lib-core",
+    "agentcraft2-aws",
+    "agentcraft2-cli",
+    "agentcraft2-core",
 ]
 
 [manifest.dependency-groups]
@@ -45,29 +45,29 @@ name = "accounts-agent"
 version = "0.1.0"
 source = { editable = "examples/accounts-agent" }
 dependencies = [
-    { name = "ai-agent-lib-core", extra = ["jwt", "mcp", "otel", "serve"] },
+    { name = "agentcraft2-core", extra = ["jwt", "mcp", "otel", "serve"] },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "ai-agent-lib-core", extras = ["jwt", "mcp", "otel", "serve"], editable = "packages/ai-agent-lib-core" }]
+requires-dist = [{ name = "agentcraft2-core", extras = ["jwt", "mcp", "otel", "serve"], editable = "packages/agentcraft2-core" }]
 
 [[package]]
 name = "accounts-mcp"
 version = "0.1.0"
 source = { editable = "examples/accounts-mcp" }
 dependencies = [
-    { name = "ai-agent-lib-core", extra = ["duckdb", "jwt", "mcp", "otel", "serve"] },
+    { name = "agentcraft2-core", extra = ["duckdb", "jwt", "mcp", "otel", "serve"] },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "ai-agent-lib-core", extras = ["duckdb", "jwt", "mcp", "otel", "serve"], editable = "packages/ai-agent-lib-core" }]
+requires-dist = [{ name = "agentcraft2-core", extras = ["duckdb", "jwt", "mcp", "otel", "serve"], editable = "packages/agentcraft2-core" }]
 
 [[package]]
-name = "ai-agent-lib-aws"
+name = "agentcraft2-aws"
 version = "0.1.0"
-source = { editable = "packages/ai-agent-lib-aws" }
+source = { editable = "packages/agentcraft2-aws" }
 dependencies = [
-    { name = "ai-agent-lib-core" },
+    { name = "agentcraft2-core" },
     { name = "boto3" },
     { name = "sqlglot" },
 ]
@@ -84,7 +84,7 @@ postgres = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ai-agent-lib-core", editable = "packages/ai-agent-lib-core" },
+    { name = "agentcraft2-core", editable = "packages/agentcraft2-core" },
     { name = "boto3", specifier = ">=1.35" },
     { name = "langchain-aws", marker = "extra == 'bedrock'", specifier = ">=1.0,<2" },
     { name = "langgraph-checkpoint-postgres", marker = "extra == 'postgres'", specifier = ">=3.1,<4" },
@@ -95,11 +95,11 @@ requires-dist = [
 provides-extras = ["bedrock", "postgres"]
 
 [[package]]
-name = "ai-agent-lib-cli"
+name = "agentcraft2-cli"
 version = "0.1.0"
-source = { editable = "packages/ai-agent-lib-cli" }
+source = { editable = "packages/agentcraft2-cli" }
 dependencies = [
-    { name = "ai-agent-lib-core", extra = ["duckdb", "mcp"] },
+    { name = "agentcraft2-core", extra = ["duckdb", "mcp"] },
     { name = "click" },
     { name = "jinja2" },
     { name = "pyyaml" },
@@ -108,13 +108,13 @@ dependencies = [
 
 [package.optional-dependencies]
 aws = [
-    { name = "ai-agent-lib-aws" },
+    { name = "agentcraft2-aws" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "ai-agent-lib-aws", marker = "extra == 'aws'", editable = "packages/ai-agent-lib-aws" },
-    { name = "ai-agent-lib-core", extras = ["duckdb", "mcp"], editable = "packages/ai-agent-lib-core" },
+    { name = "agentcraft2-aws", marker = "extra == 'aws'", editable = "packages/agentcraft2-aws" },
+    { name = "agentcraft2-core", extras = ["duckdb", "mcp"], editable = "packages/agentcraft2-core" },
     { name = "click", specifier = ">=8.1" },
     { name = "jinja2", specifier = ">=3.1" },
     { name = "pyyaml", specifier = ">=6.0" },
@@ -123,9 +123,9 @@ requires-dist = [
 provides-extras = ["aws"]
 
 [[package]]
-name = "ai-agent-lib-core"
+name = "agentcraft2-core"
 version = "0.1.0"
-source = { editable = "packages/ai-agent-lib-core" }
+source = { editable = "packages/agentcraft2-core" }
 dependencies = [
     { name = "aiosqlite" },
     { name = "httpx" },

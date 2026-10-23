@@ -6,7 +6,7 @@ from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 
-from ai_agent_lib_core import ServiceContainer
+from agentcraft2_core import ServiceContainer
 
 __all__ = ["APPLICATION", "DATA_SOURCE", "SERVER_ID", "build_server"]
 

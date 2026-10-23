@@ -25,8 +25,8 @@ from accounts_mcp_support import HERE, agent_config, records, scripted, server_c
 from accounts_agent import APPLICATION as AGENT
 from accounts_agent import ask
 from accounts_mcp import build_server
-from ai_agent_lib_core import Classification, RequestContext, ServiceContainer
-from ai_agent_lib_core.adapters import (
+from agentcraft2_core import Classification, RequestContext, ServiceContainer
+from agentcraft2_core.adapters import (
     ExchangingJwtIdentity,
     JwtIdentityOptions,
     JwtIdentityVerifier,
@@ -34,13 +34,13 @@ from ai_agent_lib_core.adapters import (
     SystemClock,
     resolve_jwt_options,
 )
-from ai_agent_lib_core.config import ConfigResolver, MappingConfigSource
-from ai_agent_lib_core.contracts import MASK, SecretsProvider, Section, ServiceConfig
-from ai_agent_lib_core.di import BuildContext, ServiceProviders
-from ai_agent_lib_core.integrations.http import ServiceLifecycle, add_health_routes, serve
-from ai_agent_lib_core.integrations.mcp import verify_registration
-from ai_agent_lib_core.testing import calls_tool, last_shown_to_model
-from ai_agent_lib_core.testing.oauth import FakeIdentityProvider
+from agentcraft2_core.config import ConfigResolver, MappingConfigSource
+from agentcraft2_core.contracts import MASK, SecretsProvider, Section, ServiceConfig
+from agentcraft2_core.di import BuildContext, ServiceProviders
+from agentcraft2_core.integrations.http import ServiceLifecycle, add_health_routes, serve
+from agentcraft2_core.integrations.mcp import verify_registration
+from agentcraft2_core.testing import calls_tool, last_shown_to_model
+from agentcraft2_core.testing.oauth import FakeIdentityProvider
 
 pytestmark = [pytest.mark.integration, pytest.mark.enable_socket]
 

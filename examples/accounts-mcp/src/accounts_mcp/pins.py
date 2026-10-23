@@ -6,8 +6,8 @@ import asyncio
 import sys
 
 from accounts_mcp.server import build_server
-from ai_agent_lib_core import ServiceContainer
-from ai_agent_lib_core.integrations.mcp import tool_fingerprints
+from agentcraft2_core import ServiceContainer
+from agentcraft2_core.integrations.mcp import tool_fingerprints
 
 __all__ = ["main"]
 

@@ -1,0 +1,758 @@
+"""Looking at a workspace: doctor, config explain, policy test, graph, run and update."""
+
+from __future__ import annotations
+
+import json
+import logging
+import signal
+import subprocess
+import sys
+import time
+from contextlib import AbstractContextManager
+from pathlib import Path, PurePosixPath
+
+import jinja2
+import pytest
+import yaml
+
+from agentcraft2_cli.__main__ import main
+from agentcraft2_cli.errors import CliError
+from agentcraft2_cli.policy import Sample, load_samples, opa_server, samples_text
+from agentcraft2_cli.processes import read_graph, run_code, run_service
+from agentcraft2_cli.render import TemplateRenderer
+from agentcraft2_cli.scaffold import LOCK_FILE, Scaffolder
+from agentcraft2_cli.testing import as_written, toolbox_for_tests
+from agentcraft2_cli.toolbox import Toolbox
+from agentcraft2_cli.workspace import (
+    AgentAnswers,
+    LibrarySource,
+    McpAnswers,
+    WorkspaceAnswers,
+)
+from agentcraft2_core.adapters import OpaPolicyDecisionPoint
+from agentcraft2_core.config import Key, deprecations, secret_key, variable_for
+from agentcraft2_core.config.bindings import legacy_spelling
+
+PINS = {"hello.greet": "ab" * 32, "hello.people_by_team": "cd" * 32}
+RULES = Path("policies/agentcraft2/rules/data.yaml")
+SAMPLES = Path("tests/policy-samples.yaml")
+
+
+# No formatter and no server processes: these tests are about the commands.
+TOOLS = toolbox_for_tests(pins=PINS)
+
+
+def run(*arguments: str | Path, tools: Toolbox = TOOLS) -> int:
+    return main([str(argument) for argument in arguments], toolbox=tools)
+
+
+@pytest.fixture
+def workspace(tmp_path: Path) -> Path:
+    root = tmp_path / "demo"
+    assert run("init", "demo", "--dir", tmp_path, "--owner", "demo-team") == 0
+    assert run("new", "mcp", "hello-mcp", "--workspace", root) == 0
+    assert run("new", "agent", "hello-agent", "--mcp", "hello", "--workspace", root) == 0
+    return root
+
+
+# ------------------------------------------------------------------------ doctor
+
+
+def test_doctor_checks_the_shared_files_and_every_service(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    capsys.readouterr()
+    assert run("doctor", "--workspace", workspace) == 0
+    out = capsys.readouterr().out
+    for line in (
+        "workspace",
+        "  ok    registries: valid and consistent",
+        "  ok    rules: valid",
+        "  ok    pins of hello: 2 tools match",
+        "hello-agent",
+        "  ok    model: fake serves 'fake-model'",
+        "hello-mcp",
+        "  ok    data 'people' (duckdb_csv): checked",
+        "Everything checked is usable.",
+    ):
+        assert line in out
+    assert "FAIL" not in out
+
+
+def test_doctor_names_what_is_wrong_and_how_to_fix_it_and_exits_with_one(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (workspace / "mcp-servers/hello-mcp/.env").unlink()
+    (workspace / "mcp-servers/hello-mcp/queries/people_by_team.sql").write_text(
+        "-- description: Broken.\n-- max_rows: 5\nSELECT * FROM people\n", encoding="utf-8"
+    )
+    agent_env = workspace / "agents/hello-agent/.env"
+    agent_env.write_text(
+        agent_env.read_text(encoding="utf-8").replace("data.yaml", "no-such-rules.yaml"),
+        encoding="utf-8",
+    )
+    changed = toolbox_for_tests(
+        pins={**PINS, "hello.greet": "ef" * 32, "hello.new_tool": "01" * 32}
+    )
+    capsys.readouterr()
+
+    assert run("doctor", "--workspace", workspace, tools=changed) == 1
+    captured = capsys.readouterr()
+    out = captured.out
+    assert "  FAIL  pins of hello: changed or not pinned: hello.greet, hello.new_tool" in out
+    assert "        fix: Run: agentcraft2 registry pin hello" in out
+    assert "  FAIL  settings:" in out
+    assert "Copy .env.example to .env" in out
+    assert "  FAIL  startup:" in out  # the agent cannot be built without its rules file
+    assert "no-such-rules.yaml" in out
+    assert captured.err.strip() == "agentcraft2: error: 3 checks failed"
+
+    # One service alone, with the developer's own fix applied.
+    (workspace / "mcp-servers/hello-mcp/.env").write_text(
+        (workspace / "mcp-servers/hello-mcp/.env.example").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    assert run("doctor", "hello-mcp", "--workspace", workspace) == 1
+    out = capsys.readouterr().out
+    assert "workspace" not in out
+    assert "  FAIL  startup:" in out
+    assert "people_by_team" in out
+
+
+def test_doctor_reports_broken_shared_files_and_unknown_services(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (workspace / RULES).write_text("schema: agentcraft2.rules/v1\nrules: [", encoding="utf-8")
+    capsys.readouterr()
+    assert run("doctor", "--no-pins", "--workspace", workspace) == 1
+    out = capsys.readouterr().out
+    assert "  FAIL  rules:" in out
+    assert "pins of hello" not in out
+    (workspace / "registry/agents.yaml").write_text("agents: [", encoding="utf-8")
+    assert run("doctor", "--no-pins", "--workspace", workspace) == 1
+    assert "  FAIL  registries:" in capsys.readouterr().out
+    assert run("doctor", "nobody", "--workspace", workspace) == 1
+    assert "no service called 'nobody'" in capsys.readouterr().err
+
+
+def test_doctor_tells_a_deprecated_spelling_and_still_passes(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    env = workspace / "agents/hello-agent/.env"
+    current, old = variable_for(Key.MODEL_ID), legacy_spelling(variable_for(Key.MODEL_ID))
+    assert old.startswith("EAP_")  # the spelling the previous release documented
+    capsys.readouterr()
+
+    assert run("doctor", "hello-agent", "--workspace", workspace) == 0
+    assert "deprecated" not in capsys.readouterr().out  # canonical spellings are not told
+
+    env.write_text(
+        env.read_text(encoding="utf-8").replace(f"{current}=", f"{old}="), encoding="utf-8"
+    )
+    assert run("doctor", "hello-agent", "--workspace", workspace) == 0
+    out = capsys.readouterr().out
+    assert f"  ok    warning: {old} is deprecated; use {current} instead" in out
+    assert "FAIL" not in out
+    assert "Everything checked is usable." in out
+
+
+def test_doctor_tells_a_deprecated_phoenix_spelling_after_the_phoenix_check(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    env = workspace / "agents/hello-agent/.env"
+    env.write_text(
+        env.read_text(encoding="utf-8")
+        + "EAP_PHOENIX_ENABLED=true\nAC2_PHOENIX_CAPTURE_CONTENT=false\n",
+        encoding="utf-8",
+    )
+    capsys.readouterr()
+
+    assert run("doctor", "hello-agent", "--workspace", workspace) == 0
+    out = capsys.readouterr().out
+    assert (
+        "  ok    phoenix: configuration valid (connectivity not checked)\n"
+        "  ok    warning: EAP_PHOENIX_ENABLED is deprecated; use AC2_PHOENIX_ENABLED instead\n"
+    ) in out
+    assert out.count("is deprecated") == 1  # the canonical capture setting is not told
+    assert "FAIL" not in out
+
+    assert run("config", "explain", "hello-agent", "--workspace", workspace) == 0
+    assert (
+        "warning: EAP_PHOENIX_ENABLED is deprecated; use AC2_PHOENIX_ENABLED instead"
+        in capsys.readouterr().err
+    )
+
+
+def test_a_deprecated_phoenix_spelling_is_not_also_logged_bare_by_doctor_or_explain(
+    workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # The loader tells a service's log once per process; start from a process that has not.
+    monkeypatch.setattr(deprecations, "_LOGGED", set())
+    env = workspace / "agents/hello-agent/.env"
+    env.write_text(env.read_text(encoding="utf-8") + "EAP_PHOENIX_ENABLED=true\n", encoding="utf-8")
+    logger = logging.getLogger("agentcraft2_core.config")
+    level = logger.level
+    capsys.readouterr()
+
+    with caplog.at_level(logging.WARNING):
+        assert run("doctor", "hello-agent", "--workspace", workspace) == 0
+        doctor = capsys.readouterr()
+        assert run("config", "explain", "hello-agent", "--workspace", workspace) == 0
+        explain = capsys.readouterr()
+
+    # The report names the spelling once; the library's log line would be a bare duplicate.
+    assert [r for r in caplog.records if r.name == "agentcraft2_core.config"] == []
+    assert doctor.out.count("EAP_PHOENIX_ENABLED is deprecated") == 1
+    assert "is deprecated" not in doctor.err
+    assert explain.err.count("EAP_PHOENIX_ENABLED is deprecated") == 1
+    assert logger.level == level  # the quiet is lifted when the command is done
+
+
+def test_doctor_fails_a_setting_that_carries_both_spellings_with_different_values(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    env = workspace / "agents/hello-agent/.env"
+    current = variable_for(Key.MODEL_ID)
+    old = legacy_spelling(current)
+    env.write_text(env.read_text(encoding="utf-8") + f"{old}=another-model\n", encoding="utf-8")
+    capsys.readouterr()
+
+    assert run("doctor", "hello-agent", "--workspace", workspace) == 1
+    out = capsys.readouterr().out
+    assert f"  FAIL  settings: {old} is deprecated and conflicts with {current}" in out
+
+
+def test_a_server_that_cannot_report_its_pins_fails_its_check(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def failing(service: Path, package: str) -> dict[str, str]:
+        raise CliError("the tools of hello_mcp could not be pinned: no output")
+
+    capsys.readouterr()
+    assert run("doctor", "--workspace", workspace, tools=toolbox_for_tests(read_pins=failing)) == 1
+    assert (
+        "  FAIL  pins of hello: the tools of hello_mcp could not be pinned"
+        in capsys.readouterr().out
+    )
+
+
+# ---------------------------------------------------------------- config explain
+
+
+def test_config_explain_shows_each_setting_its_origin_and_no_secret(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    env = workspace / "agents/hello-agent/.env"
+    env.write_text(
+        env.read_text(encoding="utf-8")
+        + f"{variable_for(secret_key('rates_token'))}=s3cret-value\n"
+        + f"{variable_for(Key.HTTPS_PROXY)}=http://user:hunter2@proxy.example.test:8080\n"
+        + f"{variable_for(Key.MODEL_ALIASES)}="
+        + json.dumps({"fast": {"model_id": "m", "provider": "fake"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    capsys.readouterr()
+    assert run("config", "explain", "hello-agent", "--workspace", workspace) == 0
+    out = capsys.readouterr().out
+    provider = variable_for(Key.MODEL_PROVIDER)
+    assert f"{provider}".ljust(10) in out
+    assert f"from variable {provider}" in out
+    assert "from profile local" in out
+    assert "********" in out
+    for hidden in ("s3cret-value", "hunter2"):
+        assert hidden not in out
+    assert variable_for(secret_key("rates_token")) in out
+
+    env.write_text("NOT_OURS=1\n" + variable_for(Key.DEPLOYMENT_ENV) + "=mars\n", encoding="utf-8")
+    assert run("config", "explain", "hello-agent", "--workspace", workspace) == 1
+    err = capsys.readouterr().err
+    assert "is not one of the values it takes" in err
+    assert "got: 'mars'" in err
+
+
+# ------------------------------------------------------------------- policy test
+
+
+@pytest.mark.parametrize(
+    ("broken", "expected"),
+    [
+        ("PHOENIX_COLLECTOR_ENDPOINT=not-an-origin\n", "HTTPS origin"),
+        ("AC2_PHOENIX_CAPTURE_CONTENT=yes\n", "true or false"),
+        ("AC2_PHOENIX_ENV_FILE=missing.env\n", "configuration file not found"),
+    ],
+)
+def test_phoenix_configuration_errors_fail_diagnostics(
+    workspace: Path,
+    capsys: pytest.CaptureFixture[str],
+    broken: str,
+    expected: str,
+) -> None:
+    env = workspace / "agents/hello-agent/.env"
+    env.write_text(
+        env.read_text(encoding="utf-8") + "AC2_PHOENIX_ENABLED=true\n"
+        "PHOENIX_API_KEY=phoenix-test-secret\n" + broken,
+        encoding="utf-8",
+    )
+    capsys.readouterr()
+    assert run("doctor", "hello-agent", "--workspace", workspace) == 1
+    doctor = capsys.readouterr()
+    assert expected in doctor.out
+    assert run("config", "explain", "hello-agent", "--workspace", workspace) == 1
+    explain = capsys.readouterr()
+    assert expected in explain.err
+    assert "phoenix-test-secret" not in doctor.out + doctor.err + explain.out + explain.err
+
+
+def test_phoenix_explanation_matches_file_precedence_and_disabled_override(
+    workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from agentcraft2_cli.diagnostics import explain_service
+    from agentcraft2_core.config.phoenix import load_phoenix_settings
+
+    folder = workspace / "agents/hello-agent"
+    env = folder / ".env"
+    env.write_text(
+        env.read_text(encoding="utf-8") + "AC2_PHOENIX_ENV_FILE=traces.env\n", encoding="utf-8"
+    )
+    extra = folder / "traces.env"
+    extra.write_text(
+        "AC2_PHOENIX_ENABLED=true\nPHOENIX_PROJECT_NAME=from-file\n"
+        "PHOENIX_API_KEY=private-key\nAC2_PHOENIX_CAPTURE_CONTENT=true\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("PHOENIX_PROJECT_NAME", "from-shell")
+    settings = load_phoenix_settings(env)
+    assert settings is not None
+    entries = {entry.variable: entry for entry in explain_service(folder)[0]}
+    assert entries["PHOENIX_PROJECT_NAME"].value == settings.project_name == "from-shell"
+    assert str(extra) in entries["AC2_PHOENIX_CAPTURE_CONTENT"].origin
+    assert entries["PHOENIX_API_KEY"].value == "********"
+    monkeypatch.setenv("AC2_PHOENIX_ENABLED", "false")
+    monkeypatch.setenv("AC2_PHOENIX_ENV_FILE", "missing.env")
+    assert run("doctor", "hello-agent", "--workspace", workspace) == 0
+    assert "phoenix: disabled" in capsys.readouterr().out
+
+
+def test_the_generated_samples_come_out_as_they_expect(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    samples = load_samples(workspace / SAMPLES)
+    assert [sample.name for sample in samples] == [
+        "an analyst calls a tool of hello",
+        "anyone else is denied at hello",
+        "a manager sees every column of hello",
+        "an analyst sees hello without email",
+        "hello-agent uses its default model",
+        "hello-agent calls its own tool",
+        "hello-agent may not call a tool no rule names",
+        "hello-agent calls a tool of hello",
+    ]
+    capsys.readouterr()
+    assert run("policy", "test", "--workspace", workspace) == 0
+    out = capsys.readouterr().out
+    assert "  ok    anyone else is denied at hello: deny (no_matching_rule)" in out
+    assert "8 samples came out as expected." in out
+
+
+def test_a_sample_that_comes_out_differently_fails_and_says_what_was_expected(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    rules = workspace / RULES
+    rules.write_text(
+        rules.read_text(encoding="utf-8").replace("roles: [analyst, manager]", "roles: [manager]"),
+        encoding="utf-8",
+    )
+    mine = {
+        "name": "an auditor may not query",
+        "action": "data.query",
+        "application": "hello-mcp",
+        "resource": "people.people_by_team",
+        "classification": "confidential",
+        "roles": ["auditor"],
+        "expect": "allow",
+    }
+    text = samples_text((workspace / SAMPLES).read_text(encoding="utf-8"), [mine])
+    (workspace / SAMPLES).write_text(text, encoding="utf-8")
+    capsys.readouterr()
+    assert run("policy", "test", "--workspace", workspace) == 1
+    captured = capsys.readouterr()
+    assert "  FAIL  an analyst calls a tool of hello: deny (no_matching_rule)" in captured.out
+    assert "        expected: allow (hello-staff-call-the-tools)" in captured.out
+    assert "  FAIL  an auditor may not query: deny (no_matching_rule)" in captured.out
+    assert "        expected: allow\n" in captured.out
+    assert captured.err.strip() == "agentcraft2: error: 2 samples did not come out as expected"
+
+
+def test_samples_are_appended_once_and_the_developers_are_kept() -> None:
+    first = samples_text(None, [])
+    assert yaml.safe_load(first)["samples"] == []
+    one = {"name": "yes: a 'quoted' name", "action": "tool.call", "application": "a",
+           "resource": "s/*", "roles": ["on"], "kind": "service", "agent": "x-agent",
+           "expect": "deny", "reason": "no_matching_rule"}  # fmt: skip
+    text = samples_text(first, [one])
+    (parsed,) = yaml.safe_load(text)["samples"]
+    assert parsed == one
+    assert samples_text(text, [one]) == text
+    edited = text.replace("expect: deny", "expect: deny  # ours")
+    later = samples_text(edited, [one, {**one, "name": "another"}])
+    assert later.startswith(edited.rstrip("\n"))
+    assert [s["name"] for s in yaml.safe_load(later)["samples"]] == [one["name"], "another"]
+    request = Sample.model_validate(one).request()
+    assert (request.principal.delegation_chain, request.principal.kind.value) == (
+        ("x-agent",),
+        "service",
+    )
+    assert request.resource.kind == "tool"
+    assert request.resource.classification is None
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        ("samples: [", "not valid YAML"),
+        ("schema: other/v1\nsamples: []\n", "not a samples document"),
+        ("schema: agentcraft2.policy-samples/v1\nsamples:\n  - name: x\n", "action"),
+        (
+            "schema: agentcraft2.policy-samples/v1\nsamples:\n"
+            + "  - {name: x, action: tool.call, application: a, resource: r, expect: allow}\n" * 2,
+            "used more than once",
+        ),
+    ],
+)
+def test_a_samples_file_that_is_wrong_is_refused(
+    workspace: Path, capsys: pytest.CaptureFixture[str], text: str, message: str
+) -> None:
+    (workspace / SAMPLES).write_text(text, encoding="utf-8")
+    capsys.readouterr()
+    assert run("policy", "test", "--workspace", workspace) == 1
+    assert message in capsys.readouterr().err
+    new = {"name": "n", "action": "tool.call", "application": "a", "resource": "r"}
+    with pytest.raises(CliError):
+        samples_text(text, [{**new, "expect": "allow"}])
+
+
+def test_without_samples_or_a_bundle_the_command_says_so(
+    workspace: Path, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    # Where the opa program is not installed, the real starter says so before it starts anything.
+    with (
+        pytest.raises(CliError, match="the opa program is not on PATH"),
+        opa_server(tmp_path, tmp_path, find_program=lambda name: None),
+    ):
+        pass
+    with (
+        pytest.raises(CliError, match="Rego bundle was not found"),
+        opa_server(tmp_path / "none", tmp_path, find_program=lambda name: "/usr/bin/true"),
+    ):
+        pass
+
+    def no_opa(bundle: Path, policies: Path) -> AbstractContextManager[OpaPolicyDecisionPoint]:
+        raise CliError("the opa program is not on PATH")
+
+    without_opa = toolbox_for_tests(pins=PINS, opa_server=no_opa)
+    assert run("policy", "test", "--opa", "--workspace", workspace, tools=without_opa) == 1
+    assert "the opa program is not on PATH" in capsys.readouterr().err
+    (workspace / SAMPLES).write_text(samples_text(None, []), encoding="utf-8")
+    assert run("policy", "test", "--workspace", workspace) == 1
+    assert "holds no samples" in capsys.readouterr().err
+    (workspace / SAMPLES).unlink()
+    assert run("policy", "test", "--workspace", workspace) == 1
+    assert "no samples to try" in capsys.readouterr().err
+
+
+# ------------------------------------------------------------------ graph and run
+
+
+def service(tmp_path: Path, **modules: str) -> Path:
+    package = tmp_path / "src" / "demo_agent"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    for name, body in modules.items():
+        (package / f"{name}.py").write_text(body, encoding="utf-8")
+    return tmp_path
+
+
+@pytest.mark.slow
+def test_a_service_runs_in_its_own_folder_with_its_arguments(tmp_path: Path) -> None:
+    body = (
+        "import pathlib, sys\n"
+        "pathlib.Path('ran.txt').write_text(' '.join(sys.argv[1:]))\n"
+        "raise SystemExit(7)\n"
+    )
+    folder = service(tmp_path, service=body)
+    assert run_service(folder, "demo_agent.service", ["--port", "9000"]) == 7
+    assert (folder / "ran.txt").read_text(encoding="utf-8") == "--port 9000"
+    with pytest.raises(CliError, match="no src folder"):
+        run_service(tmp_path / "gone", "demo_agent.service", [])
+
+
+STOPPABLE = (
+    "import pathlib, signal, sys, time\n"
+    "def stop(number, _frame):\n"
+    "    pathlib.Path('stopped.txt').write_text(signal.Signals(number).name)\n"
+    "    sys.exit(5)\n"
+    "signal.signal(signal.SIGTERM, stop)\n"
+    "signal.signal(signal.SIGINT, stop)\n"
+    "pathlib.Path('ready.txt').write_text('')\n"
+    "time.sleep(60)\n"
+)
+RUN_IT = (
+    "import sys, pathlib\n"
+    "from agentcraft2_cli.processes import run_service\n"
+    "sys.exit(run_service(pathlib.Path(sys.argv[1]), 'demo_agent.service', []))\n"
+)
+
+
+@pytest.mark.slow
+@pytest.mark.skipif(sys.platform == "win32", reason="one process cannot ask another to stop")
+@pytest.mark.parametrize("asked", [signal.SIGTERM, signal.SIGINT])
+def test_a_request_to_stop_only_the_command_still_stops_the_service_in_its_own_way(
+    tmp_path: Path, asked: signal.Signals
+) -> None:
+    folder = service(tmp_path, service=STOPPABLE)
+    # Only the command is signalled, as a process manager or an editor would do.
+    # A terminal signals the service as well; then there is nothing to pass on.
+    wrapper = subprocess.Popen([sys.executable, "-c", RUN_IT, str(folder)])  # noqa: S603
+    try:
+        deadline = time.monotonic() + 30
+        while not (folder / "ready.txt").exists():
+            assert time.monotonic() < deadline, "the service never started"
+            assert wrapper.poll() is None
+            time.sleep(0.05)
+        wrapper.send_signal(asked)
+        # The command ends with the service's own exit code, after the service has stopped.
+        assert wrapper.wait(timeout=30) == 5
+    finally:
+        if wrapper.poll() is None:
+            wrapper.kill()
+    assert (folder / "stopped.txt").read_text(encoding="utf-8") == asked.name
+
+
+@pytest.mark.slow
+def test_code_that_fails_is_reported_by_its_last_line(tmp_path: Path) -> None:
+    assert run_code(tmp_path, "print('hello')") == "hello\n"
+    with pytest.raises(CliError, match="failed: ValueError: no"):
+        run_code(tmp_path, "raise ValueError('no')")
+    with pytest.raises(CliError, match="could not be run"):
+        run_code(tmp_path / "missing", "print(1)")
+
+
+def test_run_and_graph_start_the_right_module_of_the_right_service(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    started: list[tuple[str, str, tuple[str, ...]]] = []
+
+    def runner(folder: Path, module: str, arguments: tuple[str, ...]) -> int:
+        started.append((folder.name, module, tuple(arguments)))
+        return 3 if module.endswith("__main__") else 0
+
+    tools = toolbox_for_tests(
+        pins=PINS, run_service=runner, read_graph=lambda folder, package: "graph TD;\n"
+    )
+    assert run("run", "hello-agent", "--workspace", workspace, "--port", "9000", tools=tools) == 0
+    assert run("run", "hello", "--workspace", workspace, tools=tools) == 3
+    assert started == [
+        ("hello-agent", "hello_agent.service", ("--port", "9000")),
+        ("hello-mcp", "hello_mcp.__main__", ()),
+    ]
+    capsys.readouterr()
+    assert run("graph", "hello-agent", "--workspace", workspace, tools=tools) == 0
+    assert capsys.readouterr().out == "graph TD;\n"
+    assert run("graph", "hello-mcp", "--workspace", workspace, tools=tools) == 1
+    assert run("run", "nobody", "--workspace", workspace, tools=tools) == 1
+
+
+@pytest.mark.slow
+def test_the_graph_reader_runs_the_agents_own_graph_module(tmp_path: Path) -> None:
+    folder = service(tmp_path, graph="raise SystemExit('the graph module was imported')\n")
+    with pytest.raises(CliError, match="the graph module was imported"):
+        read_graph(folder, "demo_agent")
+    assert sys.executable
+
+
+# ------------------------------------------------------------------------ update
+
+ANSWERS = WorkspaceAnswers(
+    name="demo",
+    owner="demo-team",
+    library=LibrarySource(kind="index", version=">=0.1"),
+    agents=(AgentAnswers("hello-agent", "Greets people.", "fake", 8000, ("hello",)),),
+    mcp_servers=(McpAnswers("hello-mcp", "hello", "A directory.", 8100),),
+)
+
+
+class NewerTemplates(TemplateRenderer):
+    """The package's templates as a later version of the library might write them."""
+
+    def render(self, folder: str, context: object) -> dict[PurePosixPath, str]:
+        files = super().render(folder, context)  # type: ignore[arg-type]
+        for path in list(files):
+            if path.name in {"tools.py", "graph.py"}:
+                files[path] += "\n# written by a newer version\n"
+        if folder == "agent":
+            files[PurePosixPath("src/hello_agent/extra.py")] = '"""New in this version."""\n'
+        return files
+
+
+def scaffolder(renderer: TemplateRenderer | None = None) -> Scaffolder:
+    return Scaffolder(
+        renderer, pin_reader=lambda service, package: dict(PINS), formatter=as_written
+    )
+
+
+def test_update_replaces_what_the_developer_left_alone_and_keeps_what_they_changed(
+    tmp_path: Path,
+) -> None:
+    scaffolder().init(tmp_path, ANSWERS)
+    agent = tmp_path / "agents/hello-agent"
+    lock = json.loads((tmp_path / LOCK_FILE).read_text(encoding="utf-8"))
+    assert "agents/hello-agent/src/hello_agent/tools.py" in lock["files"]
+    assert "agents/hello-agent/.env.example" in lock["files"]
+    assert not any(name.endswith("/.env") or "registry" in name for name in lock["files"])
+
+    # The developer works: one file changed, one deleted, their own settings and a rule edited.
+    tools = agent / "src/hello_agent/tools.py"
+    tools.write_text(tools.read_text(encoding="utf-8") + "\n# my tool\n", encoding="utf-8")
+    (agent / "tests/test_hello_agent_service.py").unlink()
+    (agent / ".env").write_text("# mine\n", encoding="utf-8")
+    rules = (tmp_path / RULES).read_text(encoding="utf-8") + "  # my comment\n"
+    (tmp_path / RULES).write_text(rules, encoding="utf-8")
+
+    assert scaffolder().update(tmp_path).updated == ()  # the same version: nothing to bring up
+
+    report = scaffolder(NewerTemplates()).update(tmp_path)
+    assert [path.as_posix() for path in report.updated] == [
+        "agents/hello-agent/src/hello_agent/graph.py"
+    ]
+    assert [path.as_posix() for path in report.created] == [
+        "agents/hello-agent/src/hello_agent/extra.py"
+    ]
+    assert [path.as_posix() for path in report.kept] == [
+        "agents/hello-agent/src/hello_agent/tools.py"
+    ]
+    assert "# written by a newer version" in report.new_text[report.kept[0]]
+    assert "# written by a newer version" in (agent / "src/hello_agent/graph.py").read_text("utf-8")
+    assert tools.read_text(encoding="utf-8").endswith("# my tool\n")
+    assert not (agent / "tests/test_hello_agent_service.py").exists()
+    assert (agent / ".env").read_text(encoding="utf-8") == "# mine\n"
+    assert (tmp_path / RULES).read_text(encoding="utf-8") == rules
+
+    # Updating again changes nothing more, and the kept file is still theirs.
+    again = scaffolder(NewerTemplates()).update(tmp_path)
+    assert (again.updated, again.created) == ((), ())
+    assert [path.name for path in again.kept] == ["tools.py"]
+
+
+def test_plan_lists_changes_without_writing(tmp_path: Path) -> None:
+    scaffolder().init(tmp_path, ANSWERS)
+    agent = tmp_path / "agents/hello-agent"
+    tools = agent / "src/hello_agent/tools.py"
+    tools.write_text(tools.read_text(encoding="utf-8") + "\n# my tool\n", encoding="utf-8")
+
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    report = scaffolder(NewerTemplates()).plan(tmp_path)
+    after = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    assert after == before  # nothing was written
+
+    assert [path.as_posix() for path in report.updated] == [
+        "agents/hello-agent/src/hello_agent/graph.py"
+    ]
+    assert [path.as_posix() for path in report.created] == [
+        "agents/hello-agent/src/hello_agent/extra.py"
+    ]
+    assert [path.as_posix() for path in report.kept] == [
+        "agents/hello-agent/src/hello_agent/tools.py"
+    ]
+    assert "# written by a newer version" in report.new_text[report.kept[0]]
+    # The listed "would be updated" file was not actually touched on disk.
+    graph = agent / "src/hello_agent/graph.py"
+    assert "# written by a newer version" not in graph.read_text(encoding="utf-8")
+    assert not (agent / "src/hello_agent/extra.py").exists()
+    assert tools.read_text(encoding="utf-8").endswith("# my tool\n")
+
+
+def test_the_update_command_lists_what_it_did_and_can_show_the_difference(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    capsys.readouterr()
+    assert run("update", "--workspace", workspace) == 0
+    assert "nothing to do" in capsys.readouterr().out
+
+    tools = workspace / "agents/hello-agent/src/hello_agent/tools.py"
+    original = tools.read_text(encoding="utf-8")
+    tools.write_text(original.replace("Hello, ", "Good day, "), encoding="utf-8")
+    assert run("update", "--workspace", workspace) == 0
+    out = capsys.readouterr().out
+    assert "  kept     agents/hello-agent/src/hello_agent/tools.py  (you changed it)" in out
+    assert "agentcraft2 update --diff" in out
+    assert run("update", "--diff", "--workspace", workspace) == 0
+    out = capsys.readouterr().out
+    assert '    -    return f"Good day, {cleaned}!"' in out
+    assert '    +    return f"Hello, {cleaned}!"' in out
+    assert "Good day" in tools.read_text(encoding="utf-8")
+
+
+def test_update_plan_flag_previews_and_exits_clean(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    before = {p: p.read_bytes() for p in workspace.rglob("*") if p.is_file()}
+
+    newer_tools = toolbox_for_tests(pins=PINS, renderer=NewerTemplates())
+    capsys.readouterr()
+    assert run("update", "--plan", "--workspace", workspace, tools=newer_tools) == 0
+    out = capsys.readouterr().out
+    assert "would update  agents/hello-agent/src/hello_agent/graph.py" in out
+    assert "would create  agents/hello-agent/src/hello_agent/extra.py" in out
+
+    after = {p: p.read_bytes() for p in workspace.rglob("*") if p.is_file()}
+    assert after == before  # nothing was written
+
+
+def test_the_diff_hint_in_plan_mode_names_the_command_that_writes_nothing(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    tools = workspace / "agents/hello-agent/src/hello_agent/tools.py"
+    original = tools.read_text(encoding="utf-8")
+    tools.write_text(original.replace("Hello, ", "Good day, "), encoding="utf-8")
+    capsys.readouterr()
+
+    assert run("update", "--plan", "--workspace", workspace) == 0
+    out = capsys.readouterr().out
+    assert "agentcraft2 update --plan --diff" in out
+    # Plain `update --diff` writes; the dry-run hint must not send people to it.
+    assert "agentcraft2 update --diff" not in out
+    assert "Good day" in tools.read_text(encoding="utf-8")
+
+    # Once --diff is given there is nothing left to suggest.
+    assert run("update", "--plan", "--diff", "--workspace", workspace) == 0
+    assert "See what the templates would change" not in capsys.readouterr().out
+
+
+def test_a_lock_file_that_cannot_be_read_stops_the_command(
+    workspace: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (workspace / LOCK_FILE).write_text("[not json", encoding="utf-8")
+    capsys.readouterr()
+    assert run("update", "--workspace", workspace) == 1
+    assert "delete it to start a new record" in capsys.readouterr().err
+    assert isinstance(jinja2.__version__, str)
+
+
+@pytest.mark.slow
+def test_an_opa_that_exits_early_reports_its_own_last_lines(tmp_path: Path) -> None:
+    # The interpreter stands in for opa: it exits at once and says why on stderr.
+    (tmp_path / "bundle").mkdir()
+    with (
+        pytest.raises(CliError, match="OPA did not start") as refused,
+        opa_server(tmp_path / "bundle", tmp_path, find_program=lambda name: sys.executable),
+    ):
+        pass
+    assert refused.value.actual is not None
+    assert "exited with code" in refused.value.actual
+    assert "run" in refused.value.actual  # the interpreter names the argument it could not open

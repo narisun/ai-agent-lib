@@ -19,20 +19,19 @@ def test_network_sockets_are_blocked_in_tests() -> None:
 
 
 def test_all_three_packages_import() -> None:
-    import ai_agent_lib_aws
-    import ai_agent_lib_cli
-    import ai_agent_lib_core
+    import agentcraft2_aws
+    import agentcraft2_cli
+    import agentcraft2_core
 
-    assert ai_agent_lib_core.__doc__
-    assert ai_agent_lib_aws.__doc__
-    assert ai_agent_lib_cli.__doc__
+    assert agentcraft2_core.__doc__
+    assert agentcraft2_aws.__doc__
+    assert agentcraft2_cli.__doc__
 
 
 def test_ci_tests_the_policy_with_the_opa_version_that_is_deployed() -> None:
     root = Path(__file__).parents[2]
     dockerfile = (
-        root
-        / "packages/ai-agent-lib-cli/src/ai_agent_lib_cli/templates/deploy-opa/Dockerfile.jinja"
+        root / "packages/agentcraft2-cli/src/agentcraft2_cli/templates/deploy-opa/Dockerfile.jinja"
     ).read_text(encoding="utf-8")
     deployed = re.search(r"openpolicyagent/opa:(\d+\.\d+\.\d+)", dockerfile)
     workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")

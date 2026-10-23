@@ -2,7 +2,7 @@
 
 An eval runs an agent and scores what comes back, so a prompt or model change
 is judged by more than one person's read of one transcript. The library
-supports two kinds, both off the request path — `ai_agent_lib_core.evaluation`
+supports two kinds, both off the request path — `agentcraft2_core.evaluation`
 is never imported there:
 
 - **Offline**, against a dataset you write by hand: `evals/cases.jsonl` →
@@ -40,7 +40,7 @@ A minimal offline run, scoring an exact match on a structured field:
 ```python
 from pathlib import Path
 
-from ai_agent_lib_core.evaluation import exact, load_cases, run_eval
+from agentcraft2_core.evaluation import exact, load_cases, run_eval
 
 cases = load_cases(Path("evals/cases.jsonl"))
 report = await run_eval(triage, cases, [exact("category")])
@@ -69,8 +69,8 @@ And the test, `agents/helper/tests/test_helper_eval.py`:
 from pathlib import Path
 
 import pytest
-from ai_agent_lib_core import ServiceContainer
-from ai_agent_lib_core.evaluation import (
+from agentcraft2_core import ServiceContainer
+from agentcraft2_core.evaluation import (
     EvalCase,
     dataset_digest,
     load_cases,
@@ -79,7 +79,7 @@ from ai_agent_lib_core.evaluation import (
     run_eval,
     scored_by,
 )
-from ai_agent_lib_core.testing import load_eval_config
+from agentcraft2_core.testing import load_eval_config
 
 from helper import APPLICATION, answer, build_graph
 
@@ -140,7 +140,7 @@ Run it explicitly once a real model is configured (see [step 8 of the
 tutorial](getting-started.md#8-optional-use-and-evaluate-a-real-model)):
 
 ```bat
-python -m ai_agent_lib_cli eval helper
+python -m agentcraft2_cli eval helper
 ```
 
 This writes `agents/helper/.agentcraft2/eval-report.json` — `report.to_json()`,
@@ -152,7 +152,7 @@ Accept the current report as the bar to protect once you are satisfied with
 it:
 
 ```bat
-python -m ai_agent_lib_cli eval helper --accept
+python -m agentcraft2_cli eval helper --accept
 ```
 
 `--accept` runs the evals itself — it does not reuse the last report. If that
@@ -187,7 +187,7 @@ instead with `judged`. Build the judge from the `judge` model alias, not a
 hardcoded model ID, so the eval names a role:
 
 ```python
-from ai_agent_lib_core.evaluation import Verdict, judged
+from agentcraft2_core.evaluation import Verdict, judged
 
 verdicts = services.model("judge").with_structured_output(Verdict)
 politeness = judged(verdicts.ainvoke, "Is the answer polite and on topic?")
@@ -212,7 +212,7 @@ in a gate:
 ```python
 from pathlib import Path
 
-from ai_agent_lib_core.evaluation import LabeledCase, calibrate, load_cases
+from agentcraft2_core.evaluation import LabeledCase, calibrate, load_cases
 
 cases = {case.id: case for case in load_cases(Path("evals/cases.jsonl"))}
 labeled = [
@@ -235,10 +235,10 @@ Capture happens on the request path, but it is cheap and append-only: it
 never scores anything itself.
 
 **Feedback.** Agent Lab shows thumbs up/down controls beneath every accepted
-answer (see [sign in and chat](../packages/ai-agent-lib-ui/README.md#4-sign-in-and-chat)).
+answer (see [sign in and chat](../packages/agentcraft2-ui/README.md#4-sign-in-and-chat)).
 Clicking one writes one `agentcraft2.feedback/v1` line to `feedback.jsonl`, in
 the same `.agentcraft2\ui\` folder as `conversations.sqlite`
-(see [initialize the UI](../packages/ai-agent-lib-ui/README.md#3-initialize-the-ui)).
+(see [initialize the UI](../packages/agentcraft2-ui/README.md#3-initialize-the-ui)).
 A record is never deleted, only appended — feedback is evidence.
 
 **Export.** Turn saved conversations into interaction records with
@@ -248,11 +248,11 @@ given:
 ```python
 from pathlib import Path
 
-from ai_agent_lib_ui.adapters.catalog import LocalAccess
-from ai_agent_lib_ui.adapters.interactions import export_interactions
-from ai_agent_lib_ui.adapters.sqlite import SqliteThreads
-from ai_agent_lib_ui.config.settings import Settings
-from ai_agent_lib_ui.config.shell import private_secret
+from agentcraft2_ui.adapters.catalog import LocalAccess
+from agentcraft2_ui.adapters.interactions import export_interactions
+from agentcraft2_ui.adapters.sqlite import SqliteThreads
+from agentcraft2_ui.config.settings import Settings
+from agentcraft2_ui.config.shell import private_secret
 
 STATE = Path(".agentcraft2/ui")
 settings = Settings.read(STATE / "config.json")
@@ -292,7 +292,7 @@ ordinary `EvalReport`:
 ```python
 from pathlib import Path
 
-from ai_agent_lib_core.evaluation import (
+from agentcraft2_core.evaluation import (
     load_interactions,
     load_report,
     require_no_regression,

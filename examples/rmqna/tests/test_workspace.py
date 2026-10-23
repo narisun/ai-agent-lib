@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ai_agent_lib_core.adapters import (
+from agentcraft2_core.adapters import (
     FileRegistryOptions,
     FileRegistrySource,
     RulesPolicyDecisionPoint,
     RulesPolicyOptions,
 )
-from ai_agent_lib_core.testing import SequentialIds
+from agentcraft2_core.testing import SequentialIds
 
 ROOT = Path(__file__).resolve().parents[1]
 

@@ -11,8 +11,8 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Sequence
 from typing import Annotated, Any, TypedDict
 
-from ai_agent_lib_core import RequestContext, ServiceContainer
-from ai_agent_lib_core.integrations.langgraph import static_system_prompt
+from agentcraft2_core import RequestContext, ServiceContainer
+from agentcraft2_core.integrations.langgraph import static_system_prompt
 from langchain_core.messages import AnyMessage, HumanMessage
 from langchain_core.tools import BaseTool
 from langgraph.graph import START, StateGraph

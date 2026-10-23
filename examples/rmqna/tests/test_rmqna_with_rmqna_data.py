@@ -13,15 +13,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ai_agent_lib_core import ServiceContainer
-from ai_agent_lib_core.testing import (
+from agentcraft2_core import ServiceContainer
+from agentcraft2_core.testing import (
     audit_records,
     calls_tool,
     load_test_config,
     scripted_model,
     scripted_providers,
 )
-from ai_agent_lib_core.testing.mcp import InProcessMcpConnector
+from agentcraft2_core.testing.mcp import InProcessMcpConnector
 from langchain_core.messages import BaseMessage
 
 from rmqna import APPLICATION as AGENT

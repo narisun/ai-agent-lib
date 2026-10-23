@@ -1,0 +1,33 @@
+# Written by agentcraft2. Run the workspace checks on Linux and Windows.
+# Complete README.md's "Configure CI" section before relying on this workflow.
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: {{ '${{ matrix.os }}' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+{% if library.kind == "path" %}
+      # A desktop path cannot be installed on a GitHub runner. Remove this step
+      # only after configuring a package index or a library checkout for CI.
+      - name: Configure the library source for CI
+        run: python -c "raise SystemExit('CI setup required. Follow README.md, Configure CI, to replace the desktop library path before removing this step.')"
+{% endif %}
+      - run: python -m pip install "agentcraft2-cli{{ library.version or "" }}"
+      - run: python -m agentcraft2_cli install
+      - run: python -m agentcraft2_cli check

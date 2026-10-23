@@ -9,9 +9,9 @@ from unittest.mock import Mock
 
 import httpx
 import pytest
-from ai_agent_lib_core import Principal
-from ai_agent_lib_core.integrations.http import ServiceLifecycle, build_agent_app
-from ai_agent_lib_core.testing import FakeChatModelProvider, FakeIdentityVerifier, Fakes
+from agentcraft2_core import Principal
+from agentcraft2_core.integrations.http import ServiceLifecycle, build_agent_app
+from agentcraft2_core.testing import FakeChatModelProvider, FakeIdentityVerifier, Fakes
 from langchain_core.messages import AIMessage
 
 from rmprep import service

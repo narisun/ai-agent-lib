@@ -23,7 +23,7 @@ from tools import package_runtime
 from tools.local_processes import Service, report, serve
 
 ROOT = Path(__file__).resolve().parents[1]
-UI_PROJECT = Path("packages/ai-agent-lib-ui")
+UI_PROJECT = Path("packages/agentcraft2-ui")
 WORKSPACE = Path("examples/rmprep")
 AGENT_ENV = WORKSPACE / "agents/rmprep/.env"
 MCP_ENV = WORKSPACE / "mcp-servers/rmprep-data/.env"
@@ -61,7 +61,7 @@ def prepare_ui(root: Path, config: Path) -> int:
                 root,
                 "ui",
                 "-m",
-                "ai_agent_lib_ui",
+                "agentcraft2_ui",
                 "init",
                 "--config",
                 str(config),
@@ -78,7 +78,7 @@ def prepare_ui(root: Path, config: Path) -> int:
         )
     run(
         package_runtime.command(
-            root, "ui", "-m", "ai_agent_lib_ui", "check", "--config", str(config)
+            root, "ui", "-m", "agentcraft2_ui", "check", "--config", str(config)
         ),
         root,
     )
@@ -148,25 +148,25 @@ def setup(root: Path, *, dev: bool = False, model: str = "auto") -> None:
     # runtime extras, including DuckDB, MCP, HTTP serving and trace export.
     agent_install: list[str] = []
     for project in (
-        Path("packages/ai-agent-lib-core"),
+        Path("packages/agentcraft2-core"),
         WORKSPACE / "agents/rmprep",
         WORKSPACE / "mcp-servers/rmprep-data",
     ):
         requirement = str(root / project)
-        if project == Path("packages/ai-agent-lib-core") and provider == "anthropic":
+        if project == Path("packages/agentcraft2-core") and provider == "anthropic":
             requirement += "[anthropic]"
         agent_install.extend(("-e", requirement))
     if provider == "bedrock":
-        agent_install.extend(("-e", f"{root / 'packages/ai-agent-lib-aws'}[bedrock]"))
+        agent_install.extend(("-e", f"{root / 'packages/agentcraft2-aws'}[bedrock]"))
     if dev:
         project_config = tomllib.loads((root / WORKSPACE / "pyproject.toml").read_text("utf-8"))
-        agent_install.extend(("-e", str(root / "packages/ai-agent-lib-cli")))
+        agent_install.extend(("-e", str(root / "packages/agentcraft2-cli")))
         # The CLI comes from this checkout. A second, bare requirement can make
         # older pip versions look for the unpublished package on the index.
         agent_install.extend(
             requirement
             for requirement in project_config["dependency-groups"]["dev"]
-            if requirement != "ai-agent-lib-cli"
+            if requirement != "agentcraft2-cli"
         )
     report("Installing the library, rmprep agent, and MCP server with pip...")
     package_runtime.install(root, "agent", agent_install)
@@ -176,7 +176,7 @@ def setup(root: Path, *, dev: bool = False, model: str = "auto") -> None:
         "ui",
         [
             "-e",
-            str(root / "packages/ai-agent-lib-core"),
+            str(root / "packages/agentcraft2-core"),
             "-e",
             f"{root / UI_PROJECT}[{'chat,dev' if dev else 'chat'}]",
         ],
@@ -235,7 +235,7 @@ def services_for(
                         root,
                         "ui",
                         str(root / "tools/local_service.py"),
-                        "ai_agent_lib_ui",
+                        "agentcraft2_ui",
                         "serve",
                         "--config",
                         str(config),
@@ -341,7 +341,7 @@ def main(argv: Sequence[str] | None = None, *, root: Path = ROOT) -> int:
         if args.config != UI_CONFIG and not config.is_file():
             raise ValueError(
                 f"UI configuration is missing: {config}. "
-                "Create it with python tools/package_runtime.py ui -m ai_agent_lib_ui init first."
+                "Create it with python tools/package_runtime.py ui -m agentcraft2_ui init first."
             )
         ui_port = 8765
         if args.scenario in {"rmprep", "ui"}:

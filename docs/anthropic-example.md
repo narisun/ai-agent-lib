@@ -23,11 +23,11 @@ to set `PYTHON` to your approved Python executable.
 
 This agent was created with the `fake` provider. Open
 `agents/helper/pyproject.toml` and add `anthropic` to the extras on its
-`ai-agent-lib-core` dependency. Keep any existing version constraint. For example:
+`agentcraft2-core` dependency. Keep any existing version constraint. For example:
 
 ```toml
 dependencies = [
-    "ai-agent-lib-core[jwt,mcp,otel,serve,anthropic]",
+    "agentcraft2-core[jwt,mcp,otel,serve,anthropic]",
 ]
 ```
 
@@ -36,7 +36,7 @@ Keep any other dependencies already in that list.
 Install the workspace after saving any dependency changes:
 
 ```bat
-"%PYTHON%" -m ai_agent_lib_cli install
+"%PYTHON%" -m agentcraft2_cli install
 ```
 
 `install` uses this Python's pip and the library source in `agentcraft2.toml`.
@@ -169,7 +169,7 @@ checkpoints. They also reopen the container to check saved history:
 
 ```bat
 "%PYTHON%" -m pytest agents/helper/tests/test_helper_tracing.py
-"%PYTHON%" -m ai_agent_lib_cli check
+"%PYTHON%" -m agentcraft2_cli check
 ```
 
 See [Model tracing and ReAct checkpoints](developer-guide.html#faq) for trace fields,

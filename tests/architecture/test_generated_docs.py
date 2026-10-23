@@ -15,17 +15,17 @@ import build_guide
 import pytest
 from configuration_examples import AWS_DATA, LOCAL_DATA, configuration_examples
 
-from ai_agent_lib_core.config import DEFAULT_BINDINGS, render_env_example, render_reference
-from ai_agent_lib_core.config.bindings import (
+from agentcraft2_core.config import DEFAULT_BINDINGS, render_env_example, render_reference
+from agentcraft2_core.config.bindings import (
     LEGACY_PREFIX,
     legacy_spelling,
     options_key,
     provider_key,
 )
-from ai_agent_lib_core.config.phoenix import PHOENIX_VARIABLES
-from ai_agent_lib_core.contracts import NoOptions, Section
-from ai_agent_lib_core.di import ServiceProviders
-from ai_agent_lib_core.integrations.http import AgentService
+from agentcraft2_core.config.phoenix import PHOENIX_VARIABLES
+from agentcraft2_core.contracts import NoOptions, Section
+from agentcraft2_core.di import ServiceProviders
+from agentcraft2_core.integrations.http import AgentService
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -40,7 +40,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 def test_generated_document_is_current(path: str, expected: str, command: str) -> None:
     actual = (REPO_ROOT / path).read_text(encoding="utf-8")
     assert actual == expected, (
-        f"{path} is stale; regenerate it with: python -m ai_agent_lib_core.config {command}"
+        f"{path} is stale; regenerate it with: python -m agentcraft2_core.config {command}"
     )
 
 

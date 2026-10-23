@@ -12,8 +12,8 @@ import logging
 import time
 from typing import Annotated, Any, Protocol
 
-from ai_agent_lib_core import ServiceContainer
-from ai_agent_lib_core.contracts import ConfigurationError
+from agentcraft2_core import ServiceContainer
+from agentcraft2_core.contracts import ConfigurationError
 from mcp.server.mcpserver import MCPServer
 from pydantic import Field
 

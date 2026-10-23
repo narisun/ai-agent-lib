@@ -6,17 +6,17 @@ import dataclasses
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from typing import Any
 
-from ai_agent_lib_core import ConfigurationError, RequestContext, ServiceConfig, ServiceContainer
-from ai_agent_lib_core.adapters.audit_jsonl import JsonlAuditOptions
-from ai_agent_lib_core.contracts import (
+from agentcraft2_core import ConfigurationError, RequestContext, ServiceConfig, ServiceContainer
+from agentcraft2_core.adapters.audit_jsonl import JsonlAuditOptions
+from agentcraft2_core.contracts import (
     PolicyAction,
     PolicyDenied,
     PolicyRequest,
     PolicyResource,
     Section,
 )
-from ai_agent_lib_core.contracts.inspection import TurnInspector
-from ai_agent_lib_core.integrations.http import (
+from agentcraft2_core.contracts.inspection import TurnInspector
+from agentcraft2_core.integrations.http import (
     AgentService,
     OutcomeJournal,
     ServiceLifecycle,
@@ -24,10 +24,10 @@ from ai_agent_lib_core.integrations.http import (
     build_agent_app,
     run_agent,
 )
-from ai_agent_lib_core.integrations.langgraph import AgentTracing
-from ai_agent_lib_core.integrations.langgraph.inspection import GraphCheckpointPreview
-from ai_agent_lib_core.observability import report_error
-from ai_agent_lib_core.observability.inspection import LocalTurnInspector
+from agentcraft2_core.integrations.langgraph import AgentTracing
+from agentcraft2_core.integrations.langgraph.inspection import GraphCheckpointPreview
+from agentcraft2_core.observability import report_error
+from agentcraft2_core.observability.inspection import LocalTurnInspector
 
 from rmprep.context import ContextBuilder
 from rmprep.graph import APPLICATION, build_graph, registered_mcp_tools, response, steps

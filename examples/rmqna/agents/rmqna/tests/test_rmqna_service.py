@@ -6,9 +6,9 @@ import json
 from typing import Any
 
 import httpx
-from ai_agent_lib_core import Principal
-from ai_agent_lib_core.integrations.http import ServiceLifecycle
-from ai_agent_lib_core.testing import FakeChatModelProvider, FakeIdentityVerifier, Fakes
+from agentcraft2_core import Principal
+from agentcraft2_core.integrations.http import ServiceLifecycle
+from agentcraft2_core.testing import FakeChatModelProvider, FakeIdentityVerifier, Fakes
 
 from rmqna.service import SERVICE, build_app
 

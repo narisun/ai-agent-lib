@@ -7,8 +7,8 @@ Live drafts, response metrics and per-response trace links are available.
 The temporary draft disappears when the saved outcome is ready. Local turn
 inspection remains available from Logs. The optional memo panel stores inline versions
 and offers version selection. Shared deployment remains a later phase.
-The package and CLI module names stay `ai-agent-lib-ui` and
-`ai_agent_lib_ui`.
+The package and CLI module names stay `agentcraft2-ui` and
+`agentcraft2_ui`.
 
 ## Delivery approach
 
@@ -59,21 +59,21 @@ selection gate; do not implement two full frontends.
 
 ## Phase 1: contracts and package boundaries
 
-Implemented in [ai-agent-lib-ui](../packages/ai-agent-lib-ui/README.md) with additive
+Implemented in [agentcraft2-ui](../packages/agentcraft2-ui/README.md) with additive
 core metadata capture. The [contract guide](frontend-contracts.md) records the
 schemas, examples, compatibility rules and scope of the implementation. The
 package has its own Python environment and Windows/Linux CI job. Phase 2 now adds
 runtime adapters, assets, migrations and `__main__.py` in the directories below.
 
-Add the optional `packages/ai-agent-lib-ui` distribution and the smallest necessary
+Add the optional `packages/agentcraft2-ui` distribution and the smallest necessary
 core diagnostic integration. Keep UI dependencies out of core and AWS consumers.
 Prepare this structure, adjusting names only where established repository
 conventions require it:
 
 ```text
-packages/ai-agent-lib-ui/
+packages/agentcraft2-ui/
   pyproject.toml
-  src/ai_agent_lib_ui/
+  src/agentcraft2_ui/
     contracts/       # typed values and replaceable ports
     application/     # catalog, conversations, inspector, metrics
     adapters/        # HTTP agents, storage, identity, diagnostic readers
@@ -108,7 +108,7 @@ agent internals or unscoped checkpoint storage.
 
 ## Phase 2: local chat with durable threads
 
-Implemented in the [UI package](../packages/ai-agent-lib-ui/README.md): the `chat`
+Implemented in the [UI package](../packages/agentcraft2-ui/README.md): the `chat`
 optional extra, supported Chainlit hooks, file-registry pins, local sessions and
 SQLite storage. One server owns a state folder and one configured static identity;
 UI and agent endpoints use loopback. Agent checkpoints and `/invoke` remain unchanged.

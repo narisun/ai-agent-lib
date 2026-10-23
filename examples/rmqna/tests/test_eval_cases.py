@@ -16,7 +16,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from ai_agent_lib_core.evaluation import EvalCase, load_cases
+from agentcraft2_core.evaluation import EvalCase, load_cases
 
 from rmqna.prompts import EXAMPLES_VERSION, load_prompt, schema_document
 from rmqna_data.engine import DEFAULT_ROW_CAP, RmqnaEngine

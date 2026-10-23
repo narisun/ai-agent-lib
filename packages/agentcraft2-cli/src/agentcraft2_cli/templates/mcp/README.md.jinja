@@ -1,0 +1,202 @@
+# {{ name }}
+
+{{ description }}
+
+This MCP server exposes tools for agents to call. The library checks caller
+identity, registered tools, permissions, and guardrails, then records an audit
+event. Data queries also pass through the library's permission and result checks.
+
+## Before you start
+
+Run commands from the **workspace root**, where `agentcraft2.toml` lives.
+Follow [Select Python](../../README.md#select-python) in the workspace README
+to set `PYTHON` to your approved Python executable. Select it again in
+every new terminal. These commands use Windows Command Prompt; in bash/zsh replace
+`"%PYTHON%"` with `"$PYTHON"` after setting `PYTHON` as that README describes.
+
+Install the workspace once, and again after changing dependencies:
+
+```bat
+"%PYTHON%" -m agentcraft2_cli install
+```
+
+## Available tools
+
+| Tool | What it does |
+| --- | --- |
+{% if sample %}
+| `{{ server_id }}.greet` | A plain tool: returns a greeting |
+| `{{ server_id }}.people_by_team` | Runs the named query `people_by_team` over `data/people.csv` |
+{% else %}
+{% for query in plan.queries %}
+| `{{ server_id }}.{{ query.name }}` | {{ query.description }} |
+{% endfor %}
+{% endif %}
+
+{% if plan.origin == "csv" %}
+Each tool uses a named query in `queries/` over the CSV files in `data/`.
+Review the selected columns and parameters, and keep the tools your application
+needs.
+
+{% endif %}
+{% if plan.origin == "redshift" %}
+Each tool uses a named query in `queries/`, generated from the Redshift
+catalogue. Review the selected columns and parameters, and keep the tools your
+application needs. Local tests use sample CSV data.
+
+{% endif %}
+{% if rest %}
+Each tool uses an endpoint definition in `queries/`, generated from the OpenAPI
+document. The definition fixes the endpoint, allowed parameters, and returned
+fields. Review those definitions and keep the tools your application needs.
+
+{% endif %}
+## Test it
+
+```bat
+"%PYTHON%" -m pytest mcp-servers/{{ name }}
+```
+
+The tests use local {{ "API responses from `" ~ responses_file ~ "`, keyed by method and path" if rest else "CSV data" }}.
+They apply the workspace's policy rules to check what each role may see:
+
+| Role | Tool call | Data |
+| --- | --- | --- |
+| `manager` | allowed | every column |
+{% if plan.masked %}
+| `analyst` | allowed | {% for column in plan.masked %}`{{ column }}`{{ ", " if not loop.last }}{% endfor %} {{ "is" if plan.masked | length == 1 else "are" }} masked, at most {{ analyst_rows }} rows |
+{% else %}
+| `analyst` | allowed | every column, at most {{ analyst_rows }} rows |
+{% endif %}
+| anything else | denied | none |
+
+**Expected result:** the tests pass for allowed and denied callers. To change
+behavior, add a test in `tests/test_{{ package }}.py` that sets the caller's roles,
+calls the tool, and asserts the expected result.
+{% if not sample %}
+The generated tests check the columns each role sees. Add assertions for the
+rows your application expects.
+{% endif %}
+
+{% if rest %}
+## Configure API access
+
+At runtime, tools call `{{ plan.options.base_url }}`, the data source's `base_url`
+in `mcp-servers/{{ name }}/.env`. Configure access before starting the server.
+If the API requires a token:
+
+1. Add `"auth_secret": "{{ plan.source }}_token"` to the data source's options
+   in `.env`. The token is sent as a bearer token; use `auth_header` and
+   `auth_scheme` to configure a different format.
+2. Set `{{ var.secret_prefix }}{{ plan.source | upper }}_TOKEN` in `.env`.
+   Keep credentials out of `.env.example` and source control. In a deployment,
+   configure the token through the selected secrets provider.
+
+{% endif %}
+## Run it
+
+Open a terminal at the workspace root and select Python as described above.
+Start this server **before** any agent that calls its tools:
+
+```bat
+"%PYTHON%" -m agentcraft2_cli run {{ name }}
+```
+
+Leave this terminal running. Wait for the `ready` log event before starting
+an agent in another terminal. The MCP endpoint is
+`http://127.0.0.1:{{ port }}/mcp`; `/healthz` reports liveness and `/readyz`
+reports readiness. Press Ctrl+C in the server terminal to stop it.
+
+To check readiness from another terminal, select Python there and run:
+
+```bat
+"%PYTHON%" -c "from urllib.request import urlopen; print(urlopen('http://127.0.0.1:{{ port }}/readyz', timeout=10).status)"
+```
+
+**Expected result:** a ready server prints `200`. A connection error means the
+listener is unavailable; HTTP 503 means it has not become ready. Read the server's
+output or run `"%PYTHON%" -m agentcraft2_cli doctor {{ name }}` to diagnose a failure.
+
+On this machine a caller without a token is the development identity in
+`{{ var.identity_options }}`. Local state is written under
+`mcp-servers/{{ name }}/.agentcraft2/`.
+
+## What to read
+
+These file paths are relative to this service folder:
+
+| File | Shows |
+| --- | --- |
+| `src/{{ package }}/server.py` | Tool functions and their library integrations |
+{% if sample %}
+| `queries/people_by_team.sql` | A named query: SQL with a declared interface |
+| `data/people.csv` | The sample data. Each CSV file is a table |
+{% else %}
+| `queries/` | The named queries: {{ "SQL" if plan.kind == "duckdb_csv" else "endpoint definitions" }} with a declared interface |
+{% if plan.kind == "duckdb_csv" %}
+| `data/` | The data. Each CSV file is a table |
+{% endif %}
+{% endif %}
+| `.env.example` | How the service is configured locally |
+
+{% if plan.notes or plan.deployed %}
+## Review data settings for deployment
+
+{% for note in plan.notes %}
+- {{ note }}
+{% endfor %}
+{% if plan.deployed %}
+- The same query files run against Redshift after deployment. Generate
+  `deploy.env` with `"%PYTHON%" -m agentcraft2_cli deploy {{ name }}`, then set
+  `{{ var.data_sources }}` to:
+
+  ```text
+  {{ plan.deployed_setting }}
+  ```
+
+  `"%PYTHON%" -m agentcraft2_cli deploy {{ name }} --plan` then lists what the service's role must
+  be allowed to do, and why.
+{% endif %}
+
+{% endif %}
+{% if plan.kind == "duckdb_csv" %}
+## Add a tool over your own data
+
+1. Put a CSV file in `data/` and a query in `queries/`. The query's header
+   declares its parameters, its row limit and its classification.
+2. Write a failing test that calls the new tool as a role and says what that
+   role should see.
+3. Add the tool in `src/{{ package }}/server.py` and list it under `{{ server_id }}`
+   in the workspace's `registry/mcp-tools.yaml`.
+4. From the workspace root, run
+   `"%PYTHON%" -m agentcraft2_cli registry pin {{ server_id }}` to pin its arguments.
+5. Update the workspace's `policies/agentcraft2/rules/data.yaml` for any new roles
+   or columns to mask, and add samples in `tests/policy-samples.yaml`.
+6. Run `"%PYTHON%" -m agentcraft2_cli check` from the workspace root.
+
+The queries are written in the dialect of the production database and run
+unchanged over CSV files locally.
+{% endif %}
+
+## Prepare a deployment
+
+From the workspace root:
+
+```bat
+"%PYTHON%" -m agentcraft2_cli deploy {{ name }}
+```
+
+The first run creates `mcp-servers/{{ name }}/deploy.env`. Fill in the deployment
+settings and add the provider dependencies reported by the CLI to the service's
+`pyproject.toml`. Install them, review the plan, then generate the deployment files:
+
+```bat
+"%PYTHON%" -m agentcraft2_cli install
+"%PYTHON%" -m agentcraft2_cli deploy {{ name }} --plan
+"%PYTHON%" -m agentcraft2_cli deploy {{ name }}
+```
+
+**Expected result:** `deploy/{{ name }}/` contains Terraform and image-build
+files. Follow its README to build images and apply infrastructure on a build
+machine or CI runner with a container engine, Terraform, and the required
+registry and AWS permissions.

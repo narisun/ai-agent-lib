@@ -12,9 +12,9 @@ from unittest.mock import Mock
 import pytest
 from tools import local_dev, local_processes, package_runtime
 
-from ai_agent_lib_core.config import deprecations as deprecations_module
-from ai_agent_lib_core.config.bindings import legacy_spelling
-from ai_agent_lib_core.config.phoenix import PHOENIX_VARIABLES
+from agentcraft2_core.config import deprecations as deprecations_module
+from agentcraft2_core.config.bindings import legacy_spelling
+from agentcraft2_core.config.phoenix import PHOENIX_VARIABLES
 
 
 @pytest.fixture
@@ -220,10 +220,10 @@ def test_a_legacy_enabled_root_setting_still_starts_phoenix_first_and_warns(
     (checkout / ".env").write_text("AC2_MODEL_PROVIDER=fake\nEAP_PHOENIX_ENABLED=true\n")
     start = Mock()
     monkeypatch.setattr(local_dev, "serve", start)
-    with caplog.at_level(logging.WARNING, logger="ai_agent_lib_core.config"):
+    with caplog.at_level(logging.WARNING, logger="agentcraft2_core.config"):
         assert local_dev.main(["services"], root=checkout) == 0
     assert [s.name for s in start.call_args.args[0]] == ["phoenix", "rmprep-data", "rmprep"]
-    assert [r.getMessage() for r in caplog.records if r.name == "ai_agent_lib_core.config"] == [
+    assert [r.getMessage() for r in caplog.records if r.name == "agentcraft2_core.config"] == [
         "EAP_PHOENIX_ENABLED is deprecated; use AC2_PHOENIX_ENABLED instead"
     ]
 
