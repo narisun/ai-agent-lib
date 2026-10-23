@@ -812,6 +812,15 @@ def test_the_naics_code_is_the_number_the_document_says_it_is(engine: RmqnaEngin
 
 # --- the validator rewrites the statement; the answer must not change -----------------------
 
+
+def _duckdb_at_least(major: int, minor: int) -> bool:
+    numbers = re.findall(r"\d+", duckdb.__version__)[:2]
+    return tuple(int(number) for number in numbers) >= (major, minor)
+
+
+# DuckDB 1.3 added ``lambda x: ...`` and 2.0 turned the ``x -> ...`` arrow off.
+LAMBDA = "lambda x: x * 2" if _duckdb_at_least(1, 3) else "x -> x * 2"
+
 CORPUS = [
     "SELECT uen, name FROM accounts ORDER BY uen",
     "SELECT country, count(*) AS n FROM accounts GROUP BY country ORDER BY country",
@@ -863,7 +872,7 @@ CORPUS = [
     "GROUP BY GROUPING SETS ((country), (segment), ()) ORDER BY ALL",
     "SELECT uen, sum(annual_revenue) OVER (PARTITION BY country ORDER BY uen "
     "ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running FROM accounts ORDER BY uen",
-    "SELECT list_transform([1, 2, 3], x -> x * 2) AS doubled",
+    f"SELECT list_transform([1, 2, 3], {LAMBDA}) AS doubled",
     "SELECT a.uen FROM accounts a SEMI JOIN contacts c ON a.uen = c.uen ORDER BY a.uen",
     "SELECT a.uen FROM accounts a ANTI JOIN contacts c ON a.uen = c.uen ORDER BY a.uen",
     "SELECT DISTINCT ON (country) country, name FROM accounts ORDER BY country, name",
@@ -907,6 +916,27 @@ async def test_the_engine_answers_what_duckdb_answers_for_the_models_own_sql(
                 got_cell,
                 normalised,
             )
+
+
+async def test_the_old_lambda_arrow_gets_duckdbs_own_answer(
+    engine: RmqnaEngine, reference: duckdb.DuckDBPyConnection
+) -> None:
+    # DuckDB 2.0 turned ``x -> ...`` off and says what to write instead. The engine neither
+    # switches it back on nor hides that answer: the model reads it and repairs its SQL.
+    arrow = "SELECT list_transform([1, 2, 3], x -> x * 2) AS doubled"
+    try:
+        reference.execute(arrow)
+    except duckdb.Error:
+        with pytest.raises(SqlRefused) as refused:
+            await engine.execute(arrow)
+        assert refused.value.error_kind == "execution_error"
+        assert "lambda" in refused.value.message.lower()
+        if _duckdb_at_least(1, 3):
+            assert (
+                await engine.execute(f"SELECT list_transform([1, 2, 3], {LAMBDA})")
+            ).row_count == 1
+    else:
+        assert (await engine.execute(arrow)).row_count == 1
 
 
 def _plain(value: object) -> object:
