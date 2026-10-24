@@ -71,18 +71,30 @@ class DotenvConfigSource(MappingConfigSource):
 
 
 class LayeredConfigSource:
-    """Several sources read in order; the first one that has a name wins."""
+    """Several sources read in order; the first one that has a value for a name wins.
 
-    def __init__(self, *layers: ConfigSource) -> None:
+    A blank value is not a value. A compose file that passes ``NAME=${NAME}``
+    from an empty variable would otherwise hide the setting in ``.env`` behind
+    it, and the resolver would then read the name as unset.
+
+    Args:
+        layers: The sources, the strongest first.
+        blanks_count: Whether a blank value is a value that hides the layers
+            behind it. A launcher that builds a child's environment sets this,
+            because a variable the shell set to empty must reach the child empty.
+    """
+
+    def __init__(self, *layers: ConfigSource, blanks_count: bool = False) -> None:
         if not layers:
             raise ValueError("at least one layer is required")
         self._layers = layers
+        self._blanks_count = blanks_count
 
     def get(self, name: str) -> str | None:
-        """Return the value from the first layer that defines ``name``."""
+        """Return the value from the first layer that holds ``name``, ignoring blanks."""
         for layer in self._layers:
             value = layer.get(name)
-            if value is not None:
+            if value is not None and (self._blanks_count or value.strip()):
                 return value
         return None
 

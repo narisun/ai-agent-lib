@@ -30,7 +30,8 @@ def agent_environment(
         shell = EnvironConfigSource()
         launcher = DotenvConfigSource(overrides, required=required)
         service = DotenvConfigSource(service_env)
-        source = LayeredConfigSource(shell, launcher)
+        # The child's environment is built from what was set, so an empty shell value stays empty.
+        source = LayeredConfigSource(shell, launcher, blanks_count=True)
         environment = {
             name: value for name in source.names() if (value := source.get(name)) is not None
         }
