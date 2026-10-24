@@ -545,12 +545,12 @@ def test_the_agentcore_starter_selects_ambient_telemetry_a_memory_and_the_deploy
     assert "AC2_TELEMETRY=ambient\n" in text
     assert "AC2_CHECKPOINT_PROVIDER=agentcore_memory\n" in text
     assert 'AC2_CHECKPOINT_OPTIONS={"memory_id": "created_by_terraform"}\n' in text
-    assert "AGENTCORE_AUTH=iam\n" in text
-    assert "# AGENTCORE_DISCOVERY_URL=" in text
-    assert "AGENTCORE_NETWORK=PUBLIC\n" in text
-    assert "AGENTCORE_ARTIFACT=container\n" in text
-    assert "AGENTCORE_MEMORY=create\n" in text
-    assert "AGENTCORE_GATEWAY=none\n" in text
+    assert "AC2_AGENTCORE_AUTH=iam\n" in text
+    assert "# AC2_AGENTCORE_DISCOVERY_URL=" in text
+    assert "AC2_AGENTCORE_NETWORK=PUBLIC\n" in text
+    assert "AC2_AGENTCORE_ARTIFACT=container\n" in text
+    assert "AC2_AGENTCORE_MEMORY=create\n" in text
+    assert "AC2_AGENTCORE_GATEWAY=none\n" in text
     assert "never reach the container" in text
     assert "Postgres" not in text
 
@@ -578,8 +578,8 @@ def test_the_agentcore_plan_shows_the_runtime_before_the_adapters_and_no_sidecar
     )
     assert "collector:" not in out
     assert "  opa:" not in out
-    assert "AGENTCORE_MEMORY=create: Terraform creates the memory" in out
-    assert "  AGENTCORE_" not in out  # the block is the deployment's, not the environment's
+    assert "AC2_AGENTCORE_MEMORY=create: Terraform creates the memory" in out
+    assert "  AC2_AGENTCORE_" not in out  # the block is the deployment's, not the environment's
     assert not (agentcore_ready / "deploy").exists()
 
 
@@ -619,7 +619,7 @@ def test_agentcore_refuses_opa_on_the_loopback_address(
     assert _agentcore(agentcore_ready, "--plan") == 1
     out = capsys.readouterr().out
     assert "nothing runs beside a container on AgentCore Runtime" in out
-    assert "AC2_POLICY_PROVIDER=rules" in out
+    assert "the in-process rules engine is for a developer's machine only" in out
     assert "Point url in AC2_POLICY_OPTIONS" in out
 
 
@@ -640,7 +640,9 @@ def test_agentcore_refuses_a_checkpoint_store_on_the_sessions_disk(
     assert "checkpoint sqlite runs only on a developer's machine" in out
     assert "checkpoint sqlite has nowhere durable to write" in out
     assert "set AC2_CHECKPOINT_PROVIDER to one of postgres, agentcore_memory, none" in out
-    assert "AGENTCORE_MEMORY=create while checkpoint sqlite does not use AgentCore Memory" in out
+    assert (
+        "AC2_AGENTCORE_MEMORY=create while checkpoint sqlite does not use AgentCore Memory" in out
+    )
 
 
 def test_agentcore_refuses_a_python_the_runtime_does_not_offer(
@@ -661,11 +663,12 @@ def test_agentcore_memory_named_in_the_block_must_be_the_checkpoints_memory(
     agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     _edit_settings(
-        agentcore_ready, {"AGENTCORE_MEMORY=create": "AGENTCORE_MEMORY=helper_mem-0123456789"}
+        agentcore_ready,
+        {"AC2_AGENTCORE_MEMORY=create": "AC2_AGENTCORE_MEMORY=helper_mem-0123456789"},
     )
     assert _agentcore(agentcore_ready, "--plan") == 1
     out = capsys.readouterr().out
-    assert "AGENTCORE_MEMORY names the memory helper_mem-0123456789" in out
+    assert "AC2_AGENTCORE_MEMORY names the memory helper_mem-0123456789" in out
     assert "memory_id is 'created_by_terraform'" in out
     assert "make them agree" in out
 
@@ -692,18 +695,20 @@ def test_agentcore_memory_without_the_memory_checkpoint_is_a_warning(
     assert _agentcore(agentcore_ready, "--plan") == 0
     out = capsys.readouterr().out
     assert "Warnings:" in out
-    assert "AGENTCORE_MEMORY=create while checkpoint none does not use AgentCore Memory" in out
+    assert "AC2_AGENTCORE_MEMORY=create while checkpoint none does not use AgentCore Memory" in out
     assert "set AC2_CHECKPOINT_PROVIDER=agentcore_memory" in out
 
 
 def test_agentcore_code_artifact_warns_about_wheels_and_writes_the_zip_builder(
     agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _edit_settings(agentcore_ready, {"AGENTCORE_ARTIFACT=container": "AGENTCORE_ARTIFACT=code"})
+    _edit_settings(
+        agentcore_ready, {"AC2_AGENTCORE_ARTIFACT=container": "AC2_AGENTCORE_ARTIFACT=code"}
+    )
     assert _agentcore(agentcore_ready) == 0
     out = capsys.readouterr().out
     assert "  artifact      code\n" in out
-    assert "AGENTCORE_ARTIFACT=code: every dependency needs a wheel for Python 3.13" in out
+    assert "AC2_AGENTCORE_ARTIFACT=code: every dependency needs a wheel for Python 3.13" in out
     assert "build_zip.py enforces that" in out
     assert "created  deploy/helper/build_zip.py" in out
     assert "Next: read deploy/helper/README.md, build the zip" in out
@@ -720,56 +725,76 @@ def test_agentcore_code_artifact_warns_about_wheels_and_writes_the_zip_builder(
 @pytest.mark.parametrize(
     ("replacements", "append", "named", "expected"),
     [
-        ({"AGENTCORE_AUTH=iam": "AGENTCORE_AUTH=jwt"}, "", "AGENTCORE_DISCOVERY_URL", "not set"),
         (
-            {"AGENTCORE_AUTH=iam": "AGENTCORE_AUTH=jwt"},
-            "AGENTCORE_DISCOVERY_URL=https://issuer.example/openid\n",
-            "AGENTCORE_DISCOVERY_URL",
+            {"AC2_AGENTCORE_AUTH=iam": "AC2_AGENTCORE_AUTH=jwt"},
+            "",
+            "AC2_AGENTCORE_DISCOVERY_URL",
+            "not set",
+        ),
+        (
+            {"AC2_AGENTCORE_AUTH=iam": "AC2_AGENTCORE_AUTH=jwt"},
+            "AC2_AGENTCORE_DISCOVERY_URL=https://issuer.example/openid\n",
+            "AC2_AGENTCORE_DISCOVERY_URL",
             ".well-known/openid-configuration",
         ),
         (
-            {"AGENTCORE_AUTH=iam": "AGENTCORE_AUTH=jwt"},
-            "AGENTCORE_DISCOVERY_URL=https://issuer.example/.well-known/openid-configuration\n",
-            "AGENTCORE_ALLOWED_CLIENTS",
+            {"AC2_AGENTCORE_AUTH=iam": "AC2_AGENTCORE_AUTH=jwt"},
+            "AC2_AGENTCORE_DISCOVERY_URL=https://issuer.example/.well-known/openid-configuration\n",
+            "AC2_AGENTCORE_ALLOWED_CLIENTS",
             "neither is set",
         ),
         (
             {},
-            "AGENTCORE_ALLOWED_AUDIENCE=api://helper\n",
-            "AGENTCORE_AUTH",
-            "AGENTCORE_AUTH=jwt when",
+            "AC2_AGENTCORE_ALLOWED_AUDIENCE=api://helper\n",
+            "AC2_AGENTCORE_AUTH",
+            "AC2_AGENTCORE_AUTH=jwt when",
         ),
-        ({"AGENTCORE_AUTH=iam": "AGENTCORE_AUTH=sigv4"}, "", "AGENTCORE_AUTH", "iam or jwt"),
-        ({"AGENTCORE_NETWORK=PUBLIC": "AGENTCORE_NETWORK=VPC"}, "", "AGENTCORE_SUBNETS", "not set"),
-        ({}, "AGENTCORE_SUBNETS=subnet-1\n", "AGENTCORE_NETWORK", "AGENTCORE_NETWORK=VPC when"),
         (
-            {"AGENTCORE_IDLE_TIMEOUT_SECONDS=900": "AGENTCORE_IDLE_TIMEOUT_SECONDS=soon"},
+            {"AC2_AGENTCORE_AUTH=iam": "AC2_AGENTCORE_AUTH=sigv4"},
             "",
-            "AGENTCORE_IDLE_TIMEOUT_SECONDS",
+            "AC2_AGENTCORE_AUTH",
+            "iam or jwt",
+        ),
+        (
+            {"AC2_AGENTCORE_NETWORK=PUBLIC": "AC2_AGENTCORE_NETWORK=VPC"},
+            "",
+            "AC2_AGENTCORE_SUBNETS",
+            "not set",
+        ),
+        (
+            {},
+            "AC2_AGENTCORE_SUBNETS=subnet-1\n",
+            "AC2_AGENTCORE_NETWORK",
+            "AC2_AGENTCORE_NETWORK=VPC when",
+        ),
+        (
+            {"AC2_AGENTCORE_IDLE_TIMEOUT_SECONDS=900": "AC2_AGENTCORE_IDLE_TIMEOUT_SECONDS=soon"},
+            "",
+            "AC2_AGENTCORE_IDLE_TIMEOUT_SECONDS",
             "a whole number of seconds from 60 to 28800",
         ),
         (
-            {"AGENTCORE_MAX_LIFETIME_SECONDS=28800": "AGENTCORE_MAX_LIFETIME_SECONDS=600"},
+            {"AC2_AGENTCORE_MAX_LIFETIME_SECONDS=28800": "AC2_AGENTCORE_MAX_LIFETIME_SECONDS=600"},
             "",
-            "AGENTCORE_IDLE_TIMEOUT_SECONDS",
-            "no more than AGENTCORE_MAX_LIFETIME_SECONDS (600)",
+            "AC2_AGENTCORE_IDLE_TIMEOUT_SECONDS",
+            "no more than AC2_AGENTCORE_MAX_LIFETIME_SECONDS (600)",
         ),
         (
-            {"AGENTCORE_ARTIFACT=container": "AGENTCORE_ARTIFACT=zip"},
+            {"AC2_AGENTCORE_ARTIFACT=container": "AC2_AGENTCORE_ARTIFACT=zip"},
             "",
-            "AGENTCORE_ARTIFACT",
+            "AC2_AGENTCORE_ARTIFACT",
             "container or code",
         ),
         (
-            {"AGENTCORE_GATEWAY=none": "AGENTCORE_GATEWAY=my-gateway"},
+            {"AC2_AGENTCORE_GATEWAY=none": "AC2_AGENTCORE_GATEWAY=my-gateway"},
             "",
-            "AGENTCORE_GATEWAY",
+            "AC2_AGENTCORE_GATEWAY",
             "the ARN of a gateway",
         ),
         (
-            {"AGENTCORE_MEMORY=create": "AGENTCORE_MEMORY=1-not-an-id"},
+            {"AC2_AGENTCORE_MEMORY=create": "AC2_AGENTCORE_MEMORY=1-not-an-id"},
             "",
-            "AGENTCORE_MEMORY",
+            "AC2_AGENTCORE_MEMORY",
             "the ID of a memory",
         ),
     ],
@@ -796,15 +821,17 @@ def test_agentcore_jwt_and_vpc_settings_reach_settings_tf(
     _edit_settings(
         agentcore_ready,
         {
-            "AGENTCORE_AUTH=iam": "AGENTCORE_AUTH=jwt",
-            "# AGENTCORE_DISCOVERY_URL=https://login.microsoftonline.com/<tenant>/v2.0/": (
-                "AGENTCORE_DISCOVERY_URL=https://login.microsoftonline.com/t/v2.0/"
+            "AC2_AGENTCORE_AUTH=iam": "AC2_AGENTCORE_AUTH=jwt",
+            "# AC2_AGENTCORE_DISCOVERY_URL=https://login.microsoftonline.com/<tenant>/v2.0/": (
+                "AC2_AGENTCORE_DISCOVERY_URL=https://login.microsoftonline.com/t/v2.0/"
             ),
-            "# AGENTCORE_ALLOWED_AUDIENCE=api://helper": "AGENTCORE_ALLOWED_AUDIENCE=api://helper, api://two",
-            "AGENTCORE_NETWORK=PUBLIC": "AGENTCORE_NETWORK=VPC",
-            "# AGENTCORE_SUBNETS=": "AGENTCORE_SUBNETS=",
-            "# AGENTCORE_SECURITY_GROUPS=": "AGENTCORE_SECURITY_GROUPS=",
-            "AGENTCORE_GATEWAY=none": "AGENTCORE_GATEWAY=create",
+            "# AC2_AGENTCORE_ALLOWED_AUDIENCE=api://helper": (
+                "AC2_AGENTCORE_ALLOWED_AUDIENCE=api://helper, api://two"
+            ),
+            "AC2_AGENTCORE_NETWORK=PUBLIC": "AC2_AGENTCORE_NETWORK=VPC",
+            "# AC2_AGENTCORE_SUBNETS=": "AC2_AGENTCORE_SUBNETS=",
+            "# AC2_AGENTCORE_SECURITY_GROUPS=": "AC2_AGENTCORE_SECURITY_GROUPS=",
+            "AC2_AGENTCORE_GATEWAY=none": "AC2_AGENTCORE_GATEWAY=create",
         },
     )
     assert _agentcore(agentcore_ready) == 0
@@ -912,7 +939,7 @@ def test_agentcore_running_again_rewrites_what_is_derived_and_keeps_what_is_your
     main_tf.write_text(main_tf.read_text(encoding="utf-8") + "# mine\n", encoding="utf-8")
     _edit_settings(
         agentcore_ready,
-        {"AGENTCORE_IDLE_TIMEOUT_SECONDS=900": "AGENTCORE_IDLE_TIMEOUT_SECONDS=600"},
+        {"AC2_AGENTCORE_IDLE_TIMEOUT_SECONDS=900": "AC2_AGENTCORE_IDLE_TIMEOUT_SECONDS=600"},
     )
     capsys.readouterr()
 
@@ -927,17 +954,60 @@ def test_agentcore_running_again_rewrites_what_is_derived_and_keeps_what_is_your
     )
 
 
+def test_the_earlier_spelling_of_a_deployment_variable_still_works_and_is_reported(
+    agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _edit_settings(agentcore_ready, {"AC2_AGENTCORE_AUTH=iam": "AGENTCORE_AUTH=iam"})
+    assert _agentcore(agentcore_ready, "--plan") == 0
+    out = capsys.readouterr().out
+    assert "  AGENTCORE_AUTH -> AC2_AGENTCORE_AUTH" in out
+    assert "inbound auth  iam" in out
+    # Under either spelling the variable stays out of the container.
+    assert "  AGENTCORE_AUTH  " not in out
+
+
+def test_a_deployment_variable_that_nothing_reads_is_refused_with_a_suggestion(
+    agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _edit_settings(agentcore_ready, append="AC2_AGENTCORE_NETWROK=VPC\n")
+    assert _agentcore(agentcore_ready, "--plan") == 1
+    err = capsys.readouterr().err
+    assert "AC2_AGENTCORE_NETWROK in agents/helper/deploy.env is not a deployment variable" in err
+    assert "did you mean AC2_AGENTCORE_NETWORK?" in err
+
+
+def test_both_spellings_of_a_deployment_variable_must_agree(
+    agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _edit_settings(agentcore_ready, append="AGENTCORE_AUTH=jwt\n")
+    assert _agentcore(agentcore_ready, "--plan") == 1
+    assert "AC2_AGENTCORE_AUTH is set twice" in capsys.readouterr().err
+
+
+def test_a_profile_for_another_platform_is_a_problem(
+    agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _edit_settings(agentcore_ready, {"AC2_PROFILE=agentcore": "AC2_PROFILE=aws"})
+    assert _agentcore(agentcore_ready, "--plan") == 1
+    out = capsys.readouterr().out
+    assert "AC2_PROFILE is aws in agents/helper/deploy.env" in out
+    assert "set AC2_PROFILE=agentcore" in out
+
+
 def test_the_fargate_target_is_the_default_and_ignores_the_agentcore_block(
     agentcore_ready: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """The same deploy.env, deployed to Fargate: the block is not the service's environment."""
-    _edit_settings(agentcore_ready, {"AC2_TELEMETRY=ambient": "AC2_TELEMETRY=off"})
+    _edit_settings(
+        agentcore_ready,
+        {"AC2_TELEMETRY=ambient": "AC2_TELEMETRY=off", "AC2_PROFILE=agentcore": "AC2_PROFILE=aws"},
+    )
     assert run("deploy", "helper", "--plan", "--workspace", agentcore_ready) == 0
     out = capsys.readouterr().out
     assert out.startswith("Deploying helper with the settings in agents/helper/deploy.env.\n")
     assert "Containers in the task:" in out
     assert "  service: helper-serve --host 0.0.0.0 --port 8000" in out
-    assert "  AGENTCORE_" not in out
+    assert "  AC2_AGENTCORE_" not in out
 
 
 @pytest.mark.integration
@@ -947,14 +1017,14 @@ def test_the_fargate_target_is_the_default_and_ignores_the_agentcore_block(
     [
         {},
         {
-            "AGENTCORE_ARTIFACT=container": "AGENTCORE_ARTIFACT=code",
-            "AGENTCORE_AUTH=iam": "AGENTCORE_AUTH=jwt",
-            "# AGENTCORE_DISCOVERY_URL=https://login.microsoftonline.com/<tenant>/v2.0/": (
-                "AGENTCORE_DISCOVERY_URL=https://login.microsoftonline.com/t/v2.0/"
+            "AC2_AGENTCORE_ARTIFACT=container": "AC2_AGENTCORE_ARTIFACT=code",
+            "AC2_AGENTCORE_AUTH=iam": "AC2_AGENTCORE_AUTH=jwt",
+            "# AC2_AGENTCORE_DISCOVERY_URL=https://login.microsoftonline.com/<tenant>/v2.0/": (
+                "AC2_AGENTCORE_DISCOVERY_URL=https://login.microsoftonline.com/t/v2.0/"
             ),
-            "# AGENTCORE_ALLOWED_AUDIENCE=api://helper": "AGENTCORE_ALLOWED_AUDIENCE=api://helper",
-            "AGENTCORE_GATEWAY=none": "AGENTCORE_GATEWAY=create",
-            "AGENTCORE_MEMORY=create": "AGENTCORE_MEMORY=none",
+            "# AC2_AGENTCORE_ALLOWED_AUDIENCE=api://helper": "AC2_AGENTCORE_ALLOWED_AUDIENCE=api://helper",
+            "AC2_AGENTCORE_GATEWAY=none": "AC2_AGENTCORE_GATEWAY=create",
+            "AC2_AGENTCORE_MEMORY=create": "AC2_AGENTCORE_MEMORY=none",
             'AC2_CHECKPOINT_OPTIONS={"memory_id": "created_by_terraform"}': (
                 'AC2_CHECKPOINT_OPTIONS={"memory_id": "helper_mem-0123456789"}'
             ),

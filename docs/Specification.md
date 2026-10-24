@@ -675,7 +675,7 @@ Each agent and each MCP server runs as its own ECS service on Fargate, in a task
 
 ### AWS AgentCore deployment
 
-The same service can run as an Amazon Bedrock AgentCore Runtime instead: `agentlib deploy SERVICE --target agentcore` reads the same `deploy.env`, with an `AGENTCORE_` block that describes the deployment itself and never reaches the container, and writes a root module that stands alone. The runtime runs one session in one microVM and brings its own identity, memory, gateway and observability services, so the platform replaces the sidecars rather than hosting them.
+The same service can run as an Amazon Bedrock AgentCore Runtime instead: `agentlib deploy SERVICE --target agentcore` reads the same `deploy.env`, with an `AC2_AGENTCORE_` block that describes the deployment itself and never reaches the container, and writes a root module that stands alone. The runtime runs one session in one microVM and brings its own identity, memory, gateway and observability services, so the platform replaces the sidecars rather than hosting them.
 
 | Element | Choice |
 | --- | --- |

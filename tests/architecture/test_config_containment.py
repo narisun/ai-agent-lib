@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from architecture.containment import find_violations
 
+from agentcraft2_cli.deploy.agentcore import AGENTCORE_PREFIX, AGENTCORE_VARIABLES
 from agentcraft2_core.config import DEFAULT_BINDINGS
 from agentcraft2_core.config.bindings import (
     LEGACY_PREFIX,
@@ -140,6 +141,9 @@ def _variables_a_document_may_name() -> set[str]:
         if phoenix.startswith(PREFIX):
             stem = phoenix.removeprefix(PREFIX)
             known.update({PREFIX + stem, LEGACY_PREFIX + stem})
+    # The deployment's own variables belong to the deploy step, not to a service's configuration.
+    known.update(variable.name for variable in AGENTCORE_VARIABLES)
+    known.add(AGENTCORE_PREFIX.rstrip("_"))
     return known
 
 

@@ -1,6 +1,12 @@
 # 0006: Developer settings, closed profiles, AC2_HOME and remote MCP from a local agent
 
-Proposed, 24 October 2026.
+Proposed, 24 October 2026. In force so far: blank values no longer hide a lower
+layer; MCP calls follow the standard proxy and CA variables; the AgentCore image
+installs ADOT from the lock; the `agentcore` profile; an explicit deployment
+environment on the server profiles; adapters that name their profile; no
+`allow_http` or production content capture on a deployed service; the
+`AC2_AGENTCORE_*` deployment variables. Not yet: the project home, the
+developer settings file, the token file for remote MCP.
 
 ## Context
 
@@ -46,8 +52,9 @@ The configuration surface does not separate who owns what.
    | Other tools and secrets | Credentials and tool settings. | The variables the tools define: `AWS_PROFILE`, `AWS_REGION`, `ANTHROPIC_API_KEY`, `PHOENIX_*`, `OTEL_*`, `HTTPS_PROXY`, `NO_PROXY`, `SSL_CERT_FILE`. |
 
    Only variables the library defines use `AC2_`. A secret that has a standard
-   name is never also accepted as `AC2_SECRET_<NAME>`; that family is for
-   secrets that have no standard name.
+   name is also accepted as `AC2_SECRET_<NAME>` for one release, with a warning
+   that names the standard variable; that family is for secrets that have no
+   standard name.
 
 2. **The developer file is `agentcraft2.settings.toml`.** It is not
    `agentcraft2.toml`: that file records the answers a workspace was generated
@@ -85,32 +92,39 @@ The configuration surface does not separate who owns what.
 
 3. **Profiles are closed outside local.** The profiles are `local`, `aws`
    (Fargate and other ECS) and `agentcore` (experimental).
-   - Each adapter declares the profiles it may run in. This replaces the
-     boolean `local_only`. A pairing the adapter does not declare stops startup
+   - An adapter may name the profiles it runs under, beside the `local_only`
+     flag, which stays. A pairing the adapter does not declare stops startup
      with a message naming the adapter, the profile and the allowed profiles.
-     For example, `agentcore_runtime` identity runs only in `agentcore`.
+     Today `agentcore_runtime` identity names one: it runs only in `agentcore`.
+     `--profile agentcore` serving needs `AC2_PROFILE=agentcore`, so a service
+     that lost its configuration does not listen on every address with the
+     defaults of a developer's machine.
    - Infrastructure options (`allow_http`, issuer and endpoint URLs, bind
      address) cannot come from the settings file or from `AC2_<SECTION>_OPTIONS`
      outside `local`. They arrive from the deploy step. `allow_http` is refused
      outside `local`.
    - `AC2_DEPLOYMENT_ENV` has no default under `aws` or `agentcore`: it must be
-     `dev` or `prod`, and `local` is refused. The managed-runtime guard stays as
-     a second check and recognises AgentCore, EKS and EC2.
+     set. A developer who runs a server profile on their own machine names
+     `local`, on purpose. The managed-runtime guard stays as a second check.
    - Content capture (`AC2_MODEL_TRACE_PATH`, `AC2_PHOENIX_CAPTURE_CONTENT`) is
-     refused outside `local`.
+     refused when the environment is `prod`. In `dev` the trace file is a
+     diagnostic for test data and is allowed, with a warning that says what the
+     file holds.
    - In `local` a developer may still mix adapters, for example a real Bedrock
      model with in-process everything else. The per-section variables remain as
      advanced overrides there; the settings file does not accept them.
-   - The AgentCore deploy variables move to `AC2_AGENTCORE_*`, are read by the
-     deploy step only, and an unknown name in the block is an error. The
-     `AGENTCORE_*` spellings are accepted for one release with a warning.
+   - The AgentCore deploy variables are `AC2_AGENTCORE_*`, read by the deploy step
+     only, and an unknown name in the block is an error with a suggestion. The
+     `AGENTCORE_*` spellings are accepted for one release and reported.
 
 4. **The model provider is the developer's choice on every profile.** Bedrock
    uses the AWS credential chain (`AWS_PROFILE`, `AWS_REGION`). The Anthropic
    API uses `ANTHROPIC_API_KEY` locally and Secrets Manager when deployed; the
    deploy plan keeps refusing the key in `deploy.env`. MCP connectors read the
    standard CA and proxy variables, as the AWS and Anthropic clients do, so a
-   TLS-inspecting enterprise proxy works the same for every outbound call.
+   TLS-inspecting enterprise proxy works the same for every outbound call:
+   `HTTPS_PROXY` and `NO_PROXY` (this machine is always direct), `SSL_CERT_FILE`
+   for the HTTP connector and `AWS_CA_BUNDLE` for the AgentCore one.
 
 5. **`AC2_HOME` is the root of the project's files.**
    - It is read from the process environment only, because it locates `.env`.

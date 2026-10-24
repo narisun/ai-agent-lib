@@ -328,9 +328,11 @@ AC2_MODEL_PROVIDER=fake
 
 Check these entries and keep the file's other generated settings.
 
-- `AC2_PROFILE` chooses defaults: `local` or `aws`.
+- `AC2_PROFILE` chooses defaults: `local`, `aws` or `agentcore` (a service on Bedrock
+  AgentCore Runtime).
 - `AC2_DEPLOYMENT_ENV` says where this process runs: `local`, `dev`, or `prod`.
-  Non-local environments reject development-only adapters.
+  Non-local environments reject development-only adapters. With the `aws` or
+  `agentcore` profile it has no default and must be set.
 - `AC2_MODEL_PROVIDER` chooses the model implementation. `fake` runs in process.
 
 Library variables start with `AC2_`, such as `AC2_<SECTION>_PROVIDER`. Older

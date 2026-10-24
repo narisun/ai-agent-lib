@@ -26,6 +26,8 @@ from warnings import catch_warnings, simplefilter
 from agentcraft2_cli.deploy.agentcore import (
     AgentCoreSettings,
     agentcore_preflight,
+    is_agentcore_variable,
+    legacy_agentcore_names,
     read_agentcore_settings,
     strip_agentcore,
 )
@@ -38,6 +40,7 @@ from agentcraft2_core.config import (
     ConfigResolver,
     DotenvConfigSource,
     Key,
+    MappingConfigSource,
     secret_key,
     telemetry_enabled,
     variable_for,
@@ -46,6 +49,7 @@ from agentcraft2_core.contracts import (
     ConfigSource,
     ConfigurationError,
     DeploymentEnv,
+    Profile,
     Section,
     ServiceConfig,
     TelemetryMode,
@@ -78,7 +82,7 @@ class DeploymentPlan:
         target: The service, and the platform it goes to.
         environment: The container's environment: each of the service's
             variables in ``deploy.env`` and its value, in the file's order. An
-            empty value is kept; the deployment's own ``AGENTCORE_`` variables
+            empty value is kept; the deployment's own AgentCore variables
             are not the service's and are left out.
         access: What each selected adapter needs from AWS.
         opa: Whether the task needs the OPA sidecar (Fargate only).
@@ -118,11 +122,19 @@ def _read_settings(
             fix=f"run 'agentcraft2 deploy {target.name}' to write a starting one, then fill it in",
         )
     source = DotenvConfigSource(path, required=True)
+    # The deployment's own variables are read by the plan, not by the service's configuration.
+    service_side = MappingConfigSource(
+        {
+            name: value
+            for name in source.names()
+            if not is_agentcore_variable(name) and (value := source.get(name)) is not None
+        }
+    )
     try:
         # The plan reports retired spellings itself, so the resolver's warning is not raised too.
         with catch_warnings():
             simplefilter("ignore", DeprecationWarning)
-            resolution = ConfigResolver(source, base_dir=path.parent).explain()
+            resolution = ConfigResolver(service_side, base_dir=path.parent).explain()
     except ConfigurationError as error:
         error.add_note(f"in {target.settings}")
         raise
@@ -150,6 +162,18 @@ def _read_settings(
     # An empty value is a setting too: it is kept, as the file has it.
     environment = [(n, value) for n in source.names() if (value := source.get(n)) is not None]
     return config, strip_agentcore(environment), source
+
+
+def _profile_problems(target: Target, config: ServiceConfig) -> list[str]:
+    """Say when the settings name a profile for another platform than the one targeted."""
+    wanted = Profile.AGENTCORE if target.platform == AGENTCORE else Profile.AWS
+    if config.profile is wanted:
+        return []
+    variable = variable_for(Key.PROFILE)
+    return [
+        f"{variable} is {config.profile.value} in {target.settings}, and {target.name} goes to "
+        f"{target.platform}; set {variable}={wanted.value}"
+    ]
 
 
 def _uses_opa_beside_it(config: ServiceConfig) -> bool:
@@ -369,6 +393,7 @@ def plan_deployment(
         for adapter in access.undeclared
     ]
     problems += missing_dependencies(root, target, access, registry, resolve)
+    problems += _profile_problems(target, config)
     if agentcore is not None:
         # The runtime instruments the process itself (ADOT): no sidecar, and the
         # image, not the service, brings the distribution that owns the providers.
@@ -405,10 +430,13 @@ def plan_deployment(
         )
     return DeploymentPlan(
         target=target,
-        deprecated=tuple(
-            (name, PREFIX + name.removeprefix(LEGACY_PREFIX))
-            for name, _ in environment
-            if name.startswith(LEGACY_PREFIX)
+        deprecated=(
+            *(
+                (name, PREFIX + name.removeprefix(LEGACY_PREFIX))
+                for name, _ in environment
+                if name.startswith(LEGACY_PREFIX)
+            ),
+            *legacy_agentcore_names(source.names()),
         ),
         environment=environment,
         access=access,

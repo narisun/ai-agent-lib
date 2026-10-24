@@ -1,7 +1,7 @@
 """The AgentCore Runtime deployment's own settings, and what the platform refuses.
 
 ``deploy.env`` holds two kinds of variable. The service's own (the library's
-prefix) become the container's environment. The ``AGENTCORE_`` block, read
+prefix) become the container's environment. The AgentCore block, read
 here, describes the deployment itself: how callers are authenticated, the
 network, the artifact, the session lifecycle, and whether a Memory or a
 Gateway is created beside the runtime. Nothing of it reaches the container.
@@ -11,6 +11,7 @@ Nothing here calls AWS.
 
 from __future__ import annotations
 
+import difflib
 import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -19,7 +20,9 @@ from urllib.parse import urlsplit
 from agentcraft2_cli.deploy.target import Target
 from agentcraft2_cli.errors import CliError
 from agentcraft2_core.config import (
+    PREFIX,
     Key,
+    MappingConfigSource,
     options_key,
     provider_key,
     telemetry_enabled,
@@ -32,16 +35,21 @@ __all__ = [
     "AGENTCORE_PREFIX",
     "AGENTCORE_PYTHON",
     "AGENTCORE_VARIABLES",
+    "LEGACY_AGENTCORE_PREFIX",
     "AgentCoreSettings",
     "AgentCoreVariable",
     "agentcore_preflight",
     "is_agentcore_variable",
+    "legacy_agentcore_names",
     "read_agentcore_settings",
     "strip_agentcore",
 ]
 
-AGENTCORE_PREFIX = "AGENTCORE_"
+AGENTCORE_PREFIX = PREFIX + "AGENTCORE_"
 """Every variable of ``deploy.env`` with this prefix is the deployment's, not the service's."""
+
+LEGACY_AGENTCORE_PREFIX = "AGENTCORE_"
+"""The earlier spelling, in the platform's namespace. It works for one release, with a warning."""
 
 AGENTCORE_PYTHON = "3.13"
 """The Python the runtime offers to a code artifact, and the version the image is built with."""
@@ -88,7 +96,7 @@ _OPTION_MEMORY_ID = "memory_id"
 
 @dataclass(frozen=True, slots=True)
 class AgentCoreSettings:
-    """How a service is deployed to AgentCore Runtime: the ``AGENTCORE_`` block of ``deploy.env``.
+    """How a service is deployed to AgentCore Runtime: the AgentCore block of deploy.env.
 
     Attributes:
         auth: Who may invoke the runtime: ``iam`` (SigV4-signed callers) or
@@ -149,7 +157,7 @@ class AgentCoreSettings:
 
 @dataclass(frozen=True, slots=True)
 class AgentCoreVariable:
-    """One variable of the ``AGENTCORE_`` block, as the developer guide lists it.
+    """One variable of the AgentCore block, as the developer guide lists it.
 
     Attributes:
         name: The variable.
@@ -259,12 +267,61 @@ AGENTCORE_VARIABLES: tuple[AgentCoreVariable, ...] = (
         f"an ID must equal that option. The starter settings of an agent set `{CREATE}`.",
     ),
 )
-"""Every variable of the ``AGENTCORE_`` block, in the order the starter settings write them."""
+"""Every variable of the AgentCore block, in the order the starter settings write them."""
 
 
 def is_agentcore_variable(name: str) -> bool:
     """Whether ``name`` is one of the deployment's own variables, kept out of the container."""
-    return name.startswith(AGENTCORE_PREFIX)
+    return name.startswith((AGENTCORE_PREFIX, LEGACY_AGENTCORE_PREFIX))
+
+
+def _current_spelling(name: str) -> str:
+    """Return the current spelling of a deployment variable written in either."""
+    if name.startswith(AGENTCORE_PREFIX):
+        return name
+    return AGENTCORE_PREFIX + name.removeprefix(LEGACY_AGENTCORE_PREFIX)
+
+
+def legacy_agentcore_names(names: Iterable[str]) -> tuple[tuple[str, str], ...]:
+    """Return ``(old, current)`` for each deployment variable written in the earlier spelling."""
+    return tuple(
+        (name, _current_spelling(name))
+        for name in names
+        if name.startswith(LEGACY_AGENTCORE_PREFIX) and not name.startswith(AGENTCORE_PREFIX)
+    )
+
+
+def _in_current_spelling(source: ConfigSource, where: str) -> ConfigSource:
+    """Return the block of ``source`` under the current names, each one a variable that exists.
+
+    A name that nothing reads would otherwise be ignored without a word, and a typo in
+    the authorizer's scopes or the network would deploy something other than was meant.
+
+    Raises:
+        CliError: If a name is not a deployment variable, or both spellings of one differ.
+    """
+    known = {variable.name for variable in AGENTCORE_VARIABLES}
+    values: dict[str, str] = {}
+    for name in source.names():
+        if not is_agentcore_variable(name):
+            continue
+        current = _current_spelling(name)
+        if current not in known:
+            close = difflib.get_close_matches(current, sorted(known), n=1)
+            raise CliError(
+                f"{name} in {where} is not a deployment variable",
+                expected="one of the variables listed in docs/agentcore-trial.md",
+                actual=name,
+                fix=f"did you mean {close[0]}?" if close else f"remove {name} from {where}",
+            )
+        value = source.get(name) or ""
+        if values.get(current, value) != value:
+            raise CliError(
+                f"{current} is set twice in {where}, with different values",
+                fix=f"keep only {current}",
+            )
+        values[current] = value
+    return MappingConfigSource(values)
 
 
 def strip_agentcore(environment: Iterable[tuple[str, str]]) -> tuple[tuple[str, str], ...]:
@@ -388,7 +445,7 @@ def _network_settings(
 
 
 def read_agentcore_settings(source: ConfigSource, where: str) -> AgentCoreSettings:
-    """Return the ``AGENTCORE_`` block of ``source``, each value checked.
+    """Return the AgentCore block of ``source``, each value checked.
 
     Args:
         source: The settings file.
@@ -397,6 +454,7 @@ def read_agentcore_settings(source: ConfigSource, where: str) -> AgentCoreSettin
     Raises:
         CliError: If a value is not valid; the message names the variable.
     """
+    source = _in_current_spelling(source, where)
     auth = _choice(source, V_AUTH, where, AUTH_MODES, "iam")
     discovery_url, clients, audience = _jwt_settings(source, where, auth)
     network, subnets, groups = _network_settings(source, where)
@@ -483,8 +541,8 @@ def _policy_problems(config: ServiceConfig, where: str) -> list[str]:
     return [
         "policy opa decides on the loopback address, where its sidecar would run; nothing runs "
         "beside a container on AgentCore Runtime. Point url in "
-        f"{variable_for(options_key(Section.POLICY))} at an OPA the runtime can reach, or set "
-        f"{variable_for(provider_key(Section.POLICY))}=rules in {where}"
+        f"{variable_for(options_key(Section.POLICY))} in {where} at an OPA the runtime can "
+        "reach over https; the in-process rules engine is for a developer's machine only"
     ]
 
 
@@ -542,7 +600,7 @@ def agentcore_preflight(
     Args:
         target: The service.
         config: Its settings, resolved.
-        settings: The ``AGENTCORE_`` block.
+        settings: The AgentCore block.
         requires_python: The service's ``requires-python``, when it has one.
 
     Returns:

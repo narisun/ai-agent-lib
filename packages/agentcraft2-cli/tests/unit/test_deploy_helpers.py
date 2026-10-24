@@ -26,6 +26,7 @@ from agentcraft2_cli.deploy import (
     starter_settings,
     write_deployment,
 )
+from agentcraft2_cli.deploy.agentcore import is_agentcore_variable
 from agentcraft2_cli.deploy.hcl import permissions_tf, settings_tf
 from agentcraft2_cli.deploy.plan import missing_dependencies
 from agentcraft2_cli.errors import CliError
@@ -544,14 +545,14 @@ def test_agentcore_starter_settings_select_ambient_telemetry_and_a_created_memor
     assert "AC2_TELEMETRY=ambient\n" in text
     assert "AC2_CHECKPOINT_PROVIDER=agentcore_memory\n" in text
     assert 'AC2_CHECKPOINT_OPTIONS={"memory_id": "created_by_terraform"}\n' in text
-    assert "AGENTCORE_MEMORY=create\n" in text
+    assert "AC2_AGENTCORE_MEMORY=create\n" in text
     assert "rds.amazonaws.com" not in text
     assert "AC2_SECRET_" not in text
-    assert text.index("AC2_GUARDRAILS_OPTIONS") < text.index("AGENTCORE_AUTH=iam")
+    assert text.index("AC2_GUARDRAILS_OPTIONS") < text.index("AC2_AGENTCORE_AUTH=iam")
 
     server = starter_settings(SERVER_ON_AGENTCORE)
     assert "AC2_CHECKPOINT_PROVIDER=none\n" in server
-    assert "AGENTCORE_MEMORY=none\n" in server
+    assert "AC2_AGENTCORE_MEMORY=none\n" in server
     assert "AC2_MODEL_ID" not in server
     # The Fargate starter is as it was.
     assert "AGENTCORE_" not in starter_settings(AGENT)
@@ -580,16 +581,16 @@ def test_read_agentcore_settings_splits_lists_and_recognises_existing_resources(
     gateway = "arn:aws:bedrock-agentcore:eu-west-1:123456789012:gateway/abc-123"
     source = MappingConfigSource(
         {
-            "AGENTCORE_AUTH": "jwt",
-            "AGENTCORE_DISCOVERY_URL": "https://issuer.example/.well-known/openid-configuration",
-            "AGENTCORE_ALLOWED_CLIENTS": " a , b,,",
-            "AGENTCORE_ALLOWED_SCOPES": "read",
-            "AGENTCORE_NETWORK": "VPC",
-            "AGENTCORE_SUBNETS": "subnet-1",
-            "AGENTCORE_SECURITY_GROUPS": "sg-1,sg-2",
-            "AGENTCORE_IDLE_TIMEOUT_SECONDS": "120",
-            "AGENTCORE_GATEWAY": gateway,
-            "AGENTCORE_MEMORY": "helper_mem-0123456789",
+            "AC2_AGENTCORE_AUTH": "jwt",
+            "AC2_AGENTCORE_DISCOVERY_URL": "https://issuer.example/.well-known/openid-configuration",
+            "AC2_AGENTCORE_ALLOWED_CLIENTS": " a , b,,",
+            "AC2_AGENTCORE_ALLOWED_SCOPES": "read",
+            "AC2_AGENTCORE_NETWORK": "VPC",
+            "AC2_AGENTCORE_SUBNETS": "subnet-1",
+            "AC2_AGENTCORE_SECURITY_GROUPS": "sg-1,sg-2",
+            "AC2_AGENTCORE_IDLE_TIMEOUT_SECONDS": "120",
+            "AC2_AGENTCORE_GATEWAY": gateway,
+            "AC2_AGENTCORE_MEMORY": "helper_mem-0123456789",
         }
     )
     settings = read_agentcore_settings(source, "deploy.env")
@@ -610,6 +611,8 @@ def _resolved(**overrides: str) -> ServiceConfig:
         for line in starter_settings(AGENT_ON_AGENTCORE).splitlines()
         if line and not line.startswith("#")
     )
+    # The service's configuration never sees the deployment's own variables.
+    values = {name: v for name, v in values.items() if not is_agentcore_variable(name)}
     values.update(overrides)
     return ConfigResolver(MappingConfigSource(values)).resolve()
 
@@ -646,4 +649,4 @@ def test_agentcore_preflight_passes_the_starting_settings_with_one_warning() -> 
     )
     assert problems == []
     assert len(warnings) == 1
-    assert warnings[0].startswith("AGENTCORE_MEMORY=create: Terraform creates the memory")
+    assert warnings[0].startswith("AC2_AGENTCORE_MEMORY=create: Terraform creates the memory")
