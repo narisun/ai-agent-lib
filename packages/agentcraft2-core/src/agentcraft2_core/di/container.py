@@ -616,6 +616,9 @@ class ServiceContainer:
                 bindings=self._bindings,
                 connector_factory=self._providers.mcp_connector_factory,
                 connector_context=self._connector_context,
+                token_dir=(
+                    self.config.state_dir / "tokens" if self.config.state_dir is not None else None
+                ),
             )
         return self._mcp
 

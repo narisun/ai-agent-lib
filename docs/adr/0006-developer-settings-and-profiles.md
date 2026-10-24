@@ -5,8 +5,8 @@ layer; MCP calls follow the standard proxy and CA variables; the AgentCore image
 installs ADOT from the lock; the `agentcore` profile; an explicit deployment
 environment on the server profiles; adapters that name their profile; no
 `allow_http` or production content capture on a deployed service; the
-`AC2_AGENTCORE_*` deployment variables. Not yet: the project home, the
-developer settings file, the token file for remote MCP.
+`AC2_AGENTCORE_*` deployment variables; the project home; the token file for
+remote MCP. Not yet: the developer settings file.
 
 ## Context
 
@@ -151,15 +151,16 @@ The configuration surface does not separate who owns what.
    - The developer's own sign-in tooling writes the file: a short-lived token
      for the development client application of the calling agent, with the
      server's audience. The SDK reads it on every call, sends it only to that
-     server and only over https, and never logs it. The folder is created
-     owner-only on systems that support it.
+     server and only over https, and never logs it. The SDK only reads the
+     file; the tool that writes it should keep it readable by its owner alone.
    - The server sees the real developer and the registered agent, so nothing
      changes on the server: the same checks as in production run. The local
      agent's own policy still uses the local persona; the server applies the
      developer's real roles.
-   - Plain http is allowed only to loopback, even in `local`. Remote servers
-     need schema pins even in `local`, so a changed tool description cannot
-     reach the model unnoticed.
+   - Plain http is allowed only to loopback, even in `local`. Schema pins stay
+     required outside `local` only: they fingerprint the input schema, not the
+     description the model reads, so requiring them here would promise more than
+     they give. Pinning descriptions too is a separate change.
    - Production servers must refuse tokens of the development client by issuer
      or audience. That is infrastructure and is documented, not code.
    - A built-in `agentcraft2 login` that writes the file with the device-code

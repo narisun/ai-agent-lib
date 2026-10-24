@@ -637,9 +637,16 @@ async def test_a_deployed_agent_sends_tokens_only_over_tls(url: str, allowed: bo
             with pytest.raises(ConfigurationError, match="must use https"):
                 await world.agent_services.mcp_tools("accounts")
             assert world.connector.connections == []
-    # On a developer's machine any registered address may be used.
+    # On a developer's machine too, a server that runs elsewhere is reached over TLS; plain
+    # http is for the servers on this machine. The development identity's token would be
+    # refused there, so it asks for the developer's own (see test_remote_mcp_token_file.py).
     async with World(server_entry=entry) as world:
-        assert len(await world.agent_services.mcp_tools("accounts")) == 1
+        if url.startswith("http://localhost"):
+            assert len(await world.agent_services.mcp_tools("accounts")) == 1
+        else:
+            expected = "runs elsewhere" if allowed else "must use https"
+            with pytest.raises(ConfigurationError, match=expected):
+                await world.agent_services.mcp_tools("accounts")
 
 
 async def test_the_servers_span_joins_the_agents_trace(monkeypatch: pytest.MonkeyPatch) -> None:

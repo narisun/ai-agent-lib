@@ -30,6 +30,7 @@ from agentcraft2_core.config.bindings import (
     secret_name,
     validate_bindings,
 )
+from agentcraft2_core.config.home import STATE_FOLDER
 from agentcraft2_core.config.phoenix import PHOENIX_VARIABLES
 from agentcraft2_core.config.profiles import PROFILE_DEFAULTS, ProfileDefaults
 from agentcraft2_core.contracts import (
@@ -188,6 +189,7 @@ class ConfigResolver:
                 no_proxy=values.get(Key.NO_PROXY),
             ),
             data_sources=self._data_sources(values),
+            state_dir=(self._base_dir or Path.cwd()) / STATE_FOLDER,
             model_trace_path=(
                 self._path(values, Key.MODEL_TRACE_PATH)
                 if values.get(Key.MODEL_TRACE_PATH, "").strip()

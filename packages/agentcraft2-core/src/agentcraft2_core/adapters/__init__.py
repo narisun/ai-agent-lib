@@ -35,6 +35,7 @@ from agentcraft2_core.adapters.secrets_env import EnvSecretsProvider
 from agentcraft2_core.adapters.system import SystemClock, UuidGenerator
 from agentcraft2_core.adapters.telemetry import NullTelemetry, OpenTelemetryTelemetry
 from agentcraft2_core.adapters.token_exchange import OAuthTokenExchanger
+from agentcraft2_core.adapters.token_file import TokenFileExchanger
 
 __all__ = [
     "AnthropicChatModelProvider",
@@ -72,6 +73,7 @@ __all__ = [
     "StaticIdentityVerifier",
     "SystemClock",
     "TokenExchangeOptions",
+    "TokenFileExchanger",
     "UuidGenerator",
     "resolve_jwt_options",
 ]

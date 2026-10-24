@@ -463,6 +463,10 @@ class ServiceConfig:
             section.
         model_trace_path: Optional JSONL destination for diagnostic model messages.
             Unset by default. Contains conversation content; use with test data.
+        state_dir: Where the service keeps what it writes while it runs, such as the
+            tokens a developer leaves for the servers that run elsewhere: the project
+            home's, or the folder of the service's own ``.env``. ``None`` when the
+            configuration was not read from files, as in a test.
     """
 
     profile: Profile = Profile.LOCAL
@@ -478,6 +482,7 @@ class ServiceConfig:
     external: ExternalSettings = field(default_factory=ExternalSettings)
     data_sources: Mapping[str, ProviderSelection] = field(default_factory=dict)
     model_trace_path: Path | None = None
+    state_dir: Path | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "profile", Profile(self.profile))
