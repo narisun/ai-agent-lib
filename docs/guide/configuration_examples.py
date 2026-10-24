@@ -260,6 +260,12 @@ def configuration_examples() -> dict[str, EnvironmentExample]:
             "AWS SDK CA setting. `AC2_TLS_CA_BUNDLE` takes precedence for Bedrock clients. "
             "Neither setting configures pip or the checkpoint database.",
         ),
+        Key.SSL_CERT_FILE: EnvironmentExample(
+            "Team CA file when the network inspects TLS",
+            "Unset with standard trust; otherwise an image path",
+            "The standard OpenSSL and Python CA setting. The calls to MCP servers verify against "
+            "it, and the Anthropic client reads it itself. AWS clients use `AWS_CA_BUNDLE`.",
+        ),
         Key.AWS_EXECUTION_ENV: EnvironmentExample(
             "Unset",
             "Set by AWS, e.g. `AWS_ECS_FARGATE`",

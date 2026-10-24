@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import ssl
 from pathlib import Path
+from typing import Any
 
 import httpx
 
 from agentcraft2_core.contracts import ConfigurationError
 
-__all__ = ["checked_base_url", "tls_verification"]
+__all__ = ["checked_base_url", "proxied_client_options", "tls_verification"]
 
 _LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 _ALLOW_HTTP_HINT = "set allow_http to use plain http inside a private network"
@@ -47,6 +48,36 @@ def checked_base_url(
     if url.scheme == "http" and url.host not in _LOCAL_HOSTS and not allow_http:
         raise ConfigurationError(f"{what}: the URL must use https; {hint}")
     return str(url).rstrip("/")
+
+
+def proxied_client_options(proxy: str | None, no_proxy: str | None) -> dict[str, Any]:
+    """Return the HTTP client arguments that send calls through ``proxy``, with exceptions.
+
+    This machine, and every host on ``no_proxy``, is reached directly, which is
+    what the standard ``NO_PROXY`` variable means to other tools: a host name
+    covers its subdomains, a leading dot or ``*.`` is accepted, and ``*`` turns
+    the proxy off for everything.
+
+    Args:
+        proxy: The outbound proxy, or ``None`` for none.
+        no_proxy: The comma-separated hosts that bypass it.
+
+    Returns:
+        Keyword arguments for ``httpx.AsyncClient``; empty without a proxy.
+    """
+    if proxy is None:
+        return {}
+    direct: dict[str, None] = {
+        f"all://{host}": None for host in ("localhost", "127.0.0.1", "[::1]")
+    }
+    for entry in (item.strip().lower() for item in (no_proxy or "").split(",")):
+        host = entry.lstrip("*").lstrip(".")
+        if entry == "*":
+            direct["all://"] = None
+        elif host:
+            direct[f"all://{host}"] = None
+            direct[f"all://*.{host}"] = None
+    return {"proxy": proxy, "mounts": direct}
 
 
 def tls_verification(what: str, ca_file: Path | None) -> ssl.SSLContext | bool:

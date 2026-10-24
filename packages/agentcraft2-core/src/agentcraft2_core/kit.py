@@ -13,7 +13,11 @@ both use the same catalog and compiler.
 """
 
 from agentcraft2_core.adapters.guardrails_patterns import GuardrailsOptions
-from agentcraft2_core.adapters.http_support import checked_base_url, tls_verification
+from agentcraft2_core.adapters.http_support import (
+    checked_base_url,
+    proxied_client_options,
+    tls_verification,
+)
 from agentcraft2_core.adapters.obligations import (
     check_filter_columns,
     effective_row_cap,
@@ -106,6 +110,7 @@ __all__ = [
     "parse_agents_document",
     "parse_document_text",
     "parse_tools_document",
+    "proxied_client_options",
     "tls_verification",
     "tools_document",
 ]

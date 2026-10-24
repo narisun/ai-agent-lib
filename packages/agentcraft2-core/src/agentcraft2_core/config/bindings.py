@@ -69,6 +69,7 @@ class Key(enum.StrEnum):
     AWS_PROFILE = "external.aws_profile"
     AWS_REGION = "external.aws_region"
     AWS_CA_BUNDLE = "external.aws_ca_bundle"
+    SSL_CERT_FILE = "external.ssl_cert_file"
     AWS_EXECUTION_ENV = "external.aws_execution_env"
     HTTPS_PROXY = "external.https_proxy"
     NO_PROXY = "external.no_proxy"
@@ -430,6 +431,16 @@ def _owned_and_external_bindings() -> tuple[Binding, ...]:
             details=("The AWS SDK's own CA setting, honoured as boto3 does."),
         ),
         Binding(
+            name="SSL_CERT_FILE",
+            key=Key.SSL_CERT_FILE,
+            description="CA file for HTTPS calls that are not to AWS.",
+            details=(
+                "The standard CA setting of OpenSSL and Python. The calls to MCP servers verify "
+                "certificates against it, for networks that inspect TLS. The Anthropic client "
+                "reads the same variable itself."
+            ),
+        ),
+        Binding(
             name="AWS_EXECUTION_ENV",
             key=Key.AWS_EXECUTION_ENV,
             description=(
@@ -448,9 +459,10 @@ def _owned_and_external_bindings() -> tuple[Binding, ...]:
             sensitive=True,
             alternate_names=("https_proxy",),
             details=(
-                "Outbound proxy. The AWS clients and the anthropic model use it; the jwt identity "
-                "provider and rest data sources use it only when their `use_proxy` option is set. "
-                "Masked wherever it is shown, since it can carry credentials."
+                "Outbound proxy. The AWS clients, the anthropic model and the calls to MCP servers "
+                "use it; the jwt identity provider and rest data sources use it only when their "
+                "`use_proxy` option is set. Masked wherever it is shown, since it can carry "
+                "credentials."
             ),
         ),
         Binding(
@@ -458,7 +470,10 @@ def _owned_and_external_bindings() -> tuple[Binding, ...]:
             key=Key.NO_PROXY,
             description="Hosts that bypass the proxy.",
             alternate_names=("no_proxy",),
-            details=("Comma-separated hosts the AWS clients reach without the proxy."),
+            details=(
+                "Comma-separated hosts the AWS clients and the MCP calls reach without the proxy. "
+                "A host name covers its subdomains. This machine is always reached directly."
+            ),
         ),
         Binding(
             name="ANTHROPIC_API_KEY",

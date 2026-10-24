@@ -16,6 +16,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Callable, Generator, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from contextvars import ContextVar
+from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 import httpx2
@@ -29,6 +30,7 @@ from mcp_types import Tool
 from opentelemetry import propagate
 from pydantic import PrivateAttr, SecretStr
 
+from agentcraft2_core.adapters.http_support import proxied_client_options, tls_verification
 from agentcraft2_core.contracts import (
     AgentCraft2Error,
     IntegrityError,
@@ -163,13 +165,24 @@ class HttpMcpConnector:
     Args:
         timeout_seconds: How long one HTTP exchange may take; ``None`` for no
             limit. The composition root passes the configured tool call limit.
+        proxy: The outbound proxy, as ``HTTPS_PROXY`` sets it. This machine and
+            the hosts on ``no_proxy`` are reached directly.
+        no_proxy: The hosts that bypass the proxy, as ``NO_PROXY`` lists them.
+        ca_file: The CA file that verifies the servers' certificates, as
+            ``SSL_CERT_FILE`` names it; by default the system's.
         transport: The HTTP transport, for a test; by default the real one.
+
+    Raises:
+        ConfigurationError: If ``ca_file`` cannot be read as a CA file.
     """
 
     def __init__(
         self,
         *,
         timeout_seconds: float | None,
+        proxy: str | None = None,
+        no_proxy: str | None = None,
+        ca_file: Path | None = None,
         transport: httpx2.AsyncBaseTransport | None = None,
     ) -> None:
         self._timeout_seconds = timeout_seconds
@@ -181,7 +194,9 @@ class HttpMcpConnector:
             follow_redirects=False,
             # The environment is read by the configuration layer only.
             trust_env=False,
+            verify=tls_verification("the MCP servers", ca_file),
             transport=transport,
+            **proxied_client_options(proxy, no_proxy),
         )
 
     @property

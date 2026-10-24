@@ -171,6 +171,7 @@ class ConfigResolver:
                 aws_profile=values.get(Key.AWS_PROFILE),
                 aws_region=values.get(Key.AWS_REGION),
                 aws_ca_bundle=self._path(values, Key.AWS_CA_BUNDLE),
+                ssl_cert_file=self._path(values, Key.SSL_CERT_FILE),
                 https_proxy=values.get(Key.HTTPS_PROXY),
                 no_proxy=values.get(Key.NO_PROXY),
             ),

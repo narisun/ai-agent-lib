@@ -418,6 +418,8 @@ class ExternalSettings:
         aws_profile: The AWS named profile, for example one signed in through SSO.
         aws_region: The AWS region.
         aws_ca_bundle: A CA file for AWS clients.
+        ssl_cert_file: A CA file for HTTPS calls that are not to AWS, such as
+            the calls to MCP servers.
         https_proxy: The outbound proxy. Hidden from ``repr`` because proxy URLs
             can carry credentials.
         no_proxy: Hosts that bypass the proxy.
@@ -426,6 +428,7 @@ class ExternalSettings:
     aws_profile: str | None = None
     aws_region: str | None = None
     aws_ca_bundle: Path | None = None
+    ssl_cert_file: Path | None = None
     https_proxy: str | None = field(default=None, repr=False)
     no_proxy: str | None = None
 

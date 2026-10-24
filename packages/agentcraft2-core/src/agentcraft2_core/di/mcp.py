@@ -122,7 +122,14 @@ class McpBindings:
         # Imported here so that an agent which uses no MCP server does not load the SDK.
         from agentcraft2_core.integrations.mcp.client import HttpMcpConnector
 
-        return HttpMcpConnector(timeout_seconds=self.operations.limits.tool.timeout_seconds)
+        # The standard proxy and CA variables apply to the servers too, as they do to the model.
+        external = self.connector_context().external if self.connector_context is not None else None
+        return HttpMcpConnector(
+            timeout_seconds=self.operations.limits.tool.timeout_seconds,
+            proxy=external.https_proxy if external is not None else None,
+            no_proxy=external.no_proxy if external is not None else None,
+            ca_file=external.ssl_cert_file if external is not None else None,
+        )
 
     def _registered_connector(self, kind: str) -> McpConnector:
         factory = self.connector_factory(kind)

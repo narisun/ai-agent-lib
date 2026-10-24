@@ -142,7 +142,11 @@ def _agentcore_connector_factory(
 
     def build(context: ConnectorContext) -> AgentCoreMcpConnector:
         return _agentcore_mcp_connector()(
-            shared.get(context), timeout_seconds=context.timeout_seconds
+            shared.get(context),
+            timeout_seconds=context.timeout_seconds,
+            proxy=context.external.https_proxy,
+            no_proxy=context.external.no_proxy,
+            ca_file=context.external.aws_ca_bundle,
         )
 
     return build

@@ -61,9 +61,10 @@ These keep their own names. The library reads them and never renames them.
 | `AWS_PROFILE` | AWS named profile, for example one signed in through SSO.<br>Read by the AWS session for local runs, for example after `aws sso login`. | not set |  |
 | `AWS_REGION` | AWS region.<br>Region of every AWS client the library builds. | not set | also read from `AWS_DEFAULT_REGION` |
 | `AWS_CA_BUNDLE` | CA file for AWS clients.<br>The AWS SDK's own CA setting, honoured as boto3 does. | not set |  |
+| `SSL_CERT_FILE` | CA file for HTTPS calls that are not to AWS.<br>The standard CA setting of OpenSSL and Python. The calls to MCP servers verify certificates against it, for networks that inspect TLS. The Anthropic client reads the same variable itself. | not set |  |
 | `AWS_EXECUTION_ENV` | Set by AWS inside ECS, Fargate and Lambda. A process that has it must name its deployment environment as dev or prod.<br>Set by AWS on its managed runtimes. Its presence with `AC2_DEPLOYMENT_ENV=local` stops startup, so a container never runs with development adapters by accident. | not set |  |
-| `HTTPS_PROXY` | Outbound proxy.<br>Outbound proxy. The AWS clients and the anthropic model use it; the jwt identity provider and rest data sources use it only when their `use_proxy` option is set. Masked wherever it is shown, since it can carry credentials. | not set | sensitive; also read from `https_proxy` |
-| `NO_PROXY` | Hosts that bypass the proxy.<br>Comma-separated hosts the AWS clients reach without the proxy. | not set | also read from `no_proxy` |
+| `HTTPS_PROXY` | Outbound proxy.<br>Outbound proxy. The AWS clients, the anthropic model and the calls to MCP servers use it; the jwt identity provider and rest data sources use it only when their `use_proxy` option is set. Masked wherever it is shown, since it can carry credentials. | not set | sensitive; also read from `https_proxy` |
+| `NO_PROXY` | Hosts that bypass the proxy.<br>Comma-separated hosts the AWS clients and the MCP calls reach without the proxy. A host name covers its subdomains. This machine is always reached directly. | not set | also read from `no_proxy` |
 | `ANTHROPIC_API_KEY` | API key for the anthropic model provider.<br>Supplies the secret `anthropic_api_key`, which the anthropic model provider asks the secrets port for. Masked wherever it is shown. | not set | sensitive |
 
 ## Optional Phoenix integration
