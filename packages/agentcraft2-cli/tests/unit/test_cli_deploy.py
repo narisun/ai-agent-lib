@@ -866,8 +866,12 @@ def test_agentcore_writes_a_root_module_alone_and_an_arm64_image_per_kind(
         'CMD ["opentelemetry-instrument", "python", "-m", "helper.service", '
         '"--profile", "agentcore"]' in dockerfile
     )
-    assert '"aws-opentelemetry-distro>=0.18.0"' in dockerfile
+    # ADOT comes from the hash-locked requirements, never from an install of its own.
+    assert 'pip install --no-cache-dir "aws-opentelemetry-distro' not in dockerfile
+    assert "command -v opentelemetry-instrument" in dockerfile
     assert "--require-hashes" in dockerfile
+    wanted = (agentcore_ready / "deploy/helper/requirements.in").read_text(encoding="utf-8")
+    assert "aws-opentelemetry-distro>=0.18.0" in wanted.splitlines()
     assert "USER 10001" in dockerfile
     rules = (agentcore_ready / "deploy/helper/Dockerfile.dockerignore").read_text(encoding="utf-8")
     assert rules.splitlines()[1] == "**"

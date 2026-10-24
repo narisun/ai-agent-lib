@@ -508,6 +508,7 @@ def test_agentcore_deployment_files_are_one_root_module_with_the_artifacts_files
         "deploy/helper/main.tf",
         "deploy/helper/outputs.tf",
         "deploy/helper/permissions.tf",
+        "deploy/helper/requirements.in",
         "deploy/helper/settings.tf",
         "deploy/helper/terraform.tfvars.example",
         "deploy/helper/variables.tf",

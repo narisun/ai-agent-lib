@@ -28,6 +28,7 @@ from agentcraft2_core.config import (
 from agentcraft2_core.contracts import ConfigSource, Section, ServiceConfig, TelemetryMode
 
 __all__ = [
+    "ADOT_REQUIREMENT",
     "AGENTCORE_PREFIX",
     "AGENTCORE_PYTHON",
     "AGENTCORE_VARIABLES",
@@ -44,6 +45,13 @@ AGENTCORE_PREFIX = "AGENTCORE_"
 
 AGENTCORE_PYTHON = "3.13"
 """The Python the runtime offers to a code artifact, and the version the image is built with."""
+
+ADOT_REQUIREMENT = "aws-opentelemetry-distro>=0.18.0"
+"""The distribution whose ``opentelemetry-instrument`` the runtime's entry point runs.
+
+It is locked with the service's own requirements, from ``requirements.in``, so that
+it is installed from hashes like everything else and cannot replace a locked package.
+"""
 
 AUTH_MODES = ("iam", "jwt")
 NETWORK_MODES = ("PUBLIC", "VPC")

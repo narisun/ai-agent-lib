@@ -66,13 +66,14 @@ workspace root on a Linux host, using bash:
 python{{ python }} -m venv .venv-release
 PYTHON="$PWD/.venv-release/bin/python"
 "$PYTHON" -m pip install pip-tools
-"$PYTHON" -m piptools compile --generate-hashes --output-file=deploy/{{ name }}/requirements.lock {{ folder }}/pyproject.toml
+"$PYTHON" -m piptools compile --generate-hashes --output-file=deploy/{{ name }}/requirements.lock {{ folder }}/pyproject.toml deploy/{{ name }}/requirements.in
 ```
 
 **Expected result:** `deploy/{{ name }}/requirements.lock` contains pinned
-dependencies and hashes. Review and commit it. The image and the zip install
-`aws-opentelemetry-distro` beside it: the runtime starts the service under its
-`opentelemetry-instrument`.
+dependencies and hashes, including `aws-opentelemetry-distro` from
+`deploy/{{ name }}/requirements.in`: the runtime starts the service under its
+`opentelemetry-instrument`. Review and commit both files. The image and the zip
+refuse a lock that lacks it.
 
 ## 3. Build the artifact
 

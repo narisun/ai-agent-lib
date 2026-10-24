@@ -23,7 +23,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from agentcraft2_cli.deploy.agentcore import AGENTCORE_PYTHON
+from agentcraft2_cli.deploy.agentcore import ADOT_REQUIREMENT, AGENTCORE_PYTHON
 from agentcraft2_cli.errors import CliError
 
 __all__ = ["Runner", "ZipBuild", "build_zip", "main", "run_command", "shim", "upload_zip"]
@@ -33,9 +33,6 @@ Runner = Callable[[Sequence[str]], None]
 
 PLATFORM = "manylinux2014_aarch64"
 """The wheel platform AgentCore Runtime runs: ARM64 Linux."""
-
-ADOT = "aws-opentelemetry-distro>=0.18.0"
-"""The distribution whose ``opentelemetry-instrument`` the runtime's entry point runs."""
 
 FILE_MODE = 0o644
 DIRECTORY_MODE = 0o755
@@ -163,8 +160,16 @@ def build_zip(build: ZipBuild, run: Runner = run_command, python: str = sys.exec
     site.mkdir(parents=True)
     foreign = _foreign(site, build)
     run(_pip(python, "install", *foreign, "--require-hashes", "-r", str(build.lock)))
-    # The entry point runs the service under ADOT, whatever the telemetry setting.
-    run(_pip(python, "install", *foreign, "--upgrade", ADOT))
+    # The entry point runs the service under ADOT, whatever the telemetry setting, so the
+    # lock must hold it: installed from hashes with the rest, it cannot replace a locked package.
+    if not (site / "bin" / "opentelemetry-instrument").is_file():
+        raise CliError(
+            f"the requirements lock does not install opentelemetry-instrument ({ADOT_REQUIREMENT})",
+            fix=(
+                "compile the lock with the service's pyproject.toml and the requirements.in "
+                "beside it (the README, step 2), then build again"
+            ),
+        )
     # The service itself: pure Python, so this Python builds it; its dependencies are above.
     run(
         _pip(python, "install", "--target", str(site), "--upgrade", "--no-deps", str(build.service))
