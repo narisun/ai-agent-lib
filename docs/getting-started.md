@@ -330,6 +330,8 @@ Check these entries and keep the file's other generated settings.
 
 - `AC2_PROFILE` chooses defaults: `local`, `aws` or `agentcore` (a service on Bedrock
   AgentCore Runtime).
+- `AC2_HOME` (optional) names the one folder that holds the project's `.env`, registries, rules,
+  data and the state under `.agentcraft2/`. Set it in the shell, not in a `.env`.
 - `AC2_DEPLOYMENT_ENV` says where this process runs: `local`, `dev`, or `prod`.
   Non-local environments reject development-only adapters. With the `aws` or
   `agentcore` profile it has no default and must be set.

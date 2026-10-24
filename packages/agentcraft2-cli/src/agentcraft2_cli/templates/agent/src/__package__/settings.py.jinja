@@ -4,10 +4,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-__all__ = ["ENV_FILE"]
+from agentcraft2_core.config import state_dir
+
+__all__ = ["ENV_FILE", "STATE_DIR"]
 
 ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 """The service's ``.env`` file, beside ``pyproject.toml``.
 
 A deployed service has no such file and is configured by its environment.
 """
+
+STATE_DIR = state_dir(ENV_FILE.parent)
+"""Where the service keeps what it writes while it runs: the project home's, if one is set."""

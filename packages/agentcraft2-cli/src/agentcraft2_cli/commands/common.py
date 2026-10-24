@@ -16,6 +16,7 @@ from agentcraft2_cli.workspace import (
     WorkspaceAnswers,
     find_workspace,
 )
+from agentcraft2_core.config import project_home
 
 __all__ = [
     "library_source",
@@ -67,8 +68,12 @@ def library_source(path: Path | None, version: str | None) -> LibrarySource:
 
 
 def workspace_root(workspace: Path | None) -> Path:
-    """Return the root of the workspace a command works on."""
-    return find_workspace(workspace or Path.cwd())
+    """Return the root of the workspace a command works on.
+
+    ``--workspace`` wins. Then the project home, when the environment names one, so a
+    command works on the project from any folder. Otherwise the working directory.
+    """
+    return find_workspace(workspace or project_home() or Path.cwd())
 
 
 def port_of(

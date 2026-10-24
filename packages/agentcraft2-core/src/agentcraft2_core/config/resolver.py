@@ -95,9 +95,11 @@ class ConfigResolver:
         source: Where raw values come from.
         bindings: The variable table. Defaults to the library's own table.
         profile_defaults: The adapters each profile selects by default.
-        base_dir: The folder a relative path in a value is relative to,
-            normally the folder of the ``.env`` file. Without it a relative
-            path is relative to the working directory.
+        base_dir: The folder a relative path is relative to when its source does
+            not say, normally the project home or the folder of the ``.env`` file.
+            Without it a relative path is relative to the working directory. A
+            source that knows where a value was written, such as a ``.env`` file,
+            says so through ``base_dir_for``, and that folder is used for that value.
     """
 
     def __init__(
@@ -111,6 +113,8 @@ class ConfigResolver:
         validate_bindings(bindings)
         self._source = source
         self._base_dir = base_dir
+        # Where each value was written, by key: set by ``_read`` for each ``explain``.
+        self._bases: dict[str, Path | None] = {}
         self._bindings = tuple(bindings)
         self._by_key = {binding.key: binding for binding in self._bindings}
         # Secrets that a tool names itself, such as ANTHROPIC_API_KEY: the standard name is used.
@@ -159,7 +163,7 @@ class ConfigResolver:
             sections[section] = ProviderSelection(
                 provider=values.get(selector, defaults.sections[section]),
                 options=self._json_object(values, options_key(section)),
-                base_dir=self._base_dir,
+                base_dir=self._base(options_key(section)),
             )
 
         config = ServiceConfig(
@@ -274,6 +278,7 @@ class ConfigResolver:
         values: dict[str, str] = {}
         origins: dict[str, str] = {}
         notes: list[str] = []
+        self._bases = {}
         for binding in self._bindings:
             found: tuple[str, str] | None = None
             for name in (binding.name, *binding.alternate_names):
@@ -297,6 +302,7 @@ class ConfigResolver:
             if found is not None:
                 origins[binding.key] = f"variable {found[0]}"
                 values[binding.key] = found[1]
+                self._bases[binding.key] = self._written_in(found[0])
         self._read_named_secrets(values, origins, notes)
         return values, origins, notes
 
@@ -433,13 +439,24 @@ class ConfigResolver:
                 fix=f"set {self._name(key)}={close[0] if close else next(iter(kind)).value}",
             ) from None
 
+    def _written_in(self, variable: str) -> Path | None:
+        """Return the folder the value of ``variable`` was written in, when the source knows."""
+        finder = getattr(self._source, "base_dir_for", None)
+        found = finder(variable) if callable(finder) else None
+        return found if isinstance(found, Path) else None
+
+    def _base(self, key: str) -> Path | None:
+        """Return the folder a relative path in the value of ``key`` is relative to."""
+        return self._bases.get(key) or self._base_dir
+
     def _path(self, values: Mapping[str, str], key: str) -> Path | None:
         raw = values.get(key)
         if raw is None:
             return None
         path = Path(raw).expanduser()
-        if self._base_dir is not None and not path.is_absolute():
-            return self._base_dir / path
+        base = self._base(key)
+        if base is not None and not path.is_absolute():
+            return base / path
         return path
 
     def _json(self, values: Mapping[str, str], key: str) -> Any:
@@ -541,7 +558,9 @@ class ConfigResolver:
             options = {key: value for key, value in spec.items() if key != _DATA_SOURCE_KIND}
             try:
                 sources[source] = ProviderSelection(
-                    provider=spec[_DATA_SOURCE_KIND], options=options, base_dir=self._base_dir
+                    provider=spec[_DATA_SOURCE_KIND],
+                    options=options,
+                    base_dir=self._base(Key.DATA_SOURCES),
                 )
             except (TypeError, ValueError) as exc:
                 raise ConfigurationError(

@@ -166,6 +166,13 @@ def _json(value: object) -> str:
 def configuration_examples() -> dict[str, EnvironmentExample]:
     """Return one example per configuration key, including every provider and options pair."""
     examples = {
+        Key.HOME: EnvironmentExample(
+            "Optional: the project's folder, e.g. `~/projects/accounts`",
+            "Unset: a deployment reads no `.env` and writes no state",
+            "Names the one folder that holds the project's `.env`, registries, rules, data and "
+            "the state under `.agentcraft2/`. Set it in the shell, not in a `.env`, which it "
+            "locates. A service's own `.env` keeps its paths relative to itself.",
+        ),
         Key.PROFILE: EnvironmentExample(
             "`local`",
             "`aws`",

@@ -17,9 +17,8 @@ from agentcraft2_core.observability import report_error
 from agentcraft2_core.pipeline import bind_request_context
 
 from {{ package }}.graph import APPLICATION, answer, build_graph
-from {{ package }}.settings import ENV_FILE
+from {{ package }}.settings import ENV_FILE, STATE_DIR
 
-SERVICE = ENV_FILE.parent
 QUESTIONS = (
     "My name is Ada. Could you use the greet tool to greet me?",
     "What is my name, and what did the greeting tool say? Use our conversation so far.",
@@ -80,7 +79,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--thread must not be empty")
     run_id = uuid4().hex
     thread_id = args.thread or f"anthropic-demo-{run_id}"
-    folder = SERVICE / ".agentcraft2" / "anthropic-demo" / run_id
+    folder = STATE_DIR / "anthropic-demo" / run_id
     trace_path = folder / "model-trace.jsonl"
     history_path = folder / "checkpoint-history.json"
     try:

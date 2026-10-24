@@ -25,14 +25,25 @@ __all__ = [
 
 
 class MappingConfigSource:
-    """A source backed by an in-memory mapping. Used directly in tests."""
+    """A source backed by an in-memory mapping. Used directly in tests.
 
-    def __init__(self, values: Mapping[str, str]) -> None:
+    Args:
+        values: The names and values.
+        base_dir: The folder a relative path in these values is relative to; ``None``
+            leaves that to the resolver's own.
+    """
+
+    def __init__(self, values: Mapping[str, str], *, base_dir: Path | None = None) -> None:
         self._values: Mapping[str, str] = MappingProxyType(dict(values))
+        self._base_dir = base_dir
 
     def get(self, name: str) -> str | None:
         """Return the raw value for ``name``, or ``None`` when it is not set."""
         return self._values.get(name)
+
+    def base_dir_for(self, name: str) -> Path | None:
+        """Return the folder a relative path in the value of ``name`` is relative to, if known."""
+        return self._base_dir if name in self._values else None
 
     def names(self) -> Iterable[str]:
         """Return every name the source holds."""
@@ -40,10 +51,14 @@ class MappingConfigSource:
 
 
 class EnvironConfigSource(MappingConfigSource):
-    """A snapshot of the process environment, taken at construction."""
+    """A snapshot of the process environment, taken at construction.
 
-    def __init__(self) -> None:
-        super().__init__(os.environ)
+    Args:
+        base_dir: The folder a relative path in these values is relative to.
+    """
+
+    def __init__(self, *, base_dir: Path | None = None) -> None:
+        super().__init__(os.environ, base_dir=base_dir)
 
 
 class DotenvConfigSource(MappingConfigSource):
@@ -67,7 +82,10 @@ class DotenvConfigSource(MappingConfigSource):
             parsed = dotenv_values(path, interpolate=False, encoding="utf-8")
         except (OSError, UnicodeDecodeError) as exc:
             raise ConfigurationError(f"configuration file cannot be read: {path}") from exc
-        super().__init__({name: value for name, value in parsed.items() if value is not None})
+        super().__init__(
+            {name: value for name, value in parsed.items() if value is not None},
+            base_dir=path.resolve().parent,
+        )
 
 
 class LayeredConfigSource:
@@ -92,10 +110,24 @@ class LayeredConfigSource:
 
     def get(self, name: str) -> str | None:
         """Return the value from the first layer that holds ``name``, ignoring blanks."""
+        layer = self._supplying(name)
+        return layer.get(name) if layer is not None else None
+
+    def base_dir_for(self, name: str) -> Path | None:
+        """Return the folder a relative path in the value of ``name`` is relative to, if known.
+
+        It is the folder of the layer that supplies the value: a path written in a service's
+        ``.env`` is relative to that file, whatever else is layered above or below it.
+        """
+        layer = self._supplying(name)
+        finder = getattr(layer, "base_dir_for", None)
+        return finder(name) if callable(finder) else None
+
+    def _supplying(self, name: str) -> ConfigSource | None:
         for layer in self._layers:
             value = layer.get(name)
             if value is not None and (self._blanks_count or value.strip()):
-                return value
+                return layer
         return None
 
     def names(self) -> Iterable[str]:

@@ -14,12 +14,12 @@ from agentcraft2_core.pipeline import bind_request_context
 from agentcraft2_core.testing import FakeChatModelProvider, Fakes, calls_tool
 
 from {{ package }}.graph import APPLICATION, answer, build_graph
-from {{ package }}.settings import ENV_FILE
+from {{ package }}.settings import STATE_DIR
 
 
 async def main() -> None:
     """Run two turns on one in-memory checkpoint thread and write their trace."""
-    trace_path = ENV_FILE.parent / ".agentcraft2/react-demo.jsonl"
+    trace_path = STATE_DIR / "react-demo.jsonl"
     config = ServiceConfig.for_testing(model_trace_path=trace_path)
     fakes = Fakes(
         model=FakeChatModelProvider(

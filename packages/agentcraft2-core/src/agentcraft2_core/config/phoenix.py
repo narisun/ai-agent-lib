@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 
 from agentcraft2_core.config.bindings import PREFIX, legacy_spelling
 from agentcraft2_core.config.deprecations import log_deprecation
+from agentcraft2_core.config.home import project_home
 from agentcraft2_core.config.sources import (
     DotenvConfigSource,
     EnvironConfigSource,
@@ -177,8 +178,9 @@ def resolve_phoenix_settings(
         enabled, env_file = PHOENIX_LABELS["enabled"], PHOENIX_LABELS["env_file"]
         if (_value(from_process, enabled) or "").lower() != "false":
             extra = _value(from_process, env_file)
-            if extra and working_dir is not None:
-                extra = str(working_dir / extra)
+            anchor = working_dir if working_dir is not None else project_home()
+            if extra and anchor is not None:
+                extra = str(anchor / extra)
             if not extra and (extra := _value([("service settings", service)], env_file)):
                 extra = str((dotenv_path.parent if dotenv_path else Path.cwd()) / extra)
             if extra:

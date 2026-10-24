@@ -18,7 +18,7 @@ from agentcraft2_core.integrations.http import (
 from agentcraft2_core.integrations.langgraph import AgentTracing
 
 from {{ package }}.graph import APPLICATION, answer, build_graph, steps
-from {{ package }}.settings import ENV_FILE
+from {{ package }}.settings import ENV_FILE, STATE_DIR
 
 __all__ = ["SERVICE", "build_app", "main"]
 
@@ -45,7 +45,7 @@ async def _stream(
 def _outcomes(config: ServiceConfig) -> OutcomeJournal | None:
     # Local-only: a deployed service gets no durable journal from this library.
     if config.deployment_env == "local":
-        return SqliteOutcomeJournal(ENV_FILE.parent / ".agentcraft2" / "outcomes.sqlite")
+        return SqliteOutcomeJournal(STATE_DIR / "outcomes.sqlite")
     return None
 
 

@@ -55,6 +55,7 @@ class ValueKind(enum.Enum):
 class Key(enum.StrEnum):
     """Logical keys for the settings that are not per-section."""
 
+    HOME = "platform.home"
     PROFILE = "platform.profile"
     DEPLOYMENT_ENV = "platform.deployment_env"
     TELEMETRY = "platform.telemetry"
@@ -249,9 +250,13 @@ def _section_bindings() -> list[Binding]:
     return bindings
 
 
+_NEW_SINCE_THE_RENAME = frozenset({Key.HOME})
+"""Keys of variables that never had the earlier prefix, so no old spelling is accepted."""
+
+
 def _with_legacy_spelling(binding: Binding) -> Binding:
     """Return an owned binding that also accepts its legacy spelling, with a warning."""
-    if not binding.owned:
+    if not binding.owned or binding.key in _NEW_SINCE_THE_RENAME:
         return binding
     return replace(
         binding, deprecated_names=(*binding.deprecated_names, legacy_spelling(binding.name))
@@ -264,6 +269,24 @@ def _default_bindings() -> tuple[Binding, ...]:
 
 def _owned_and_external_bindings() -> tuple[Binding, ...]:
     return (
+        Binding(
+            name=f"{PREFIX}HOME",
+            key=Key.HOME,
+            description="The project's folder: the one place its files and state are found.",
+            example="~/projects/accounts",
+            details=(
+                "With it set, the `.env` file, the registries, the rules, the data and the state "
+                "under `.agentcraft2/` (audit, checkpoints, traces, tokens, Agent Lab, Phoenix) "
+                "are found in this folder, so a project is one folder to copy or back up. A "
+                "relative path in the process environment or in this folder's `.env` is relative "
+                "to it; a service's own `.env` keeps its paths relative to itself. It locates "
+                "the `.env` file, so it is read from the process environment only and is refused "
+                "inside a `.env`. A server profile has no use for it: a deployment reads no "
+                "`.env` and writes no state."
+            ),
+            default="not set: the command line works from the current directory, and a service "
+            "from the folder of its own `.env`",
+        ),
         Binding(
             name=f"{PREFIX}PROFILE",
             key=Key.PROFILE,
