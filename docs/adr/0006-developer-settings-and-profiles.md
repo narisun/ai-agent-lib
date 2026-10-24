@@ -6,7 +6,7 @@ installs ADOT from the lock; the `agentcore` profile; an explicit deployment
 environment on the server profiles; adapters that name their profile; no
 `allow_http` or production content capture on a deployed service; the
 `AC2_AGENTCORE_*` deployment variables; the project home; the token file for
-remote MCP. Not yet: the developer settings file.
+remote MCP; the developer settings file, in a first form (see below).
 
 ## Context
 
@@ -61,34 +61,24 @@ The configuration surface does not separate who owns what.
    from, and `init`, `new` and `update` rewrite it whole. The settings file is
    written once and then belongs to the developer; the CLI adds to it and does
    not regenerate it.
-   - It holds no secrets and no infrastructure values, and is validated at
-     startup against a JSON Schema that `agentcraft2 schema` prints.
-   - It is a configuration layer. Precedence is process environment, then
-     `.env`, then the settings file, then the profile defaults. Blank values
+   - It holds no secrets and no infrastructure values. A key it does not know
+     is an error with a suggestion, and a value is never repeated in a message.
+     `agentcraft2 config schema` prints a JSON Schema of it.
+   - It is the weakest configuration layer. Precedence is process environment,
+     then the service's `.env`, then the home's `.env`, then the service's
+     settings file, then the home's, then the profile defaults. Blank values
      never hide a lower layer.
-   - Where a knob differs between local and server (a CSV folder locally, a
-     Redshift workgroup deployed), the same entry carries both forms. The
-     file is never edited per environment.
-   - `agentcraft2 config explain --json` lists every effective setting with its
-     owner and the layer it came from. Coding tools read that and the schema.
-   - Illustration only; the schema is fixed in the implementation change:
-
-     ```toml
-     [model]
-     provider = "bedrock"            # or "anthropic": a developer's choice
-     id = "<model-id>"
-
-     [policy]
-     rules = "policies/agentcraft2/rules/data.yaml"
-
-     [limits]
-     model = { timeout_seconds = 120 }
-
-     [mcp-servers.accounts.data.accounts]
-     kind = "duckdb_csv"
-     data_dir = "data"
-     queries_dir = "queries"
-     ```
+   - Each table is another way to write a variable that exists, so there is no
+     second configuration to keep in step: `[model]` writes the model
+     provider, ID, aliases and options; `[limits]` the limits; `[registry]` the
+     file registry's options; `[policy]` the rules engine's path; `[persona]`
+     the development identity's options; `[data.<name>]` one data source. A
+     relative path is relative to the file.
+   - `agentcraft2 config explain` says which table of which file wrote each
+     setting.
+   - Not done: one entry that carries both a local and a deployed form of a
+     knob, a machine-readable `config explain`, and shipping the file in a
+     deployment. A deployment is still configured by `deploy.env`.
 
 3. **Profiles are closed outside local.** The profiles are `local`, `aws`
    (Fargate and other ECS) and `agentcore` (experimental).

@@ -35,6 +35,12 @@ from agentcraft2_core.config.reference import (
     variable_for,
 )
 from agentcraft2_core.config.resolver import MASKED, ConfigResolver, Resolution
+from agentcraft2_core.config.settings_file import (
+    SETTINGS_FILE,
+    SettingsFileSource,
+    settings_files,
+    settings_schema,
+)
 from agentcraft2_core.config.sources import (
     DotenvConfigSource,
     EnvironConfigSource,
@@ -51,6 +57,7 @@ __all__ = [
     "MASKED",
     "PREFIX",
     "PROFILE_DEFAULTS",
+    "SETTINGS_FILE",
     "STATE_FOLDER",
     "Binding",
     "ConfigResolver",
@@ -62,6 +69,7 @@ __all__ = [
     "MappingConfigSource",
     "ProfileDefaults",
     "Resolution",
+    "SettingsFileSource",
     "ValueKind",
     "load_service_config",
     "log_deprecation",
@@ -74,6 +82,8 @@ __all__ = [
     "render_reference",
     "secret_key",
     "service_resolver",
+    "settings_files",
+    "settings_schema",
     "state_dir",
     "telemetry_enabled",
     "variable_for",
@@ -130,6 +140,12 @@ def service_resolver(dotenv_path: Path | None = DEFAULT_DOTENV) -> ConfigResolve
                 fix=f"remove it from {file} and set it in the shell that starts the service",
             )
         layers.append(source)
+    # The developer's settings file is the weakest layer: beside the service, then in the home.
+    folders = [file.resolve().parent for file in files[:1]] if dotenv_path is not None else []
+    settings = settings_files(*folders, *([home] if home is not None else []))
+    layers.extend(SettingsFileSource(path) for path in settings)
+    if base_dir is None and settings:
+        base_dir = settings[0].resolve().parent
     return ConfigResolver(LayeredConfigSource(*layers), base_dir=base_dir)
 
 

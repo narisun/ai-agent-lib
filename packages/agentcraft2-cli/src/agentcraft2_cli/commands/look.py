@@ -25,6 +25,7 @@ from agentcraft2_cli.options_listing import (
 )
 from agentcraft2_cli.toolbox import Toolbox
 from agentcraft2_cli.workspace import AGENTS_FOLDER, load_answers
+from agentcraft2_core.config import settings_schema
 from agentcraft2_core.contracts import CheckResult
 from agentcraft2_core.di import ServiceProviders
 
@@ -100,6 +101,12 @@ def config_options(port: str | None, name: str | None, schema: bool) -> None:
         lines = option_lines(providers, port, name)
     for line in lines:
         click.echo(line)
+
+
+@config.command("schema")
+def config_schema() -> None:
+    """Print a JSON Schema of agentcraft2.settings.toml, for an editor or a coding assistant."""
+    click.echo(settings_schema())
 
 
 @config.command("explain")

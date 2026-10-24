@@ -358,6 +358,43 @@ services; with cloud adapters, that can contact external services.
 For JSON options, use double quotes around keys and strings, and keep the
 value on one line. An unknown option produces a configuration error.
 
+### Your choices in a settings file
+
+Instead of JSON in variables, the choices you make about your own agents and
+servers can go in `agentcraft2.settings.toml`, beside the service's `.env` or in the
+project home. It is TOML, it holds no secret and none of the infrastructure, and
+a variable or the `.env` still wins over it:
+
+```toml
+[model]
+provider = "bedrock"          # or "anthropic", with ANTHROPIC_API_KEY
+id = "<model-id>"
+
+[limits.budget]
+model_calls = 20
+
+[registry]
+agents = "registry/agents.yaml"   # relative to this file
+tools = "registry/mcp-tools.yaml"
+
+[policy]
+rules = "policies/agentcraft2/rules/data.yaml"
+
+[persona]                       # who you are, on your machine
+subject = "dev-user"
+roles = ["analyst"]
+
+[data.accounts]
+kind = "duckdb_csv"
+data_dir = "data"
+queries_dir = "queries"
+```
+
+A key the file does not know is an error with a suggestion, and a value is never
+repeated in a message. `agentcraft2 config schema` prints a JSON Schema of the file
+for your editor and your coding assistant, and `config explain` says which line of
+which file wrote each setting.
+
 ## 5. Add a shared tool server
 
 MCP (Model Context Protocol) lets a separate server provide tools to agents.

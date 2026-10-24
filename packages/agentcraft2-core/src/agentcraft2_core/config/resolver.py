@@ -302,7 +302,7 @@ class ConfigResolver:
                 if found is None:
                     found = (old_name, old_value)
             if found is not None:
-                origins[binding.key] = f"variable {found[0]}"
+                origins[binding.key] = self._origin(found[0])
                 values[binding.key] = found[1]
                 self._bases[binding.key] = self._written_in(found[0])
         self._read_named_secrets(values, origins, notes)
@@ -440,6 +440,12 @@ class ConfigResolver:
                 actual=shown_value(raw),
                 fix=f"set {self._name(key)}={close[0] if close else next(iter(kind)).value}",
             ) from None
+
+    def _origin(self, variable: str) -> str:
+        """Say where a value came from: the settings file that wrote it, else the variable."""
+        finder = getattr(self._source, "origin_of", None)
+        found = finder(variable) if callable(finder) else None
+        return found if isinstance(found, str) else f"variable {variable}"
 
     def _written_in(self, variable: str) -> Path | None:
         """Return the folder the value of ``variable`` was written in, when the source knows."""

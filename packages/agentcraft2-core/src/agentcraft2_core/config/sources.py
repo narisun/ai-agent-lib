@@ -123,6 +123,12 @@ class LayeredConfigSource:
         finder = getattr(layer, "base_dir_for", None)
         return finder(name) if callable(finder) else None
 
+    def origin_of(self, name: str) -> str | None:
+        """Say where the value of ``name`` was written, when the layer that supplies it knows."""
+        layer = self._supplying(name)
+        finder = getattr(layer, "origin_of", None)
+        return finder(name) if callable(finder) else None
+
     def _supplying(self, name: str) -> ConfigSource | None:
         for layer in self._layers:
             value = layer.get(name)
