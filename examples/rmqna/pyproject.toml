@@ -4,7 +4,7 @@
 [project]
 name = "rmqna"
 version = "0.1.0"
-description = "Agents and MCP servers of commercial-banking, built on ai-agent-lib."
+description = "Agents and MCP servers of commercial-banking, built on agentcraft2-sdk."
 requires-python = ">=3.11"
 
 [tool.uv]

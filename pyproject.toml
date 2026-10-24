@@ -1,4 +1,4 @@
-# Workspace root for the ai-agent-lib repository.
+# Workspace root for the ai-agentcraft2-sdk repository.
 # The root is not a distribution: it wires the agent packages together
 # and holds the shared tool configuration.
 

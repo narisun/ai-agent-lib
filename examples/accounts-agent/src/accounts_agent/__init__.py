@@ -1,4 +1,4 @@
-"""Reference agent for ai-agent-lib: answers account balance questions."""
+"""Reference agent for agentcraft2-sdk: answers account balance questions."""
 
 from accounts_agent.graph import APPLICATION, State, ask, build_graph
 

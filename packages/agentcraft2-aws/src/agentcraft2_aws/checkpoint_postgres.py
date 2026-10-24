@@ -156,7 +156,7 @@ class PostgresCheckpointBackend:
             "dbname": options.database,
             "user": options.user,
             "password": await self._token_source(),
-            "application_name": "ai-agent-lib",
+            "application_name": "agentcraft2-sdk",
             # The checkpointer needs these three.
             "autocommit": True,
             "prepare_threshold": 0,

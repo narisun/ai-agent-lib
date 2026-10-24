@@ -34,7 +34,7 @@ Follow steps 1–5 for the local walkthrough. After that, choose what you need:
 - Python 3.11 or newer with pip. Check with `python --version` and
   `python -m pip --version`. On macOS/Linux, the command may be `python3`;
   on Windows, it may be `py -3.11`.
-- A copy of this repository. Open a terminal in its top-level `ai-agent-lib/`
+- A copy of this repository. Open a terminal in its top-level `ai-agentcraft2-sdk/`
   folder, where you can see `packages/` and `docs/`.
 - Access to your approved package index, or a team-provided wheelhouse
   (a folder of pre-downloaded Python packages).
@@ -129,22 +129,22 @@ In each new terminal, open `tutorial/` and set the interpreter path:
 
 ```bat
 rem Windows Command Prompt, from tutorial/
-set "LIBRARY=%CD%\..\ai-agent-lib"
+set "LIBRARY=%CD%\..\ai-agentcraft2-sdk"
 set "PYTHON=python"
 ```
 
 ```bash
 # macOS/Linux, from tutorial/
-LIBRARY="$(cd ../ai-agent-lib && pwd)"
+LIBRARY="$(cd ../ai-agentcraft2-sdk && pwd)"
 PYTHON=python3
 ```
 
-These paths assume your checkout is named `ai-agent-lib` and sits beside
+These paths assume your checkout is named `ai-agentcraft2-sdk` and sits beside
 `tutorial`. Adjust that folder name if needed.
 
 ## 2. Understand your project
 
-You now have two folders: `ai-agent-lib/` contains the library;
+You now have two folders: `ai-agentcraft2-sdk/` contains the library;
 `tutorial/` contains your application. Most changes to the agent belong in
 the application workspace.
 

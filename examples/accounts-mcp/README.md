@@ -1,6 +1,6 @@
 # accounts-mcp
 
-The reference MCP server for `ai-agent-lib`. It is an ordinary MCP server: two
+The reference MCP server for `agentcraft2-sdk`. It is an ordinary MCP server: two
 tools written as plain functions. The library supplies the keyword arguments
 that govern the server (the check of the caller's token at the door and the
 middleware around every tool call) and the governed data source the tools read

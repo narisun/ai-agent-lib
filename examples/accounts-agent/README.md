@@ -1,6 +1,6 @@
 # accounts-agent
 
-The reference agent for `ai-agent-lib`. It is an ordinary LangGraph
+The reference agent for `agentcraft2-sdk`. It is an ordinary LangGraph
 tool-calling agent: one model node, one tool node and the standard routing
 between them. The library supplies the governed model, the governed tool, the
 scoped checkpointer and the per-request run arguments.

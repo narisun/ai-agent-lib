@@ -1,4 +1,4 @@
-<title>ai-agent-lib Developer Guide</title>
+<title>agentcraft2-sdk Developer Guide</title>
 <style>
 /* Fill the viewport, keep navigation beside the guide on wide screens, and
    contain long tables and examples in panels that scroll in both directions. */
@@ -181,8 +181,8 @@ kbd { font-family: var(--font-mono); font-size: .85em; border: 1px solid var(--l
 <a class="skip-link" href="#main">Skip to the guide</a>
 <div class="shell">
 <header class="masthead">
-  <p class="eyebrow">ai-agent-lib Â· Developer guide</p>
-  <h1>Build and test agents with ai-agent-lib</h1>
+  <p class="eyebrow">agentcraft2-sdk Â· Developer guide</p>
+  <h1>Build and test agents with agentcraft2-sdk</h1>
   <p class="lede">Understand the design, build a local agent, and extend it with tested
   tools. Use interfaces and dependency injection to keep application logic separate
   from the services it depends on.</p>
@@ -278,7 +278,7 @@ kbd { font-family: var(--font-mono); font-size: .85em; border: 1px solid var(--l
   It also needs to know who is calling, check permissions, protect data, record
   actions, and handle failures. These supporting responsibilities are called
   <strong>cross-cutting concerns</strong> because many different features need them.</p>
-  <p>ai-agent-lib gives each responsibility a clear home: your application defines
+  <p>agentcraft2-sdk gives each responsibility a clear home: your application defines
   the workflow and business logic, shared pipelines apply checks around calls, and
   adapters connect to models and other services. This structure centralizes common
   rules and lets tests replace external dependencies with controlled implementations.
@@ -395,7 +395,7 @@ def test_expiry_uses_the_supplied_clock() -&gt; None:
 
   <h3 id="langgraph-boundary">LangGraph owns the workflow; the library supplies governed operations</h3>
   <p>Your graph uses LangGraph state, nodes, edges, and tool routing.
-  Your application owns prompts and business rules. ai-agent-lib supplies model,
+  Your application owns prompts and business rules. agentcraft2-sdk supplies model,
   tool, and data operations with shared enforcement around them. A
   <strong>governed operation</strong> means a call that goes through those checks.</p>
   <div class="table-wrap"><table>
@@ -584,7 +584,7 @@ def main() -&gt; int:
     <thead><tr><th>You need</th><th>What to obtain</th></tr></thead>
     <tbody>
       <tr><td>Python and pip</td><td>An approved Python 3.11+ installation with pip and permission to install approved packages into its configured location. Use the Python version your team supports.</td></tr>
-      <tr><td>Library source</td><td>The team's approved checkout or source archive of <code>ai-agent-lib</code>, with <code>packages/</code> and <code>docs/</code> at its top level.</td></tr>
+      <tr><td>Library source</td><td>The team's approved checkout or source archive of <code>ai-agentcraft2-sdk</code>, with <code>packages/</code> and <code>docs/</code> at its top level.</td></tr>
       <tr><td>Package access</td><td>The team's pip configuration for its Python repository, such as JFrog Artifactory, including its sign-in method and any proxy or certificate setup.</td></tr>
       <tr><td>A development folder</td><td>A location where your account can create files and run Python, for example a team-approved folder under your user profile. Both the library folder and its parent must be writable.</td></tr>
     </tbody>
@@ -601,7 +601,7 @@ def main() -&gt; int:
   later in the guide.</p>
 
   <h3>A. Open the library folder and check Python</h3>
-  <p>Open the <code>ai-agent-lib</code> folder in File Explorer, type
+  <p>Open the <code>ai-agentcraft2-sdk</code> folder in File Explorer, type
   <code>cmd</code> in its address bar, and press Enter. Use this ordinary
   <strong>Command Prompt</strong> window for setup. If your company provides a
   prepared command prompt for Python, open that and use <code>cd /d</code> with
@@ -670,7 +670,7 @@ set "LIBRARY=%CD%"</code></pre>
   outside application source and shared logs.</p>
 
   <h3>D. Install the library and its command-line tool</h3>
-  <p>Still in <code>ai-agent-lib</code>, install the two local packages:</p>
+  <p>Still in <code>ai-agentcraft2-sdk</code>, install the two local packages:</p>
 <pre><code class="language-bat" id="desktop-install-library">"%PYTHON%" -m pip install -e "%LIBRARY%\packages\agentcraft2-core" -e "%LIBRARY%\packages\agentcraft2-cli"
 "%PYTHON%" -m agentcraft2_cli --help</code></pre>
   <p><strong>Check:</strong> installation succeeds and the CLI help lists commands
@@ -697,7 +697,7 @@ cd /d "%LIBRARY%\..\tutorial"
   <code>install</code> installs the workspace's services and development tools
   into the selected Python environment using pip.</p>
 <pre><code>your development folder/
-  ai-agent-lib/         Shared library source; LIBRARY points here
+  ai-agentcraft2-sdk/  Shared library source; LIBRARY points here
   tutorial/            Your application; run the remaining commands here
     agents/helper/     The agent you will change and test</code></pre>
   <p>Both folders use the Python selected in step B. Your application code belongs
@@ -724,7 +724,7 @@ cd /d "%LIBRARY%\..\tutorial"
   <h3 id="new-terminal">Resume in a new Command Prompt window</h3>
   <p>The <code>set</code> commands apply only to the current terminal. To resume,
   open Command Prompt in <code>tutorial</code> and select the existing environment:</p>
-<pre><code class="language-bat" id="desktop-resume">set "LIBRARY=%CD%\..\ai-agent-lib"
+<pre><code class="language-bat" id="desktop-resume">set "LIBRARY=%CD%\..\ai-agentcraft2-sdk"
 set "PYTHON=python"
 "%PYTHON%" -c "import sys; print(sys.executable)"
 "%PYTHON%" -m helper "Say hello to Ada."</code></pre>
@@ -777,7 +777,7 @@ with urlopen(request, timeout=30) as response:
 
 <section id="idea">
   <h2>2. Understand the project</h2>
-  <p>You now have two folders with different jobs. <code>ai-agent-lib/</code> is the
+  <p>You now have two folders with different jobs. <code>ai-agentcraft2-sdk/</code> is the
   library's source. <code>tutorial/</code> is your application workspace. Most of your
   work on an agent belongs in the application workspace.</p>
 <pre><code>tutorial/
@@ -1905,7 +1905,7 @@ async def classify(
   Expand the group you need, or use your browser's Find command.</p>
   <details class="lesson" id="variables" open>
     <summary>Configuration variables: local and AWS</summary>
-    <p>This is the complete list of environment variables bound by ai-agent-lib,
+    <p>This is the complete list of environment variables bound by agentcraft2-sdk,
     followed by OpenTelemetry, Python/pip setup and rmprep context settings used in
     this guide. <strong>Local</strong> is the zero-config default on any machine:
     with nothing set, every provider is local (files, SQLite and in-process engines)

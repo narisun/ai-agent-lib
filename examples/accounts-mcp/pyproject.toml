@@ -1,7 +1,7 @@
 [project]
 name = "accounts-mcp"
 version = "0.1.0"
-description = "Reference MCP server for ai-agent-lib: governed account queries over CSV files."
+description = "Reference MCP server for agentcraft2-sdk: governed account queries over CSV files."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

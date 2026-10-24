@@ -7,7 +7,7 @@ trace viewer that runs separately from the agent.
 
 ## 1. Pick a Phoenix server
 
-- **On your machine, for one developer:** in the ai-agent-lib repository, run the
+- **On your machine, for one developer:** in the ai-agentcraft2-sdk repository, run the
   `start-phoenix` launcher (`start-phoenix.bat` on Windows, `./start-phoenix.sh` on
   macOS and Linux): `setup` once, then `start`. It serves Phoenix at
   `http://127.0.0.1:6006` and keeps traces in a local SQLite file. The repository's

@@ -21,7 +21,7 @@ def editable_requirements(project: Path) -> list[str]:
     config = tomllib.loads(project.read_text(encoding="utf-8"))
     # UI dependencies have their own package folder and checks. In particular the
     # selected browser framework and the agent MCP SDK need different versions.
-    if config.get("tool", {}).get("ai-agent-lib", {}).get("development-environment") == "ui":
+    if config.get("tool", {}).get("agentcraft2-sdk", {}).get("development-environment") == "ui":
         return []
     workspace = config.get("tool", {}).get("uv", {})
     if workspace.get("package") is False:
