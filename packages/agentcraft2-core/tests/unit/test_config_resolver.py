@@ -52,7 +52,9 @@ def test_aws_profile_selects_the_server_side_adapters() -> None:
 
 
 def test_a_selector_beats_the_profile() -> None:
-    config = resolve({"AC2_PROFILE": "aws", "AC2_AUDIT_PROVIDER": "jsonl"})
+    config = resolve(
+        {"AC2_PROFILE": "aws", "AC2_DEPLOYMENT_ENV": "dev", "AC2_AUDIT_PROVIDER": "jsonl"}
+    )
     assert config.section(Section.AUDIT).provider == "jsonl"
     assert config.section(Section.SECRETS).provider == "secrets_manager"
 
@@ -104,12 +106,12 @@ def test_a_blank_value_counts_as_not_set(blank: str) -> None:
 
 
 def test_enum_values_are_validated_and_case_insensitive() -> None:
-    assert resolve({"AC2_PROFILE": "AWS"}).profile is Profile.AWS
+    assert resolve({"AC2_PROFILE": "AWS", "AC2_DEPLOYMENT_ENV": "dev"}).profile is Profile.AWS
     with pytest.raises(ConfigurationError) as caught:
         resolve({"AC2_PROFILE": "moon"})
     error = caught.value
     assert error.message == "AC2_PROFILE is not one of the values it takes"
-    assert (error.expected, error.actual) == ("one of: local, aws", "'moon'")
+    assert (error.expected, error.actual) == ("one of: local, aws, agentcore", "'moon'")
     assert error.fix == "set AC2_PROFILE=local"
     with pytest.raises(ConfigurationError) as near:
         resolve({"AC2_PROFILE": "aw"})
@@ -302,10 +304,13 @@ def test_a_secret_variable_supplies_a_named_secret() -> None:
 
 
 def test_a_secret_set_twice_with_different_values_is_a_conflict() -> None:
-    same = resolve({"ANTHROPIC_API_KEY": "sk-1", "AC2_SECRET_ANTHROPIC_API_KEY": "sk-1"})
-    assert same.secrets["anthropic_api_key"].get_secret_value() == "sk-1"
-    with pytest.raises(ConfigurationError, match="both set the secret") as caught:
-        resolve({"ANTHROPIC_API_KEY": "sk-1", "AC2_SECRET_ANTHROPIC_API_KEY": "sk-2"})
+    # The twin is deprecated in favour of the standard name; that is not what this is about.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        same = resolve({"ANTHROPIC_API_KEY": "sk-1", "AC2_SECRET_ANTHROPIC_API_KEY": "sk-1"})
+        assert same.secrets["anthropic_api_key"].get_secret_value() == "sk-1"
+        with pytest.raises(ConfigurationError, match="both set the secret") as caught:
+            resolve({"ANTHROPIC_API_KEY": "sk-1", "AC2_SECRET_ANTHROPIC_API_KEY": "sk-2"})
     assert "sk-" not in str(caught.value)
 
 

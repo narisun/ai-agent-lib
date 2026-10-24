@@ -519,7 +519,7 @@ def test_the_agentcore_profile_listens_where_the_runtime_reaches_the_container(
 
     monkeypatch.setattr(composition, "_serve", fake_serve)
     env_file = tmp_path / "service.env"
-    env_file.write_text("", encoding="utf-8")
+    env_file.write_text("AC2_PROFILE=agentcore\nAC2_DEPLOYMENT_ENV=dev\n", encoding="utf-8")
     service = AgentService(
         application="probe",
         build_graph=_build_graph,
@@ -540,6 +540,30 @@ def test_the_agentcore_profile_listens_where_the_runtime_reaches_the_container(
         (False, "10.0.0.5", 8123),
     ]
     assert service.agentcore is False  # the caller's service is left as it was
+
+
+def test_listening_for_agentcore_without_the_agentcore_profile_serves_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A service that lost its profile does not listen on every address with local defaults."""
+    served: list[int] = []
+
+    async def fake_serve(
+        service: AgentService, config: ServiceConfig, host: str, port: int
+    ) -> None:
+        served.append(port)
+
+    monkeypatch.setattr(composition, "_serve", fake_serve)
+    env_file = tmp_path / "service.env"
+    env_file.write_text("", encoding="utf-8")
+    service = AgentService(
+        application="probe", build_graph=_build_graph, respond=_respond, env_file=env_file
+    )
+
+    assert run_agent(service, ["--profile", "agentcore"]) == 1
+
+    assert served == []
+    assert "AC2_PROFILE=agentcore" in capsys.readouterr().err
 
 
 async def test_an_agentcore_service_serves_the_runtime_contract_beside_its_own() -> None:

@@ -23,7 +23,7 @@ from agentcraft2_cli.deploy.plan import depends_on_aws
 from agentcraft2_cli.deploy.target import AGENTCORE, AWS_DISTRIBUTION, Target
 from agentcraft2_cli.render import Report, write_files
 from agentcraft2_core.config import EnvSetting, Key, options_key, provider_key, render_env_file
-from agentcraft2_core.contracts import Section
+from agentcraft2_core.contracts import Profile, Section
 
 __all__ = ["next_steps", "starter_settings", "write_starter"]
 
@@ -35,9 +35,16 @@ _MEMORY_CHECKPOINT_OPTIONS = {"memory_id": _MEMORY_PLACEHOLDER}
 
 def _platform_settings(target: Target) -> list[EnvSetting]:
     """The profile, the environment and telemetry, for the platform the service goes to."""
+    on_agentcore = target.platform == AGENTCORE
     settings = [
         EnvSetting(
-            Key.PROFILE, "aws", comment="The AWS adapters: Bedrock, Firehose, OPA and the rest."
+            Key.PROFILE,
+            Profile.AGENTCORE.value if on_agentcore else Profile.AWS.value,
+            comment=(
+                "The AWS adapters, and those that trust AgentCore Runtime's perimeter."
+                if on_agentcore
+                else "The AWS adapters: Bedrock, Firehose, OPA and the rest."
+            ),
         ),
         EnvSetting(
             Key.DEPLOYMENT_ENV,
@@ -62,7 +69,7 @@ def _platform_settings(target: Target) -> list[EnvSetting]:
                 "opa",
                 comment=(
                     "No sidecar runs beside a container on AgentCore Runtime: decide policy\n"
-                    "in-process with rules, or at an OPA the runtime can reach over the network."
+                    "at an OPA the runtime can reach over the network."
                 ),
             )
         )
@@ -70,7 +77,7 @@ def _platform_settings(target: Target) -> list[EnvSetting]:
             EnvSetting(
                 options_key(Section.POLICY),
                 {"url": "https://opa.internal:8181"},
-                comment="A remote OPA. For in-process rules: policy provider rules, no url.",
+                comment="A remote OPA, reached over https.",
             )
         )
     else:
@@ -106,11 +113,11 @@ def _checkpoint_example(target: Target) -> tuple[Section, dict[str, object], str
 
 
 def _agentcore_block(target: Target) -> str:
-    """The ``AGENTCORE_`` block: the deployment's own settings, kept out of the container."""
+    """The AgentCore block: the deployment's own settings, kept out of the container."""
     memory = "create" if target.kind == "agent" else "none"
     lines = [
         "",
-        "# ---- The deployment itself. These AGENTCORE_ variables never reach the container.",
+        "# ---- The deployment itself. These deployment variables never reach the container.",
         "",
         "# Who may invoke the runtime: iam (callers sign their requests and need",
         "# bedrock-agentcore:InvokeAgentRuntime) or jwt (bearer tokens from the issuer below).",

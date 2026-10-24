@@ -46,7 +46,8 @@ OTHER_CLIENT = "33333333-3333-3333-3333-333333333333"
 SERVER = ServerEntry(
     id="accounts",
     owner="treasury",
-    url="https://accounts.internal.example/mcp",
+    # On this machine, where the development identity is what the server is called with.
+    url="https://localhost/mcp",
     audience=API,
     tools=(ToolEntry(name="ping", version="1"),),
 )

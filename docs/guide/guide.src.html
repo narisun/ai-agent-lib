@@ -954,8 +954,8 @@ AC2_MODEL_PROVIDER=fake</code></pre>
   <div class="table-wrap"><table>
     <thead><tr><th>Setting</th><th>What it means</th></tr></thead>
     <tbody>
-      <tr><td><code>AC2_PROFILE</code></td><td>A starting set of adapter choices: <code>local</code> or <code>aws</code>. You can override individual choices.</td></tr>
-      <tr><td><code>AC2_DEPLOYMENT_ENV</code></td><td>Where this process actually runs. Non-local environments reject adapters intended only for local development. It is a separate setting from the profile.</td></tr>
+      <tr><td><code>AC2_PROFILE</code></td><td>A starting set of adapter choices: <code>local</code>, <code>aws</code> or <code>agentcore</code>. You can override individual choices.</td></tr>
+      <tr><td><code>AC2_DEPLOYMENT_ENV</code></td><td>Where this process actually runs. Non-local environments reject adapters intended only for local development. It is a separate setting from the profile, and with the <code>aws</code> or <code>agentcore</code> profile it has no default: it must be set.</td></tr>
       <tr><td><code>AC2_MODEL_PROVIDER</code></td><td>The model adapter to use. <code>fake</code> runs in-process; a hosted model requires its adapter dependencies and credentials.</td></tr>
     </tbody>
   </table></div>
@@ -1755,7 +1755,7 @@ async def classify(
   <p>Amazon Bedrock AgentCore Runtime is AWS's managed runtime for agents and MCP
   servers: each session runs in its own isolated microVM, with no sidecars and no disk
   that outlives it. The same workspace deploys there. <code>--target agentcore</code>
-  reads an <code>AGENTCORE_</code> block from <code>deploy.env</code> that describes the
+  reads an <code>AC2_AGENTCORE_</code> block from <code>deploy.env</code> that describes the
   deployment itself and never reaches the container, refuses what the runtime cannot
   host (a loopback OPA, the service's own OpenTelemetry providers, a checkpoint store
   with nowhere durable to write), and renders an ARM64 image or a code zip together

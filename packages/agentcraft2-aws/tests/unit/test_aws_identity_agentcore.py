@@ -23,6 +23,7 @@ from agentcraft2_core.contracts import (
     PresentedCredentials,
     Principal,
     PrincipalKind,
+    Profile,
     ProviderSelection,
     RequestContext,
     RequestVerifier,
@@ -232,8 +233,11 @@ def providers() -> tuple[Fakes, ServiceProviders]:
     return fakes, register_aws_adapters(fakes.providers(), sessions=offline_sessions())
 
 
-def config(env: DeploymentEnv, **more: Any) -> ServiceConfig:
+def config(
+    env: DeploymentEnv, *, profile: Profile = Profile.AGENTCORE, **more: Any
+) -> ServiceConfig:
     return ServiceConfig.for_testing(
+        profile=profile,
         deployment_env=env,
         sections={
             Section.IDENTITY: ProviderSelection("agentcore_runtime", {"tenant": "acme", **more})
@@ -251,6 +255,18 @@ async def test_the_factory_refuses_to_build_in_local_development() -> None:
 
     assert caught.value.fix is not None
     assert "identity=static" in caught.value.fix
+
+
+@pytest.mark.parametrize("profile", [Profile.LOCAL, Profile.AWS])
+async def test_the_factory_is_refused_under_any_profile_but_agentcore(profile: Profile) -> None:
+    # On ECS, or any host a caller can reach, the user-ID header is whatever the caller sends.
+    fakes, registry = providers()
+
+    with pytest.raises(ConfigurationError, match="runs only under the agentcore profile"):
+        async with ServiceContainer(
+            config(DeploymentEnv.PROD, profile=profile), registry, clock=fakes.clock
+        ):
+            pass
 
 
 @pytest.mark.parametrize("env", [DeploymentEnv.DEV, DeploymentEnv.PROD])

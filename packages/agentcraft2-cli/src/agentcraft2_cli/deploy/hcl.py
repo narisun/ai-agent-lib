@@ -147,7 +147,7 @@ def agentcore_settings_tf(plan: DeploymentPlan, header: str) -> str:
     """Return ``settings.tf`` of an AgentCore deployment: what the runtime is made of.
 
     The locals carry the protocol and port the service's kind fixes, the
-    command, the ``AGENTCORE_`` block as Terraform values, and the container's
+    command, the AgentCore block as Terraform values, and the container's
     environment. ``memory_option_variable`` names the checkpoint options
     variable Terraform rewrites with the ID of the memory it creates, or is
     ``null`` when the checkpoints do not go to a memory Terraform creates.

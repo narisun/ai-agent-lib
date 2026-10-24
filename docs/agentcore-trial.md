@@ -73,7 +73,7 @@ Next:
 
 The starting file already selects the `aws` profile, `dev`, `ambient` telemetry,
 a remote OPA and, for the agent, the `agentcore_memory` checkpoint with the
-`created_by_terraform` placeholder and `AGENTCORE_MEMORY=create`. The trial
+`created_by_terraform` placeholder and `AC2_AGENTCORE_MEMORY=create`. The trial
 added the dependency lines to both `pyproject.toml` files as the next steps
 say. No `install` ran: the plan reads the dependency list, not the installed
 packages, so the plan passes without it (the image build installs them).
@@ -84,7 +84,7 @@ The file as it ended up, comments removed. `<placeholder>` marks a value the
 operator replaces; the other values are the trial's choices.
 
 ```dotenv
-AC2_PROFILE=aws
+AC2_PROFILE=agentcore
 AC2_DEPLOYMENT_ENV=dev
 AC2_TELEMETRY=ambient
 AC2_POLICY_PROVIDER=opa
@@ -98,15 +98,15 @@ AC2_IDENTITY_OPTIONS={"preset": "entra", "tenant_id": "00000000-0000-0000-0000-0
 AC2_REGISTRY_OPTIONS={"bucket": "my-eap-registry"}                         # <placeholder>: your registry bucket
 AC2_GUARDRAILS_OPTIONS={"guardrail_id": "abc123def456", "guardrail_version": "1"}   # <placeholder>: your guardrail
 
-AGENTCORE_AUTH=jwt
-AGENTCORE_DISCOVERY_URL=https://login.microsoftonline.com/00000000-0000-0000-0000-000000000000/v2.0/.well-known/openid-configuration   # <placeholder>: tenant GUID
-AGENTCORE_ALLOWED_AUDIENCE=api://rmprep
-AGENTCORE_NETWORK=PUBLIC
-AGENTCORE_IDLE_TIMEOUT_SECONDS=900
-AGENTCORE_MAX_LIFETIME_SECONDS=28800
-AGENTCORE_ARTIFACT=container
-AGENTCORE_GATEWAY=none
-AGENTCORE_MEMORY=create
+AC2_AGENTCORE_AUTH=jwt
+AC2_AGENTCORE_DISCOVERY_URL=https://login.microsoftonline.com/00000000-0000-0000-0000-000000000000/v2.0/.well-known/openid-configuration   # <placeholder>: tenant GUID
+AC2_AGENTCORE_ALLOWED_AUDIENCE=api://rmprep
+AC2_AGENTCORE_NETWORK=PUBLIC
+AC2_AGENTCORE_IDLE_TIMEOUT_SECONDS=900
+AC2_AGENTCORE_MAX_LIFETIME_SECONDS=28800
+AC2_AGENTCORE_ARTIFACT=container
+AC2_AGENTCORE_GATEWAY=none
+AC2_AGENTCORE_MEMORY=create
 ```
 
 Two things differ from the plan document's wording of this pilot. The plan says
@@ -120,7 +120,7 @@ from `tenant_id`.
 ### The MCP server: mcp-servers/rmprep-data/deploy.env
 
 ```dotenv
-AC2_PROFILE=aws
+AC2_PROFILE=agentcore
 AC2_DEPLOYMENT_ENV=dev
 AC2_TELEMETRY=ambient
 AC2_POLICY_PROVIDER=opa
@@ -134,18 +134,18 @@ AC2_IDENTITY_OPTIONS={"tenant": "commercial-banking"}
 AC2_REGISTRY_OPTIONS={"bucket": "my-eap-registry"}                         # <placeholder>
 AC2_GUARDRAILS_OPTIONS={"guardrail_id": "abc123def456", "guardrail_version": "1"}   # <placeholder>
 
-AGENTCORE_AUTH=iam
-AGENTCORE_NETWORK=PUBLIC
-AGENTCORE_IDLE_TIMEOUT_SECONDS=900
-AGENTCORE_MAX_LIFETIME_SECONDS=28800
-AGENTCORE_ARTIFACT=container
-AGENTCORE_GATEWAY=none
-AGENTCORE_MEMORY=none
+AC2_AGENTCORE_AUTH=iam
+AC2_AGENTCORE_NETWORK=PUBLIC
+AC2_AGENTCORE_IDLE_TIMEOUT_SECONDS=900
+AC2_AGENTCORE_MAX_LIFETIME_SECONDS=28800
+AC2_AGENTCORE_ARTIFACT=container
+AC2_AGENTCORE_GATEWAY=none
+AC2_AGENTCORE_MEMORY=none
 ```
 
 Three settings were changed from the starter, each for a reason the trial met:
 
-- **`AGENTCORE_AUTH=iam`, identity `agentcore_runtime`.** The agent reaches the
+- **`AC2_AGENTCORE_AUTH=iam`, identity `agentcore_runtime`.** The agent reaches the
   server through a registry entry with `auth: sigv4` (section 3). A runtime in
   JWT mode refuses a signed request, so the server runtime takes IAM, and no
   bearer token reaches the container. The `agentcore_runtime` identity adapter
@@ -251,7 +251,7 @@ Environment: 13 variables from agents/rmprep/deploy.env.
   AC2_PROFILE ... AC2_GUARDRAILS_OPTIONS
 
 Warnings:
-  - AGENTCORE_MEMORY=create: Terraform creates the memory, puts its ID into the checkpoint option memory_id of the runtime's environment and grants the role access to it; memory_id in agents/rmprep/deploy.env ('created_by_terraform') is a placeholder, and the statement in permissions.tf names that placeholder
+  - AC2_AGENTCORE_MEMORY=create: Terraform creates the memory, puts its ID into the checkpoint option memory_id of the runtime's environment and grants the role access to it; memory_id in agents/rmprep/deploy.env ('created_by_terraform') is a placeholder, and the statement in permissions.tf names that placeholder
   - this workspace installs the library from a local checkout, which an image build cannot reach; publish the library to a package index before building the image
 ```
 
@@ -309,24 +309,24 @@ know, so the operator narrows `workgroup/*` after the workgroup exists.
 The settings of section 2 passed at the first attempt because the starter
 already chose the platform's values. The refusals below were met while
 carrying values over from the example's local `.env.example`, from the Fargate
-starter, and while probing the `AGENTCORE_` block. Each is the message as the
+starter, and while probing the `AC2_AGENTCORE_` block. Each is the message as the
 command printed it; the fix is what changed in `deploy.env`.
 
 | Setting tried | Refusal (recorded) | Fix |
 | --- | --- | --- |
 | `AC2_POLICY_PROVIDER=rules` (the plan's "no OPA") | `policy rules runs only on a developer's machine; select another in agents/rmprep/deploy.env` | Keep `opa` with a remote `url`. Open item below. |
-| `AC2_POLICY_OPTIONS={"url": "http://localhost:8181"}` (the Fargate value) | `policy opa decides on the loopback address, where its sidecar would run; nothing runs beside a container on AgentCore Runtime. Point url in AC2_POLICY_OPTIONS at an OPA the runtime can reach, or set AC2_POLICY_PROVIDER=rules in agents/rmprep/deploy.env` | `{"url": "https://opa.internal:8181"}`. The message's second option, `rules`, is itself refused in `dev`. |
+| `AC2_POLICY_OPTIONS={"url": "http://localhost:8181"}` (the Fargate value) | `policy opa decides on the loopback address, where its sidecar would run; nothing runs beside a container on AgentCore Runtime. Point url in AC2_POLICY_OPTIONS in agents/rmprep/deploy.env at an OPA the runtime can reach over https; the in-process rules engine is for a developer's machine only` | `{"url": "https://opa.internal:8181"}`. |
 | `AC2_TELEMETRY=opentelemetry` (the Fargate value) | `AC2_TELEMETRY=opentelemetry installs the service's own tracer and meter providers, which collide with the ones ADOT installs on AgentCore Runtime; set AC2_TELEMETRY=ambient (or off) in agents/rmprep/deploy.env` | `AC2_TELEMETRY=ambient` |
-| `AC2_CHECKPOINT_PROVIDER=sqlite` (the local value) | Two problems: `checkpoint sqlite runs only on a developer's machine; select another ...` and `checkpoint sqlite has nowhere durable to write on AgentCore Runtime, whose disk ends with the session; set AC2_CHECKPOINT_PROVIDER to one of postgres, agentcore_memory, none ...`; plus the warning `AGENTCORE_MEMORY=create while checkpoint sqlite does not use AgentCore Memory` | `AC2_CHECKPOINT_PROVIDER=agentcore_memory` with `{"memory_id": "created_by_terraform"}` |
+| `AC2_CHECKPOINT_PROVIDER=sqlite` (the local value) | Two problems: `checkpoint sqlite runs only on a developer's machine; select another ...` and `checkpoint sqlite has nowhere durable to write on AgentCore Runtime, whose disk ends with the session; set AC2_CHECKPOINT_PROVIDER to one of postgres, agentcore_memory, none ...`; plus the warning `AC2_AGENTCORE_MEMORY=create while checkpoint sqlite does not use AgentCore Memory` | `AC2_CHECKPOINT_PROVIDER=agentcore_memory` with `{"memory_id": "created_by_terraform"}` |
 | `AC2_DATA_SOURCES` copied from the server's `.env.example` (`duckdb_csv`) | `data source rmprep (duckdb_csv) runs only on a developer's machine; select another in mcp-servers/rmprep-data/deploy.env` | `redshift_data` with the server's `queries` folder (section 2) |
 | `agentcraft2-aws` missing from `agents/rmprep/pyproject.toml` | `audit firehose, checkpoint agentcore_memory, guardrails bedrock, model bedrock, registry s3_file, secrets secrets_manager need agentcraft2-aws, which rmprep does not install; list "agentcraft2-aws[agentcore,bedrock]" in the dependencies in agents/rmprep/pyproject.toml and run 'python -m agentcraft2_cli install'` | Add the dependency line. The plan checks the file, not the installed packages. |
-| `AGENTCORE_MEMORY=rmprep_memory-abc123` with the placeholder still in the options | `AGENTCORE_MEMORY names the memory rmprep_memory-abc123, but the checkpoint option memory_id is 'created_by_terraform'; make them agree in agents/rmprep/deploy.env (AGENTCORE_MEMORY and AC2_CHECKPOINT_OPTIONS)` | Either `create` with the placeholder, or the same ID in both places once the memory exists. |
-| `AGENTCORE_AUTH=jwt` with neither clients nor audience | `AGENTCORE_ALLOWED_CLIENTS in agents/rmprep/deploy.env is not valid` / `expected: at least one client ID in AGENTCORE_ALLOWED_CLIENTS or one audience in AGENTCORE_ALLOWED_AUDIENCE` / `got: neither is set` | `AGENTCORE_ALLOWED_AUDIENCE=api://rmprep` |
-| `AGENTCORE_DISCOVERY_URL=https://login.microsoftonline.com/<tenant>/v2.0` | `AGENTCORE_DISCOVERY_URL in agents/rmprep/deploy.env is not valid` / `expected: an https URL ending in .well-known/openid-configuration` | Append `/.well-known/openid-configuration` |
+| `AC2_AGENTCORE_MEMORY=rmprep_memory-abc123` with the placeholder still in the options | `AC2_AGENTCORE_MEMORY names the memory rmprep_memory-abc123, but the checkpoint option memory_id is 'created_by_terraform'; make them agree in agents/rmprep/deploy.env (AC2_AGENTCORE_MEMORY and AC2_CHECKPOINT_OPTIONS)` | Either `create` with the placeholder, or the same ID in both places once the memory exists. |
+| `AC2_AGENTCORE_AUTH=jwt` with neither clients nor audience | `AC2_AGENTCORE_ALLOWED_CLIENTS in agents/rmprep/deploy.env is not valid` / `expected: at least one client ID in AC2_AGENTCORE_ALLOWED_CLIENTS or one audience in AC2_AGENTCORE_ALLOWED_AUDIENCE` / `got: neither is set` | `AC2_AGENTCORE_ALLOWED_AUDIENCE=api://rmprep` |
+| `AC2_AGENTCORE_DISCOVERY_URL=https://login.microsoftonline.com/<tenant>/v2.0` | `AC2_AGENTCORE_DISCOVERY_URL in agents/rmprep/deploy.env is not valid` / `expected: an https URL ending in .well-known/openid-configuration` | Append `/.well-known/openid-configuration` |
 | `AC2_DEPLOYMENT_ENV=local` | `agents/rmprep/deploy.env describes a developer's machine, not a deployment` / `expected: AC2_DEPLOYMENT_ENV=dev or AC2_DEPLOYMENT_ENV=prod` | `AC2_DEPLOYMENT_ENV=dev` |
 | An `AC2_SECRET_API_KEY=...` line | `agents/rmprep/deploy.env holds secrets, and its values become the task's environment` / `fix: remove them from agents/rmprep/deploy.env and store each in Secrets Manager` | Remove the line; the service reads secrets under `AC2_SECRETS_OPTIONS`'s prefix. |
 
-The `AGENTCORE_` refusals and the `local` and secret refusals stop the command
+The `AC2_AGENTCORE_` refusals and the `local` and secret refusals stop the command
 before the plan is printed; the adapter refusals are listed under `Problems`
 after the plan, and nothing is written while one remains.
 
@@ -449,7 +449,7 @@ The operator's steps. None of them ran in the dry run.
 2. **Entra ID.** Register an application with the Application ID URI
    `api://rmprep` and expose a scope, and a client application allowed to
    request it. Put the directory (tenant) ID in both `tenant_id` and
-   `AGENTCORE_DISCOVERY_URL` of `agents/rmprep/deploy.env` and run the deploy
+   `AC2_AGENTCORE_DISCOVERY_URL` of `agents/rmprep/deploy.env` and run the deploy
    command again, so that `settings.tf` carries it.
 3. **The server.** `terraform -chdir=deploy\rmprep-data apply`. Note the
    outputs `agent_runtime_arn`, `role_arn` and `log_group_name`.
@@ -488,7 +488,7 @@ The operator's steps. None of them ran in the dry run.
    For a daemon, the client-credentials grant against
    `https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token` with
    `scope=api://rmprep/.default`. The token's `aud` must be `api://rmprep`:
-   the runtime's authorizer checks it against `AGENTCORE_ALLOWED_AUDIENCE`, and
+   the runtime's authorizer checks it against `AC2_AGENTCORE_ALLOWED_AUDIENCE`, and
    the service's `jwt` identity checks it again against `audience`.
 7. **An invocation.** The runtime's endpoint is the ARN, URL-encoded, under the
    regional `bedrock-agentcore` host; the session header names the
@@ -531,23 +531,23 @@ The operator's steps. None of them ran in the dry run.
 
 ## Settings
 
-The `AGENTCORE_` block of `deploy.env` describes the deployment and never
+The `AC2_AGENTCORE_` block of `deploy.env` describes the deployment and never
 reaches the container; `settings.tf` carries it to Terraform. The plan prints
 the resolved values under `Runtime:`.
 
 | Variable | Meaning | Trial value |
 | --- | --- | --- |
-| `AGENTCORE_AUTH` | Who may invoke the runtime: `iam` (SigV4-signed callers with `bedrock-agentcore:InvokeAgentRuntime`) or `jwt` (bearer tokens from the issuer below) | agent `jwt`, server `iam` |
-| `AGENTCORE_DISCOVERY_URL` | The issuer's OpenID discovery document; `https`, ending in `.well-known/openid-configuration`; required with `jwt` | Entra tenant's `v2.0` document |
-| `AGENTCORE_ALLOWED_AUDIENCE` | Audiences a token may carry; with `jwt`, this or `AGENTCORE_ALLOWED_CLIENTS` is required | `api://rmprep` |
-| `AGENTCORE_ALLOWED_CLIENTS` | Client IDs a token may carry, comma-separated | not set |
-| `AGENTCORE_ALLOWED_SCOPES` | Scopes a token must carry | not set |
-| `AGENTCORE_NETWORK` | `PUBLIC`, or `VPC` with `AGENTCORE_SUBNETS` and `AGENTCORE_SECURITY_GROUPS` | `PUBLIC` |
-| `AGENTCORE_IDLE_TIMEOUT_SECONDS` | A session ends after this long idle (60 to 28800) | `900` |
-| `AGENTCORE_MAX_LIFETIME_SECONDS` | A session ends after this long in any case; at least the idle timeout | `28800` |
-| `AGENTCORE_ARTIFACT` | `container` (an ARM64 image in the ECR repository Terraform creates) or `code` (a zip from `build_zip.py` in the S3 bucket it creates) | `container` |
-| `AGENTCORE_GATEWAY` | `none`, `create` (a gateway in front of the runtime with the workspace's MCP servers as targets) or a gateway ARN | `none` |
-| `AGENTCORE_MEMORY` | `none`, `create` (Terraform creates the memory the checkpoints go to) or a memory ID, which must then equal the checkpoint option `memory_id` | agent `create`, server `none` |
+| `AC2_AGENTCORE_AUTH` | Who may invoke the runtime: `iam` (SigV4-signed callers with `bedrock-agentcore:InvokeAgentRuntime`) or `jwt` (bearer tokens from the issuer below) | agent `jwt`, server `iam` |
+| `AC2_AGENTCORE_DISCOVERY_URL` | The issuer's OpenID discovery document; `https`, ending in `.well-known/openid-configuration`; required with `jwt` | Entra tenant's `v2.0` document |
+| `AC2_AGENTCORE_ALLOWED_AUDIENCE` | Audiences a token may carry; with `jwt`, this or `AC2_AGENTCORE_ALLOWED_CLIENTS` is required | `api://rmprep` |
+| `AC2_AGENTCORE_ALLOWED_CLIENTS` | Client IDs a token may carry, comma-separated | not set |
+| `AC2_AGENTCORE_ALLOWED_SCOPES` | Scopes a token must carry | not set |
+| `AC2_AGENTCORE_NETWORK` | `PUBLIC`, or `VPC` with `AC2_AGENTCORE_SUBNETS` and `AC2_AGENTCORE_SECURITY_GROUPS` | `PUBLIC` |
+| `AC2_AGENTCORE_IDLE_TIMEOUT_SECONDS` | A session ends after this long idle (60 to 28800) | `900` |
+| `AC2_AGENTCORE_MAX_LIFETIME_SECONDS` | A session ends after this long in any case; at least the idle timeout | `28800` |
+| `AC2_AGENTCORE_ARTIFACT` | `container` (an ARM64 image in the ECR repository Terraform creates) or `code` (a zip from `build_zip.py` in the S3 bucket it creates) | `container` |
+| `AC2_AGENTCORE_GATEWAY` | `none`, `create` (a gateway in front of the runtime with the workspace's MCP servers as targets) or a gateway ARN | `none` |
+| `AC2_AGENTCORE_MEMORY` | `none`, `create` (Terraform creates the memory the checkpoints go to) or a memory ID, which must then equal the checkpoint option `memory_id` | agent `create`, server `none` |
 
 The service's own variables are the `AC2_` ones of section 2; run
 `"%PYTHON%" -m agentcraft2_cli config explain rmprep` with `deploy.env` as the
@@ -560,7 +560,7 @@ repeats the build and apply steps for that service.
   `rules`)". The `rules` policy adapter is registered `local_only`, so the plan
   refuses it in `dev` and `prod`. The pilot therefore needs an OPA the runtime
   can reach at `AC2_POLICY_OPTIONS`'s `url`: from a `PUBLIC` runtime, one
-  reachable over the internet with TLS; otherwise `AGENTCORE_NETWORK=VPC` with
+  reachable over the internet with TLS; otherwise `AC2_AGENTCORE_NETWORK=VPC` with
   the subnets that reach it. Lifting `local_only` from `rules`, with the Rego
   bundle's decisions mirrored, is the way to the plan's intent.
 - **The agent's grant to call the server.** The registry entry's `auth: sigv4`
@@ -580,7 +580,7 @@ repeats the build and apply steps for that service.
   client and takes the region, CA file, proxy and timeouts, but not a named
   profile. On the runtime the role is the identity, so this only matters when
   the saver is tried from a developer's machine.
-- **Gateway runtime target.** With `AGENTCORE_GATEWAY=create`, the MCP targets
+- **Gateway runtime target.** With `AC2_AGENTCORE_GATEWAY=create`, the MCP targets
   come from the `mcp_targets` variable; registering the agent runtime itself
   as a target with an allowed-workload configuration is not expressed by the
   Terraform provider, and the generated README points to the AWS CLI or boto3.
@@ -601,15 +601,15 @@ nothing is written while a problem remains.
 | Message | What to do |
 | --- | --- |
 | `policy rules runs only on a developer's machine; select another in <service>/deploy.env` | `rules` is `local_only`. Set `AC2_POLICY_PROVIDER=opa` and point `url` in `AC2_POLICY_OPTIONS` at a remote OPA. |
-| `policy opa decides on the loopback address, where its sidecar would run; nothing runs beside a container on AgentCore Runtime. Point url in AC2_POLICY_OPTIONS at an OPA the runtime can reach, or set AC2_POLICY_PROVIDER=rules ...` | Replace the Fargate sidecar's `http://localhost:8181` with the remote OPA's `https` URL. |
+| `policy opa decides on the loopback address, where its sidecar would run; nothing runs beside a container on AgentCore Runtime. Point url in AC2_POLICY_OPTIONS in <service>/deploy.env at an OPA the runtime can reach over https; ...` | Replace the Fargate sidecar's `http://localhost:8181` with the remote OPA's `https` URL. |
 | `AC2_TELEMETRY=opentelemetry installs the service's own tracer and meter providers, which collide with the ones ADOT installs on AgentCore Runtime; set AC2_TELEMETRY=ambient (or off) ...` | `AC2_TELEMETRY=ambient`. The Fargate starter's `opentelemetry` is for the collector sidecar, which the runtime does not have. |
-| `checkpoint sqlite has nowhere durable to write on AgentCore Runtime, whose disk ends with the session; set AC2_CHECKPOINT_PROVIDER to one of postgres, agentcore_memory, none ...` | `AC2_CHECKPOINT_PROVIDER=agentcore_memory` (with `AGENTCORE_MEMORY=create` and the `memory_id` placeholder), `postgres`, or `none` for an MCP server. |
-| `AGENTCORE_MEMORY=create while checkpoint <provider> does not use AgentCore Memory; ...` (warning) | Either select `agentcore_memory`, or set `AGENTCORE_MEMORY=none` so that Terraform creates no memory. |
-| `AGENTCORE_MEMORY names the memory <id>, but the checkpoint option memory_id is '<other>'; make them agree ...` | Put the same ID in `AGENTCORE_MEMORY` and in `memory_id` of `AC2_CHECKPOINT_OPTIONS`, or go back to `create` with the placeholder. |
+| `checkpoint sqlite has nowhere durable to write on AgentCore Runtime, whose disk ends with the session; set AC2_CHECKPOINT_PROVIDER to one of postgres, agentcore_memory, none ...` | `AC2_CHECKPOINT_PROVIDER=agentcore_memory` (with `AC2_AGENTCORE_MEMORY=create` and the `memory_id` placeholder), `postgres`, or `none` for an MCP server. |
+| `AC2_AGENTCORE_MEMORY=create while checkpoint <provider> does not use AgentCore Memory; ...` (warning) | Either select `agentcore_memory`, or set `AC2_AGENTCORE_MEMORY=none` so that Terraform creates no memory. |
+| `AC2_AGENTCORE_MEMORY names the memory <id>, but the checkpoint option memory_id is '<other>'; make them agree ...` | Put the same ID in `AC2_AGENTCORE_MEMORY` and in `memory_id` of `AC2_CHECKPOINT_OPTIONS`, or go back to `create` with the placeholder. |
 | `data source rmprep (duckdb_csv) runs only on a developer's machine; select another ...` | Select `redshift_data` in `AC2_DATA_SOURCES` with `queries_dir`, `database` and `workgroup`, and load the CSV files into that workgroup. |
 | `... need agentcraft2-aws, which <service> does not install; list "agentcraft2-aws[agentcore,bedrock]" in the dependencies in <service>/pyproject.toml ...` | Add the dependency line to the service's `pyproject.toml`. The plan reads the file; no install is needed for it to pass. |
-| `AGENTCORE_ALLOWED_CLIENTS in <service>/deploy.env is not valid` / `expected: at least one client ID in AGENTCORE_ALLOWED_CLIENTS or one audience in AGENTCORE_ALLOWED_AUDIENCE` | With `AGENTCORE_AUTH=jwt`, uncomment `AGENTCORE_ALLOWED_AUDIENCE` (or list clients). |
-| `AGENTCORE_DISCOVERY_URL in <service>/deploy.env is not valid` / `expected: an https URL ending in .well-known/openid-configuration` | Use the full discovery document URL, not the issuer. |
+| `AC2_AGENTCORE_ALLOWED_CLIENTS in <service>/deploy.env is not valid` / `expected: at least one client ID in AC2_AGENTCORE_ALLOWED_CLIENTS or one audience in AC2_AGENTCORE_ALLOWED_AUDIENCE` | With `AC2_AGENTCORE_AUTH=jwt`, uncomment `AC2_AGENTCORE_ALLOWED_AUDIENCE` (or list clients). |
+| `AC2_AGENTCORE_DISCOVERY_URL in <service>/deploy.env is not valid` / `expected: an https URL ending in .well-known/openid-configuration` | Use the full discovery document URL, not the issuer. |
 | `<service>/deploy.env describes a developer's machine, not a deployment` | `AC2_DEPLOYMENT_ENV=dev` or `prod`. `local` is for `.env`. |
 | `<service>/deploy.env holds secrets, and its values become the task's environment` | Remove every `AC2_SECRET_*` line; the service reads its secrets from Secrets Manager under `AC2_SECRETS_OPTIONS`'s prefix. |
 | `the service reads the data sources rmprep locally, but <service>/deploy.env does not configure them, so the deployed service cannot find them; set AC2_DATA_SOURCES there` (warning) | The server's `.env.example` names a data source the deployment does not. Configure it with an AWS adapter, as above. |

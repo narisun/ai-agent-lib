@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from architecture.containment import find_violations
 
+from agentcraft2_cli.deploy.agentcore import AGENTCORE_PREFIX, AGENTCORE_VARIABLES
 from agentcraft2_core.config import DEFAULT_BINDINGS
 from agentcraft2_core.config.bindings import (
     LEGACY_PREFIX,
@@ -112,8 +113,10 @@ def _documents() -> list[Path]:
     )
     found = {path for pattern in patterns for path in REPO_ROOT.glob(pattern)}
     # Dated records quoting removed variables; ADR 0004 keeps its history and its removal amendment.
+    # ADR 0006 names variables it proposes, which exist only once it is implemented.
     records = {
         REPO_ROOT / "docs/adr/0004-tracing-configuration.md",
+        REPO_ROOT / "docs/adr/0006-developer-settings-and-profiles.md",
         REPO_ROOT / "docs/design/code-structure-review-2026-10-13.md",
         REPO_ROOT / "docs/design/enterprise-architecture-review-2026-10-18.md",
     }
@@ -138,6 +141,9 @@ def _variables_a_document_may_name() -> set[str]:
         if phoenix.startswith(PREFIX):
             stem = phoenix.removeprefix(PREFIX)
             known.update({PREFIX + stem, LEGACY_PREFIX + stem})
+    # The deployment's own variables belong to the deploy step, not to a service's configuration.
+    known.update(variable.name for variable in AGENTCORE_VARIABLES)
+    known.add(AGENTCORE_PREFIX.rstrip("_"))
     return known
 
 

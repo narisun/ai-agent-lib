@@ -29,6 +29,19 @@ class ProfileDefaults:
         object.__setattr__(self, "sections", MappingProxyType(dict(self.sections)))
 
 
+_AWS = ProfileDefaults(
+    model_provider="bedrock",
+    sections={
+        Section.SECRETS: "secrets_manager",
+        Section.AUDIT: "firehose",
+        Section.IDENTITY: "jwt",
+        Section.CHECKPOINT: "postgres",
+        Section.REGISTRY: "s3_file",
+        Section.POLICY: "opa",
+        Section.GUARDRAILS: "bedrock",
+    },
+)
+
 PROFILE_DEFAULTS: Mapping[Profile, ProfileDefaults] = MappingProxyType(
     {
         Profile.LOCAL: ProfileDefaults(
@@ -43,17 +56,9 @@ PROFILE_DEFAULTS: Mapping[Profile, ProfileDefaults] = MappingProxyType(
                 Section.GUARDRAILS: "patterns",
             },
         ),
-        Profile.AWS: ProfileDefaults(
-            model_provider="bedrock",
-            sections={
-                Section.SECRETS: "secrets_manager",
-                Section.AUDIT: "firehose",
-                Section.IDENTITY: "jwt",
-                Section.CHECKPOINT: "postgres",
-                Section.REGISTRY: "s3_file",
-                Section.POLICY: "opa",
-                Section.GUARDRAILS: "bedrock",
-            },
-        ),
+        # AgentCore Runtime starts from the same adapters; what it adds are the adapters
+        # that only it can use, which a deployment selects by name.
+        Profile.AWS: _AWS,
+        Profile.AGENTCORE: _AWS,
     }
 )

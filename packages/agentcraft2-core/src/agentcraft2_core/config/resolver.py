@@ -30,6 +30,7 @@ from agentcraft2_core.config.bindings import (
     secret_name,
     validate_bindings,
 )
+from agentcraft2_core.config.home import STATE_FOLDER
 from agentcraft2_core.config.phoenix import PHOENIX_VARIABLES
 from agentcraft2_core.config.profiles import PROFILE_DEFAULTS, ProfileDefaults
 from agentcraft2_core.contracts import (
@@ -95,9 +96,11 @@ class ConfigResolver:
         source: Where raw values come from.
         bindings: The variable table. Defaults to the library's own table.
         profile_defaults: The adapters each profile selects by default.
-        base_dir: The folder a relative path in a value is relative to,
-            normally the folder of the ``.env`` file. Without it a relative
-            path is relative to the working directory.
+        base_dir: The folder a relative path is relative to when its source does
+            not say, normally the project home or the folder of the ``.env`` file.
+            Without it a relative path is relative to the working directory. A
+            source that knows where a value was written, such as a ``.env`` file,
+            says so through ``base_dir_for``, and that folder is used for that value.
     """
 
     def __init__(
@@ -111,8 +114,16 @@ class ConfigResolver:
         validate_bindings(bindings)
         self._source = source
         self._base_dir = base_dir
+        # Where each value was written, by key: set by ``_read`` for each ``explain``.
+        self._bases: dict[str, Path | None] = {}
         self._bindings = tuple(bindings)
         self._by_key = {binding.key: binding for binding in self._bindings}
+        # Secrets that a tool names itself, such as ANTHROPIC_API_KEY: the standard name is used.
+        self._standard_secrets = {
+            binding.key: binding.name
+            for binding in self._bindings
+            if binding.key.startswith(SECRET_KEY_PREFIX) and not binding.owned
+        }
         self._profile_defaults = profile_defaults
 
     def resolve(self) -> ServiceConfig:
@@ -131,7 +142,9 @@ class ConfigResolver:
         profile = self._enum(values, Key.PROFILE, Profile, Profile.LOCAL)
         deployment_env = self._enum(values, Key.DEPLOYMENT_ENV, DeploymentEnv, DeploymentEnv.LOCAL)
         telemetry = self._enum(values, Key.TELEMETRY, TelemetryMode, TelemetryMode.OFF)
+        self._require_a_named_environment(values, profile)
         self._refuse_local_on_a_managed_runtime(values, deployment_env)
+        self._check_content_capture(values, deployment_env, notes)
         defaults = self._profile_defaults[profile]
         profile_origin = f"profile {profile.value}"
 
@@ -151,7 +164,7 @@ class ConfigResolver:
             sections[section] = ProviderSelection(
                 provider=values.get(selector, defaults.sections[section]),
                 options=self._json_object(values, options_key(section)),
-                base_dir=self._base_dir,
+                base_dir=self._base(options_key(section)),
             )
 
         config = ServiceConfig(
@@ -171,10 +184,12 @@ class ConfigResolver:
                 aws_profile=values.get(Key.AWS_PROFILE),
                 aws_region=values.get(Key.AWS_REGION),
                 aws_ca_bundle=self._path(values, Key.AWS_CA_BUNDLE),
+                ssl_cert_file=self._path(values, Key.SSL_CERT_FILE),
                 https_proxy=values.get(Key.HTTPS_PROXY),
                 no_proxy=values.get(Key.NO_PROXY),
             ),
             data_sources=self._data_sources(values),
+            state_dir=(self._base_dir or Path.cwd()) / STATE_FOLDER,
             model_trace_path=(
                 self._path(values, Key.MODEL_TRACE_PATH)
                 if values.get(Key.MODEL_TRACE_PATH, "").strip()
@@ -265,6 +280,7 @@ class ConfigResolver:
         values: dict[str, str] = {}
         origins: dict[str, str] = {}
         notes: list[str] = []
+        self._bases = {}
         for binding in self._bindings:
             found: tuple[str, str] | None = None
             for name in (binding.name, *binding.alternate_names):
@@ -286,8 +302,9 @@ class ConfigResolver:
                 if found is None:
                     found = (old_name, old_value)
             if found is not None:
-                origins[binding.key] = f"variable {found[0]}"
+                origins[binding.key] = self._origin(found[0])
                 values[binding.key] = found[1]
+                self._bases[binding.key] = self._written_in(found[0])
         self._read_named_secrets(values, origins, notes)
         return values, origins, notes
 
@@ -307,6 +324,10 @@ class ConfigResolver:
             if name is None or value is None:
                 continue
             key = secret_key(name)
+            standard = self._standard_secrets.get(key)
+            if standard is not None:
+                # Another tool defines this secret's variable, and its name is the one to use.
+                self._deprecated(notes, variable, standard)
             if values.get(key, value) != value:
                 other = origins[key].removeprefix("variable ")
                 raise ConfigurationError(
@@ -320,6 +341,54 @@ class ConfigResolver:
                     self._deprecated(notes, variable, current)
             values[key] = value
             origins.setdefault(key, f"variable {variable}")
+
+    def _require_a_named_environment(self, values: Mapping[str, str], profile: Profile) -> None:
+        """Make a service on a server profile say where it runs.
+
+        The deployment environment defaults to ``local``, which allows the
+        development identity and every other local-only adapter. A service that
+        lost the variable on its way to a server would start as a developer's
+        machine, so outside the ``local`` profile the variable has no default.
+        A developer who runs a server profile on their own machine names
+        ``local`` on purpose.
+        """
+        if profile is Profile.LOCAL or Key.DEPLOYMENT_ENV in values:
+            return
+        name = self._name(Key.DEPLOYMENT_ENV)
+        raise ConfigurationError(
+            f"{name} is not set, and the {profile.value} profile does not assume a "
+            "developer's machine",
+            expected=f"{name}=dev or {name}=prod on a deployed service",
+            actual="not set",
+            fix=f"set {name}=dev (or prod); on a developer's machine set {name}=local",
+        )
+
+    def _check_content_capture(
+        self, values: Mapping[str, str], deployment_env: DeploymentEnv, notes: list[str]
+    ) -> None:
+        """Keep conversation content out of a production service's files.
+
+        A model trace file holds the messages themselves. In ``prod`` it is
+        refused, because a variable left over from a developer's file would
+        write every customer's conversation to the task's disk. In ``dev`` it
+        is a diagnostic tool and is allowed, with a warning that says what it
+        holds.
+        """
+        traced = bool(values.get(Key.MODEL_TRACE_PATH, "").strip())
+        if not traced or deployment_env is DeploymentEnv.LOCAL:
+            return
+        name = self._name(Key.MODEL_TRACE_PATH)
+        if deployment_env is DeploymentEnv.PROD:
+            raise ConfigurationError(
+                f"{name} writes conversation content to a file, and a production service does not",
+                expected=f"{name} unset when {self._name(Key.DEPLOYMENT_ENV)} is prod",
+                actual="set",
+                fix=f"remove {name}; trace a dev deployment with test data instead",
+            )
+        notes.append(
+            f"{name} is set: the file holds complete conversations. Use test data, "
+            "restrict access to it and remove the setting afterwards"
+        )
 
     def _refuse_local_on_a_managed_runtime(
         self, values: Mapping[str, str], deployment_env: DeploymentEnv
@@ -372,13 +441,30 @@ class ConfigResolver:
                 fix=f"set {self._name(key)}={close[0] if close else next(iter(kind)).value}",
             ) from None
 
+    def _origin(self, variable: str) -> str:
+        """Say where a value came from: the settings file that wrote it, else the variable."""
+        finder = getattr(self._source, "origin_of", None)
+        found = finder(variable) if callable(finder) else None
+        return found if isinstance(found, str) else f"variable {variable}"
+
+    def _written_in(self, variable: str) -> Path | None:
+        """Return the folder the value of ``variable`` was written in, when the source knows."""
+        finder = getattr(self._source, "base_dir_for", None)
+        found = finder(variable) if callable(finder) else None
+        return found if isinstance(found, Path) else None
+
+    def _base(self, key: str) -> Path | None:
+        """Return the folder a relative path in the value of ``key`` is relative to."""
+        return self._bases.get(key) or self._base_dir
+
     def _path(self, values: Mapping[str, str], key: str) -> Path | None:
         raw = values.get(key)
         if raw is None:
             return None
         path = Path(raw).expanduser()
-        if self._base_dir is not None and not path.is_absolute():
-            return self._base_dir / path
+        base = self._base(key)
+        if base is not None and not path.is_absolute():
+            return base / path
         return path
 
     def _json(self, values: Mapping[str, str], key: str) -> Any:
@@ -480,7 +566,9 @@ class ConfigResolver:
             options = {key: value for key, value in spec.items() if key != _DATA_SOURCE_KIND}
             try:
                 sources[source] = ProviderSelection(
-                    provider=spec[_DATA_SOURCE_KIND], options=options, base_dir=self._base_dir
+                    provider=spec[_DATA_SOURCE_KIND],
+                    options=options,
+                    base_dir=self._base(Key.DATA_SOURCES),
                 )
             except (TypeError, ValueError) as exc:
                 raise ConfigurationError(

@@ -18,6 +18,7 @@ from agentcraft2_core.config import (
     PREFIX,
     Binding,
     ConfigResolver,
+    Key,
     MappingConfigSource,
     Resolution,
     log_resolution_warnings,
@@ -55,6 +56,10 @@ def test_every_owned_binding_accepts_its_legacy_spelling() -> None:
     assert owned
     for binding in owned:
         legacy = LEGACY_PREFIX + binding.name.removeprefix(PREFIX)
+        if binding.key == Key.HOME:
+            # It never had the earlier prefix, so there is nothing to carry over.
+            assert legacy not in binding.deprecated_names
+            continue
         assert legacy in binding.deprecated_names, binding.name
 
 

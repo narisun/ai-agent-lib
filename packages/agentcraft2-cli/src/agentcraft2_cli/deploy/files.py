@@ -16,7 +16,16 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-from agentcraft2_cli.deploy.agentcore import AGENTCORE_PYTHON
+from agentcraft2_cli.deploy.agentcore import (
+    ADOT_REQUIREMENT,
+    AGENTCORE_PREFIX,
+    AGENTCORE_PYTHON,
+    V_ARTIFACT,
+    V_AUTH,
+    V_DISCOVERY_URL,
+    V_GATEWAY,
+    V_MEMORY,
+)
 from agentcraft2_cli.deploy.hcl import agentcore_settings_tf, permissions_tf, settings_tf
 from agentcraft2_cli.deploy.plan import DeploymentPlan
 from agentcraft2_cli.deploy.target import MODULE_FOLDER, OPA_FOLDER, Target
@@ -72,6 +81,15 @@ def _context(target: Target) -> dict[str, object]:
         "port": target.port,
         "command_json": json.dumps(list(target.command)),
         "python": AGENTCORE_PYTHON,
+        "adot": ADOT_REQUIREMENT,
+        "v": {
+            "PREFIX": AGENTCORE_PREFIX,
+            "ARTIFACT": V_ARTIFACT,
+            "AUTH": V_AUTH,
+            "DISCOVERY_URL": V_DISCOVERY_URL,
+            "MEMORY": V_MEMORY,
+            "GATEWAY": V_GATEWAY,
+        },
     }
 
 

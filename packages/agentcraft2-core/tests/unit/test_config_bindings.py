@@ -32,6 +32,7 @@ def test_third_party_variables_keep_their_own_names() -> None:
         "AWS_PROFILE",
         "AWS_REGION",
         "AWS_CA_BUNDLE",
+        "SSL_CERT_FILE",
         "AWS_EXECUTION_ENV",
         "HTTPS_PROXY",
         "NO_PROXY",

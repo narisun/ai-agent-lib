@@ -8,6 +8,8 @@ import traceback
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from agentcraft2_ui.config.home import config_file
+
 if TYPE_CHECKING:
     from agentcraft2_ui.contracts.catalog import AgentCoreRuntime
 
@@ -23,7 +25,12 @@ def arguments() -> argparse.Namespace:
     commands = parser.add_subparsers(dest="command", required=True)
     for name in ("init", "check", "serve"):
         command = commands.add_parser(name)
-        command.add_argument("--config", type=Path, default=Path(".agentcraft2/ui/config.json"))
+        command.add_argument(
+            "--config",
+            type=Path,
+            default=None,
+            help="the Agent Lab config file (default: ui/config.json in the state folder)",
+        )
         if name == "init":
             command.add_argument("--env-file", type=Path, required=True)
             command.add_argument(
@@ -87,7 +94,7 @@ def main() -> int:
         from agentcraft2_ui.contracts.queries import PageRequest
         from agentcraft2_ui.integrations.runtime import compose
 
-        path = args.config.resolve()
+        path = config_file(args.config)
         if args.command == "init":
             if path.exists() and not args.overwrite:
                 raise ValueError(

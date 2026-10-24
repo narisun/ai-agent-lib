@@ -84,6 +84,27 @@ def test_layered_source_prefers_earlier_layers() -> None:
     assert tuple(source.names()) == ("A", "B")
 
 
+def test_a_blank_value_in_an_earlier_layer_does_not_hide_a_later_one() -> None:
+    source = LayeredConfigSource(
+        MappingConfigSource({"A": "", "B": "   ", "C": ""}),
+        MappingConfigSource({"A": "from-file", "B": "from-file"}),
+    )
+    assert source.get("A") == "from-file"
+    assert source.get("B") == "from-file"
+    assert source.get("C") is None
+
+
+def test_a_blank_deployment_environment_does_not_hide_the_one_in_the_file() -> None:
+    from agentcraft2_core.config import ConfigResolver
+    from agentcraft2_core.contracts import DeploymentEnv
+
+    source = LayeredConfigSource(
+        MappingConfigSource({"AC2_DEPLOYMENT_ENV": ""}),
+        MappingConfigSource({"AC2_DEPLOYMENT_ENV": "prod"}),
+    )
+    assert ConfigResolver(source).resolve().deployment_env is DeploymentEnv.PROD
+
+
 def test_layered_source_needs_at_least_one_layer() -> None:
     with pytest.raises(ValueError, match="at least one"):
         LayeredConfigSource()

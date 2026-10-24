@@ -683,7 +683,7 @@ def permissions() -> str:
 
 
 def agentcore_settings() -> str:
-    """Every ``AGENTCORE_`` variable the deploy target reads, from the target's own table.
+    """Every ``AC2_AGENTCORE_`` variable the deploy target reads, from the target's own table.
 
     The table lives beside the reader in ``deploy/agentcore.py``; this checks
     that it names exactly the variables the module reads, so the guide cannot

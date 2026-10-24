@@ -46,10 +46,14 @@ DEFAULT_MODEL_ALIAS = "default"
 
 
 class Profile(enum.StrEnum):
-    """A named set of default adapters."""
+    """A named set of default adapters, and the kind of place the service runs in."""
 
     LOCAL = "local"
     AWS = "aws"
+    """Services on AWS compute such as ECS Fargate."""
+    AGENTCORE = "agentcore"
+    """Services on Amazon Bedrock AgentCore Runtime: the AWS defaults, and the adapters
+    that trust the runtime's perimeter."""
 
 
 class DeploymentEnv(enum.StrEnum):
@@ -418,6 +422,8 @@ class ExternalSettings:
         aws_profile: The AWS named profile, for example one signed in through SSO.
         aws_region: The AWS region.
         aws_ca_bundle: A CA file for AWS clients.
+        ssl_cert_file: A CA file for HTTPS calls that are not to AWS, such as
+            the calls to MCP servers.
         https_proxy: The outbound proxy. Hidden from ``repr`` because proxy URLs
             can carry credentials.
         no_proxy: Hosts that bypass the proxy.
@@ -426,6 +432,7 @@ class ExternalSettings:
     aws_profile: str | None = None
     aws_region: str | None = None
     aws_ca_bundle: Path | None = None
+    ssl_cert_file: Path | None = None
     https_proxy: str | None = field(default=None, repr=False)
     no_proxy: str | None = None
 
@@ -456,6 +463,10 @@ class ServiceConfig:
             section.
         model_trace_path: Optional JSONL destination for diagnostic model messages.
             Unset by default. Contains conversation content; use with test data.
+        state_dir: Where the service keeps what it writes while it runs, such as the
+            tokens a developer leaves for the servers that run elsewhere: the project
+            home's, or the folder of the service's own ``.env``. ``None`` when the
+            configuration was not read from files, as in a test.
     """
 
     profile: Profile = Profile.LOCAL
@@ -471,6 +482,7 @@ class ServiceConfig:
     external: ExternalSettings = field(default_factory=ExternalSettings)
     data_sources: Mapping[str, ProviderSelection] = field(default_factory=dict)
     model_trace_path: Path | None = None
+    state_dir: Path | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "profile", Profile(self.profile))

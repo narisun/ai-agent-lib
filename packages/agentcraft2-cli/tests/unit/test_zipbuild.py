@@ -12,7 +12,6 @@ import pytest
 
 from agentcraft2_cli.deploy import zipbuild
 from agentcraft2_cli.deploy.zipbuild import (
-    ADOT,
     PLATFORM,
     ZipBuild,
     build_zip,
@@ -26,8 +25,9 @@ from agentcraft2_cli.errors import CliError
 class FakePip:
     """Records each command and lays files out in the target folder, as pip would."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, adot: bool = True) -> None:
         self.commands: list[list[str]] = []
+        self._adot = adot
 
     def __call__(self, command: Sequence[str]) -> None:
         arguments = list(command)
@@ -38,9 +38,10 @@ class FakePip:
             (target / "pydantic" / "__init__.py").write_text("# a wheel's module\n")
             (target / "pydantic" / "__pycache__").mkdir()
             (target / "pydantic" / "__pycache__" / "__init__.cpython-313.pyc").write_bytes(b"\0")
-        elif ADOT in arguments:
-            (target / "bin").mkdir(parents=True)
-            (target / "bin" / "opentelemetry-instrument").write_text("#!python\n")
+            if self._adot:
+                # The lock holds ADOT, so pip installs its script with the rest.
+                (target / "bin").mkdir(parents=True)
+                (target / "bin" / "opentelemetry-instrument").write_text("#!python\n")
         else:
             (target / "helper").mkdir(parents=True)
             (target / "helper" / "__init__.py").write_text("")
@@ -71,7 +72,7 @@ def test_build_zip_asks_pip_for_arm64_wheels_then_the_service_then_writes_the_sh
     output = build_zip(build, run=pip, python="py")
     assert output == build.output
 
-    lock, adot, service = pip.commands
+    lock, service = pip.commands
     site = str(build.build / "site")
     foreign = [
         "--target",
@@ -93,8 +94,6 @@ def test_build_zip_asks_pip_for_arm64_wheels_then_the_service_then_writes_the_sh
         "--disable-pip-version-check",
         "--no-cache-dir",
     ]
-    assert adot[4 : 4 + len(foreign)] == foreign
-    assert ADOT in adot
     assert service[4:] == [
         "--target",
         site,
@@ -123,6 +122,16 @@ def test_build_zip_asks_pip_for_arm64_wheels_then_the_service_then_writes_the_sh
                 assert stat.S_IMODE(mode) == 0o644, info.filename
             assert info.create_system == 3
         assert archive.read("main.py").decode() == shim("helper.service")
+
+
+def test_build_zip_refuses_a_lock_without_adot_and_says_how_to_compile_it(tmp_path: Path) -> None:
+    pip = FakePip(adot=False)
+    with pytest.raises(CliError) as caught:
+        build_zip(_build(tmp_path), run=pip, python="py")
+    assert "opentelemetry-instrument" in caught.value.message
+    assert "requirements.in" in (caught.value.fix or "")
+    # Nothing unpinned was installed to make up for it.
+    assert len(pip.commands) == 1
 
 
 def test_the_shim_starts_the_service_with_its_agentcore_profile() -> None:

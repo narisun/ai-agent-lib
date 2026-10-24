@@ -186,6 +186,33 @@ To test against real tokens without Entra, `agentcraft2_core.testing.oauth`
 has a stand-in identity provider that signs tokens, publishes its keys and
 answers the token endpoint.
 
+### A local agent calling an MCP server that runs on AWS
+
+The development token is signed with a key that is in the source, so no server
+that runs elsewhere accepts it. To try a local agent against a server
+deployed to `dev`, register the server with its `https` URL and its audience,
+and leave a token of your own for it in a file:
+
+```text
+.agentcraft2/tokens/<server-id>.token
+```
+
+The folder is under `AC2_HOME` when that is set, and otherwise beside the
+service's `.env`. Sign in with your own tooling, the corporate single sign-on
+with its second factor, for the development client application of the agent
+and with the server's audience, and write the token alone, on one line. The
+token is read on every call, so a refreshed one is used at once, and it is
+never logged or repeated in an error.
+
+The server then sees you and the registered agent, as it does in production,
+and applies your real roles; the agent's own policy still sees the development
+principal. A server on this machine (`localhost`) keeps the development
+identity. Plain `http` is for those servers only. A deployed service never
+reads a token file: it exchanges tokens through its identity provider and
+needs every tool pinned. The deployed servers should refuse tokens of the
+development client, by issuer or audience; that is set up in the identity
+provider, not here.
+
 ## Another identity provider
 
 Leave out the preset and give the standard settings directly:

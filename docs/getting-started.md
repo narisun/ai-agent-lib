@@ -328,9 +328,13 @@ AC2_MODEL_PROVIDER=fake
 
 Check these entries and keep the file's other generated settings.
 
-- `AC2_PROFILE` chooses defaults: `local` or `aws`.
+- `AC2_PROFILE` chooses defaults: `local`, `aws` or `agentcore` (a service on Bedrock
+  AgentCore Runtime).
+- `AC2_HOME` (optional) names the one folder that holds the project's `.env`, registries, rules,
+  data and the state under `.agentcraft2/`. Set it in the shell, not in a `.env`.
 - `AC2_DEPLOYMENT_ENV` says where this process runs: `local`, `dev`, or `prod`.
-  Non-local environments reject development-only adapters.
+  Non-local environments reject development-only adapters. With the `aws` or
+  `agentcore` profile it has no default and must be set.
 - `AC2_MODEL_PROVIDER` chooses the model implementation. `fake` runs in process.
 
 Library variables start with `AC2_`, such as `AC2_<SECTION>_PROVIDER`. Older
@@ -353,6 +357,43 @@ services; with cloud adapters, that can contact external services.
 
 For JSON options, use double quotes around keys and strings, and keep the
 value on one line. An unknown option produces a configuration error.
+
+### Your choices in a settings file
+
+Instead of JSON in variables, the choices you make about your own agents and
+servers can go in `agentcraft2.settings.toml`, beside the service's `.env` or in the
+project home. It is TOML, it holds no secret and none of the infrastructure, and
+a variable or the `.env` still wins over it:
+
+```toml
+[model]
+provider = "bedrock"          # or "anthropic", with ANTHROPIC_API_KEY
+id = "<model-id>"
+
+[limits.budget]
+model_calls = 20
+
+[registry]
+agents = "registry/agents.yaml"   # relative to this file
+tools = "registry/mcp-tools.yaml"
+
+[policy]
+rules = "policies/agentcraft2/rules/data.yaml"
+
+[persona]                       # who you are, on your machine
+subject = "dev-user"
+roles = ["analyst"]
+
+[data.accounts]
+kind = "duckdb_csv"
+data_dir = "data"
+queries_dir = "queries"
+```
+
+A key the file does not know is an error with a suggestion, and a value is never
+repeated in a message. `agentcraft2 config schema` prints a JSON Schema of the file
+for your editor and your coding assistant, and `config explain` says which line of
+which file wrote each setting.
 
 ## 5. Add a shared tool server
 

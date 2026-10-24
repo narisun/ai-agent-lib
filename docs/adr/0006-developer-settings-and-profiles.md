@@ -1,0 +1,194 @@
+# 0006: Developer settings, closed profiles, AC2_HOME and remote MCP from a local agent
+
+Proposed, 24 October 2026. In force so far: blank values no longer hide a lower
+layer; MCP calls follow the standard proxy and CA variables; the AgentCore image
+installs ADOT from the lock; the `agentcore` profile; an explicit deployment
+environment on the server profiles; adapters that name their profile; no
+`allow_http` or production content capture on a deployed service; the
+`AC2_AGENTCORE_*` deployment variables; the project home; the token file for
+remote MCP; the developer settings file, in a first form (see below).
+
+## Context
+
+Developers work on restricted enterprise desktops: they cannot install
+software, and Python and pip are the preinstalled ones. They reach Bedrock with
+the AWS CLI and two-factor sign-in, and some teams still use an Anthropic API
+key. They need the whole loop on one machine (agent, MCP servers, Agent Lab,
+Phoenix, sample data, a production-quality model) and then the same project on
+AWS: Fargate today, Bedrock AgentCore Runtime as an experiment. A coding
+assistant should be able to read one place and understand the project.
+
+The configuration surface does not separate who owns what.
+
+- Seven sections each take `AC2_<SECTION>_PROVIDER` and `AC2_<SECTION>_OPTIONS`,
+  and any combination is accepted. A developer's own choices (the data folder,
+  the policy file, the registries) travel as JSON inside environment variables,
+  next to infrastructure options such as `allow_http` and the identity issuer.
+  The AgentCore deploy step adds 13 `AGENTCORE_*` variables outside the binding
+  table.
+- `AC2_DEPLOYMENT_ENV` defaults to `local`. The guard against a deployed
+  service running as local recognises ECS and Lambda only, and a blank value in
+  the process environment hides the value in `.env`.
+- Paths are anchored in four ways: the folder of a service's `.env`, the current
+  directory (CLI, Agent Lab, launchers), the folder of `pyproject.toml`, and
+  `../../` in generated files. State lands in `.agentcraft2/` relative to
+  whichever anchor applied.
+- A local agent cannot call an MCP server running on the server side. The local
+  identity is the static development one, which sends no token, and a deployed
+  server requires a token and a registered calling agent.
+- The security and configuration review of 24 October 2026 found that most
+  server-side findings come from this freedom to mix: a service that starts as
+  local, `agentcore_runtime` identity on ECS, `allow_http` and content capture
+  accepted in dev and prod, and third-party secrets accepted in `deploy.env`.
+
+## Decision
+
+1. **Three owners of configuration.**
+
+   | Owner | What it holds | Where it lives |
+   | --- | --- | --- |
+   | Developer | The model, the policy rules, data sources and their folders, memory and context settings, guardrail rules, limits, the local persona, the registries, tracing switches. | `agentcraft2.settings.toml`, committed, the same in every profile. |
+   | Profile | Identity provider, secrets store, audit sink, checkpoint backend, registry location, policy and guardrail engines, TLS rules, bind address, networking, IAM, AgentCore settings. | Code (the profile) and values the deploy step generates. Developers do not edit them. |
+   | Other tools and secrets | Credentials and tool settings. | The variables the tools define: `AWS_PROFILE`, `AWS_REGION`, `ANTHROPIC_API_KEY`, `PHOENIX_*`, `OTEL_*`, `HTTPS_PROXY`, `NO_PROXY`, `SSL_CERT_FILE`. |
+
+   Only variables the library defines use `AC2_`. A secret that has a standard
+   name is also accepted as `AC2_SECRET_<NAME>` for one release, with a warning
+   that names the standard variable; that family is for secrets that have no
+   standard name.
+
+2. **The developer file is `agentcraft2.settings.toml`.** It is not
+   `agentcraft2.toml`: that file records the answers a workspace was generated
+   from, and `init`, `new` and `update` rewrite it whole. The settings file is
+   written once and then belongs to the developer; the CLI adds to it and does
+   not regenerate it.
+   - It holds no secrets and no infrastructure values. A key it does not know
+     is an error with a suggestion, and a value is never repeated in a message.
+     `agentcraft2 config schema` prints a JSON Schema of it.
+   - It is the weakest configuration layer. Precedence is process environment,
+     then the service's `.env`, then the home's `.env`, then the service's
+     settings file, then the home's, then the profile defaults. Blank values
+     never hide a lower layer.
+   - Each table is another way to write a variable that exists, so there is no
+     second configuration to keep in step: `[model]` writes the model
+     provider, ID, aliases and options; `[limits]` the limits; `[registry]` the
+     file registry's options; `[policy]` the rules engine's path; `[persona]`
+     the development identity's options; `[data.<name>]` one data source. A
+     relative path is relative to the file.
+   - `agentcraft2 config explain` says which table of which file wrote each
+     setting.
+   - Not done: one entry that carries both a local and a deployed form of a
+     knob, a machine-readable `config explain`, and shipping the file in a
+     deployment. A deployment is still configured by `deploy.env`.
+
+3. **Profiles are closed outside local.** The profiles are `local`, `aws`
+   (Fargate and other ECS) and `agentcore` (experimental).
+   - An adapter may name the profiles it runs under, beside the `local_only`
+     flag, which stays. A pairing the adapter does not declare stops startup
+     with a message naming the adapter, the profile and the allowed profiles.
+     Today `agentcore_runtime` identity names one: it runs only in `agentcore`.
+     `--profile agentcore` serving needs `AC2_PROFILE=agentcore`, so a service
+     that lost its configuration does not listen on every address with the
+     defaults of a developer's machine.
+   - Infrastructure options (`allow_http`, issuer and endpoint URLs, bind
+     address) cannot come from the settings file or from `AC2_<SECTION>_OPTIONS`
+     outside `local`. They arrive from the deploy step. `allow_http` is refused
+     outside `local`.
+   - `AC2_DEPLOYMENT_ENV` has no default under `aws` or `agentcore`: it must be
+     set. A developer who runs a server profile on their own machine names
+     `local`, on purpose. The managed-runtime guard stays as a second check.
+   - Content capture (`AC2_MODEL_TRACE_PATH`, `AC2_PHOENIX_CAPTURE_CONTENT`) is
+     refused when the environment is `prod`. In `dev` the trace file is a
+     diagnostic for test data and is allowed, with a warning that says what the
+     file holds.
+   - In `local` a developer may still mix adapters, for example a real Bedrock
+     model with in-process everything else. The per-section variables remain as
+     advanced overrides there; the settings file does not accept them.
+   - The AgentCore deploy variables are `AC2_AGENTCORE_*`, read by the deploy step
+     only, and an unknown name in the block is an error with a suggestion. The
+     `AGENTCORE_*` spellings are accepted for one release and reported.
+
+4. **The model provider is the developer's choice on every profile.** Bedrock
+   uses the AWS credential chain (`AWS_PROFILE`, `AWS_REGION`). The Anthropic
+   API uses `ANTHROPIC_API_KEY` locally and Secrets Manager when deployed; the
+   deploy plan keeps refusing the key in `deploy.env`. MCP connectors read the
+   standard CA and proxy variables, as the AWS and Anthropic clients do, so a
+   TLS-inspecting enterprise proxy works the same for every outbound call:
+   `HTTPS_PROXY` and `NO_PROXY` (this machine is always direct), `SSL_CERT_FILE`
+   for the HTTP connector and `AWS_CA_BUNDLE` for the AgentCore one.
+
+5. **`AC2_HOME` is the root of the project's files.**
+   - It is read from the process environment only, because it locates `.env`.
+   - When unset it is the nearest folder at or above the current directory that
+     holds `agentcraft2.toml`, and otherwise the current directory. Services
+     find it from their own location, so starting one from another folder works.
+   - `.env`, `agentcraft2.settings.toml`, `registry/`, `policies/`, data folders
+     and all state under `.agentcraft2/` (audit, checkpoints, outcomes, traces,
+     tokens, Agent Lab, Phoenix, local runs) live under it.
+   - A relative path resolves against the file that holds it. Values in the
+     settings file, the home `.env` and the process environment resolve against
+     `AC2_HOME`. A service-level `.env` keeps resolving against its own folder,
+     as today, so existing workspaces still work. The generator stops writing
+     path settings into service `.env` files once the settings file holds them.
+     Absolute paths always work.
+   - Server profiles read no `.env` and write no `.agentcraft2/` state, and the
+     deploy step does not pass `AC2_HOME`.
+
+6. **A local agent reaches a server-side MCP server with a token file.**
+   - In `local`, a registry entry whose URL is remote (https, not loopback) gets
+     its token from `$AC2_HOME/.agentcraft2/tokens/<server-id>.token`. Nothing
+     machine-specific is committed. A missing file is an error that names the
+     path and says what writes it.
+   - The developer's own sign-in tooling writes the file: a short-lived token
+     for the development client application of the calling agent, with the
+     server's audience. The SDK reads it on every call, sends it only to that
+     server and only over https, and never logs it. The SDK only reads the
+     file; the tool that writes it should keep it readable by its owner alone.
+   - The server sees the real developer and the registered agent, so nothing
+     changes on the server: the same checks as in production run. The local
+     agent's own policy still uses the local persona; the server applies the
+     developer's real roles.
+   - Plain http is allowed only to loopback, even in `local`. Schema pins stay
+     required outside `local` only: they fingerprint the input schema, not the
+     description the model reads, so requiring them here would promise more than
+     they give. Pinning descriptions too is a separate change.
+   - Production servers must refuse tokens of the development client by issuer
+     or audience. That is infrastructure and is documented, not code.
+   - A built-in `agentcraft2 login` that writes the file with the device-code
+     flow is a possible later change and is not decided here.
+
+## Consequences
+
+By construction a server profile can no longer start as local, accept the
+perimeter identity off AgentCore, accept `allow_http` or content capture, or
+take third-party secrets as plain deploy variables. The IAM wildcards, the
+policy and registry gaps, redaction and request limits from the review are
+separate work.
+
+A developer sets nothing but `AWS_PROFILE`/`AWS_REGION` or an API key, and
+optionally `AC2_HOME`. Moving a project is copying a folder. The generated
+`.env.example` files shrink to secrets and third-party names.
+
+Costs: one more file to learn; an adapter-by-profile test matrix replaces the
+`local_only` flag; `docs/variables.md` and the developer guide are generated
+from the new tables; precedence between layers must stay visible through
+`config explain`. Existing deployments keep working for one release: the
+per-section variables, `EAP_*` and `AGENTCORE_*` spellings are accepted with a
+warning, except where this record refuses a combination as unsafe.
+
+Windows ignores the owner-only file modes, so a home on a shared drive can
+expose `.env`, tokens and state to other users; the CLI warns where it can
+tell. Remote MCP from a local agent depends on the identity provider issuing
+the development client's tokens, which is not verified for any provider here.
+
+Not decided: the exact schema of the settings file; `agentcraft2 login`; whether
+`rules` may run in `aws` (open since ADR 0005); AgentCore settings beyond the
+move to `AC2_AGENTCORE_*`, which stay experimental.
+
+Suggested order: the fixes that do not depend on this record (blank-value
+layering, pinned ADOT install, MCP proxy and CA handling), then profiles and
+the explicit deployment environment, then `AC2_HOME`, then the settings file and
+its schema, then the remote MCP token file.
+
+## Owner
+
+Library maintainers.

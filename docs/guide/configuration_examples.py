@@ -166,6 +166,13 @@ def _json(value: object) -> str:
 def configuration_examples() -> dict[str, EnvironmentExample]:
     """Return one example per configuration key, including every provider and options pair."""
     examples = {
+        Key.HOME: EnvironmentExample(
+            "Optional: the project's folder, e.g. `~/projects/accounts`",
+            "Unset: a deployment reads no `.env` and writes no state",
+            "Names the one folder that holds the project's `.env`, registries, rules, data and "
+            "the state under `.agentcraft2/`. Set it in the shell, not in a `.env`, which it "
+            "locates. A service's own `.env` keeps its paths relative to itself.",
+        ),
         Key.PROFILE: EnvironmentExample(
             "`local`",
             "`aws`",
@@ -259,6 +266,12 @@ def configuration_examples() -> dict[str, EnvironmentExample]:
             "Unset with standard AWS trust",
             "AWS SDK CA setting. `AC2_TLS_CA_BUNDLE` takes precedence for Bedrock clients. "
             "Neither setting configures pip or the checkpoint database.",
+        ),
+        Key.SSL_CERT_FILE: EnvironmentExample(
+            "Team CA file when the network inspects TLS",
+            "Unset with standard trust; otherwise an image path",
+            "The standard OpenSSL and Python CA setting. The calls to MCP servers verify against "
+            "it, and the Anthropic client reads it itself. AWS clients use `AWS_CA_BUNDLE`.",
         ),
         Key.AWS_EXECUTION_ENV: EnvironmentExample(
             "Unset",

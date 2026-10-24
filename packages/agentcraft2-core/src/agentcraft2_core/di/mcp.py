@@ -4,10 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
+from urllib.parse import urlsplit
 
 from agentcraft2_core.adapters.http_support import checked_base_url
-from agentcraft2_core.config import options_key, variable_for
+from agentcraft2_core.adapters.identity_static import StaticIdentityVerifier
+from agentcraft2_core.adapters.token_file import TokenFileExchanger
+from agentcraft2_core.config import STATE_FOLDER, options_key, variable_for
 from agentcraft2_core.contracts import (
     AuditSink,
     Classification,
@@ -45,6 +49,14 @@ if TYPE_CHECKING:
     from agentcraft2_core.integrations.mcp.client import McpConnector
 
 _HTTP = "http"
+_THIS_MACHINE = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+def _runs_elsewhere(entry: ServerEntry) -> bool:
+    """Whether the server is reached over the network, not on this machine."""
+    if entry.transport != _HTTP:
+        return False
+    return (urlsplit(entry.url).hostname or "") not in _THIS_MACHINE
 
 
 def _no_factory(kind: str) -> McpConnectorFactory | None:  # noqa: ARG001 - the default knows none
@@ -78,6 +90,8 @@ class McpBindings:
             other than ``http``; by default none is known.
         connector_context: Builds what such a factory is given; ``None`` when
             the bindings stand alone, in which case only ``http`` is served.
+        token_dir: The folder a developer leaves tokens in for the servers that run
+            elsewhere, one file per server; used in local development only.
     """
 
     audit: AuditSink
@@ -95,6 +109,7 @@ class McpBindings:
     bindings: Callable[[], LangGraphBindings]
     connector_factory: Callable[[str], McpConnectorFactory | None] = _no_factory
     connector_context: Callable[[], ConnectorContext] | None = None
+    token_dir: Path | None = None
     _owned: _OwnedConnectors = field(default_factory=_OwnedConnectors, init=False, repr=False)
 
     def mcp_connector(self, entry: ServerEntry | None = None) -> McpConnector:
@@ -122,7 +137,14 @@ class McpBindings:
         # Imported here so that an agent which uses no MCP server does not load the SDK.
         from agentcraft2_core.integrations.mcp.client import HttpMcpConnector
 
-        return HttpMcpConnector(timeout_seconds=self.operations.limits.tool.timeout_seconds)
+        # The standard proxy and CA variables apply to the servers too, as they do to the model.
+        external = self.connector_context().external if self.connector_context is not None else None
+        return HttpMcpConnector(
+            timeout_seconds=self.operations.limits.tool.timeout_seconds,
+            proxy=external.https_proxy if external is not None else None,
+            no_proxy=external.no_proxy if external is not None else None,
+            ca_file=external.ssl_cert_file if external is not None else None,
+        )
 
     def _registered_connector(self, kind: str) -> McpConnector:
         factory = self.connector_factory(kind)
@@ -159,17 +181,28 @@ class McpBindings:
         """
         entry = self._registered_server(server)
         local = self.environment is DeploymentEnv.LOCAL
-        # Send only service or audience-bound exchanged tokens. HTTP is allowed
-        # on loopback, and on other hosts only during local development. An
-        # AgentCore runtime's URL is derived from its ARN and carries the
-        # qualifier as a query; the address before it is what is checked.
+        # A server that runs somewhere else is reached as the deployed ones are: over TLS, with
+        # a token. Its tools are pinned when the registry pins them, and must be outside local.
+        remote = local and _runs_elsewhere(entry)
+        # Send only service or audience-bound exchanged tokens. Plain HTTP is for servers on
+        # this machine, in local development or not. An AgentCore runtime's URL is derived
+        # from its ARN and carries the qualifier as a query; the address before it is checked.
         checked_base_url(
             f"MCP server {server!r} in the tool registry",
             entry.url.split("?", 1)[0] if entry.transport == "agentcore" else entry.url,
-            allow_http=local,
-            hint="outside local development a caller's token is sent only over TLS",
+            allow_http=False,
+            hint="a token is sent only over TLS; plain http reaches only this machine",
         )
-        exchanger = self.identity if isinstance(self.identity, TokenExchanger) else None
+        # The development identity signs tokens with a key that is public, so nothing that runs
+        # elsewhere accepts them: the developer's own token is presented instead.
+        exchanger: TokenExchanger | None = (
+            self.identity
+            if isinstance(self.identity, TokenExchanger)
+            and not (remote and isinstance(self.identity, StaticIdentityVerifier))
+            else None
+        )
+        if exchanger is None and remote:
+            exchanger = self._token_file(entry)
         if exchanger is None and not local and entry.auth != "sigv4":
             raise ConfigurationError(
                 f"MCP server {server!r} cannot be called: the identity provider "
@@ -182,6 +215,13 @@ class McpBindings:
             exchanger=exchanger,
             require_pins=not local,
         )
+
+    def _token_file(self, entry: ServerEntry) -> TokenFileExchanger:
+        """Return the exchanger that presents the token a developer left for ``entry``."""
+        folder = (
+            self.token_dir if self.token_dir is not None else Path.cwd() / STATE_FOLDER / "tokens"
+        )
+        return TokenFileExchanger(folder / f"{entry.id}.token", entry.id)
 
     async def registered_mcp_tools(self, application: str) -> list[BaseTool]:
         """Return the governed tools of every MCP server the registry lists for an agent.

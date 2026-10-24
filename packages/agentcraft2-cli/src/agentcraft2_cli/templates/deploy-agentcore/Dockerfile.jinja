@@ -9,11 +9,11 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
 WORKDIR /app
 COPY deploy/{{ name }}/requirements.lock /tmp/requirements.lock
 RUN python -m pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock
-# The runtime expects the process under opentelemetry-instrument, which this ADOT
-# distribution provides. It installs the tracer and meter providers before the
-# service's code runs; the service uses them when its telemetry is ambient, and
-# sends nothing of its own when it is off.
-RUN python -m pip install --no-cache-dir "aws-opentelemetry-distro>=0.18.0"
+# The runtime expects the process under opentelemetry-instrument, which the ADOT
+# distribution in requirements.lock provides. It installs the tracer and meter
+# providers before the service's code runs; the service uses them when its telemetry
+# is ambient, and sends nothing of its own when it is off.
+RUN command -v opentelemetry-instrument > /dev/null     || { echo "requirements.lock lacks {{ adot }}: compile it with deploy/{{ name }}/requirements.in (README, step 2)" >&2; exit 1; }
 # Dockerfile.dockerignore admits only this service's code and runtime assets.
 COPY {{ folder }} {{ folder }}
 COPY registry registry

@@ -55,6 +55,7 @@ class ValueKind(enum.Enum):
 class Key(enum.StrEnum):
     """Logical keys for the settings that are not per-section."""
 
+    HOME = "platform.home"
     PROFILE = "platform.profile"
     DEPLOYMENT_ENV = "platform.deployment_env"
     TELEMETRY = "platform.telemetry"
@@ -69,6 +70,7 @@ class Key(enum.StrEnum):
     AWS_PROFILE = "external.aws_profile"
     AWS_REGION = "external.aws_region"
     AWS_CA_BUNDLE = "external.aws_ca_bundle"
+    SSL_CERT_FILE = "external.ssl_cert_file"
     AWS_EXECUTION_ENV = "external.aws_execution_env"
     HTTPS_PROXY = "external.https_proxy"
     NO_PROXY = "external.no_proxy"
@@ -248,9 +250,13 @@ def _section_bindings() -> list[Binding]:
     return bindings
 
 
+_NEW_SINCE_THE_RENAME = frozenset({Key.HOME})
+"""Keys of variables that never had the earlier prefix, so no old spelling is accepted."""
+
+
 def _with_legacy_spelling(binding: Binding) -> Binding:
     """Return an owned binding that also accepts its legacy spelling, with a warning."""
-    if not binding.owned:
+    if not binding.owned or binding.key in _NEW_SINCE_THE_RENAME:
         return binding
     return replace(
         binding, deprecated_names=(*binding.deprecated_names, legacy_spelling(binding.name))
@@ -264,14 +270,34 @@ def _default_bindings() -> tuple[Binding, ...]:
 def _owned_and_external_bindings() -> tuple[Binding, ...]:
     return (
         Binding(
+            name=f"{PREFIX}HOME",
+            key=Key.HOME,
+            description="The project's folder: the one place its files and state are found.",
+            example="~/projects/accounts",
+            details=(
+                "With it set, the `.env` file, the registries, the rules, the data and the state "
+                "under `.agentcraft2/` (audit, checkpoints, traces, tokens, Agent Lab, Phoenix) "
+                "are found in this folder, so a project is one folder to copy or back up. A "
+                "relative path in the process environment or in this folder's `.env` is relative "
+                "to it; a service's own `.env` keeps its paths relative to itself. It locates "
+                "the `.env` file, so it is read from the process environment only and is refused "
+                "inside a `.env`. A server profile has no use for it: a deployment reads no "
+                "`.env` and writes no state."
+            ),
+            default="not set: the command line works from the current directory, and a service "
+            "from the folder of its own `.env`",
+        ),
+        Binding(
             name=f"{PREFIX}PROFILE",
             key=Key.PROFILE,
-            description="Default adapter set: local or aws.",
+            description="Default adapter set: local, aws or agentcore.",
             example="local",
             details=(
                 "`local` selects file storage, SQLite, local rules, a development identity, "
-                "and the Anthropic model provider. `aws` selects the AWS deployment defaults. "
-                "Override individual providers to match your environment; use "
+                "and the Anthropic model provider. `aws` selects the AWS deployment defaults, "
+                "and `agentcore` the same for a service on Bedrock AgentCore Runtime, where the "
+                "adapters that trust the runtime's perimeter can also be used. Override "
+                "individual providers to match your environment; use "
                 "`AC2_MODEL_PROVIDER=fake` for the local tutorial."
             ),
         ),
@@ -283,8 +309,11 @@ def _owned_and_external_bindings() -> tuple[Binding, ...]:
             details=(
                 "Says where the process runs. Anything other than `local` turns on the one-way "
                 f"guard: adapters registered as local only ({_LOCAL_ONLY_PHRASES}) refuse to "
-                "start. Inside ECS, Fargate or Lambda the value must be dev or prod."
+                "start. Inside ECS, Fargate or Lambda the value must be dev or prod. The `aws` "
+                "and `agentcore` profiles do not assume a developer's machine: with either, the "
+                "value must be set. `AC2_MODEL_TRACE_PATH` is refused when it is prod."
             ),
+            default="`local`; required with the `aws` and `agentcore` profiles",
         ),
         Binding(
             name=f"{PREFIX}TELEMETRY",
@@ -430,6 +459,16 @@ def _owned_and_external_bindings() -> tuple[Binding, ...]:
             details=("The AWS SDK's own CA setting, honoured as boto3 does."),
         ),
         Binding(
+            name="SSL_CERT_FILE",
+            key=Key.SSL_CERT_FILE,
+            description="CA file for HTTPS calls that are not to AWS.",
+            details=(
+                "The standard CA setting of OpenSSL and Python. The calls to MCP servers verify "
+                "certificates against it, for networks that inspect TLS. The Anthropic client "
+                "reads the same variable itself."
+            ),
+        ),
+        Binding(
             name="AWS_EXECUTION_ENV",
             key=Key.AWS_EXECUTION_ENV,
             description=(
@@ -448,9 +487,10 @@ def _owned_and_external_bindings() -> tuple[Binding, ...]:
             sensitive=True,
             alternate_names=("https_proxy",),
             details=(
-                "Outbound proxy. The AWS clients and the anthropic model use it; the jwt identity "
-                "provider and rest data sources use it only when their `use_proxy` option is set. "
-                "Masked wherever it is shown, since it can carry credentials."
+                "Outbound proxy. The AWS clients, the anthropic model and the calls to MCP servers "
+                "use it; the jwt identity provider and rest data sources use it only when their "
+                "`use_proxy` option is set. Masked wherever it is shown, since it can carry "
+                "credentials."
             ),
         ),
         Binding(
@@ -458,7 +498,10 @@ def _owned_and_external_bindings() -> tuple[Binding, ...]:
             key=Key.NO_PROXY,
             description="Hosts that bypass the proxy.",
             alternate_names=("no_proxy",),
-            details=("Comma-separated hosts the AWS clients reach without the proxy."),
+            details=(
+                "Comma-separated hosts the AWS clients and the MCP calls reach without the proxy. "
+                "A host name covers its subdomains. This machine is always reached directly."
+            ),
         ),
         Binding(
             name="ANTHROPIC_API_KEY",
