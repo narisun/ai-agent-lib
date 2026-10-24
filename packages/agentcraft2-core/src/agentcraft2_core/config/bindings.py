@@ -267,12 +267,14 @@ def _owned_and_external_bindings() -> tuple[Binding, ...]:
         Binding(
             name=f"{PREFIX}PROFILE",
             key=Key.PROFILE,
-            description="Default adapter set: local or aws.",
+            description="Default adapter set: local, aws or agentcore.",
             example="local",
             details=(
                 "`local` selects file storage, SQLite, local rules, a development identity, "
-                "and the Anthropic model provider. `aws` selects the AWS deployment defaults. "
-                "Override individual providers to match your environment; use "
+                "and the Anthropic model provider. `aws` selects the AWS deployment defaults, "
+                "and `agentcore` the same for a service on Bedrock AgentCore Runtime, where the "
+                "adapters that trust the runtime's perimeter can also be used. Override "
+                "individual providers to match your environment; use "
                 "`AC2_MODEL_PROVIDER=fake` for the local tutorial."
             ),
         ),
@@ -284,8 +286,11 @@ def _owned_and_external_bindings() -> tuple[Binding, ...]:
             details=(
                 "Says where the process runs. Anything other than `local` turns on the one-way "
                 f"guard: adapters registered as local only ({_LOCAL_ONLY_PHRASES}) refuse to "
-                "start. Inside ECS, Fargate or Lambda the value must be dev or prod."
+                "start. Inside ECS, Fargate or Lambda the value must be dev or prod. The `aws` "
+                "and `agentcore` profiles do not assume a developer's machine: with either, the "
+                "value must be set. `AC2_MODEL_TRACE_PATH` is refused when it is prod."
             ),
+            default="`local`; required with the `aws` and `agentcore` profiles",
         ),
         Binding(
             name=f"{PREFIX}TELEMETRY",

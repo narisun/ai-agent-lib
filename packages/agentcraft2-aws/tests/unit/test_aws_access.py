@@ -267,7 +267,12 @@ def test_the_aws_profile_derives_a_complete_plan() -> None:
 
 
 def test_a_missing_option_says_which_adapter_was_being_worked_out() -> None:
-    values = {"AC2_PROFILE": "aws", **_AWS_OPTIONS, "AC2_AUDIT_OPTIONS": "{}"}
+    values = {
+        "AC2_PROFILE": "aws",
+        "AC2_DEPLOYMENT_ENV": "dev",
+        **_AWS_OPTIONS,
+        "AC2_AUDIT_OPTIONS": "{}",
+    }
     config = ConfigResolver(MappingConfigSource(values)).resolve()
 
     with pytest.raises(ConfigurationError) as caught:

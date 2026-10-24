@@ -46,10 +46,14 @@ DEFAULT_MODEL_ALIAS = "default"
 
 
 class Profile(enum.StrEnum):
-    """A named set of default adapters."""
+    """A named set of default adapters, and the kind of place the service runs in."""
 
     LOCAL = "local"
     AWS = "aws"
+    """Services on AWS compute such as ECS Fargate."""
+    AGENTCORE = "agentcore"
+    """Services on Amazon Bedrock AgentCore Runtime: the AWS defaults, and the adapters
+    that trust the runtime's perimeter."""
 
 
 class DeploymentEnv(enum.StrEnum):

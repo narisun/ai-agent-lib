@@ -113,6 +113,12 @@ class ConfigResolver:
         self._base_dir = base_dir
         self._bindings = tuple(bindings)
         self._by_key = {binding.key: binding for binding in self._bindings}
+        # Secrets that a tool names itself, such as ANTHROPIC_API_KEY: the standard name is used.
+        self._standard_secrets = {
+            binding.key: binding.name
+            for binding in self._bindings
+            if binding.key.startswith(SECRET_KEY_PREFIX) and not binding.owned
+        }
         self._profile_defaults = profile_defaults
 
     def resolve(self) -> ServiceConfig:
@@ -131,7 +137,9 @@ class ConfigResolver:
         profile = self._enum(values, Key.PROFILE, Profile, Profile.LOCAL)
         deployment_env = self._enum(values, Key.DEPLOYMENT_ENV, DeploymentEnv, DeploymentEnv.LOCAL)
         telemetry = self._enum(values, Key.TELEMETRY, TelemetryMode, TelemetryMode.OFF)
+        self._require_a_named_environment(values, profile)
         self._refuse_local_on_a_managed_runtime(values, deployment_env)
+        self._check_content_capture(values, deployment_env, notes)
         defaults = self._profile_defaults[profile]
         profile_origin = f"profile {profile.value}"
 
@@ -308,6 +316,10 @@ class ConfigResolver:
             if name is None or value is None:
                 continue
             key = secret_key(name)
+            standard = self._standard_secrets.get(key)
+            if standard is not None:
+                # Another tool defines this secret's variable, and its name is the one to use.
+                self._deprecated(notes, variable, standard)
             if values.get(key, value) != value:
                 other = origins[key].removeprefix("variable ")
                 raise ConfigurationError(
@@ -321,6 +333,54 @@ class ConfigResolver:
                     self._deprecated(notes, variable, current)
             values[key] = value
             origins.setdefault(key, f"variable {variable}")
+
+    def _require_a_named_environment(self, values: Mapping[str, str], profile: Profile) -> None:
+        """Make a service on a server profile say where it runs.
+
+        The deployment environment defaults to ``local``, which allows the
+        development identity and every other local-only adapter. A service that
+        lost the variable on its way to a server would start as a developer's
+        machine, so outside the ``local`` profile the variable has no default.
+        A developer who runs a server profile on their own machine names
+        ``local`` on purpose.
+        """
+        if profile is Profile.LOCAL or Key.DEPLOYMENT_ENV in values:
+            return
+        name = self._name(Key.DEPLOYMENT_ENV)
+        raise ConfigurationError(
+            f"{name} is not set, and the {profile.value} profile does not assume a "
+            "developer's machine",
+            expected=f"{name}=dev or {name}=prod on a deployed service",
+            actual="not set",
+            fix=f"set {name}=dev (or prod); on a developer's machine set {name}=local",
+        )
+
+    def _check_content_capture(
+        self, values: Mapping[str, str], deployment_env: DeploymentEnv, notes: list[str]
+    ) -> None:
+        """Keep conversation content out of a production service's files.
+
+        A model trace file holds the messages themselves. In ``prod`` it is
+        refused, because a variable left over from a developer's file would
+        write every customer's conversation to the task's disk. In ``dev`` it
+        is a diagnostic tool and is allowed, with a warning that says what it
+        holds.
+        """
+        traced = bool(values.get(Key.MODEL_TRACE_PATH, "").strip())
+        if not traced or deployment_env is DeploymentEnv.LOCAL:
+            return
+        name = self._name(Key.MODEL_TRACE_PATH)
+        if deployment_env is DeploymentEnv.PROD:
+            raise ConfigurationError(
+                f"{name} writes conversation content to a file, and a production service does not",
+                expected=f"{name} unset when {self._name(Key.DEPLOYMENT_ENV)} is prod",
+                actual="set",
+                fix=f"remove {name}; trace a dev deployment with test data instead",
+            )
+        notes.append(
+            f"{name} is set: the file holds complete conversations. Use test data, "
+            "restrict access to it and remove the setting afterwards"
+        )
 
     def _refuse_local_on_a_managed_runtime(
         self, values: Mapping[str, str], deployment_env: DeploymentEnv

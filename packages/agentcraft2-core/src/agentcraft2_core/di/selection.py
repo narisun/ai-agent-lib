@@ -8,12 +8,13 @@ variables a developer changes, so every error says where to look.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from agentcraft2_core.config import Key, options_key, provider_key, variable_for
 from agentcraft2_core.contracts import (
     ConfigurationError,
     DeploymentEnv,
+    Profile,
     ProviderSelection,
     Section,
     ServiceConfig,
@@ -24,6 +25,7 @@ from agentcraft2_core.di.providers import DATA_PORT, MODEL_PORT, ProviderSpec, S
 __all__ = [
     "AdapterKey",
     "check_allowed",
+    "check_infrastructure_options",
     "check_options",
     "label",
     "selected_adapters",
@@ -64,12 +66,35 @@ def label(key: AdapterKey) -> str:
     return f"{port} {instance!r} ({name})" if instance else f"{port} ({name})"
 
 
-def check_allowed(spec: ProviderSpec, env: DeploymentEnv) -> None:
-    """Refuse a local-only adapter outside local development: the one-way guard.
+def check_allowed(spec: ProviderSpec, env: DeploymentEnv, profile: Profile | None = None) -> None:
+    """Refuse an adapter where it must not run: the one-way guard, and the profile guard.
+
+    A local-only adapter is refused outside local development. An adapter that
+    names the profiles it runs under is refused under any other, so that one
+    which trusts a platform's perimeter cannot be selected on a host that is
+    not behind it.
+
+    Args:
+        spec: The adapter.
+        env: Where the process runs.
+        profile: The profile the service runs under; ``None`` skips that check.
 
     Raises:
-        ConfigurationError: If the adapter is for local development only.
+        ConfigurationError: If the adapter may not run here.
     """
+    if spec.profiles is not None and profile is not None and profile not in spec.profiles:
+        allowed = " or ".join(sorted(p.value for p in spec.profiles))
+        raise ConfigurationError(
+            f"provider {spec.name!r} for {spec.port} runs only under the {allowed} profile, "
+            f"and this service runs under {profile.value!r}",
+            expected=f"a {spec.port} provider that fits the {profile.value} profile",
+            actual=f"{spec.name!r}, which needs {allowed}",
+            fix=(
+                f"select another {spec.port} provider, or deploy the service to the platform "
+                f"that provides what {spec.name!r} trusts and set {variable_for(Key.PROFILE)}"
+                f"={allowed}"
+            ),
+        )
     if spec.local_only and env is not DeploymentEnv.LOCAL:
         raise ConfigurationError(
             f"provider {spec.name!r} for {spec.port} is for local development only "
@@ -80,6 +105,52 @@ def check_allowed(spec: ProviderSpec, env: DeploymentEnv) -> None:
                 f"select a server-side provider for {spec.port} (the aws profile does), "
                 f"or set {variable_for(Key.DEPLOYMENT_ENV)}=local on a developer's machine"
             ),
+        )
+
+
+_LOCAL_ONLY_OPTIONS = ("allow_http",)
+"""Options that exist for a developer's machine and are refused anywhere else.
+
+``allow_http`` sends a caller's token, a signing-key request or a policy decision
+over plain http. On a private network that is a decision about the network, which
+a deployment's infrastructure makes, so no setting a developer edits can turn it on.
+"""
+
+
+def _truthy_option(options: object, name: str) -> bool:
+    """Return whether ``name`` is set to something other than false anywhere in ``options``."""
+    if isinstance(options, Mapping):
+        return any(
+            (key == name and bool(value)) or _truthy_option(value, name)
+            for key, value in options.items()
+        )
+    if isinstance(options, list | tuple):
+        return any(_truthy_option(item, name) for item in options)
+    return False
+
+
+def check_infrastructure_options(config: ServiceConfig, selected: Sequence[AdapterKey]) -> None:
+    """Refuse the options that are for a developer's machine outside local development.
+
+    Raises:
+        ConfigurationError: Naming each adapter that sets one.
+    """
+    if config.deployment_env is DeploymentEnv.LOCAL:
+        return
+    problems = [
+        f"{label(key)}: {name}"
+        for key in selected
+        for name in _LOCAL_ONLY_OPTIONS
+        if _truthy_option(selection_for(config, key).options, name)
+    ]
+    if problems:
+        raise ConfigurationError(
+            "options that are for a developer's machine are set on a deployed service",
+            expected=f"none of {', '.join(_LOCAL_ONLY_OPTIONS)} when the deployment environment "
+            f"is {config.deployment_env.value!r}",
+            actual="; ".join(problems),
+            fix="remove them; reach the service over https, or put it on a network the "
+            "deployment's infrastructure secures",
         )
 
 

@@ -22,8 +22,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from agentcraft2_core.config import log_resolution_warnings, service_resolver
+from agentcraft2_core.config import Key, log_resolution_warnings, service_resolver, variable_for
 from agentcraft2_core.contracts import (
+    ConfigurationError,
+    Profile,
     RequestContext,
     ServiceConfig,
     ValidationFailed,
@@ -47,7 +49,14 @@ if TYPE_CHECKING:
     # graph, which the import contracts forbid outside integrations.langgraph.
     from agentcraft2_core.integrations.langgraph import AgentTracing
 
-__all__ = ["PROFILES", "AgentService", "build_agent_app", "read_question", "run_agent"]
+__all__ = [
+    "PROFILES",
+    "AgentService",
+    "build_agent_app",
+    "read_question",
+    "require_serving_profile",
+    "run_agent",
+]
 
 PROFILES: Mapping[str, tuple[str, int | None]] = {
     "standard": ("127.0.0.1", None),
@@ -59,6 +68,35 @@ A ``None`` port is the service's own ``default_port``. AgentCore Runtime
 invokes ``POST /invocations`` and asks ``GET /ping`` on port 8080 at any
 address of the container.
 """
+
+
+def require_serving_profile(serving: str, config: ServiceConfig) -> None:
+    """Refuse to listen as AgentCore Runtime's container unless the service is configured as one.
+
+    ``--profile agentcore`` binds every address on the platform's port. A service
+    that lost its configuration on the way there would otherwise start with the
+    defaults of a developer's machine and listen to the network. The service's
+    own profile is what tells the adapters, and the identity that trusts the
+    runtime's perimeter, where they are.
+
+    Args:
+        serving: The ``--profile`` the process was started with.
+        config: The resolved configuration.
+
+    Raises:
+        ConfigurationError: If the service listens for AgentCore under another profile.
+    """
+    if serving == "agentcore" and config.profile is not Profile.AGENTCORE:
+        variable = variable_for(Key.PROFILE)
+        raise ConfigurationError(
+            "--profile agentcore serves the AgentCore Runtime contract, and this service is "
+            f"not configured for it: its {variable} is {config.profile.value!r}",
+            expected=f"{variable}={Profile.AGENTCORE.value} on a service that AgentCore runs",
+            actual=config.profile.value,
+            fix=f"set {variable}={Profile.AGENTCORE.value} where the runtime starts the "
+            "service; on a developer's machine, serve with --profile standard",
+        )
+
 
 Respond = Callable[[Any, ServiceContainer, RequestContext, str], Awaitable[dict[str, Any]]]
 """Answers one question with the compiled graph.
@@ -290,6 +328,7 @@ def run_agent(service: AgentService, argv: Sequence[str] | None = None) -> int:
             else service_resolver()
         ).explain()
         config = resolution.config
+        require_serving_profile(arguments.profile, config)
         configure_logging(service.application, details=shows_details(config))
         log_resolution_warnings(resolution)
         stop_telemetry = start_telemetry(service.application, config)

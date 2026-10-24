@@ -7,8 +7,17 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from agentcraft2_core.config.phoenix import PhoenixSettings, load_phoenix_settings
-from agentcraft2_core.contracts import ModelTraceSink, ServiceConfig
+from agentcraft2_core.config.phoenix import (
+    PHOENIX_LABELS,
+    PhoenixSettings,
+    load_phoenix_settings,
+)
+from agentcraft2_core.contracts import (
+    ConfigurationError,
+    DeploymentEnv,
+    ModelTraceSink,
+    ServiceConfig,
+)
 from agentcraft2_core.integrations.langgraph._agent_tracing import (
     AgentTracing,
     local_model_trace,
@@ -72,6 +81,19 @@ async def phoenix_tracing(
     ``local_sink`` replaces the JSONL model trace ``config`` names.
     """
     settings = settings or load_phoenix_settings(dotenv_path)
+    if (
+        settings is not None
+        and settings.capture_content
+        and config.deployment_env is DeploymentEnv.PROD
+    ):
+        raise ConfigurationError(
+            "Phoenix is set to capture conversation content, and a production service "
+            "does not send it",
+            expected="content capture off when the deployment environment is prod",
+            actual="on",
+            fix=f"set {PHOENIX_LABELS['capture_content']}=false; trace a dev deployment "
+            "with test data",
+        )
     tracing = (
         PhoenixTracing(
             settings,

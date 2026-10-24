@@ -35,6 +35,7 @@ from agentcraft2_core.integrations.http.composition import (
     AgentService,
     build_agent_app,
     read_question,
+    require_serving_profile,
     run_agent,
 )
 from agentcraft2_core.integrations.http.entrypoint import (
@@ -76,6 +77,7 @@ __all__ = [
     "build_agent_app",
     "health_routes",
     "read_question",
+    "require_serving_profile",
     "run_agent",
     "run_command",
     "run_service",

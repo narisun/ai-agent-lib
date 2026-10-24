@@ -10,6 +10,7 @@ from agentcraft2_core.contracts import DeploymentEnv
 from agentcraft2_core.integrations.http import (
     ServiceLifecycle,
     add_health_routes,
+    require_serving_profile,
     run_service,
     serve,
 )
@@ -28,7 +29,10 @@ PROFILES: dict[str, tuple[str, int]] = {
 }
 
 
-async def _serve(config: ServiceConfig, host: str, port: int) -> None:
+async def _serve(config: ServiceConfig, host: str, port: int, profile: str) -> None:
+    # Listening for the platform without being configured for it is refused before the
+    # configuration builds anything.
+    require_serving_profile(profile, config)
     async with ServiceContainer(config) as services:
         server = build_server(services)
         # Health and readiness answer without a token; a load balancer has none.
@@ -69,7 +73,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     # module only says what to serve.
     return run_service(
         APPLICATION,
-        lambda config: _serve(config, host, port),
+        lambda config: _serve(config, host, port, arguments.profile),
         env_file=ENV_FILE,
         program="{{ name }}",
     )

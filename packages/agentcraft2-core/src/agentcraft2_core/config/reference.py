@@ -80,10 +80,21 @@ def _profile_defaults() -> dict[str, dict[str, str]]:
     from agentcraft2_core.config.sources import MappingConfigSource
 
     found: dict[str, dict[str, str]] = {}
-    for profile in Profile:
-        source = MappingConfigSource({variable_for(Key.PROFILE): profile.value})
+    # AgentCore Runtime starts from the AWS defaults, so it has no column of its own.
+    for profile in (Profile.LOCAL, Profile.AWS):
+        source = MappingConfigSource(
+            {
+                variable_for(Key.PROFILE): profile.value,
+                # A server profile has no default environment; this only reads the defaults.
+                variable_for(Key.DEPLOYMENT_ENV): "dev"
+                if profile is not Profile.LOCAL
+                else "local",
+            }
+        )
         for key, value in ConfigResolver(source).explain().shown.items():
             found.setdefault(key, {})[profile.value] = value
+    # The environment above only let the defaults be read; its own default is stated in words.
+    found.pop(Key.DEPLOYMENT_ENV, None)
     return found
 
 

@@ -26,6 +26,7 @@ from agentcraft2_core.contracts import (
     ExternalSettings,
     IdGenerator,
     OptionsModel,
+    Profile,
     ProviderSelection,
     describe,
 )
@@ -259,6 +260,10 @@ class ProviderSpec:
         name: The name configuration uses to select it.
         factory: Builds the adapter.
         local_only: Whether it may be used only in local development.
+        profiles: The profiles it may run under; ``None`` for any. An adapter that
+            trusts something only one platform provides, such as AgentCore's
+            perimeter, names that platform, and a service under another profile
+            is refused at startup.
         options: The model its options must satisfy, so that they can be
             checked before anything is built and documented from the code.
             :class:`~agentcraft2_core.contracts.NoOptions` for an adapter that
@@ -285,6 +290,7 @@ class ProviderSpec:
     extra: str | None = None
     dependencies: tuple[str, ...] | None = None
     contract: ServicePort[Any] | None = None
+    profiles: frozenset[Profile] | None = None
 
 
 def _normalize(distribution: str) -> str:
@@ -340,6 +346,7 @@ class ServiceProviders:
         extra: str | None = None,
         replace: bool = False,
         dependencies: Iterable[str | ServicePort[Any]] | None = None,
+        profiles: Iterable[Profile] | None = None,
     ) -> ServiceProviders: ...
 
     @overload
@@ -355,6 +362,7 @@ class ServiceProviders:
         extra: str | None = None,
         replace: bool = False,
         dependencies: Iterable[str | ServicePort[Any]] | None = None,
+        profiles: Iterable[Profile] | None = None,
     ) -> ServiceProviders: ...
 
     def register(
@@ -369,6 +377,7 @@ class ServiceProviders:
         extra: str | None = None,
         replace: bool = False,
         dependencies: Iterable[str | ServicePort[Any]] | None = None,
+        profiles: Iterable[Profile] | None = None,
     ) -> ServiceProviders:
         """Add an adapter and return the registry, so calls can be chained.
 
@@ -388,6 +397,7 @@ class ServiceProviders:
                 ``ServiceContainer._selected``) and access to any
                 already-built singleton.
                 An explicit empty iterable declares no dependencies.
+            profiles: The profiles the adapter may run under; ``None`` for any.
 
         Raises:
             RuntimeError: If the registry is frozen.
@@ -416,6 +426,7 @@ class ServiceProviders:
                 else None
             ),
             contract=contract,
+            profiles=frozenset(Profile(p) for p in profiles) if profiles is not None else None,
         )
         return self
 

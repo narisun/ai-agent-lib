@@ -42,6 +42,7 @@ from agentcraft2_core.contracts import (
     ConfigurationError,
     DeploymentEnv,
     NoOptions,
+    Profile,
 )
 from agentcraft2_core.kit import (
     AUDIT,
@@ -233,6 +234,8 @@ def register_aws_adapters(
         access=agentcore_identity_access,
         replace=replace,
         dependencies=(),
+        # It trusts a header that only AgentCore Runtime's perimeter sets honestly.
+        profiles=(Profile.AGENTCORE,),
     )
     providers.register(
         CHECKPOINT,

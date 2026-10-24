@@ -30,6 +30,7 @@ from agentcraft2_core.di.providers import BuildContext, BuildResources, ServiceP
 from agentcraft2_core.di.selection import (
     AdapterKey,
     check_allowed,
+    check_infrastructure_options,
     check_options,
     label,
     selected_adapters,
@@ -167,7 +168,12 @@ class AdapterGraph:
             raise RuntimeError("a container can be started only once")
         selected = selected_adapters(self._config)
         for port, name, _ in selected:
-            check_allowed(self._providers.lookup(port, name), self._config.deployment_env)
+            check_allowed(
+                self._providers.lookup(port, name),
+                self._config.deployment_env,
+                self._config.profile,
+            )
+        check_infrastructure_options(self._config, selected)
         check_options(self._config, self._providers, selected)
         selected = build_order(selected, self._providers)
         self._providers.freeze()
