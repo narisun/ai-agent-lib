@@ -112,8 +112,10 @@ def _documents() -> list[Path]:
     )
     found = {path for pattern in patterns for path in REPO_ROOT.glob(pattern)}
     # Dated records quoting removed variables; ADR 0004 keeps its history and its removal amendment.
+    # ADR 0006 names variables it proposes, which exist only once it is implemented.
     records = {
         REPO_ROOT / "docs/adr/0004-tracing-configuration.md",
+        REPO_ROOT / "docs/adr/0006-developer-settings-and-profiles.md",
         REPO_ROOT / "docs/design/code-structure-review-2026-10-13.md",
         REPO_ROOT / "docs/design/enterprise-architecture-review-2026-10-18.md",
     }

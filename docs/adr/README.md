@@ -9,5 +9,6 @@ section 19 of the [target specification](../Specification.md).
 - [0003: Release contract](0003-release-contract.md)
 - [0004: Tracing configuration ownership](0004-tracing-configuration.md)
 - [0005: AgentCore deployment target](0005-agentcore-target.md)
+- [0006: Developer settings, closed profiles, project home and remote MCP](0006-developer-settings-and-profiles.md)
 
 The [release matrix](../release-scope.md) maps these decisions to code and tests.
